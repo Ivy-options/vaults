@@ -64,11 +64,14 @@ export async function deployIvy(connection: Connection) {
     EXERCISE_WINDOW,
     AUCTION_TIMEOUT,
     SETTLEMENT_GRACE,
-    "ipfs://ivy/{id}.json",
   ]);
   const proxy = await ethers.deployContract("ERC1967Proxy", [await hubImpl.getAddress(), initData]);
   const hubAddress = await proxy.getAddress();
   const hub = await ethers.getContractAt("IvyVaultsHub", hubAddress);
+
+  const shares = await ethers.deployContract("IvyShares", [hubAddress, "ipfs://ivy/{id}.json"]);
+  const sharesAddress = await shares.getAddress();
+  await (await hub.setShares(sharesAddress)).wait();
 
   await (await hub.grantRole(await hub.BID_MASTER_ROLE(), bidMaster.address)).wait();
   await (await hub.grantRole(await hub.MARKET_MAKER_ROLE(), marketMaker.address)).wait();
@@ -80,6 +83,8 @@ export async function deployIvy(connection: Connection) {
     hub,
     hubAddress,
     hubImpl,
+    shares,
+    sharesAddress,
     vaultImpl,
     vaultImplAddress,
     weth,

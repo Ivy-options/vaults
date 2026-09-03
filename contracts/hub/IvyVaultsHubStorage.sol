@@ -2,21 +2,19 @@
 pragma solidity ^0.8.34;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import {ERC1155SupplyUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {IIvyVaultsHubEvents} from "../interfaces/IIvyVaultsHubEvents.sol";
 import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
+import {IIvyShares} from "../interfaces/IIvyShares.sol";
 import "../types/IvyTypes.sol";
 
 /// @dev Storage layout, roles, settings, views and shared guards for the hub. Append-only storage.
 abstract contract IvyVaultsHubStorage is
     IIvyVaultsHubEvents,
     AccessControlUpgradeable,
-    ERC1155SupplyUpgradeable,
     EIP712Upgradeable,
     UUPSUpgradeable,
     ReentrancyGuardTransient
@@ -35,8 +33,9 @@ abstract contract IvyVaultsHubStorage is
     mapping(uint256 vaultId => mapping(address quoteToken => PairTerms)) internal _pairTerms;
     mapping(uint256 vaultId => address[]) internal _quoteTokens;
     mapping(address marketMaker => mapping(uint256 nonce => bool)) public usedBidNonces;
+    IIvyShares public shareToken;
 
-    uint256[40] private __gap;
+    uint256[39] private __gap;
 
     // ------------------------------------------------------------ views
 
@@ -72,7 +71,7 @@ abstract contract IvyVaultsHubStorage is
 
     /// @notice Shares outstanding for a vault (== credited collateral). Use this instead of the overloaded totalSupply.
     function totalShares(uint256 vaultId) public view returns (uint256) {
-        return totalSupply(vaultId);
+        return shareToken.totalSupply(vaultId);
     }
 
     function remainingNotional(uint256 vaultId) public view returns (uint256) {
@@ -104,11 +103,5 @@ abstract contract IvyVaultsHubStorage is
         if (price == 0 || updatedAt > block.timestamp) revert InvalidPrice();
         if (block.timestamp - updatedAt > t.maxPriceAge) revert StalePrice();
         return price;
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public view virtual override(AccessControlUpgradeable, ERC1155Upgradeable) returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 }

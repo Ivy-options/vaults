@@ -134,3 +134,6 @@ error NothingToExercise();
 error SettlementNotReached();
 error NothingToClaim();
 error InsufficientShares();
+error SharesNotSet();
+error SharesAlreadySet();
+error SharesHubMismatch();

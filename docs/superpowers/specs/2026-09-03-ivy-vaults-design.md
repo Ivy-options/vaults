@@ -472,3 +472,17 @@ logic into an abstract parent (`IvyVaultsSettlement`) that the hub inherits.
 Protocol fee on premium, pausing, bid-master-signature relay (permissionless
 activation), `permit`-based deposits, multi-underlying put vaults, historical
 settlement prices in the feed interface.
+
+## 17. Amendment (2026-09-03): share token extracted to `IvyShares`
+
+During implementation `IvyVaultsHub` hit the EIP-170 bytecode limit (24,576 bytes) once settlement
+logic was added, and optimizer tuning could not recover enough. The ERC-1155 share token now lives in
+its own non-upgradeable contract, `IvyShares`, owned by the hub:
+
+- `IvyShares(hub, uri)` is `ERC1155 + ERC1155Supply`; `mint`, `burn`, `setURI` are hub-only; transfers are free.
+- The hub stores it as `shareToken`, wired once by the admin via `setShares(address)` (the token must name
+  this hub). `createVault` reverts with `SharesNotSet` until then. `initialize` no longer takes a URI.
+- Everything user-facing is unchanged: token id = vault id, 1 share = 1 smallest unit of collateral,
+  claims burn shares, `totalShares(vaultId)` remains a hub view.
+- §3.1 "is the ERC-1155 share token" and the §2 decision "ERC-1155 on the hub" should be read as
+  "ERC-1155 owned by the hub".

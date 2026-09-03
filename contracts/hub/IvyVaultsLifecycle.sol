@@ -16,6 +16,7 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     function createVault(VaultTerms calldata terms, PairInput[] calldata pairs)
         external nonReentrant returns (uint256 vaultId, address vault)
     {
+        if (address(shareToken) == address(0)) revert SharesNotSet();
         _validateTerms(terms, pairs);
         bool isCall = terms.collateral == terms.underlying;
 
@@ -93,7 +94,7 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     function withdraw(uint256 vaultId, uint256 shares) external nonReentrant {
         _requirePhase(vaultId, Phase.Open);
         if (shares == 0) revert ZeroAmount();
-        _burn(msg.sender, vaultId, shares);
+        shareToken.burn(msg.sender, vaultId, shares);
         IIvyVault(_state[vaultId].vault).push(_terms[vaultId].collateral, msg.sender, shares);
         emit Withdrawn(vaultId, msg.sender, shares);
     }
@@ -106,7 +107,7 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
 
     function _credit(uint256 vaultId, address depositor, uint256 received) internal {
         if (received == 0) revert ZeroAmount();
-        _mint(depositor, vaultId, received, "");
+        shareToken.mint(depositor, vaultId, received);
         emit Deposited(vaultId, depositor, received);
     }
 
@@ -175,7 +176,7 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
         VaultTerms storage t = _terms[vaultId];
         bool scheduled = t.auctionStartsAt != 0 && block.timestamp >= t.auctionStartsAt;
         if (msg.sender != s.owner && !scheduled) revert AuctionNotStartable();
-        uint256 collateral = totalSupply(vaultId);
+        uint256 collateral = shareToken.totalSupply(vaultId);
         if (collateral == 0) revert ZeroAmount();
         if (collateral < t.minCollateral) revert BelowMinCollateral(collateral, t.minCollateral);
         s.phase = Phase.Auction;

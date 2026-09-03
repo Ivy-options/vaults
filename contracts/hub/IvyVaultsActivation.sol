@@ -39,7 +39,7 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         _checkStrike(s.isCall, t, p, bid.quoteToken, bid.strike);
         if (bid.premium < p.minPremium) revert PremiumTooLow();
 
-        uint256 totalNotional = IvyMath.notionalOf(s.isCall, totalSupply(vaultId), s.underlyingUnit, bid.strike);
+        uint256 totalNotional = IvyMath.notionalOf(s.isCall, shareToken.totalSupply(vaultId), s.underlyingUnit, bid.strike);
         if (totalNotional == 0) revert EmptyNotional();
         uint256 totalPremium = IvyMath.premiumTotal(bid.premium, totalNotional, s.underlyingUnit);
 

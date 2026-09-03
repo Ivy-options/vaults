@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {IvyVaultsSettlement} from "./hub/IvyVaultsSettlement.sol";
+import {IIvyShares} from "./interfaces/IIvyShares.sol";
 import "./types/IvyTypes.sol";
 
 /// @title IvyVaultsHub
@@ -17,13 +18,10 @@ contract IvyVaultsHub is IvyVaultsSettlement {
         address vaultImplementation_,
         uint64 exerciseWindow_,
         uint64 auctionTimeout_,
-        uint64 settlementGracePeriod_,
-        string calldata uri_
+        uint64 settlementGracePeriod_
     ) external initializer {
         if (admin == address(0) || vaultImplementation_ == address(0)) revert ZeroAddress();
         __AccessControl_init();
-        __ERC1155_init(uri_);
-        __ERC1155Supply_init();
         __EIP712_init("IvyVaultsHub", "1");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         vaultImplementation = vaultImplementation_;
@@ -35,6 +33,15 @@ contract IvyVaultsHub is IvyVaultsSettlement {
     }
 
     // ------------------------------------------------------------ admin
+
+    /// @notice One-time wiring of the share token. The token must name this hub as its minter.
+    function setShares(address shares_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (shares_ == address(0)) revert ZeroAddress();
+        if (address(shareToken) != address(0)) revert SharesAlreadySet();
+        if (IIvyShares(shares_).hub() != address(this)) revert SharesHubMismatch();
+        shareToken = IIvyShares(shares_);
+        emit SharesSet(shares_);
+    }
 
     function setSettings(uint64 exerciseWindow_, uint64 auctionTimeout_, uint64 settlementGracePeriod_)
         external onlyRole(DEFAULT_ADMIN_ROLE)
@@ -52,7 +59,7 @@ contract IvyVaultsHub is IvyVaultsSettlement {
     }
 
     function setURI(string calldata newUri) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setURI(newUri);
+        shareToken.setURI(newUri);
     }
 
     function version() external pure virtual returns (string memory) {

@@ -33,4 +33,5 @@ interface IIvyVaultsHubEvents {
     event VaultOwnershipTransferred(uint256 indexed vaultId, address indexed previousOwner, address indexed newOwner);
     event SettingsUpdated(uint64 exerciseWindow, uint64 auctionTimeout, uint64 settlementGracePeriod);
     event VaultImplementationUpdated(address implementation);
+    event SharesSet(address shares);
 }
