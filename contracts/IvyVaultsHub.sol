@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {IvyVaultsActivation} from "./hub/IvyVaultsActivation.sol";
+import {IvyVaultsSettlement} from "./hub/IvyVaultsSettlement.sol";
 import "./types/IvyTypes.sol";
 
 /// @title IvyVaultsHub
 /// @notice Factory, rule engine and ERC-1155 share ledger for Ivy option vaults. UUPS upgradeable.
-contract IvyVaultsHub is IvyVaultsActivation {
+contract IvyVaultsHub is IvyVaultsSettlement {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
