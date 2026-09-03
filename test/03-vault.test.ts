@@ -73,6 +73,6 @@ describe("IvyVault", function () {
 
   it("rejects native ether", async function () {
     const { vaultAddress, alice } = await networkHelpers.loadFixture(fixture);
-    await expect(alice.sendTransaction({ to: vaultAddress, value: 1n })).to.be.revert;
+    await expect(alice.sendTransaction({ to: vaultAddress, value: 1n })).to.be.revert(ethers);
   });
 });
