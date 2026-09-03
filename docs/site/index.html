@@ -64,7 +64,7 @@
 
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
   a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
   a:hover { text-decoration-color: var(--accent); }
   a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -74,39 +74,33 @@
   pre code { background: none; padding: 0; font-size: inherit; }
   p { margin: 0 0 14px; }
   .muted { color: var(--muted); }
-  .small { font-size: 13px; }
+  .small { font-size: 14px; }
 
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
-  .label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+  .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
 
   /* top bar */
   .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--ink); }
   .brand { display: flex; align-items: baseline; gap: 12px; }
   .brand .name { font-family: var(--display); font-size: 24px; letter-spacing: 0.04em; }
-  .brand .tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
-  .bar nav { display: flex; gap: 22px; flex-wrap: wrap; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .brand .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+  .bar nav { display: flex; gap: 22px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
   .bar nav a { text-decoration: none; color: var(--muted); }
   .bar nav a:hover { color: var(--accent); }
 
   /* hero */
   .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; padding: 72px 0 56px; border-bottom: 1px solid var(--line); align-items: end; }
-  .kicker { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
   .kicker::before { content: ""; width: 28px; height: 1px; background: var(--accent); }
   h1 { font-family: var(--display); font-weight: 400; font-size: clamp(42px, 6.4vw, 76px); line-height: 0.98; letter-spacing: -0.04em; margin: 0 0 28px; max-width: 13ch; text-wrap: balance; }
   h1 em, h2 em { font-style: italic; font-weight: 300; color: var(--accent); }
-  .lede { font-size: 17px; line-height: 1.55; color: var(--muted); max-width: 56ch; margin: 0; }
+  .lede { font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 56ch; margin: 0; }
   .figure { border: 1px solid var(--line); background: var(--panel); padding: 18px 18px 14px; }
   .figure svg { display: block; width: 100%; height: auto; }
-  .figcap { display: flex; justify-content: space-between; gap: 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 10px; }
+  .figcap { display: flex; justify-content: space-between; gap: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 10px; }
   .figcap b { color: var(--ink); font-weight: 500; }
-
-  /* stats strip */
-  .strip { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: 1px solid var(--line); }
-  .strip div { padding: 16px 16px 16px 0; border-right: 1px solid var(--line); }
-  .strip div + div { padding-left: 16px; }
-  .strip div:last-child { border-right: 0; }
-  .strip .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
-  .strip .v { font-family: var(--display); font-size: 20px; line-height: 1.15; margin-top: 4px; letter-spacing: -0.01em; }
+  .sw { display: inline-block; width: 18px; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 6px; }
+  .sw.dash { border-top: 1.5px dashed var(--faint); }
 
   /* editorial section grid */
   section { padding: 72px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 200px 1fr; gap: 40px; }
@@ -114,12 +108,12 @@
   .side .num { font-family: var(--display); font-weight: 300; font-size: 72px; line-height: 0.9; letter-spacing: -0.04em; color: var(--ink); }
   .side .num i { font-style: normal; color: var(--accent); }
   .side .rule { width: 32px; height: 1px; background: var(--accent); margin: 16px 0 12px; }
-  .side .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+  .side .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
   .main { min-width: 0; }
   h2 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 3.8vw, 44px); line-height: 1.05; letter-spacing: -0.03em; margin: -6px 0 22px; max-width: 22ch; text-wrap: balance; }
   h3 { font-family: var(--body); font-weight: 600; font-size: 14px; margin: 0 0 8px; }
   .prose { max-width: 66ch; }
-  .fig { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 30px 0 10px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .fig { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 30px 0 10px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .fig b { color: var(--ink); font-weight: 500; }
 
   /* two-up */
@@ -127,9 +121,9 @@
   .two > div { padding: 24px 26px; }
   .two > div + div { border-left: 1px solid var(--line); }
   .two h3 { font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: -0.015em; margin-bottom: 12px; }
-  .two p { font-size: 14px; }
+  .two p { font-size: 15px; }
   .two p:last-child { margin-bottom: 0; }
-  .two .tok { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .two .tok { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
 
   /* lifecycle timeline */
   .timeline { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 18px; }
@@ -139,21 +133,21 @@
   .step::before { content: ""; position: absolute; top: 3px; left: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); border: 1.5px solid var(--ink); }
   .step + .step::before { left: 22px; }
   .step.live::before { background: var(--accent); border-color: var(--accent); }
-  .step .idx { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--faint); }
+  .step .idx { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; color: var(--faint); }
   .step .name { font-family: var(--display); font-size: 30px; letter-spacing: -0.02em; line-height: 1; margin: 6px 0 14px; }
   .step dl { margin: 0; display: grid; gap: 10px; }
-  .step dt { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
-  .step dd { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .step dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
+  .step dd { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
   .step dd strong { color: var(--ink); font-weight: 500; }
   .step code { font-size: 0.85em; }
-  .loop { margin-top: 22px; padding-top: 12px; border-top: 1px dashed var(--line-strong); font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; gap: 10px; align-items: baseline; }
+  .loop { margin-top: 22px; padding-top: 12px; border-top: 1px dashed var(--line-strong); font-family: var(--body); font-size: 14px; color: var(--muted); display: flex; gap: 10px; align-items: baseline; }
   .loop b { color: var(--accent); font-weight: 500; }
 
   /* tables */
   .tablewrap { overflow-x: auto; border: 1px solid var(--line); }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
   th, td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 500; background: var(--panel); }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 500; background: var(--panel); }
   tr:last-child td { border-bottom: 0; }
   td.k { font-weight: 500; white-space: nowrap; }
   td code, td .mono { white-space: nowrap; }
@@ -162,7 +156,7 @@
   /* calculator */
   .calc { border: 1px solid var(--line); }
   .calc .inputs { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; border-bottom: 1px solid var(--line); background: var(--panel); }
-  .calc .inputs label { display: grid; gap: 6px; padding: 14px 16px; border-right: 1px solid var(--line); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+  .calc .inputs label { display: grid; gap: 6px; padding: 14px 16px; border-right: 1px solid var(--line); font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
   .calc .inputs label:last-child { border-right: 0; }
   .calc input, .calc select { font-family: var(--mono); font-size: 15px; padding: 6px 0; border: 0; border-bottom: 1px solid var(--line-strong); background: transparent; color: var(--ink); border-radius: 0; width: 100%; }
   .calc input:focus, .calc select:focus { outline: none; border-bottom-color: var(--accent); }
@@ -172,18 +166,18 @@
   .calc .results { padding: 0; }
   .calc .results table th:first-child, .calc .results table td:first-child { padding-left: 18px; }
   .calc .results .big { font-family: var(--display); font-size: 22px; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .calc .results .unit { font-family: var(--mono); font-size: 10px; color: var(--faint); letter-spacing: 0.1em; margin-left: 4px; }
+  .calc .results .unit { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.1em; margin-left: 4px; }
   .calc .results td { padding: 14px 16px; }
-  .calc .results td.mm { color: var(--muted); font-size: 12.5px; }
-  .calc .derived { display: flex; gap: 22px; padding: 12px 18px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+  .calc .results td.mm { color: var(--muted); font-size: 13.5px; }
+  .calc .derived { display: flex; gap: 22px; padding: 12px 18px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
   .calc .derived b { color: var(--ink); font-weight: 500; }
 
   /* terms ledger */
   .terms { border: 1px solid var(--line); }
-  .terms .row { display: grid; grid-template-columns: 240px 1fr 200px; gap: 18px; padding: 13px 18px; border-bottom: 1px solid var(--line); font-size: 13.5px; align-items: baseline; }
+  .terms .row { display: grid; grid-template-columns: 240px 1fr 200px; gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14.5px; align-items: baseline; }
   .terms .row:last-child { border-bottom: 0; }
-  .terms .row.head { background: var(--panel); font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); padding: 9px 18px; }
-  .terms .dir { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .terms .row.head { background: var(--panel); font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); padding: 9px 18px; }
+  .terms .dir { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
   .terms .dir.fixed { color: var(--faint); }
 
   /* market makers */
@@ -199,18 +193,18 @@
   .dev .fig b { color: var(--inv-ink); }
   .dev code { background: var(--inv-panel); color: var(--inv-ink); }
   .contracts { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--inv-line); }
-  .contracts > div { padding: 20px; border-right: 1px solid var(--inv-line); font-size: 13px; }
+  .contracts > div { padding: 20px; border-right: 1px solid var(--inv-line); font-size: 14.5px; }
   .contracts > div:last-child { border-right: 0; }
   .contracts .name { font-family: var(--display); font-size: 22px; letter-spacing: -0.01em; display: block; margin-bottom: 10px; }
-  .contracts .role { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 8px; }
+  .contracts .role { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 8px; }
   .contracts p { margin: 0; color: var(--inv-muted); line-height: 1.55; }
   .calls { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--inv-line); }
   .calls > div { padding: 18px 20px; }
   .calls > div + div { border-left: 1px solid var(--inv-line); }
-  .calls dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 7px 18px; font-size: 13px; align-items: baseline; }
-  .calls dt { font-family: var(--mono); font-size: 12px; white-space: nowrap; color: var(--inv-ink); }
+  .calls dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 9px 18px; font-size: 14px; align-items: baseline; }
+  .calls dt { font-family: var(--mono); font-size: 13px; white-space: nowrap; color: var(--inv-ink); }
   .calls dd { margin: 0; color: var(--inv-muted); }
-  .calls .who { grid-column: 1 / -1; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 14px 0 2px; }
+  .calls .who { grid-column: 1 / -1; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 14px 0 2px; }
   .calls .who:first-child { margin-top: 0; }
   .dev .tablewrap { border-color: var(--inv-line); }
   .dev th { background: var(--inv-panel); color: var(--inv-faint); }
@@ -222,10 +216,6 @@
   footer .wrap { padding-top: 26px; padding-bottom: 44px; border-top: 1px solid var(--inv-line); font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
   @media (max-width: 1000px) {
-    .strip { grid-template-columns: repeat(3, 1fr); }
-    .strip div:nth-child(3) { border-right: 0; }
-    .strip div:nth-child(4) { padding-left: 0; }
-    .strip div:nth-child(n+4) { border-top: 1px solid var(--line); }
     .hero { grid-template-columns: 1fr; gap: 36px; }
     .timeline { grid-template-columns: 1fr 1fr; row-gap: 28px; }
     .timeline::before { display: none; }
@@ -255,9 +245,6 @@
     .wrap { padding: 0 20px; }
     .two { grid-template-columns: 1fr; }
     .two > div + div { border-left: 0; border-top: 1px solid var(--line); }
-    .strip { grid-template-columns: 1fr 1fr; }
-    .strip div { border-right: 0; padding-left: 0 !important; }
-    .strip div:nth-child(n+3) { border-top: 1px solid var(--line); }
     .timeline { grid-template-columns: 1fr; }
     .contracts { grid-template-columns: 1fr; }
     .contracts > div { border-right: 0; }
@@ -289,21 +276,12 @@
     <div>
       <div class="kicker">Single-use · Covered calls &amp; cash-secured puts · Physical or cash</div>
       <h1>A vault sells exactly <em>one</em> option.</h1>
-      <p class="lede">LPs deposit collateral into a fresh vault. The vault freezes, an off-chain auction picks a market maker, and the market maker's signed bid is activated on-chain with the premium pulled into the vault in the same transaction. At expiry the option is exercised or it is not. Share holders claim a pro-rata slice of whatever the vault holds, and the vault is finished.</p>
+      <p class="lede">LPs deposit collateral into a new vault. An off-chain auction picks a market maker. The bid master activates the winning bid on-chain, and the premium moves into the vault in that same transaction. At expiry the market maker exercises or does not. Share holders then claim their share of whatever the vault holds. A vault is never reused.</p>
     </div>
     <div class="figure">
       <svg id="heroChart" viewBox="0 0 420 250" role="img" aria-label="LP value at settlement versus spot for a covered call"></svg>
-      <div class="figcap"><span>Fig. 01 — LP value at settlement vs. spot</span><span><b>Covered call</b> · 10 WETH · K 3,000 · premium 100</span></div>
+      <div class="figcap"><span>Fig. 01 · LP value at settlement vs. spot</span><span><b>Covered call</b> · 10 WETH · K 3,000 · premium 100</span></div>
     </div>
-  </div>
-
-  <div class="strip">
-    <div><div class="k">Phases</div><div class="v">Open → Auction → Live → Settled</div></div>
-    <div><div class="k">Exercise</div><div class="v">European or American, partial</div></div>
-    <div><div class="k">Settlement</div><div class="v">Physical or cash</div></div>
-    <div><div class="k">Shares</div><div class="v">ERC-1155, id = vault</div></div>
-    <div><div class="k">Hub</div><div class="v">UUPS proxy, 22.2 KB</div></div>
-    <div><div class="k">Tests</div><div class="v">125 passing</div></div>
   </div>
 
   <section id="collateral">
@@ -314,19 +292,19 @@
         <div>
           <div class="tok">collateral == underlying</div>
           <h3>Covered call</h3>
-          <p>Deposit the <strong>underlying</strong> (WETH). Strike and premium are quoted in one of the vault's listed quote tokens (USDC, DAI…). Notional equals the collateral: 10 WETH covers 10 calls.</p>
-          <p class="muted">The kind is derived from the two addresses at creation, never declared.</p>
+          <p>Deposit the <strong>underlying</strong>, for example WETH. Bids quote strike and premium in one of the vault's quote tokens (USDC, DAI). Notional equals the collateral, so 10 WETH covers 10 calls.</p>
+          <p class="muted">The hub reads the kind from these two addresses at creation. Nobody declares it.</p>
         </div>
         <div>
           <div class="tok">collateral != underlying</div>
           <h3>Cash-secured put</h3>
-          <p>Deposit the <strong>quote token</strong> (USDC). The underlying is fixed at creation and the vault has exactly one pair. Notional is set at activation: <code>collateral × 10^underlyingDecimals / strike</code>. 30,000 USDC at a 3,000 strike covers 10 puts.</p>
+          <p>Deposit the <strong>quote token</strong>, for example USDC. The underlying is fixed at creation and the vault has one pair. Notional depends on the winning strike: <code>collateral × 10^decimals / strike</code>. 30,000 USDC at a 3,000 strike covers 10 puts.</p>
           <p class="muted">Strike is always quote units per one whole underlying, e.g. <code>3000e6</code> USDC per WETH.</p>
         </div>
       </div>
       <div class="prose" style="margin-top:24px">
-        <p><strong>Shares.</strong> One share is one smallest unit of collateral, minted on the amount the vault actually received (fee-on-transfer safe). Shares are ERC-1155 tokens on <code>IvyShares</code> with token id equal to the vault id, freely transferable in every phase. Whoever holds shares at settlement claims. There is no separate premium claim: premium is part of the pot.</p>
-        <p><strong>Approvals.</strong> Every approval targets the <em>vault address</em>, never the hub. The hub instructs the vault to pull; it never custodies tokens. You can also call <code>deposit(amount)</code> on the vault directly; it notifies the hub.</p>
+        <p><strong>Shares.</strong> One share is one smallest unit of collateral. The hub mints shares for the amount the vault actually received, so fee-on-transfer tokens are safe. Shares are ERC-1155 tokens on <code>IvyShares</code> and the token id is the vault id. They transfer freely in every phase, and whoever holds them at settlement claims. Premium is part of the pot, so there is no separate premium claim.</p>
+        <p><strong>Approvals.</strong> Approve the <em>vault address</em>, never the hub. The hub tells the vault to pull and never holds tokens itself. You can also call <code>deposit(amount)</code> on the vault directly. It notifies the hub.</p>
       </div>
     </div>
   </section>
@@ -335,33 +313,30 @@
     <aside class="side"><div class="num">0<i>2</i></div><div class="rule"></div><div class="lbl">Lifecycle</div></aside>
     <div class="main">
       <h2>Four phases, one direction.</h2>
-      <div class="fig"><span>Fig. 02 — Who may act in each phase</span></div>
+      <div class="fig"><span>Fig. 02 · Who may act in each phase</span></div>
       <div class="timeline">
         <div class="step">
           <div class="idx">PHASE 0</div>
           <div class="name">Open</div>
           <dl>
-            <dt>Anyone</dt><dd><strong>Deposit / withdraw</strong> freely. Non-owners only if <code>publicDeposits</code>.</dd>
-            <dt>Owner</dt><dd>May only <strong>tighten</strong> terms, schedule the auction, transfer ownership.</dd>
-            <dt>Exit</dt><dd><code>openAuction</code>: owner any time; anyone once <code>auctionStartsAt</code> has passed. Needs collateral ≥ <code>minCollateral</code>.</dd>
+            <dt>Anyone</dt><dd>Deposit and withdraw. Non-owners only if <code>publicDeposits</code> is on.</dd>
+            <dt>Owner</dt><dd>May tighten terms, schedule the auction, transfer ownership. Opens the auction with <code>openAuction</code>. Anyone may open it once <code>auctionStartsAt</code> has passed. Needs collateral of at least <code>minCollateral</code>.</dd>
           </dl>
         </div>
         <div class="step">
           <div class="idx">PHASE 1</div>
           <div class="name">Auction</div>
           <dl>
-            <dt>Funds</dt><dd><strong>Frozen.</strong> Deposits, withdrawals and tightening revert.</dd>
-            <dt>Bid master</dt><dd>Submits the off-chain winner: <code>activate(vaultId, bid, signature)</code>.</dd>
-            <dt>Exit</dt><dd><code>cancelAuction</code>: bid master any time; owner after <code>auctionTimeout</code> (3 d). Clears the schedule.</dd>
+            <dt>Funds</dt><dd>Frozen. Deposits, withdrawals and tightening revert.</dd>
+            <dt>Bid master</dt><dd>Activates the off-chain winner with <code>activate(vaultId, bid, signature)</code>. May cancel back to Open at any time. The owner may cancel after <code>auctionTimeout</code>, 3 days by default.</dd>
           </dl>
         </div>
         <div class="step live">
           <div class="idx">PHASE 2</div>
           <div class="name">Live</div>
           <dl>
-            <dt>Pot</dt><dd>Premium already sits in the vault.</dd>
-            <dt>Market maker</dt><dd><code>exercise(vaultId, amount)</code> inside its window, repeatedly, up to the remaining notional.</dd>
-            <dt>Exit</dt><dd><code>settle(vaultId)</code>: anyone, once the settlement time is reached, or automatically on full exercise.</dd>
+            <dt>Market maker</dt><dd>Calls <code>exercise(vaultId, amount)</code> inside its window, as often as it likes, up to the remaining notional. The premium is already in the vault.</dd>
+            <dt>Anyone</dt><dd>Calls <code>settle(vaultId)</code> once the settlement time arrives. A full exercise settles on its own.</dd>
           </dl>
         </div>
         <div class="step">
@@ -369,12 +344,11 @@
           <div class="name">Settled</div>
           <dl>
             <dt>Share holders</dt><dd><code>claim(vaultId, shares)</code> burns shares and pays <code>shares / totalShares</code> of every token in the vault.</dd>
-            <dt>Market maker</dt><dd>Cash auto-settlement reserves its payout; collected with <code>claimPayout</code>.</dd>
-            <dt>Exit</dt><dd>Terminal. Roll by creating a new vault.</dd>
+            <dt>Market maker</dt><dd>Collects a cash payout with <code>claimPayout</code>. The vault is finished. Create a new one to roll.</dd>
           </dl>
         </div>
       </div>
-      <div class="loop"><b>↺</b><span>Cancelling an auction returns the vault to Open with its schedule cleared. Every other transition is one-way.</span></div>
+      <div class="loop"><span>Cancelling an auction returns the vault to Open and clears its schedule. Every other transition is one-way.</span></div>
     </div>
   </section>
 
@@ -382,20 +356,20 @@
     <aside class="side"><div class="num">0<i>3</i></div><div class="rule"></div><div class="lbl">Outcomes</div></aside>
     <div class="main">
       <h2>What the pot contains at settlement.</h2>
-      <p class="prose">Let <span class="mono">D</span> be call collateral, <span class="mono">C</span> put collateral, <span class="mono">K</span> strike, <span class="mono">N = C / K</span> put notional, <span class="mono">S</span> spot at settlement, <span class="mono">f</span> the exercised fraction. Premium <span class="mono">P = premium × notional</span> is pulled at activation and is always in the pot.</p>
+      <p class="prose">Symbols: <span class="mono">D</span> call collateral, <span class="mono">C</span> put collateral, <span class="mono">K</span> strike, <span class="mono">N = C / K</span> put notional, <span class="mono">S</span> spot at settlement, <span class="mono">f</span> exercised fraction. <span class="mono">P</span> is the total premium, <span class="mono">premium × notional</span>. The market maker pays it at activation, so it is always in the pot.</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Outcome</th><th>Covered call (deposit D underlying)</th><th>Cash-secured put (deposit C quote)</th></tr></thead>
           <tbody>
             <tr><td class="k">Not exercised</td><td><span class="mono">D</span> underlying + <span class="mono">P</span></td><td><span class="mono">C</span> quote + <span class="mono">P</span></td></tr>
             <tr><td class="k">Physical, fraction f</td><td><span class="mono">(1−f)·D</span> underlying + <span class="mono">f·D·K</span> quote + <span class="mono">P</span></td><td><span class="mono">f·N</span> underlying + <span class="mono">C − f·N·K</span> quote + <span class="mono">P</span></td></tr>
-            <tr><td class="k">Cash, remaining r</td><td><span class="mono">D − r·(S−K)/S</span> underlying + <span class="mono">P</span> <span class="muted small">(payout 0 if S ≤ K)</span></td><td><span class="mono">C − r·(K−S)</span> quote + <span class="mono">P</span> <span class="muted small">(payout 0 if S ≥ K)</span></td></tr>
+            <tr><td class="k">Cash, unexercised r</td><td><span class="mono">D − r·(S−K)/S</span> underlying + <span class="mono">P</span> <span class="muted small">(payout 0 if S ≤ K)</span></td><td><span class="mono">C − r·(K−S)</span> quote + <span class="mono">P</span> <span class="muted small">(payout 0 if S ≥ K)</span></td></tr>
           </tbody>
         </table>
       </div>
-      <p class="muted small" style="margin-top:12px">Rounding always favours LPs: the market maker pays <code>ceil</code>, receives <code>floor</code>. Remainders stay in the vault and are distributed pro-rata. Cash payouts come out of the collateral, so the market maker delivers nothing at a cash exercise.</p>
+      <p class="muted small" style="margin-top:12px">Rounding favours LPs. The market maker pays <code>ceil</code> and receives <code>floor</code>, and remainders stay in the vault for the pro-rata split. Cash payouts come out of the collateral, so the market maker delivers nothing at a cash exercise.</p>
 
-      <div class="fig"><span>Fig. 03 — Settlement outcomes with the contract formulas</span><span>Example inputs · WETH / USDC</span></div>
+      <div class="fig"><span>Fig. 03 · Settlement outcomes from the contract formulas</span><span>Example inputs · WETH / USDC</span></div>
       <div class="calc">
         <div class="inputs">
           <label>Kind
@@ -409,7 +383,7 @@
         <div class="body">
           <div class="chart">
             <svg id="calcChart" viewBox="0 0 420 250" role="img" aria-label="LP value at settlement versus spot for the current inputs"></svg>
-            <div class="figcap"><span>LP value at settlement, quote terms</span><span><b>—</b> vault &nbsp; <span style="opacity:.6">┈</span> hold collateral</span></div>
+            <div class="figcap"><span>LP value at settlement, quote terms</span><span><span class="sw"></span>vault &nbsp; <span class="sw dash"></span>hold collateral</span></div>
           </div>
           <div class="results">
             <table>
@@ -426,18 +400,18 @@
   <section id="terms">
     <aside class="side"><div class="num">0<i>4</i></div><div class="rule"></div><div class="lbl">Terms</div></aside>
     <div class="main">
-      <h2>The owner sets the floor. Bids must clear it.</h2>
-      <p class="prose">Terms are fixed at creation and can only move in the LP-favourable direction while the vault is Open. A bid that fails any check reverts at activation.</p>
+      <h2>Terms the owner sets.</h2>
+      <p class="prose">The owner sets terms at creation. While the vault is Open they can only move in the LPs' favour. A bid that fails any check reverts at activation.</p>
       <div class="terms">
         <div class="row head"><span>Term</span><span>Check at activation</span><span>After creation</span></div>
-        <div class="row"><span class="mono">strikeLimit</span><span>Per quote token. Calls: <span class="mono">strike ≥ limit</span>. Puts: <span class="mono">strike ≤ limit</span>.</span><span class="dir">calls ↑ raise · puts ↓ lower</span></div>
-        <div class="row"><span class="mono">minPremium</span><span>Per quote token, per one whole underlying.</span><span class="dir">↑ raise only</span></div>
-        <div class="row"><span class="mono">minCollateral</span><span>Shares required before the auction can open.</span><span class="dir">↑ raise only</span></div>
-        <div class="row"><span class="mono">maxTenor</span><span><span class="mono">expiry − now ≤ maxTenor</span>, checked at activation.</span><span class="dir">↓ lower only</span></div>
+        <div class="row"><span class="mono">strikeLimit</span><span>Per quote token. Calls: <span class="mono">strike ≥ limit</span>. Puts: <span class="mono">strike ≤ limit</span>.</span><span class="dir">calls raise, puts lower</span></div>
+        <div class="row"><span class="mono">minPremium</span><span>Per quote token, per one whole underlying.</span><span class="dir">raise only</span></div>
+        <div class="row"><span class="mono">minCollateral</span><span>Shares required before the auction can open.</span><span class="dir">raise only</span></div>
+        <div class="row"><span class="mono">maxTenor</span><span><span class="mono">expiry − now ≤ maxTenor</span>, checked at activation.</span><span class="dir">lower only</span></div>
         <div class="row"><span class="mono">allowedExercise</span><span>European, American, or Either. Each bid picks one.</span><span class="dir">Either → one</span></div>
         <div class="row"><span class="mono">allowedSettlement</span><span>Physical, Cash, or Either. Cash requires a price feed.</span><span class="dir">Either → one</span></div>
-        <div class="row"><span class="mono">priceFeed · maxSpotDeviationBps</span><span>Optional. Calls: <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts: <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both this and <span class="mono">strikeLimit</span> must pass.</span><span class="dir">bps ↓ lower · feed fixed</span></div>
-        <div class="row"><span class="mono">maxPriceAge</span><span>Activation and cash settlement reject a price older than this.</span><span class="dir">↓ lower only, stays &gt; 0</span></div>
+        <div class="row"><span class="mono">priceFeed · maxSpotDeviationBps</span><span>Optional. Calls: <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts: <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both this and <span class="mono">strikeLimit</span> must pass.</span><span class="dir">bps lower only, feed fixed</span></div>
+        <div class="row"><span class="mono">maxPriceAge</span><span>Activation and cash settlement reject a price older than this.</span><span class="dir">lower only, never 0</span></div>
         <div class="row"><span class="mono">pairs</span><span>Accepted quote tokens, each with its premium token.</span><span class="dir">disable only</span></div>
         <div class="row"><span class="mono">publicDeposits · underlying · collateral</span><span>Who may deposit, and what the vault is.</span><span class="dir fixed">immutable</span></div>
         <div class="row"><span class="mono">auctionStartsAt</span><span>Time from which anyone may open the auction. 0 = manual only.</span><span class="dir">any value while Open</span></div>
@@ -448,12 +422,12 @@
   <section id="makers">
     <aside class="side"><div class="num">0<i>5</i></div><div class="rule"></div><div class="lbl">Market makers</div></aside>
     <div class="main">
-      <h2>Sign the bid once. Approve the vault. Exercise inside the window.</h2>
+      <h2>Bidding and exercise.</h2>
       <div class="split" style="margin-bottom:8px">
         <div class="prose">
           <h3>The bid</h3>
-          <p>EIP-712 typed data, domain <code>IvyVaultsHub</code> / <code>1</code> / chain id / hub proxy. The signer must hold <code>MARKET_MAKER_ROLE</code>. Nonces are free-form: sign several competing bids, only the winner is consumed, the rest lapse at <code>validUntil</code> or via <code>cancelBid(nonce)</code>. The bid master submits; it cannot alter a bid.</p>
-          <p>Total premium <code>premium × notional / 10^dec</code> is pulled from you at activation, so approve the vault for it beforehand. For physical settlement, also approve what you will pay at exercise.</p>
+          <p>A bid is EIP-712 typed data. The domain is <code>IvyVaultsHub</code>, version <code>1</code>, the chain id and the hub proxy address. The signer must hold <code>MARKET_MAKER_ROLE</code>. Nonces are free-form, so you can sign several competing bids. Activation consumes the winner. The rest lapse at <code>validUntil</code>, or you burn them with <code>cancelBid(nonce)</code>. The bid master submits your bid unchanged.</p>
+          <p>At activation the vault pulls the total premium, <code>premium × notional / 10^decimals</code>, from you. Approve the vault for it beforehand. For physical settlement, also approve what you will pay at exercise.</p>
         </div>
         <pre><code>struct Bid {
   uint256 vaultId;
@@ -468,7 +442,7 @@
   uint256 nonce;
 }</code></pre>
       </div>
-      <div class="fig"><span>Fig. 04 — Exercise windows and settlement time</span><span><b>exerciseWindow</b> default 6 h</span></div>
+      <div class="fig"><span>Fig. 04 · Exercise windows and settlement time</span><span><b>exerciseWindow</b> default 6 h</span></div>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Style · settlement</th><th>exercise(vaultId, amount)</th><th>settle(vaultId)</th><th>At exercise</th></tr></thead>
@@ -480,7 +454,7 @@
           </tbody>
         </table>
       </div>
-      <p class="muted small" style="margin-top:12px"><strong>Dead-feed rule.</strong> Cash <code>settle</code> reverts with <code>StalePrice</code> while the feed is stale or unavailable. From <code>expiry + settlementGracePeriod</code> (7 days) a stale price is accepted, and a feed that reverts settles with zero payout, so LP funds can never be locked by an oracle.</p>
+      <p class="muted small" style="margin-top:12px"><strong>Dead-feed rule.</strong> Cash <code>settle</code> reverts with <code>StalePrice</code> while the feed is stale or unavailable. After <code>expiry + settlementGracePeriod</code> (7 days) the hub accepts a stale price, and a feed that reverts settles with zero payout. An oracle can never lock LP funds.</p>
     </div>
   </section>
 </div>
@@ -491,10 +465,10 @@
     <div class="main">
       <h2>Four contracts, three roles.</h2>
       <div class="contracts">
-        <div><span class="role">UUPS proxy</span><span class="name">IvyVaultsHub</span><p>Factory, every rule, EIP-712 verification, phase machine. All token-moving entry points are <code>nonReentrant</code>.</p></div>
-        <div><span class="role">EIP-1167 clone</span><span class="name">IvyVault</span><p>One per vault. Holds tokens. <code>deposit</code> for anyone; <code>pull</code> / <code>push</code> hub-only. No logic.</p></div>
-        <div><span class="role">ERC-1155</span><span class="name">IvyShares</span><p>LP shares. <code>mint</code> / <code>burn</code> hub-only. Kept outside the hub to stay under the 24,576-byte limit.</p></div>
-        <div><span class="role">Interface</span><span class="name">IIvyPriceFeed</span><p><code>spot(underlying, quote) → (price, updatedAt)</code>, price in quote decimals per one whole underlying. The feed is yours to implement.</p></div>
+        <div><span class="role">UUPS proxy</span><span class="name">IvyVaultsHub</span><p>Creates vaults, holds every rule, verifies bids, runs the phase machine. Every token-moving call is <code>nonReentrant</code>.</p></div>
+        <div><span class="role">EIP-1167 clone</span><span class="name">IvyVault</span><p>One per vault. Holds tokens and nothing else. Anyone may <code>deposit</code>. Only the hub may <code>pull</code> or <code>push</code>.</p></div>
+        <div><span class="role">ERC-1155</span><span class="name">IvyShares</span><p>LP shares. Only the hub may <code>mint</code> or <code>burn</code>. Lives outside the hub to stay under the 24,576-byte limit.</p></div>
+        <div><span class="role">Interface</span><span class="name">IIvyPriceFeed</span><p><code>spot(underlying, quote)</code> returns <code>(price, updatedAt)</code>, price in quote decimals per one whole underlying. You implement the feed.</p></div>
       </div>
 
       <div class="fig"><span>Calls by phase</span><span>Roles · <b>DEFAULT_ADMIN</b> · <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span></div>
@@ -585,11 +559,11 @@
     // premium bracket at left edge
     var yb0 = Y(vault(xs[0]) - P), yb1 = Y(vault(xs[0]));
     h += '<line x1="' + (L + 6) + '" x2="' + (L + 6) + '" y1="' + yb0.toFixed(1) + '" y2="' + yb1.toFixed(1) + '" stroke="' + accent + '" stroke-width="2"/>';
-    h += '<text x="' + (L + 6) + '" y="' + (Math.max(yb0, yb1) + 12).toFixed(1) + '" font-family="JetBrains Mono, monospace" font-size="9" fill="' + accent + '">P = ' + fmt(P, 0) + '</text>';
+    h += '<text x="' + (L + 6) + '" y="' + (Math.max(yb0, yb1) + 12).toFixed(1) + '" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + accent + '">P = ' + fmt(P, 0) + '</text>';
     // axes labels
-    ticks.forEach(function (S) { h += '<text x="' + X(S).toFixed(1) + '" y="' + (H - 12) + '" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="' + faint + '">' + (S === K ? "K " : "") + fmt(S, 0) + '</text>'; });
-    yTicks.forEach(function (v) { h += '<text x="' + (L - 8) + '" y="' + (Y(v) + 3).toFixed(1) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="9" fill="' + faint + '">' + (v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, 0)) + '</text>'; });
-    h += '<text x="' + (W - R) + '" y="' + (H - 12) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="8" fill="' + faint + '" letter-spacing="1">SPOT</text>';
+    ticks.forEach(function (S) { h += '<text x="' + X(S).toFixed(1) + '" y="' + (H - 12) + '" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + faint + '">' + (S === K ? "K " : "") + fmt(S, 0) + '</text>'; });
+    yTicks.forEach(function (v) { h += '<text x="' + (L - 8) + '" y="' + (Y(v) + 3).toFixed(1) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + faint + '">' + (v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, 0)) + '</text>'; });
+    h += '<text x="' + (W - R) + '" y="' + (H - 12) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="' + faint + '" letter-spacing="1">SPOT</text>';
     svg.innerHTML = h;
   }
 
