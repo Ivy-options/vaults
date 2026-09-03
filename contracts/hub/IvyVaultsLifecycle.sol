@@ -5,10 +5,11 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IvyVaultsHubStorage} from "./IvyVaultsHubStorage.sol";
 import {IIvyVault} from "../interfaces/IIvyVault.sol";
+import {IIvyVaultsHub} from "../interfaces/IIvyVaultsHub.sol";
 import "../types/IvyTypes.sol";
 
 /// @dev Vault creation, deposits, withdrawals, owner controls and the auction phase (spec §4.2, §6.1, §6.2, §8).
-abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage {
+abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     // ------------------------------------------------------------ creation (spec §4.2)
 
     /// @notice Create a vault. Kind is derived: `collateral == underlying` is a covered call, anything else a put.
@@ -70,5 +71,42 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage {
                 if (pairs[j].quoteToken == p.quoteToken) revert DuplicatePair(p.quoteToken);
             }
         }
+    }
+
+    // ------------------------------------------------------------ deposits (spec §6.1)
+
+    /// @notice Deposit through the hub. The caller must have approved the vault address.
+    function deposit(uint256 vaultId, uint256 amount) external nonReentrant {
+        _checkDeposit(vaultId, msg.sender, amount);
+        uint256 received = IIvyVault(_state[vaultId].vault).pull(_terms[vaultId].collateral, msg.sender, amount);
+        _credit(vaultId, msg.sender, received);
+    }
+
+    /// @inheritdoc IIvyVaultsHub
+    function onVaultDeposit(uint256 vaultId, address depositor, uint256 amount) external nonReentrant {
+        if (vaultId == 0 || vaultId > vaultCount || msg.sender != _state[vaultId].vault) revert NotVault();
+        _checkDeposit(vaultId, depositor, amount);
+        _credit(vaultId, depositor, amount);
+    }
+
+    /// @notice Burn shares and take collateral back. Only while the vault is Open.
+    function withdraw(uint256 vaultId, uint256 shares) external nonReentrant {
+        _requirePhase(vaultId, Phase.Open);
+        if (shares == 0) revert ZeroAmount();
+        _burn(msg.sender, vaultId, shares);
+        IIvyVault(_state[vaultId].vault).push(_terms[vaultId].collateral, msg.sender, shares);
+        emit Withdrawn(vaultId, msg.sender, shares);
+    }
+
+    function _checkDeposit(uint256 vaultId, address depositor, uint256 amount) internal view {
+        _requirePhase(vaultId, Phase.Open);
+        if (amount == 0) revert ZeroAmount();
+        if (!_terms[vaultId].publicDeposits && depositor != _state[vaultId].owner) revert DepositsNotPublic();
+    }
+
+    function _credit(uint256 vaultId, address depositor, uint256 received) internal {
+        if (received == 0) revert ZeroAmount();
+        _mint(depositor, vaultId, received, "");
+        emit Deposited(vaultId, depositor, received);
     }
 }
