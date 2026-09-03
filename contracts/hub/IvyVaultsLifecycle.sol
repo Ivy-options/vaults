@@ -165,4 +165,35 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
         _state[vaultId].owner = newOwner;
         emit VaultOwnershipTransferred(vaultId, previous, newOwner);
     }
+
+    // ------------------------------------------------------------ auction (spec §6.1, §6.2)
+
+    /// @notice Freeze deposits and start the off-chain auction. Owner any time; anyone once `auctionStartsAt` passed.
+    function openAuction(uint256 vaultId) external {
+        _requirePhase(vaultId, Phase.Open);
+        VaultState storage s = _state[vaultId];
+        VaultTerms storage t = _terms[vaultId];
+        bool scheduled = t.auctionStartsAt != 0 && block.timestamp >= t.auctionStartsAt;
+        if (msg.sender != s.owner && !scheduled) revert AuctionNotStartable();
+        uint256 collateral = totalSupply(vaultId);
+        if (collateral == 0) revert ZeroAmount();
+        if (collateral < t.minCollateral) revert BelowMinCollateral(collateral, t.minCollateral);
+        s.phase = Phase.Auction;
+        s.auctionOpenedAt = uint64(block.timestamp);
+        emit AuctionOpened(vaultId, collateral);
+    }
+
+    /// @notice Bid master any time; owner once `auctionTimeout` has elapsed. Clears the schedule.
+    function cancelAuction(uint256 vaultId) external {
+        _requirePhase(vaultId, Phase.Auction);
+        VaultState storage s = _state[vaultId];
+        if (!hasRole(BID_MASTER_ROLE, msg.sender)) {
+            if (msg.sender != s.owner) revert NotVaultOwner();
+            if (block.timestamp < uint256(s.auctionOpenedAt) + auctionTimeout) revert AuctionTimeoutNotReached();
+        }
+        s.phase = Phase.Open;
+        s.auctionOpenedAt = 0;
+        _terms[vaultId].auctionStartsAt = 0;
+        emit AuctionCancelled(vaultId);
+    }
 }
