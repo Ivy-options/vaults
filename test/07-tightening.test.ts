@@ -33,8 +33,8 @@ describe("tightening", function () {
   }
 
   const base: {
-    allowedExercise: number;
-    allowedSettlement: number;
+    allowedExercise: 0 | 1 | 2;
+    allowedSettlement: 0 | 1 | 2;
     maxTenor: bigint;
     minCollateral: bigint;
     maxSpotDeviationBps: number;

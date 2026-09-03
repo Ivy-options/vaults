@@ -59,6 +59,7 @@ contract IvyVaultsHub is IvyVaultsSettlement {
     }
 
     function setURI(string calldata newUri) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (address(shareToken) == address(0)) revert SharesNotSet();
         shareToken.setURI(newUri);
     }
 

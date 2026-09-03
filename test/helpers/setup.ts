@@ -168,7 +168,6 @@ export async function fund(
   spender: string,
   amount: bigint,
 ) {
-  void ctx;
   await (await token.mint(holder.address, amount)).wait();
   await (await token.connect(holder).approve(spender, amount)).wait();
 }

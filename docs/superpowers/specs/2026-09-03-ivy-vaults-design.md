@@ -36,9 +36,9 @@ strikes.
 
 ### 3.1 `IvyVaultsHub`
 
-Inherits (OpenZeppelin upgradeable 5.x): `UUPSUpgradeable`,
-`AccessControlUpgradeable`, (share token: `IvyShares`, §17), `EIP712Upgradeable`,
-`ReentrancyGuardUpgradeable`. `_authorizeUpgrade` is admin-only.
+Inherits (OpenZeppelin 5.x): `UUPSUpgradeable`, `AccessControlUpgradeable`, `EIP712Upgradeable`,
+`ReentrancyGuardTransient`. The ERC-1155 share token is a separate hub-owned contract, `IvyShares` (§17).
+`_authorizeUpgrade` is admin-only.
 
 Responsibilities: vault creation, deposits/withdrawals, term tightening, auction
 lifecycle, bid verification and activation, exercise, settlement, claims, hub

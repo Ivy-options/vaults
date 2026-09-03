@@ -100,6 +100,8 @@ describe("IvyVaultsHub admin", function () {
     await expect(
       hub2.connect(admin).createVault(callTerms(ctxLike), callPairs(ctxLike)),
     ).to.be.revertedWithCustomError(hub2, "SharesNotSet");
+    await expect(hub2.totalShares(1n)).to.be.revertedWithCustomError(hub2, "SharesNotSet");
+    await expect(hub2.connect(admin).setURI("x")).to.be.revertedWithCustomError(hub2, "SharesNotSet");
 
     const shares2 = await ethers.deployContract("IvyShares", [await hub2.getAddress(), ""]);
     await expect(hub2.connect(admin).setShares(await shares2.getAddress())).to.emit(hub2, "SharesSet").withArgs(await shares2.getAddress());

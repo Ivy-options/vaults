@@ -71,6 +71,7 @@ abstract contract IvyVaultsHubStorage is
 
     /// @notice Shares outstanding for a vault (== credited collateral), read from the share token.
     function totalShares(uint256 vaultId) public view returns (uint256) {
+        if (address(shareToken) == address(0)) revert SharesNotSet();
         return shareToken.totalSupply(vaultId);
     }
 

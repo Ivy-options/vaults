@@ -3,7 +3,7 @@
 Single-use option vaults for Ivy. LPs deposit collateral, an off-chain auction picks a market maker,
 the market maker's signed bid is activated on-chain, and the vault settles by physical delivery or cash.
 
-- `contracts/IvyVaultsHub.sol` — UUPS-upgradeable hub: factory, rules, ERC-1155 share ledger, roles.
+- `contracts/IvyVaultsHub.sol` — UUPS-upgradeable hub: factory, rules, owner of the ERC-1155 share token (`IvyShares`), roles.
 - `contracts/IvyVault.sol` — minimal clone per vault; only moves tokens on the hub's instruction.
 - `contracts/IvyShares.sol` — ERC-1155 LP share token owned by the hub (token id = vault id); minted/burned only by the hub.
 - `contracts/interfaces/IIvyPriceFeed.sol` — price feed interface (implementation lands later).
