@@ -109,4 +109,60 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
         _mint(depositor, vaultId, received, "");
         emit Deposited(vaultId, depositor, received);
     }
+
+    // ------------------------------------------------------------ owner controls (spec §8)
+
+    /// @notice Tighten vault-level terms. Every field must be equal or more LP-favourable than today.
+    function tightenVaultTerms(uint256 vaultId, TightenableTerms calldata n) external onlyVaultOwner(vaultId) {
+        _requirePhase(vaultId, Phase.Open);
+        VaultTerms storage t = _terms[vaultId];
+        if (!(t.allowedExercise == n.allowedExercise || t.allowedExercise == ExercisePolicy.Either)) revert LoosensTerms();
+        if (!(t.allowedSettlement == n.allowedSettlement || t.allowedSettlement == SettlementPolicy.Either)) revert LoosensTerms();
+        if (n.maxTenor == 0) revert InvalidTenor();
+        if (n.maxTenor > t.maxTenor) revert LoosensTerms();
+        if (n.minCollateral < t.minCollateral) revert LoosensTerms();
+        if (t.priceFeed != address(0)) {
+            if (n.maxSpotDeviationBps > t.maxSpotDeviationBps) revert LoosensTerms();
+            if (n.maxPriceAge == 0) revert FeedNeedsMaxPriceAge();
+            if (n.maxPriceAge > t.maxPriceAge) revert LoosensTerms();
+            t.maxSpotDeviationBps = n.maxSpotDeviationBps;
+            t.maxPriceAge = n.maxPriceAge;
+        }
+        t.allowedExercise = n.allowedExercise;
+        t.allowedSettlement = n.allowedSettlement;
+        t.maxTenor = n.maxTenor;
+        t.minCollateral = n.minCollateral;
+        emit VaultTermsTightened(vaultId);
+    }
+
+    /// @notice Tighten one quote token's terms. Premium token is fixed; a disabled pair stays disabled.
+    function tightenPairTerms(uint256 vaultId, address quoteToken, PairTerms calldata n) external onlyVaultOwner(vaultId) {
+        _requirePhase(vaultId, Phase.Open);
+        PairTerms storage p = _pairTerms[vaultId][quoteToken];
+        if (p.premiumToken == address(0)) revert PairUnknown(quoteToken);
+        if (n.premiumToken != p.premiumToken) revert LoosensTerms();
+        bool isCall = _state[vaultId].isCall;
+        if (isCall ? n.strikeLimit < p.strikeLimit : n.strikeLimit > p.strikeLimit) revert LoosensTerms();
+        if (!isCall && n.strikeLimit == 0) revert InvalidStrikeLimit();
+        if (n.minPremium < p.minPremium) revert LoosensTerms();
+        if (n.enabled && !p.enabled) revert LoosensTerms();
+        p.strikeLimit = n.strikeLimit;
+        p.minPremium = n.minPremium;
+        p.enabled = n.enabled;
+        emit PairTermsTightened(vaultId, quoteToken);
+    }
+
+    /// @notice Set or clear the time from which anyone may open the auction. Operational, not economic.
+    function scheduleAuction(uint256 vaultId, uint64 auctionStartsAt) external onlyVaultOwner(vaultId) {
+        _requirePhase(vaultId, Phase.Open);
+        _terms[vaultId].auctionStartsAt = auctionStartsAt;
+        emit AuctionScheduled(vaultId, auctionStartsAt);
+    }
+
+    function transferVaultOwnership(uint256 vaultId, address newOwner) external onlyVaultOwner(vaultId) {
+        if (newOwner == address(0)) revert ZeroAddress();
+        address previous = _state[vaultId].owner;
+        _state[vaultId].owner = newOwner;
+        emit VaultOwnershipTransferred(vaultId, previous, newOwner);
+    }
 }
