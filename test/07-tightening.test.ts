@@ -32,7 +32,14 @@ describe("tightening", function () {
     return { ...ctx, callId: call.vaultId, putId: put.vaultId, plainId: plain.vaultId };
   }
 
-  const base = {
+  const base: {
+    allowedExercise: number;
+    allowedSettlement: number;
+    maxTenor: bigint;
+    minCollateral: bigint;
+    maxSpotDeviationBps: number;
+    maxPriceAge: number;
+  } = {
     allowedExercise: ExercisePolicy.Either,
     allowedSettlement: SettlementPolicy.Either,
     maxTenor: THIRTY_DAYS,

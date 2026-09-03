@@ -69,7 +69,7 @@ abstract contract IvyVaultsHubStorage is
         return _state[vaultId].isCall ? OptionKind.CoveredCall : OptionKind.CashSecuredPut;
     }
 
-    /// @notice Shares outstanding for a vault (== credited collateral). Use this instead of the overloaded totalSupply.
+    /// @notice Shares outstanding for a vault (== credited collateral), read from the share token.
     function totalShares(uint256 vaultId) public view returns (uint256) {
         return shareToken.totalSupply(vaultId);
     }

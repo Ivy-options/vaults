@@ -6,7 +6,7 @@ import {IIvyShares} from "./interfaces/IIvyShares.sol";
 import "./types/IvyTypes.sol";
 
 /// @title IvyVaultsHub
-/// @notice Factory, rule engine and ERC-1155 share ledger for Ivy option vaults. UUPS upgradeable.
+/// @notice Factory, rule engine and owns the ERC-1155 share token (`IvyShares`) for Ivy option vaults. UUPS upgradeable.
 contract IvyVaultsHub is IvyVaultsSettlement {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

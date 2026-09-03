@@ -80,6 +80,7 @@ describe("IvyVaultsHub admin", function () {
     const { hub, shares } = await networkHelpers.loadFixture(fixture);
     expect(await shares.supportsInterface("0xd9b67a26")).to.equal(true); // ERC-1155
     expect(await hub.supportsInterface("0x7965db0b")).to.equal(true); // AccessControl
+    expect(await hub.supportsInterface("0xd9b67a26")).to.equal(false); // ERC-1155 lives on IvyShares, not the hub
   });
 
   it("wires the share token exactly once and only to a token that names this hub", async function () {

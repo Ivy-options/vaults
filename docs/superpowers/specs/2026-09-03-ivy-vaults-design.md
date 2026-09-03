@@ -10,7 +10,7 @@ single-use vault and sell one option on it to a market maker chosen through an
 off-chain auction. Two contracts:
 
 - **`IvyVaultsHub`** — one upgradeable contract that holds every rule, creates
-  vaults, keeps the share ledger (ERC-1155), manages roles, and verifies bids.
+  vaults, owns the ERC-1155 share token (`IvyShares`, see §17), manages roles, and verifies bids.
 - **`IvyVault`** — a minimal clone per vault that only holds tokens and moves
   them when the hub says so. Users approve the vault, never the hub.
 
@@ -37,7 +37,7 @@ strikes.
 ### 3.1 `IvyVaultsHub`
 
 Inherits (OpenZeppelin upgradeable 5.x): `UUPSUpgradeable`,
-`AccessControlUpgradeable`, `ERC1155SupplyUpgradeable`, `EIP712Upgradeable`,
+`AccessControlUpgradeable`, (share token: `IvyShares`, §17), `EIP712Upgradeable`,
 `ReentrancyGuardUpgradeable`. `_authorizeUpgrade` is admin-only.
 
 Responsibilities: vault creation, deposits/withdrawals, term tightening, auction
@@ -174,12 +174,12 @@ mapping(address => mapping(uint256 => bool)) usedBidNonces;     // marketMaker =
 ```
 
 Hub settings: `vaultImplementation`, `exerciseWindow`, `auctionTimeout`,
-`settlementGracePeriod` (all admin-settable), plus ERC-1155 `uri`.
+`settlementGracePeriod`, `IIvyShares shareToken;` (all admin-settable), plus ERC-1155 `uri`.
 
 ## 5. Units and math
 
 - **Shares.** 1 share = 1 smallest unit of collateral. Minted 1:1 on deposit,
-  burned 1:1 on withdraw. `totalSupply(vaultId)` is the credited collateral.
+  burned 1:1 on withdraw. `shareToken.totalSupply(vaultId)` (exposed as `totalShares(vaultId)`) is the credited collateral.
 - **Strike.** Quote-token units per 1 whole underlying. Example: `3000e6` USDC per WETH.
 - **Premium.** Premium-token units per 1 whole underlying.
 - **Notional** (underlying units):
