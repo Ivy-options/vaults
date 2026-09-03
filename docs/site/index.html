@@ -184,7 +184,8 @@
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
 
   /* developers (inverted block) */
-  .dev { background: var(--inv-bg); color: var(--inv-ink); border-bottom: 0; }
+  .dev { background: var(--inv-bg); color: var(--inv-ink); border-bottom: 0; display: block; }
+  .devgrid { display: grid; grid-template-columns: 200px 1fr; gap: 40px; }
   .dev .side .num { color: var(--inv-ink); }
   .dev .side .lbl { color: var(--inv-faint); }
   .dev h2 { color: var(--inv-ink); }
@@ -202,7 +203,7 @@
   .calls > div { padding: 18px 20px; }
   .calls > div + div { border-left: 1px solid var(--inv-line); }
   .calls dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 9px 18px; font-size: 14px; align-items: baseline; }
-  .calls dt { font-family: var(--mono); font-size: 13px; white-space: nowrap; color: var(--inv-ink); }
+  .calls dt { font-family: var(--mono); font-size: 13px; color: var(--inv-ink); overflow-wrap: anywhere; }
   .calls dd { margin: 0; color: var(--inv-muted); }
   .calls .who { grid-column: 1 / -1; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 14px 0 2px; }
   .calls .who:first-child { margin-top: 0; }
@@ -237,6 +238,9 @@
   }
   @media (max-width: 800px) {
     section { grid-template-columns: 1fr; gap: 18px; padding: 56px 0; }
+    .devgrid { grid-template-columns: 1fr; gap: 18px; }
+    .calls dl { grid-template-columns: 1fr; gap: 2px 0; }
+    .calls dd { margin-bottom: 8px; }
     .side { position: static; display: flex; align-items: baseline; gap: 14px; }
     .side .num { font-size: 40px; }
     .side .rule { display: none; }
@@ -460,7 +464,7 @@
 </div>
 
 <section class="dev" id="developers">
-  <div class="wrap" style="display:grid;grid-template-columns:200px 1fr;gap:40px">
+  <div class="wrap devgrid">
     <aside class="side"><div class="num">0<i>6</i></div><div class="rule"></div><div class="lbl">Developers</div></aside>
     <div class="main">
       <h2>Four contracts, three roles.</h2>
@@ -563,7 +567,7 @@
     // axes labels
     ticks.forEach(function (S) { h += '<text x="' + X(S).toFixed(1) + '" y="' + (H - 12) + '" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + faint + '">' + (S === K ? "K " : "") + fmt(S, 0) + '</text>'; });
     yTicks.forEach(function (v) { h += '<text x="' + (L - 8) + '" y="' + (Y(v) + 3).toFixed(1) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + faint + '">' + (v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, 0)) + '</text>'; });
-    h += '<text x="' + (W - R) + '" y="' + (H - 12) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="' + faint + '" letter-spacing="1">SPOT</text>';
+    h += '<text x="' + (W - R) + '" y="' + (T - 6) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="' + faint + '" letter-spacing="1">SPOT →</text>';
     svg.innerHTML = h;
   }
 
