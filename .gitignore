@@ -1,0 +1,15 @@
+/node_modules
+/dist
+/bundle
+/artifacts
+/cache
+/types
+.env
+.env.*
+!.env.example
+/coverage
+/.gas-snapshot
+/snapshots
+/ignition/deployments/chain-31337
+.superpowers/
+.DS_Store
