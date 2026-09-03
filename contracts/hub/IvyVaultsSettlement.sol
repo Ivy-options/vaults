@@ -129,4 +129,40 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
             return (false, 0);
         }
     }
+
+    // ------------------------------------------------------------ claims (spec §10)
+
+    /// @notice Burn `shares` and receive the same fraction of every token the vault holds
+    ///         (collateral or settlement proceeds, plus premium), net of any reserved market-maker payout.
+    function claim(uint256 vaultId, uint256 shares) external nonReentrant {
+        _requirePhase(vaultId, Phase.Settled);
+        if (shares == 0) revert ZeroAmount();
+        if (shareToken.balanceOf(msg.sender, vaultId) < shares) revert InsufficientShares();
+        VaultState storage s = _state[vaultId];
+        VaultTerms storage t = _terms[vaultId];
+        uint256 supply = shareToken.totalSupply(vaultId);
+
+        address[3] memory tokens = [t.collateral, s.premiumToken, s.isCall ? s.quoteToken : t.underlying];
+        uint256[3] memory amounts;
+        for (uint256 i = 0; i < 3; ++i) {
+            if (_seenBefore(tokens, i)) continue;
+            uint256 available = IERC20(tokens[i]).balanceOf(s.vault);
+            if (tokens[i] == t.collateral) available -= s.pendingPayout;
+            amounts[i] = (available * shares) / supply;
+        }
+
+        shareToken.burn(msg.sender, vaultId, shares);
+        IIvyVault vault = IIvyVault(s.vault);
+        for (uint256 i = 0; i < 3; ++i) {
+            if (amounts[i] > 0) vault.push(tokens[i], msg.sender, amounts[i]);
+        }
+        emit Claimed(vaultId, msg.sender, shares);
+    }
+
+    function _seenBefore(address[3] memory tokens, uint256 i) private pure returns (bool) {
+        for (uint256 j = 0; j < i; ++j) {
+            if (tokens[j] == tokens[i]) return true;
+        }
+        return false;
+    }
 }
