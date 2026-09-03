@@ -85,7 +85,7 @@ serve every quote token on a vault. A `MockPriceFeed` implements it for tests.
 ### 4.1 Enums
 
 ```solidity
-enum OptionKind      { CoveredCall, CashSecuredPut }
+enum OptionKind      { CoveredCall, CashSecuredPut }   // derived, never an input (see §4.2)
 enum ExerciseStyle   { European, American }
 enum ExercisePolicy  { European, American, Either }
 enum SettlementType  { Physical, Cash }
@@ -97,9 +97,8 @@ enum Phase           { Open, Auction, Live, Settled }
 
 ```solidity
 struct VaultTerms {
-    OptionKind       kind;
     address          underlying;          // token being optioned (e.g. WETH)
-    address          collateral;          // calls: == underlying. puts: the quote token LPs deposit
+    address          collateral;          // == underlying for a covered call; a quote token for a cash-secured put
     bool             publicDeposits;      // false = only the vault owner may deposit
     ExercisePolicy   allowedExercise;
     SettlementPolicy allowedSettlement;   // Cash requires priceFeed != 0
@@ -124,11 +123,18 @@ function createVault(VaultTerms calldata terms, PairInput[] calldata pairs)
     external returns (uint256 vaultId, address vault);
 ```
 
+The option kind is **derived, not declared**: `collateral == underlying` makes
+the vault a covered call, anything else makes it a cash-secured put. The hub
+stores `isCall` and branches on it everywhere (§5, §5.1, §9). `OptionKind` exists
+only as a read-only view (`kindOf(vaultId)`) and in the `VaultCreated` event so
+UIs and indexers get a human-readable classification. No inconsistent input is
+possible.
+
 Creation validation:
 
 - `underlying`, `collateral`, every `quoteToken`, every `premiumToken` non-zero.
-- Calls: `collateral == underlying`; at least one pair; every `quoteToken != underlying`; no duplicate quote tokens.
-- Puts: exactly one pair and `pairs[0].quoteToken == collateral`; `strikeLimit > 0`.
+- Calls (`collateral == underlying`): at least one pair; every `quoteToken != underlying`; no duplicate quote tokens.
+- Puts (`collateral != underlying`): exactly one pair and `pairs[0].quoteToken == collateral`; `strikeLimit > 0`.
 - Every pair `enabled == true` at creation.
 - `maxTenor > 0`.
 - `allowedSettlement` includes `Cash` ⇒ `priceFeed != 0`.
@@ -143,6 +149,7 @@ The caller becomes the vault owner. A clone is created and initialized. Phase = 
 struct VaultState {
     address        vault;
     address        owner;
+    bool           isCall;             // derived at creation: collateral == underlying
     Phase          phase;
     uint64         auctionOpenedAt;
     uint256        underlyingUnit;
@@ -313,7 +320,7 @@ Every change must be equal or tighter for the LP. Anything else reverts.
 | `minPremium` | raise |
 | `enabled` | `true` → `false` only |
 
-Not changeable ever: `kind`, `underlying`, `collateral`, `publicDeposits`,
+Not changeable ever: `underlying`, `collateral` (and therefore the kind), `publicDeposits`,
 `priceFeed`, adding pairs, re-enabling pairs.
 
 `scheduleAuction(vaultId, auctionStartsAt)`: owner, `Open`, any value
