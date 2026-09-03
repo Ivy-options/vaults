@@ -70,4 +70,63 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
         s.phase = Phase.Settled;
         emit Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
     }
+
+    // ------------------------------------------------------------ settlement (spec §9.2)
+
+    /// @notice First moment `settle` may be called: expiry for cash, expiry + exerciseWindow for physical.
+    function settlementTimeOf(uint256 vaultId) public view returns (uint256) {
+        VaultState storage s = _state[vaultId];
+        return s.settlement == SettlementType.Cash ? uint256(s.expiry) : uint256(s.expiry) + exerciseWindow;
+    }
+
+    /// @notice Permissionless. Physical: closes the vault. Cash: prices the remaining notional and reserves
+    ///         the market maker's payout (collected via `claimPayout`).
+    function settle(uint256 vaultId) external nonReentrant {
+        _requirePhase(vaultId, Phase.Live);
+        VaultState storage s = _state[vaultId];
+        if (block.timestamp < settlementTimeOf(vaultId)) revert SettlementNotReached();
+
+        uint256 remaining = s.totalNotional - s.exercisedNotional;
+        if (s.settlement == SettlementType.Cash && remaining > 0) {
+            VaultTerms storage t = _terms[vaultId];
+            bool grace = block.timestamp >= uint256(s.expiry) + settlementGracePeriod;
+            (bool ok, uint256 spot) = _trySpot(t, s.quoteToken, grace);
+            if (!ok && !grace) revert StalePrice();
+            uint256 payout;
+            if (ok) {
+                payout = s.isCall
+                    ? IvyMath.callIntrinsic(remaining, s.strike, spot)
+                    : IvyMath.putIntrinsic(remaining, s.strike, spot, s.underlyingUnit);
+            }
+            s.pendingPayout += payout;
+            s.exercisedNotional = s.totalNotional;
+        }
+        _finalize(vaultId, s);
+    }
+
+    /// @notice Market maker collects what cash auto-settlement reserved. Pull-based so a failing transfer
+    ///         can never block `settle`.
+    function claimPayout(uint256 vaultId) external nonReentrant {
+        _requirePhase(vaultId, Phase.Settled);
+        VaultState storage s = _state[vaultId];
+        if (msg.sender != s.marketMaker) revert NotMarketMaker();
+        uint256 amount = s.pendingPayout;
+        if (amount == 0) revert NothingToClaim();
+        s.pendingPayout = 0;
+        IIvyVault(s.vault).push(_terms[vaultId].collateral, msg.sender, amount);
+        emit PayoutClaimed(vaultId, msg.sender, amount);
+    }
+
+    /// @dev Non-reverting feed read. `allowStale` lets an old (but non-zero, non-future) price through.
+    function _trySpot(VaultTerms storage t, address quoteToken, bool allowStale)
+        internal view returns (bool ok, uint256 spot)
+    {
+        try IIvyPriceFeed(t.priceFeed).spot(t.underlying, quoteToken) returns (uint256 price, uint256 updatedAt) {
+            if (price == 0 || updatedAt > block.timestamp) return (false, 0);
+            if (!allowStale && block.timestamp - updatedAt > t.maxPriceAge) return (false, 0);
+            return (true, price);
+        } catch {
+            return (false, 0);
+        }
+    }
 }
