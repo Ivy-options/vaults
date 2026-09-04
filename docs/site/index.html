@@ -42,12 +42,12 @@
       --accent: #E0764A;
       --accent-soft: #3A251C;
       --code-bg: #1B1B1F;
-      --inv-bg: #F3EFE8;
-      --inv-panel: #ECE7DE;
-      --inv-ink: #1A1A1A;
-      --inv-muted: #5A564E;
-      --inv-faint: #8C8678;
-      --inv-line: #D8D2C5;
+      --inv-bg: #151519;
+      --inv-panel: #1D1D22;
+      --inv-ink: #EDE9E1;
+      --inv-muted: #A9A297;
+      --inv-faint: #7B766C;
+      --inv-line: #2C2C32;
       --c-lp: #7FC7B4;
       --c-owner: #8FB4E6;
       --c-bid: #C39BD6;
@@ -65,12 +65,12 @@
     --accent: #E0764A;
     --accent-soft: #3A251C;
     --code-bg: #1B1B1F;
-    --inv-bg: #F3EFE8;
-    --inv-panel: #ECE7DE;
-    --inv-ink: #1A1A1A;
-    --inv-muted: #5A564E;
-    --inv-faint: #8C8678;
-    --inv-line: #D8D2C5;
+    --inv-bg: #151519;
+    --inv-panel: #1D1D22;
+    --inv-ink: #EDE9E1;
+    --inv-muted: #A9A297;
+    --inv-faint: #7B766C;
+    --inv-line: #2C2C32;
     --c-lp: #7FC7B4;
     --c-owner: #8FB4E6;
     --c-bid: #C39BD6;
@@ -102,6 +102,8 @@
   .bar nav { display: flex; gap: 22px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
   .bar nav a { text-decoration: none; color: var(--muted); }
   .bar nav a:hover { color: var(--accent); }
+  .theme { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--line-strong); border-radius: 2px; padding: 6px 10px; cursor: pointer; line-height: 1; }
+  .theme:hover { color: var(--ink); border-color: var(--ink); }
 
   /* hero */
   .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; padding: 72px 0 56px; border-bottom: 1px solid var(--line); align-items: end; }
@@ -224,7 +226,7 @@
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
 
   /* developers (inverted block) */
-  .dev { background: var(--inv-bg); color: var(--inv-ink); border-bottom: 0; display: block; }
+  .dev { background: var(--inv-bg); color: var(--inv-ink); border-bottom: 0; border-top: 1px solid var(--inv-line); display: block; }
   .devgrid { display: grid; grid-template-columns: 200px 1fr; gap: 40px; }
   .dev .side .num { color: var(--inv-ink); }
   .dev .side .lbl { color: var(--inv-faint); }
@@ -319,6 +321,7 @@
       <a href="#terms">Terms</a>
       <a href="#makers">Market makers</a>
       <a href="#developers">Developers</a>
+      <button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme · light</button>
     </nav>
   </header>
 
@@ -599,6 +602,18 @@
     return x.toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: 0 });
   };
   var css = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
+  var root = document.documentElement;
+  var themeBtn = $("themeToggle");
+  try {
+    var saved = localStorage.getItem("ivy-theme");
+    if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+  } catch (e) {}
+  function currentTheme() {
+    var t = root.getAttribute("data-theme");
+    if (t === "light" || t === "dark") return t;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function labelTheme() { themeBtn.textContent = "Theme · " + currentTheme(); }
 
   // LP value at settlement (quote terms) as a function of spot, for the fully-in-the-money case.
   // call: D*min(S,K) + P (hold = D*S).  put: N*min(S,K) + P (hold = C).
@@ -678,11 +693,20 @@
     if (o.K > 0) drawPayoff($("calcChart"), o);
   }
 
+  var HERO = { kind: "call", D: 10, C: 10, K: 3000, p: 100, S: 3300, N: 10, P: 1000 };
+  function redrawAll() { render(); drawPayoff($("heroChart"), HERO); }
   ["kind", "dep", "strike", "prem", "spot"].forEach(function (id) { $(id).addEventListener("input", render); });
-  render();
-  drawPayoff($("heroChart"), { kind: "call", D: 10, C: 10, K: 3000, p: 100, S: 3300, N: 10, P: 1000 });
+  redrawAll();
+  labelTheme();
+  themeBtn.addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ivy-theme", next); } catch (e) {}
+    labelTheme();
+    redrawAll();
+  });
   if (window.matchMedia) {
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { render(); drawPayoff($("heroChart"), { kind: "call", D: 10, C: 10, K: 3000, p: 100, S: 3300, N: 10, P: 1000 }); });
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { labelTheme(); redrawAll(); });
   }
 })();
 </script>
