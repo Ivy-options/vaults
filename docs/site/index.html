@@ -154,6 +154,7 @@
   tr:last-child td { border-bottom: 0; }
   td.k { font-weight: 500; white-space: nowrap; }
   td code, td .mono { white-space: nowrap; }
+  td .mono.wrapok { white-space: normal; line-height: 1.8; }
   td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 
   /* calculator */
@@ -522,7 +523,7 @@
             <tr><td class="k">exerciseWindow</td><td class="num">21 600 s · 6 h</td><td class="muted">Physical exercise grace after expiry.</td></tr>
             <tr><td class="k">auctionTimeout</td><td class="num">259 200 s · 3 d</td><td class="muted">After this the owner may cancel a stalled auction.</td></tr>
             <tr><td class="k">settlementGracePeriod</td><td class="num">604 800 s · 7 d</td><td class="muted">After this a stale or dead feed no longer blocks cash settlement.</td></tr>
-            <tr><td class="k">Events</td><td colspan="2"><span class="mono">VaultCreated · Deposited · Withdrawn · VaultTermsTightened · PairTermsTightened · AuctionScheduled · AuctionOpened · AuctionCancelled · Activated · Exercised · Settled · Claimed · PayoutClaimed · BidCancelled · VaultOwnershipTransferred</span></td></tr>
+            <tr><td class="k">Events</td><td colspan="2"><span class="mono wrapok">VaultCreated · Deposited · Withdrawn · VaultTermsTightened · PairTermsTightened · AuctionScheduled · AuctionOpened · AuctionCancelled · Activated · Exercised · Settled · Claimed · PayoutClaimed · BidCancelled · VaultOwnershipTransferred</span></td></tr>
           </tbody>
         </table>
       </div>
