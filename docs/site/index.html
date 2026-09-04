@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ivy Vaults</title>
@@ -147,7 +148,7 @@
 
   /* tables */
   .tablewrap { overflow-x: auto; border: 1px solid var(--line); }
-  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; color: inherit; }
   th, td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 500; background: var(--panel); }
   tr:last-child td { border-bottom: 0; }
@@ -214,7 +215,8 @@
   .dev .tablewrap { border-color: var(--inv-line); }
   .dev th { background: var(--inv-panel); color: var(--inv-faint); }
   .dev th, .dev td { border-color: var(--inv-line); }
-  .dev td.num { color: var(--inv-ink); }
+  .dev td { color: var(--inv-ink); }
+  .dev td.muted { color: var(--inv-muted); }
   .dev pre { background: var(--inv-panel); border-color: var(--inv-line); color: var(--inv-ink); }
 
   footer { background: var(--inv-bg); color: var(--inv-faint); }
