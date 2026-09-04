@@ -204,10 +204,12 @@
   .calls { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--inv-line); }
   .calls > div { padding: 18px 20px; }
   .calls > div + div { border-left: 1px solid var(--inv-line); }
-  .calls dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 9px 18px; font-size: 14px; align-items: baseline; }
-  .calls dt { font-family: var(--mono); font-size: 13px; color: var(--inv-ink); overflow-wrap: anywhere; }
-  .calls dd { margin: 0; color: var(--inv-muted); }
-  .calls .who { grid-column: 1 / -1; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 14px 0 2px; }
+  .calls dl { margin: 0; display: block; font-size: 14px; min-width: 0; }
+  .calls dt { font-family: var(--mono); font-size: 13px; color: var(--inv-ink); overflow-wrap: anywhere; line-height: 1.5; }
+  .calls dd { margin: 2px 0 12px; color: var(--inv-muted); }
+  .calls dd:empty { display: none; }
+  .calls > div { min-width: 0; }
+  .calls .who { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 16px 0 8px; }
   .calls .who:first-child { margin-top: 0; }
   .dev .tablewrap { border-color: var(--inv-line); }
   .dev th { background: var(--inv-panel); color: var(--inv-faint); }
@@ -241,8 +243,6 @@
   @media (max-width: 800px) {
     section { grid-template-columns: 1fr; gap: 18px; padding: 56px 0; }
     .devgrid { grid-template-columns: 1fr; gap: 18px; }
-    .calls dl { grid-template-columns: 1fr; gap: 2px 0; }
-    .calls dd { margin-bottom: 8px; }
     .side { position: static; display: flex; align-items: baseline; gap: 14px; }
     .side .num { font-size: 40px; }
     .side .rule { display: none; }
@@ -502,10 +502,13 @@
             <dt>claim(vaultId, shares)</dt><dd>any share holder</dd>
             <dt>claimPayout(vaultId)</dt><dd>market maker, cash payout</dd>
             <div class="who">Admin</div>
-            <dt>setShares · setSettings · setVaultImplementation · setURI</dt><dd>DEFAULT_ADMIN</dd>
+            <dt>setShares · setSettings</dt><dd>DEFAULT_ADMIN</dd>
+            <dt>setVaultImplementation · setURI</dt><dd>DEFAULT_ADMIN</dd>
             <dt>upgradeToAndCall</dt><dd>DEFAULT_ADMIN</dd>
             <div class="who">Views</div>
-            <dt>termsOf · stateOf · pairTermsOf · quoteTokensOf · vaultOf · kindOf · totalShares · remainingNotional</dt><dd></dd>
+            <dt>termsOf · stateOf · pairTermsOf</dt><dd>vault terms, live state, one quote token's terms</dd>
+            <dt>quoteTokensOf · vaultOf · kindOf</dt><dd>listed quote tokens, clone address, call or put</dd>
+            <dt>totalShares · remainingNotional</dt><dd>shares outstanding, notional still exercisable</dd>
           </dl>
         </div>
       </div>
