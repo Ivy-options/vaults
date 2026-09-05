@@ -12,6 +12,7 @@
 /snapshots
 /ignition/deployments/chain-31337
 .superpowers/
+/docs/superpowers/
 .DS_Store
 
 .diffstory/

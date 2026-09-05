@@ -47,4 +47,4 @@ npm run operator -- settle settlement.json
 
 Cash settlement needs the finalized report for the exact expiry. If Ivy's signer becomes unavailable before publication, funds stay locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
 
-See the [contract design](docs/superpowers/specs/2026-09-03-ivy-vaults-design.md), [implementation acceptance record](docs/superpowers/plans/2026-09-03-ivy-vaults.md), and [public guide](docs/site/index.html).
+See the [operator runbook](docs/operations.md) and [public guide](docs/site/index.html).
