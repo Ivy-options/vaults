@@ -329,11 +329,11 @@
     <div>
       <div class="kicker">Single-use · Covered calls &amp; cash-secured puts · Physical or cash</div>
       <h1>A vault sells exactly <em>one</em> option.</h1>
-      <p class="lede">LPs deposit collateral into a new vault. An off-chain auction picks a market maker. The bid master activates the winning bid on-chain, and the premium moves into the vault in that same transaction. At expiry the market maker exercises or does not. Share holders then claim their share of whatever the vault holds. A vault is never reused.</p>
+      <p class="lede">LPs deposit collateral into a new vault. An off-chain auction picks a market maker. The bid master activates the winning bid on-chain, and the premium moves into the vault in that same transaction. Activation holders can claim premium immediately. The buyer or its executor may exercise within the agreed window; after finalization, current shareholders claim the unreserved pool. A vault is never reused.</p>
     </div>
     <div class="figure">
-      <svg id="heroChart" viewBox="0 0 420 250" role="img" aria-label="LP value at settlement versus spot for a covered call"></svg>
-      <div class="figcap"><span>Fig. 01 · LP value at settlement vs. spot</span><span><b>Covered call</b> · 10 WETH · K 3,000 · premium 100</span></div>
+      <svg id="heroChart" viewBox="0 0 420 250" role="img" aria-label="LP total value including earned premium versus spot for a covered call"></svg>
+      <div class="figcap"><span>Fig. 01 · LP total value including earned premium vs. spot</span><span><b>Covered call</b> · 10 WETH · K 3,000 · premium 100</span></div>
     </div>
   </div>
 
@@ -347,7 +347,7 @@
           <h3>Covered call</h3>
           <ul class="plain">
             <li>Deposit the underlying, for example WETH.</li>
-            <li>Bids quote strike and premium in a listed quote token (USDC, DAI).</li>
+            <li>Bids quote strike in a listed quote token and premium in that pair’s fixed premium token.</li>
             <li>Notional equals the collateral. 10 WETH covers 10 calls.</li>
           </ul>
         </div>
@@ -362,10 +362,10 @@
         </div>
       </div>
       <div class="grid2">
-        <div><div class="k">Shares</div>One share is one smallest unit of collateral, minted on the amount actually received. ERC-1155 on <code>IvyShares</code>, token id = vault id, transferable in every phase. Whoever holds them at settlement claims.</div>
+        <div><div class="k">Shares</div>One share is one smallest unit of collateral, minted on the amount actually received. ERC-1155 on <code>IvyShares</code>, token id = vault id, transferable in every phase. Current holders claim the remaining pool after settlement; activation premium stays with its original holder.</div>
         <div><div class="k">Kind</div>Read from the two addresses at creation. Same address means covered call, different means cash-secured put. Nobody declares it.</div>
         <div><div class="k">Approvals</div>Approve the vault address, never the hub. The hub tells the vault to pull and holds no tokens. <code>deposit(amount)</code> on the vault works too.</div>
-        <div><div class="k">Premium</div>Pulled from the market maker at activation, kept in the vault, split pro-rata at claim. There is no separate premium claim.</div>
+        <div><div class="k">Premium</div>Pulled at activation and immediately claimable through <code>claimPremium(vaultId)</code>. Each activation holder keeps its entitlement after transfers or burns. Floor-rounding dust stays reserved permanently.</div>
       </div>
     </div>
   </section>
@@ -380,10 +380,10 @@
           <div class="card">
             <div><div class="idx">PHASE 0</div><div class="name">Open</div></div>
             <ul class="facts">
-              <li><span class="chip lp">LPs</span><span>Deposit and withdraw freely. Non-owners need <code>publicDeposits</code>.</span></li>
+              <li><span class="chip lp">LPs</span><span>Withdraw while Open; deposits also require admission to be unpaused. Non-owners need <code>publicDeposits</code>.</span></li>
               <li><span class="chip owner">Owner</span><span>May only tighten terms, schedule the auction, transfer ownership.</span></li>
             </ul>
-            <div class="exit"><b>Exit</b> <code>openAuction</code> by the owner, or by anyone once <code>auctionStartsAt</code> has passed. Needs at least <code>minCollateral</code>.</div>
+            <div class="exit"><b>Exit</b> <code>openAuction</code> by the owner, or by anyone once <code>auctionStartsAt</code> has passed. Needs at least <code>minCollateral</code> and a future exact expiry.</div>
           </div>
         </div>
         <div class="step">
@@ -393,30 +393,31 @@
               <li><span class="chip lp">LPs</span><span>Funds frozen. No deposits, withdrawals or term changes.</span></li>
               <li><span class="chip bid">Bid master</span><span>Runs the auction off-chain and submits the winner.</span></li>
             </ul>
-            <div class="exit"><b>Exit</b> <code>activate(bid, signature)</code>. Cancel back to Open: bid master any time, owner after 3 days.</div>
+            <div class="exit"><b>Exit</b> <code>activate(vaultId, bid, signature)</code>. Cancel back to Open: bid master any time, owner after its snapshotted timeout (3 days by default), or immediately when admission is paused or expiry has passed.</div>
           </div>
         </div>
         <div class="step live">
           <div class="card">
             <div><div class="idx">PHASE 2</div><div class="name">Live</div></div>
             <ul class="facts">
-              <li><span class="chip mm">Market maker</span><span><code>exercise(amount)</code> inside its window, any amount up to what remains, as often as it likes.</span></li>
-              <li><span class="chip lp">LPs</span><span>Premium is already in the vault. Shares still transfer.</span></li>
+              <li><span class="chip mm">Market maker</span><span><code>exercise(vaultId, amount)</code> inside its window, any amount up to what remains, as often as it likes.</span></li>
+              <li><span class="chip lp">LPs</span><span>Claim activation premium now. Shares still transfer; current holders may vote on an unwind.</span></li>
             </ul>
-            <div class="exit"><b>Exit</b> <code>settle()</code> by anyone at the settlement time, or automatically on full exercise.</div>
+            <div class="exit"><b>Exit</b> <code>settle(vaultId)</code> by anyone at the settlement time, automatically on full exercise, or through a buyer-signed unanimous unwind.</div>
           </div>
         </div>
         <div class="step">
           <div class="card">
             <div><div class="idx">PHASE 3</div><div class="name">Settled</div></div>
             <ul class="facts">
-              <li><span class="chip lp">Share holders</span><span><code>claim(shares)</code> burns shares for a pro-rata slice of every token in the vault.</span></li>
-              <li><span class="chip mm">Market maker</span><span><code>claimPayout()</code> collects a reserved cash payout.</span></li>
+              <li><span class="chip lp">Share holders</span><span><code>claim(vaultId, shares)</code> burns shares for a pro-rata slice of unreserved collateral and proceeds. Premium and buyer reserves are excluded.</span></li>
+              <li><span class="chip mm">Market maker</span><span><code>claimPayout(vaultId)</code> collects a reserved cash payout or unwind refund for the configured recipient.</span></li>
             </ul>
             <div class="exit"><b>Terminal.</b> Create a new vault to roll.</div>
           </div>
         </div>
       </div>
+      <div class="callout"><b>Admission pause.</b> Global or per-vault pauses block new creation where applicable, deposits, auction opening and activation. Withdrawals, transfers, exercise, reports, settlement, claims and agreed unwinds remain available. Deadlines never move.</div>
       <div class="loop"><span class="chip">Legend</span><span class="chip lp">LPs</span><span class="chip owner">Owner</span><span class="chip bid">Bid master</span><span class="chip mm">Market maker</span><span style="margin-left:8px">Cancelling an auction returns the vault to Open. Every other transition is one-way.</span></div>
     </div>
   </section>
@@ -424,8 +425,8 @@
   <section id="outcomes">
     <aside class="side"><div class="num">0<i>3</i></div><div class="rule"></div><div class="lbl">Outcomes</div></aside>
     <div class="main">
-      <h2>What the pot contains at settlement.</h2>
-      <div class="legend"><span><b>D</b>call collateral</span><span><b>C</b>put collateral</span><span><b>K</b>strike</span><span><b>N</b>put notional, C / K</span><span><b>S</b>spot at settlement</span><span><b>f</b>exercised fraction</span><span><b>P</b>total premium, always in the pot</span></div>
+      <h2>LP proceeds, including earned premium.</h2>
+      <div class="legend"><span><b>D</b>call collateral</span><span><b>C</b>put collateral</span><span><b>K</b>strike</span><span><b>N</b>put notional, C / K</span><span><b>S</b>finalized expiry price</span><span><b>f</b>exercised fraction</span><span><b>P</b>premium earned at activation, paid separately</span></div>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Outcome</th><th>Covered call (deposit D underlying)</th><th>Cash-secured put (deposit C quote)</th></tr></thead>
@@ -436,7 +437,7 @@
           </tbody>
         </table>
       </div>
-      <div class="callout" style="margin-top:14px"><b>Rounding favours LPs.</b> The market maker pays <code>ceil</code> and receives <code>floor</code>; remainders stay in the vault for the pro-rata split.</div>
+      <div class="callout" style="margin-top:14px"><b>Two separate claims.</b> These formulas and charts show total LP proceeds assuming the same holders throughout, including premium earned at activation. The settlement pool excludes all unpaid premium and buyer reserves. Exercise consideration rounds up and buyer payouts round down; premium entitlement dust remains permanently reserved. Cash rows assume no prior American cash exercise; prior payouts must also be subtracted.</div>
 
       <div class="fig"><span>Fig. 03 · Settlement outcomes from the contract formulas</span><span>Example inputs · WETH / USDC</span></div>
       <div class="calc">
@@ -447,19 +448,19 @@
           <label><span id="depLabel">Deposit (WETH)</span><input id="dep" type="number" step="any" value="10"></label>
           <label>Strike (USDC / WETH)<input id="strike" type="number" step="any" value="3000"></label>
           <label>Premium (USDC / WETH)<input id="prem" type="number" step="any" value="100"></label>
-          <label>Spot at settlement<input id="spot" type="number" step="any" value="3300"></label>
+          <label>Finalized expiry price<input id="spot" type="number" step="any" value="3300"></label>
         </div>
         <div class="body">
           <div class="chart">
-            <svg id="calcChart" viewBox="0 0 420 250" role="img" aria-label="LP value at settlement versus spot for the current inputs"></svg>
-            <div class="figcap"><span>LP value at settlement, quote terms</span><span><span class="sw"></span>vault &nbsp; <span class="sw dash"></span>hold collateral</span></div>
+            <svg id="calcChart" viewBox="0 0 420 250" role="img" aria-label="LP total value including earned premium versus spot for the current inputs"></svg>
+            <div class="figcap"><span>LP total value including earned premium, quote terms</span><span><span class="sw"></span>LP total &nbsp; <span class="sw dash"></span>hold collateral</span></div>
           </div>
           <div class="results">
             <table>
-              <thead><tr><th>LPs receive, in total</th><th class="num">WETH</th><th class="num">USDC</th><th>Market maker</th></tr></thead>
+              <thead><tr><th>LP total, including earned premium</th><th class="num">WETH</th><th class="num">USDC</th><th>Market maker</th></tr></thead>
               <tbody id="rows"></tbody>
             </table>
-            <div class="derived"><span>Notional <b id="notional">10 WETH</b></span><span>Premium in pot <b id="premTotal">1,000 USDC</b></span><span id="calcNote"></span></div>
+            <div class="derived"><span>Notional <b id="notional">10 WETH</b></span><span>Premium earned at activation <b id="premTotal">1,000 USDC</b></span><span id="calcNote"></span></div>
           </div>
         </div>
       </div>
@@ -476,11 +477,11 @@
         <div class="row"><span class="mono">strikeLimit</span><span>Per quote token. Calls: <span class="mono">strike ≥ limit</span>. Puts: <span class="mono">strike ≤ limit</span>.</span><span class="chip lp">calls raise · puts lower</span></div>
         <div class="row"><span class="mono">minPremium</span><span>Per quote token, per one whole underlying.</span><span class="chip lp">raise only</span></div>
         <div class="row"><span class="mono">minCollateral</span><span>Shares required before the auction can open.</span><span class="chip lp">raise only</span></div>
-        <div class="row"><span class="mono">maxTenor</span><span><span class="mono">expiry − now ≤ maxTenor</span>, checked at activation.</span><span class="chip lp">lower only</span></div>
+        <div class="row"><span class="mono">expiry</span><span>Exact timestamp fixed at creation; opening and activation must occur before it.</span><span class="chip">immutable</span></div>
         <div class="row"><span class="mono">allowedExercise</span><span>European, American, or Either. Each bid picks one.</span><span class="chip lp">Either → one</span></div>
         <div class="row"><span class="mono">allowedSettlement</span><span>Physical, Cash, or Either. Cash requires a price feed.</span><span class="chip lp">Either → one</span></div>
-        <div class="row"><span class="mono">priceFeed · maxSpotDeviationBps</span><span>Optional. Calls: <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts: <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both this and <span class="mono">strikeLimit</span> must pass.</span><span class="chip lp">bps lower · feed fixed</span></div>
-        <div class="row"><span class="mono">maxPriceAge</span><span>Activation and cash settlement reject a price older than this.</span><span class="chip lp">lower only, never 0</span></div>
+        <div class="row"><span class="mono">priceFeed · maxInTheMoneyBps</span><span>Optional. Calls: <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts: <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both this and <span class="mono">strikeLimit</span> must pass.</span><span class="chip lp">bps lower · feed fixed</span></div>
+        <div class="row"><span class="mono">maxPriceAge</span><span>Activation and American cash exercise reject old spot prices. Finalized expiry reports do not expire.</span><span class="chip lp">lower only, never 0</span></div>
         <div class="row"><span class="mono">pairs</span><span>Accepted quote tokens, each with its premium token.</span><span class="chip lp">disable only</span></div>
         <div class="row"><span class="mono">publicDeposits · underlying · collateral</span><span>Who may deposit, and what the vault is.</span><span class="chip">immutable</span></div>
         <div class="row"><span class="mono">auctionStartsAt</span><span>Time from which anyone may open the auction. 0 = manual only.</span><span class="chip owner">any value while Open</span></div>
@@ -492,12 +493,13 @@
     <aside class="side"><div class="num">0<i>5</i></div><div class="rule"></div><div class="lbl">Market makers</div></aside>
     <div class="main">
       <h2>Bidding and exercise.</h2>
+      <p class="prose">An auction ID, exact collateral amount, accepted pair hash, expiry and execution settings are signed into every bid. Reopening an auction requires a new bid. A Live vault can end early through an agreement signed by the buyer and approved by all current shares. The executing sponsor funds the agreed refund in the premium token; completed exercises and earned premium are preserved.</p>
       <div class="split" style="margin-bottom:8px">
         <ol class="steps">
-          <li><div><b>Sign the bid</b>EIP-712, domain <code>IvyVaultsHub</code> / <code>1</code> / chain id / hub proxy. Needs <code>MARKET_MAKER_ROLE</code>. Nonces are free-form: sign many, the winner is consumed, the rest lapse at <code>validUntil</code> or via <code>cancelBid(nonce)</code>.</div></li>
-          <li><div><b>Approve the vault</b>For the total premium, <code>premium × notional</code>. For physical settlement also approve what you will pay at exercise.</div></li>
+          <li><div><b>Sign the bid</b>EIP-712, domain <code>IvyVaultsHub</code> / <code>2</code> / chain id / deployed hub. Needs <code>MARKET_MAKER_ROLE</code>. Nonces are free-form: sign many, the winner is consumed, the rest lapse at <code>validUntil</code> or via <code>cancelBid(nonce)</code>.</div></li>
+          <li><div><b>Approve the vault</b>For the total premium, <code>floor(premium × notional / underlyingUnit)</code>. For physical exercise the executing buyer or executor approves and supplies the consideration.</div></li>
           <li><div><b>Activation</b>The bid master submits your bid unchanged. The vault pulls the premium in the same transaction.</div></li>
-          <li><div><b>Exercise</b>Inside your window (Fig. 04), any amount up to what remains. Cash payouts come out of the collateral, so you deliver nothing.</div></li>
+          <li><div><b>Exercise</b>Inside your window (Fig. 04), any amount up to what remains. Cash payouts come out of collateral. Only the buyer may change its executor or recipient; exercise assets go only to that recipient.</div></li>
         </ol>
         <pre><code>struct Bid {
   uint256 vaultId;
@@ -510,21 +512,27 @@
   uint64  expiry;       // unix seconds
   uint64  validUntil;   // signature deadline
   uint256 nonce;
+  uint256 auctionId;
+  uint256 collateralAmount;
+  bytes32 pairHash;
+  address executor;
+  address recipient;
 }</code></pre>
       </div>
-      <div class="fig"><span>Fig. 04 · Exercise windows and settlement time</span><span><b>exerciseWindow</b> default 6 h</span></div>
+      <p class="prose">For raw token amounts, <code>underlyingUnit = 10 ** underlyingDecimals</code>. Strike and premium are raw payment-token units per whole underlying.</p>
+      <div class="fig"><span>Fig. 04 · Exercise windows and settlement time</span><span><b>exerciseWindow</b> launch default 1 h</span></div>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Style · settlement</th><th>exercise(vaultId, amount)</th><th>settle(vaultId)</th><th>At exercise</th></tr></thead>
           <tbody>
-            <tr><td class="k">American · Physical</td><td><span class="mono">t ≤ expiry + window</span></td><td><span class="mono">t ≥ expiry + window</span></td><td>Call: pay <span class="mono">ceil(amount·K)</span> quote, receive <span class="mono">amount</span> underlying. Put: deliver <span class="mono">amount</span> underlying, receive <span class="mono">floor(amount·K)</span> quote.</td></tr>
-            <tr><td class="k">European · Physical</td><td><span class="mono">expiry ≤ t ≤ expiry + window</span></td><td><span class="mono">t ≥ expiry + window</span></td><td>Same as above.</td></tr>
+            <tr><td class="k">American · Physical</td><td><span class="mono">t &lt; expiry + window</span></td><td><span class="mono">t ≥ expiry + window</span></td><td>Call: pay <span class="mono">ceil(amount·K/underlyingUnit)</span> quote, receive <span class="mono">amount</span> underlying. Put: deliver <span class="mono">amount</span> underlying, receive <span class="mono">floor(amount·K/underlyingUnit)</span> quote.</td></tr>
+            <tr><td class="k">European · Physical</td><td><span class="mono">expiry ≤ t &lt; expiry + window</span></td><td><span class="mono">t ≥ expiry + window</span></td><td>Same as above.</td></tr>
             <tr><td class="k">American · Cash</td><td><span class="mono">t &lt; expiry</span></td><td><span class="mono">t ≥ expiry</span></td><td>Receive intrinsic value from the collateral at the current fresh spot; reverts if out of the money.</td></tr>
             <tr><td class="k">European · Cash</td><td>never</td><td><span class="mono">t ≥ expiry</span></td><td>No exercise. <span class="mono">settle</span> prices the remaining notional and reserves your payout; collect it with <span class="mono">claimPayout</span>.</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="callout"><b>Dead-feed rule.</b> Cash <code>settle</code> reverts with <code>StalePrice</code> while the feed is stale or unavailable. After <code>expiry + settlementGracePeriod</code> (7 days) the hub accepts a stale price, and a feed that reverts settles with zero payout. An oracle can never lock LP funds.</div>
+      <div class="callout"><b>Expiry reports are final.</b> Cash settlement uses Ivy’s signed 30-minute average ending at the exact expiry. The feed verifies the signature, not the averaging calculation. Reports are write-once and support multisig contract signers. If Ivy cannot publish, cash vaults remain locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. There is no stale-price or zero-payout fallback.</div>
     </div>
   </section>
 </div>
@@ -533,15 +541,22 @@
   <div class="wrap devgrid">
     <aside class="side"><div class="num">0<i>6</i></div><div class="rule"></div><div class="lbl">Developers</div></aside>
     <div class="main">
-      <h2>Four contracts, three roles.</h2>
+      <h2>Six contracts and two fixed libraries.</h2>
       <div class="contracts">
-        <div><span class="role">UUPS proxy</span><span class="name">IvyVaultsHub</span><p>Creates vaults, holds every rule, verifies bids, runs the phase machine. Every token-moving call is <code>nonReentrant</code>.</p></div>
-        <div><span class="role">EIP-1167 clone</span><span class="name">IvyVault</span><p>One per vault. Holds tokens and nothing else. Anyone may <code>deposit</code>. Only the hub may <code>pull</code> or <code>push</code>.</p></div>
-        <div><span class="role">ERC-1155</span><span class="name">IvyShares</span><p>LP shares. Only the hub may <code>mint</code> or <code>burn</code>. Lives outside the hub to stay under the 24,576-byte limit.</p></div>
-        <div><span class="role">Interface</span><span class="name">IIvyPriceFeed</span><p><code>spot(underlying, quote)</code> returns <code>(price, updatedAt)</code>, price in quote decimals per one whole underlying. You implement the feed.</p></div>
+        <div><span class="role">Immutable hub</span><span class="name">IvyVaultsHub</span><p>Creates vaults, verifies bids and runs the phase machine. Linked libraries implement term rules and settlement logic. Every token-moving call is <code>nonReentrant</code>.</p></div>
+        <div><span class="role">EIP-1167 clone</span><span class="name">IvyVault</span><p>One per vault. Holds tokens and token-keyed reserves. Ordinary hub transfers spend only unreserved assets; premium payments also obey an independent fixed budget.</p></div>
+        <div><span class="role">ERC-1155</span><span class="name">IvyShares</span><p>LP shares. Only the hub may mint or burn. Pre-update notifications checkpoint activation balances and invalidate unwind votes before balances or receiver callbacks change.</p></div>
+        <div><span class="role">Immutable signer</span><span class="name">IvyPriceFeed</span><p>Separate signed fresh spot and finalized expiry lookups. Prices use quote decimals per whole underlying. Historical prices remain valid for delayed settlement.</p></div>
       </div>
 
-      <div class="fig"><span>Calls by phase</span><span>Roles · <b>DEFAULT_ADMIN</b> · <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span></div>
+      <div class="contracts">
+        <div><span class="role">Activation income</span><span class="name">IvyPremiums</span><p>Lazy checkpoints preserve premium ownership. Payments can only start through the guarded hub claim; the vault enforces the premium budget independently.</p></div>
+        <div><span class="role">Shareholder consent</span><span class="name">IvyUnwind</span><p>One active agreement per vault. Transfers invalidate affected votes, replacement supersedes approvals, and normal exercise or settlement remains available.</p></div>
+        <div><span class="role">Linked rules library</span><span class="name">IvyVaultRules</span><p>Creation validation and term tightening. Creation checks admission. Tightening checks the owner and Open phase.</p></div>
+        <div><span class="role">Linked settlement library</span><span class="name">IvyOptionSettlement</span><p>Exercise, cash settlement and residual claims execute against hub storage, under its reentrancy guard. Library addresses are fixed in hub bytecode.</p></div>
+      </div>
+      <div class="fig"><span>Calls by phase</span><span>Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> · <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span></div>
+      <p class="prose">Two libraries deploy first, followed by the vault implementation, hub, shares, premium module, unwind module and signed feed. Addresses are predicted from a fixed nonce sequence; deployment and recovery verify constructor bindings and every embedded library link. There are no upgrade, library or module replacement setters. Admins retain role, metadata and future-default controls; guardians can pause admission.</p>
       <div class="calls">
         <div>
           <dl>
@@ -554,21 +569,22 @@
             <dt>openAuction(vaultId)</dt><dd><span class="chip owner">owner</span> or <span class="chip">anyone</span> after the schedule</dd>
             <div class="who">Auction</div>
             <dt>activate(vaultId, bid, signature)</dt><dd><span class="chip bid">bid master</span></dd>
-            <dt>cancelAuction(vaultId)</dt><dd><span class="chip bid">bid master</span> or <span class="chip owner">owner</span> after timeout</dd>
+            <dt>cancelAuction(vaultId)</dt><dd><span class="chip bid">bid master</span> or <span class="chip owner">owner</span> after timeout, at expiry, or while admission is paused</dd>
           </dl>
         </div>
         <div>
           <dl>
             <div class="who">Live</div>
-            <dt>exercise(vaultId, amount)</dt><dd><span class="chip mm">market maker</span></dd>
+            <dt>exercise(vaultId, amount)</dt><dd><span class="chip mm">buyer or executor</span> caller supplies physical funding</dd>
+            <dt>proposeUnwind · approveUnwind · executeUnwind</dt><dd>owner/buyer proposal, all current shares approve, buyer signs, sponsor funds refund</dd>
+            <dt>claimPremium(vaultId)</dt><dd>activation holder, also after settlement or burning all shares</dd>
             <dt>settle(vaultId)</dt><dd><span class="chip">anyone</span> at <code>settlementTimeOf</code></dd>
             <div class="who">Settled</div>
             <dt>claim(vaultId, shares)</dt><dd><span class="chip lp">share holder</span></dd>
-            <dt>claimPayout(vaultId)</dt><dd><span class="chip mm">market maker</span> cash payout</dd>
+            <dt>claimPayout(vaultId)</dt><dd><span class="chip mm">buyer or executor</span> cash payout or refund to configured recipient</dd>
             <div class="who">Admin</div>
-            <dt>setShares · setSettings</dt><dd><span class="chip">admin</span></dd>
-            <dt>setVaultImplementation · setURI</dt><dd><span class="chip">admin</span></dd>
-            <dt>upgradeToAndCall</dt><dd><span class="chip">admin</span></dd>
+            <dt>setSettings · setURI</dt><dd><span class="chip">admin</span></dd>
+            <dt>setAdmissionPause(vaultId, paused)</dt><dd><span class="chip">guardian</span> zero ID pauses global admission</dd>
             <div class="who">Views</div>
             <dt>termsOf · stateOf · pairTermsOf</dt><dd>vault terms, live state, one quote token's terms</dd>
             <dt>quoteTokensOf · vaultOf · kindOf</dt><dd>listed quote tokens, clone address, call or put</dd>
@@ -577,18 +593,18 @@
         </div>
       </div>
 
-      <div class="fig" style="margin-top:30px"><span>Defaults and events</span><span>settings are hub-wide</span></div>
+      <div class="fig" style="margin-top:30px"><span>Defaults and events</span><span>timing defaults are snapshotted at vault creation</span></div>
       <div class="tablewrap">
         <table>
           <tbody>
-            <tr><td class="k">exerciseWindow</td><td class="num">21 600 s · 6 h</td><td class="muted">Physical exercise grace after expiry.</td></tr>
+            <tr><td class="k">exerciseWindow</td><td class="num">3 600 s · 1 h</td><td class="muted">Physical exercise grace after expiry.</td></tr>
             <tr><td class="k">auctionTimeout</td><td class="num">259 200 s · 3 d</td><td class="muted">After this the owner may cancel a stalled auction.</td></tr>
-            <tr><td class="k">settlementGracePeriod</td><td class="num">604 800 s · 7 d</td><td class="muted">After this a stale or dead feed no longer blocks cash settlement.</td></tr>
-            <tr><td class="k">Events</td><td colspan="2"><span class="mono wrapok">VaultCreated · Deposited · Withdrawn · VaultTermsTightened · PairTermsTightened · AuctionScheduled · AuctionOpened · AuctionCancelled · Activated · Exercised · Settled · Claimed · PayoutClaimed · BidCancelled · VaultOwnershipTransferred</span></td></tr>
+            <tr><td class="k">Operational settlement target</td><td class="num">30 min</td><td class="muted">After the physical window closes; after expiry for cash, subject to report availability.</td></tr>
+            <tr><td class="k">Selected events</td><td colspan="2"><span class="mono wrapok">VaultCreated · Deposited · Withdrawn · VaultTermsTightened · PairTermsTightened · AuctionScheduled · AuctionOpened · AuctionCancelled · Activated · Exercised · Settled · Claimed · PayoutClaimed · BidCancelled · VaultOwnershipTransferred</span></td></tr>
           </tbody>
         </table>
       </div>
-      <p class="muted small" style="margin-top:14px">Repo: <code>contracts/</code>, <code>test/</code> (Hardhat 3, mocha + ethers), <code>ignition/modules/IvyVaults.ts</code>. Design: <code>docs/superpowers/specs/2026-09-03-ivy-vaults-design.md</code>. Run <code>npx hardhat test</code>.</p>
+      <p class="muted small" style="margin-top:14px">Repo: <code>contracts/</code>, <code>test/</code> (Hardhat 3, mocha + ethers), <code>scripts/operator.mjs</code> and <code>docs/operations.md</code>. Design: <code>docs/superpowers/specs/2026-09-03-ivy-vaults-design.md</code>. Run <code>npx hardhat test</code>.</p>
     </div>
   </div>
 </section>
@@ -615,7 +631,7 @@
   }
   function labelTheme() { themeBtn.textContent = "Theme · " + currentTheme(); }
 
-  // LP value at settlement (quote terms) as a function of spot, for the fully-in-the-money case.
+  // LP total value including earned premium (quote terms) as a function of spot, for the fully-in-the-money case.
   // call: D*min(S,K) + P (hold = D*S).  put: N*min(S,K) + P (hold = C).
   function drawPayoff(svg, o) {
     var W = 420, H = 250, L = 52, R = 16, T = 18, B = 34;
@@ -671,7 +687,7 @@
       rows = [
         ["Not exercised", o.D, o.P, "pays premium only"],
         ["Physical, fully exercised", 0, o.D * o.K + o.P, "pays " + fmt(o.D * o.K, 2) + " USDC, takes " + fmt(o.D, 6) + " WETH"],
-        ["Cash-settled at spot", o.D - payoutCall, o.P, payoutCall > 0 ? "receives " + fmt(payoutCall, 6) + " WETH" : "out of the money, receives 0"]
+        ["Cash at finalized expiry price", o.D - payoutCall, o.P, payoutCall > 0 ? "receives " + fmt(payoutCall, 6) + " WETH" : "out of the money, receives 0"]
       ];
       $("calcNote").textContent = "Cash payout = remaining × (spot − strike) / spot, in WETH.";
     } else {
@@ -679,7 +695,7 @@
       rows = [
         ["Not exercised", 0, o.C + o.P, "pays premium only"],
         ["Physical, fully exercised", o.N, o.C - o.N * o.K + o.P, "delivers " + fmt(o.N, 6) + " WETH, takes " + fmt(o.N * o.K, 2) + " USDC"],
-        ["Cash-settled at spot", 0, o.C - payoutPut + o.P, payoutPut > 0 ? "receives " + fmt(payoutPut, 2) + " USDC" : "out of the money, receives 0"]
+        ["Cash at finalized expiry price", 0, o.C - payoutPut + o.P, payoutPut > 0 ? "receives " + fmt(payoutPut, 2) + " USDC" : "out of the money, receives 0"]
       ];
       $("calcNote").textContent = "Cash payout = remaining × (strike − spot), in USDC.";
     }

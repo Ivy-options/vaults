@@ -14,7 +14,7 @@ contract MockHub {
 
     function createClone(address implementation, uint256 id, address collateral) external returns (address clone) {
         clone = Clones.clone(implementation);
-        IIvyVault(clone).initialize(address(this), id, collateral);
+        IIvyVault(clone).initialize(address(this), id, collateral, address(this));
         lastClone = clone;
     }
 
@@ -32,4 +32,8 @@ contract MockHub {
     function push(address vault, address token, address to, uint256 amount) external {
         IIvyVault(vault).push(token, to, amount);
     }
+    function collectPremium(address vault, address token, address from, uint256 amount) external { IIvyVault(vault).collectPremium(token, from, amount); }
+    function reserveBuyer(address vault, address token, uint256 amount) external { IIvyVault(vault).reserveBuyer(token, amount); }
+    function payPremium(address vault, address to, uint256 amount) external { IIvyVault(vault).payPremium(to, amount); }
+    function payBuyer(address vault, address token, address to) external { IIvyVault(vault).payBuyer(token, to); }
 }

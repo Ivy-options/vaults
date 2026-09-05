@@ -31,7 +31,10 @@ interface IIvyVaultsHubEvents {
     event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 amount);
     event BidCancelled(address indexed marketMaker, uint256 nonce);
     event VaultOwnershipTransferred(uint256 indexed vaultId, address indexed previousOwner, address indexed newOwner);
-    event SettingsUpdated(uint64 exerciseWindow, uint64 auctionTimeout, uint64 settlementGracePeriod);
-    event VaultImplementationUpdated(address implementation);
-    event SharesSet(address shares);
+    event SettingsUpdated(uint64 exerciseWindow, uint64 auctionTimeout);
+    event AdmissionPauseUpdated(uint256 indexed vaultId, bool paused);
+    event ExecutionUpdated(uint256 indexed vaultId, address executor, address recipient);
+    event AuctionIdentity(uint256 indexed vaultId, uint256 auctionId);
+    event Unwound(uint256 indexed vaultId, uint256 nonce, uint256 refund);
+
 }

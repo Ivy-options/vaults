@@ -1,31 +1,37 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
+import {IIvyVaultsHubErrors} from "../interfaces/IIvyVaultsHubErrors.sol";
 import {IIvyVaultsHubEvents} from "../interfaces/IIvyVaultsHubEvents.sol";
 import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
 import {IIvyShares} from "../interfaces/IIvyShares.sol";
+import {IvyPremiums} from "../IvyPremiums.sol";
+import {IvyUnwind} from "../IvyUnwind.sol";
 import "../types/IvyTypes.sol";
 
-/// @dev Storage layout, roles, settings, views and shared guards for the hub. Append-only storage.
+/// @dev Storage layout, roles, settings, views and shared guards for the immutable hub.
 abstract contract IvyVaultsHubStorage is
     IIvyVaultsHubEvents,
-    AccessControlUpgradeable,
-    EIP712Upgradeable,
-    UUPSUpgradeable,
+    IIvyVaultsHubErrors,
+    AccessControl,
+    EIP712,
     ReentrancyGuardTransient
 {
     bytes32 public constant BID_MASTER_ROLE = keccak256("BID_MASTER_ROLE");
     bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
 
-    address public vaultImplementation;
+    address public immutable vaultImplementation;
+    IvyPremiums public immutable premiums;
+    IvyUnwind public immutable unwind;
+    bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
+    bool public paused;
+    mapping(uint256 => bool) public vaultPaused;
     uint64 public exerciseWindow;
     uint64 public auctionTimeout;
-    uint64 public settlementGracePeriod;
     uint256 public vaultCount;
 
     mapping(uint256 vaultId => VaultTerms) internal _terms;
@@ -33,9 +39,27 @@ abstract contract IvyVaultsHubStorage is
     mapping(uint256 vaultId => mapping(address quoteToken => PairTerms)) internal _pairTerms;
     mapping(uint256 vaultId => address[]) internal _quoteTokens;
     mapping(address marketMaker => mapping(uint256 nonce => bool)) public usedBidNonces;
-    IIvyShares public shareToken;
+    IIvyShares public immutable shareToken;
 
-    uint256[39] private __gap;
+    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
+        EIP712("IvyVaultsHub", "2")
+    {
+        if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) revert ZeroAddress();
+        if (implementation.code.length == 0) revert BindingMismatch();
+        vaultImplementation = implementation;
+        shareToken = IIvyShares(shares_);
+        premiums = IvyPremiums(premiums_);
+        unwind = IvyUnwind(unwind_);
+        exerciseWindow = window_;
+        auctionTimeout = timeout_;
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(GUARDIAN_ROLE, admin);
+    }
+
+    function _admission(uint256 vaultId) internal view {
+        if (paused || vaultPaused[vaultId]) revert AdmissionPaused();
+    }
+
 
     // ------------------------------------------------------------ views
 
@@ -71,7 +95,6 @@ abstract contract IvyVaultsHubStorage is
 
     /// @notice Shares outstanding for a vault (== credited collateral), read from the share token.
     function totalShares(uint256 vaultId) public view returns (uint256) {
-        if (address(shareToken) == address(0)) revert SharesNotSet();
         return shareToken.totalSupply(vaultId);
     }
 

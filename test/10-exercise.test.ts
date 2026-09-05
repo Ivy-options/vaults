@@ -49,17 +49,17 @@ describe("exercise", function () {
       await fund(ctx, ctx.usdc, ctx.marketMaker, vaultAddress, 40_000n * USDC_UNIT);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 11n * WETH_UNIT))
         .to.be.revertedWithCustomError(ctx.hub, "ExceedsRemaining").withArgs(10n * WETH_UNIT);
-      await expect(ctx.hub.connect(ctx.alice).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "NotMarketMaker");
+      await expect(ctx.hub.connect(ctx.alice).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "NotExecutor");
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 0n)).to.be.revertedWithCustomError(ctx.hub, "ZeroAmount");
     });
 
-    it("American: open until expiry + exerciseWindow, closed one second later", async function () {
+    it("American: open before the physical deadline, closed at the deadline", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, vaultAddress, bid } = await goLive(ctx);
       await fund(ctx, ctx.usdc, ctx.marketMaker, vaultAddress, 30_000n * USDC_UNIT);
-      await at(ctx, bid.expiry + EXERCISE_WINDOW);
+      await at(ctx, bid.expiry + EXERCISE_WINDOW - 1n);
       await ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT);
-      await at(ctx, bid.expiry + EXERCISE_WINDOW + 1n);
+      await at(ctx, bid.expiry + EXERCISE_WINDOW);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT))
         .to.be.revertedWithCustomError(ctx.hub, "ExerciseWindowClosed");
     });
@@ -72,7 +72,7 @@ describe("exercise", function () {
         .to.be.revertedWithCustomError(ctx.hub, "ExerciseNotOpenYet");
       await at(ctx, bid.expiry);
       await ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT);
-      await at(ctx, bid.expiry + EXERCISE_WINDOW + 1n);
+      await at(ctx, bid.expiry + EXERCISE_WINDOW);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT))
         .to.be.revertedWithCustomError(ctx.hub, "ExerciseWindowClosed");
     });

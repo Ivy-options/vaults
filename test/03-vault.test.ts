@@ -21,7 +21,7 @@ describe("IvyVault", function () {
 
   it("locks the implementation so it cannot be initialized", async function () {
     const { impl, mockHubAddress, tokenAddress } = await networkHelpers.loadFixture(fixture);
-    await expect(impl.initialize(mockHubAddress, 1n, tokenAddress)).to.be.revertedWithCustomError(impl, "AlreadyInitialized");
+    await expect(impl.initialize(mockHubAddress, 1n, tokenAddress, mockHubAddress)).to.be.revertedWithCustomError(impl, "AlreadyInitialized");
   });
 
   it("initializes a clone exactly once", async function () {
@@ -29,7 +29,7 @@ describe("IvyVault", function () {
     expect(await vault.hub()).to.equal(mockHubAddress);
     expect(await vault.vaultId()).to.equal(1n);
     expect(await vault.collateral()).to.equal(tokenAddress);
-    await expect(vault.initialize(mockHubAddress, 2n, tokenAddress)).to.be.revertedWithCustomError(vault, "AlreadyInitialized");
+    await expect(vault.initialize(mockHubAddress, 2n, tokenAddress, mockHubAddress)).to.be.revertedWithCustomError(vault, "AlreadyInitialized");
   });
 
   it("direct deposit pulls collateral and notifies the hub with the received amount", async function () {

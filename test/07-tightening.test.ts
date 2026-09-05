@@ -20,7 +20,7 @@ describe("tightening", function () {
       callTerms(ctx, {
         priceFeed: ctx.feedAddress,
         maxPriceAge: 3600,
-        maxSpotDeviationBps: 1000,
+        maxInTheMoneyBps: 1000,
         allowedSettlement: SettlementPolicy.Either,
         allowedExercise: ExercisePolicy.Either,
         minCollateral: WETH_UNIT,
@@ -35,16 +35,14 @@ describe("tightening", function () {
   const base: {
     allowedExercise: 0 | 1 | 2;
     allowedSettlement: 0 | 1 | 2;
-    maxTenor: bigint;
     minCollateral: bigint;
-    maxSpotDeviationBps: number;
+    maxInTheMoneyBps: number;
     maxPriceAge: number;
   } = {
     allowedExercise: ExercisePolicy.Either,
     allowedSettlement: SettlementPolicy.Either,
-    maxTenor: THIRTY_DAYS,
     minCollateral: WETH_UNIT,
-    maxSpotDeviationBps: 1000,
+    maxInTheMoneyBps: 1000,
     maxPriceAge: 3600,
   };
 
@@ -54,18 +52,16 @@ describe("tightening", function () {
     const tighter = {
       allowedExercise: ExercisePolicy.European,
       allowedSettlement: SettlementPolicy.Physical,
-      maxTenor: SEVEN_DAYS,
       minCollateral: 2n * WETH_UNIT,
-      maxSpotDeviationBps: 500,
+      maxInTheMoneyBps: 500,
       maxPriceAge: 600,
     };
     await hub.connect(alice).tightenVaultTerms(callId, tighter);
     const t = await hub.termsOf(callId);
     expect(t.allowedExercise).to.equal(ExercisePolicy.European);
     expect(t.allowedSettlement).to.equal(SettlementPolicy.Physical);
-    expect(t.maxTenor).to.equal(SEVEN_DAYS);
     expect(t.minCollateral).to.equal(2n * WETH_UNIT);
-    expect(t.maxSpotDeviationBps).to.equal(500n);
+    expect(t.maxInTheMoneyBps).to.equal(500n);
     expect(t.maxPriceAge).to.equal(600n);
   });
 
@@ -78,10 +74,8 @@ describe("tightening", function () {
       ["switching exercise style", { allowedExercise: ExercisePolicy.American }, "LoosensTerms"],
       ["widening settlement back to Either", { allowedSettlement: SettlementPolicy.Either }, "LoosensTerms"],
       ["switching settlement type", { allowedSettlement: SettlementPolicy.Cash }, "LoosensTerms"],
-      ["raising maxTenor", { maxTenor: THIRTY_DAYS + 1n }, "LoosensTerms"],
-      ["zero maxTenor", { maxTenor: 0n }, "InvalidTenor"],
       ["lowering minCollateral", { minCollateral: WETH_UNIT - 1n }, "LoosensTerms"],
-      ["raising spot deviation", { maxSpotDeviationBps: 1001 }, "LoosensTerms"],
+      ["raising spot deviation", { maxInTheMoneyBps: 1001 }, "LoosensTerms"],
       ["raising maxPriceAge", { maxPriceAge: 3601 }, "LoosensTerms"],
       ["zero maxPriceAge", { maxPriceAge: 0 }, "FeedNeedsMaxPriceAge"],
     ];
@@ -95,13 +89,12 @@ describe("tightening", function () {
     await hub.connect(alice).tightenVaultTerms(plainId, {
       allowedExercise: ExercisePolicy.Either,
       allowedSettlement: SettlementPolicy.Physical,
-      maxTenor: THIRTY_DAYS,
       minCollateral: 0n,
-      maxSpotDeviationBps: 5000,
+      maxInTheMoneyBps: 5000,
       maxPriceAge: 0,
     });
     const t = await hub.termsOf(plainId);
-    expect(t.maxSpotDeviationBps).to.equal(0n);
+    expect(t.maxInTheMoneyBps).to.equal(0n);
     expect(t.maxPriceAge).to.equal(0n);
   });
 

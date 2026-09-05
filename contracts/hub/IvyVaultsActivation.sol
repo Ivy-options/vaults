@@ -14,6 +14,7 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
     function activate(uint256 vaultId, Bid calldata bid, bytes calldata signature)
         external nonReentrant onlyRole(BID_MASTER_ROLE)
     {
+        _admission(vaultId);
         _requirePhase(vaultId, Phase.Auction);
         if (bid.vaultId != vaultId) revert BidVaultMismatch();
         if (!hasRole(MARKET_MAKER_ROLE, bid.marketMaker)) revert NotMarketMaker();
@@ -35,7 +36,9 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
             revert SettlementNotAllowed();
         }
         if (bid.expiry <= block.timestamp) revert ExpiryInPast();
-        if (bid.expiry - block.timestamp > t.maxTenor) revert TenorTooLong();
+        if (bid.expiry != t.expiry || bid.auctionId != s.auctionId || bid.collateralAmount != shareToken.totalSupply(vaultId)
+            || bid.pairHash != keccak256(abi.encode(p))) revert CommitmentMismatch();
+        if (bid.recipient == address(0)) revert ZeroAddress();
         _checkStrike(s.isCall, t, p, bid.quoteToken, bid.strike);
         if (bid.premium < p.minPremium) revert PremiumTooLow();
 
@@ -44,6 +47,8 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         uint256 totalPremium = IvyMath.premiumTotal(bid.premium, totalNotional, s.underlyingUnit);
 
         s.marketMaker = bid.marketMaker;
+        s.executor = bid.executor;
+        s.recipient = bid.recipient;
         s.quoteToken = bid.quoteToken;
         s.premiumToken = p.premiumToken;
         s.strike = bid.strike;
@@ -54,10 +59,8 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         s.totalNotional = totalNotional;
         s.phase = Phase.Live;
 
-        if (totalPremium > 0) {
-            uint256 received = IIvyVault(s.vault).pull(p.premiumToken, bid.marketMaker, totalPremium);
-            if (received < totalPremium) revert ShortReceived(totalPremium, received);
-        }
+        premiums.activate(vaultId, s.vault, totalPremium, shareToken.totalSupply(vaultId));
+        IIvyVault(s.vault).collectPremium(p.premiumToken, bid.marketMaker, totalPremium);
 
         emit Activated(
             vaultId,
@@ -91,7 +94,7 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
             if (strike > p.strikeLimit) revert StrikeAboveLimit();
         }
         if (t.priceFeed != address(0)) {
-            uint256 bound = IvyMath.spotBound(isCall, _readSpot(t, quoteToken), t.maxSpotDeviationBps);
+            uint256 bound = IvyMath.spotBound(isCall, _readSpot(t, quoteToken), t.maxInTheMoneyBps);
             if (isCall ? strike < bound : strike > bound) revert StrikeOutsideSpotBand();
         }
     }

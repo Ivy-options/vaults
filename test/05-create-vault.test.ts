@@ -35,7 +35,7 @@ describe("createVault", function () {
     const pair = await hub.pairTermsOf(1n, usdcAddress);
     expect(pair.premiumToken).to.equal(usdcAddress);
     expect(pair.enabled).to.equal(true);
-    expect((await hub.termsOf(1n)).maxTenor).to.equal(THIRTY_DAYS);
+    expect((await hub.termsOf(1n)).expiry).to.equal(ctx.defaultExpiry);
   });
 
   it("creates a cash-secured put vault", async function () {
@@ -84,11 +84,11 @@ describe("createVault", function () {
     const cases: Case[] = [
       { name: "zero underlying", error: "ZeroAddress", build: (c) => [callTerms(c, { underlying: ZeroAddress }), callPairs(c)] },
       { name: "zero collateral", error: "ZeroAddress", build: (c) => [callTerms(c, { collateral: ZeroAddress }), callPairs(c)] },
-      { name: "zero maxTenor", error: "InvalidTenor", build: (c) => [callTerms(c, { maxTenor: 0n }), callPairs(c)] },
+      { name: "elapsed expiry", error: "ExpiryInPast", build: (c) => [callTerms(c, { expiry: 0n }), callPairs(c)] },
       { name: "cash allowed without a feed", error: "CashSettlementNeedsFeed", build: (c) => [callTerms(c, { allowedSettlement: SettlementPolicy.Cash }), callPairs(c)] },
       { name: "either settlement without a feed", error: "CashSettlementNeedsFeed", build: (c) => [callTerms(c, { allowedSettlement: SettlementPolicy.Either }), callPairs(c)] },
       { name: "feed without maxPriceAge", error: "FeedNeedsMaxPriceAge", build: (c) => [callTerms(c, { priceFeed: c.feedAddress, maxPriceAge: 0 }), callPairs(c)] },
-      { name: "call deviation above 100%", error: "DeviationTooLarge", build: (c) => [callTerms(c, { priceFeed: c.feedAddress, maxPriceAge: 60, maxSpotDeviationBps: 10_001 }), callPairs(c)] },
+      { name: "call deviation above 100%", error: "DeviationTooLarge", build: (c) => [callTerms(c, { priceFeed: c.feedAddress, maxPriceAge: 60, maxInTheMoneyBps: 10_001 }), callPairs(c)] },
       { name: "no pairs", error: "NoPairs", build: (c) => [callTerms(c), []] },
       { name: "put with two pairs", error: "PutRequiresSinglePair", build: (c) => [putTerms(c), [...putPairs(c), { quoteToken: c.daiAddress, terms: putPairs(c)[0].terms }]] },
       { name: "put pair that is not the collateral", error: "PutPairMustBeCollateral", build: (c) => [putTerms(c), [{ quoteToken: c.daiAddress, terms: putPairs(c)[0].terms }]] },
@@ -109,7 +109,7 @@ describe("createVault", function () {
 
     it("allows a put deviation above 100%", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
-      await createVaultAs(ctx, ctx.alice, putTerms(ctx, { priceFeed: ctx.feedAddress, maxPriceAge: 60, maxSpotDeviationBps: 20_000 }), putPairs(ctx));
+      await createVaultAs(ctx, ctx.alice, putTerms(ctx, { priceFeed: ctx.feedAddress, maxPriceAge: 60, maxInTheMoneyBps: 20_000 }), putPairs(ctx));
       expect(await ctx.hub.vaultCount()).to.equal(1n);
     });
   });

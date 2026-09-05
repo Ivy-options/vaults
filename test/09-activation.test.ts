@@ -184,12 +184,12 @@ describe("activate", function () {
       await activate(ctx, vaultId, vaultAddress, { style: ExerciseStyle.European });
     });
 
-    it("expiry must be in the future and within maxTenor", async function () {
+    it("expiry must be in the future and match the LP commitment", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, vaultAddress } = await openVault(ctx);
       const now = BigInt(await networkHelpers.time.latest());
       await expect(activate(ctx, vaultId, vaultAddress, { expiry: now })).to.be.revertedWithCustomError(ctx.hub, "ExpiryInPast");
-      await expect(activate(ctx, vaultId, vaultAddress, { tenor: THIRTY_DAYS + 60n })).to.be.revertedWithCustomError(ctx.hub, "TenorTooLong");
+      await expect(activate(ctx, vaultId, vaultAddress, { tenor: THIRTY_DAYS + 60n })).to.be.revertedWithCustomError(ctx.hub, "CommitmentMismatch");
     });
 
     it("strike must respect the configured limit", async function () {

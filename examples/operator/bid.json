@@ -1,0 +1,9 @@
+{
+  "rpc": "http://127.0.0.1:8545", "sender": "BUYER_ADDRESS", "hub": "HUB_ADDRESS", "vaultId": "1",
+  "bid": {
+    "marketMaker": "BUYER_ADDRESS", "quoteToken": "USDC_ADDRESS", "strike": "3600000000",
+    "premium": "100000000", "style": 1, "settlement": 0,
+    "validUntil": "SUBMISSION_DEADLINE_UNIX_SECONDS", "nonce": "1",
+    "executor": "0x0000000000000000000000000000000000000000", "recipient": "BUYER_ADDRESS"
+  }
+}

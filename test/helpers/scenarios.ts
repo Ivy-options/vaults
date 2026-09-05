@@ -1,3 +1,4 @@
+import { AbiCoder, keccak256, ZeroAddress } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import {
   ExerciseStyle, SettlementPolicy, SettlementType, USDC_UNIT, WETH_UNIT,
@@ -41,9 +42,10 @@ export interface VaultOptions {
 export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
   const isCall = o.isCall ?? true;
   const feedTerms: Partial<VaultTermsInput> = o.withFeed
-    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, maxSpotDeviationBps: 1000, allowedSettlement: SettlementPolicy.Either }
+    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, maxInTheMoneyBps: 1000, allowedSettlement: SettlementPolicy.Either }
     : {};
-  const terms = isCall ? callTerms(ctx, { ...feedTerms, ...o.terms }) : putTerms(ctx, { ...feedTerms, ...o.terms });
+  const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR;
+  const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });
   const pairs = isCall ? callPairs(ctx, o.pair) : putPairs(ctx, o.pair);
   const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs);
 
@@ -72,11 +74,15 @@ export interface BidOptions {
   expiry?: bigint;
   validFor?: bigint;
   nonce?: bigint;
+  executor?: string;
+  recipient?: string;
 }
 
 /** Physical American bid at STRIKE / PREMIUM expiring in TENOR, valid for one hour, fresh nonce. */
 export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = {}): Promise<Bid> {
   const now = BigInt(await ctx.networkHelpers.time.latest());
+  const state = await ctx.hub.stateOf(vaultId);
+  const pair = await ctx.hub.pairTermsOf(vaultId, o.quoteToken ?? ctx.usdcAddress);
   return {
     vaultId: o.vaultId ?? vaultId,
     marketMaker: o.marketMaker ?? ctx.marketMaker.address,
@@ -85,9 +91,14 @@ export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = 
     premium: o.premium ?? PREMIUM,
     style: o.style ?? ExerciseStyle.American,
     settlement: o.settlement ?? SettlementType.Physical,
-    expiry: o.expiry ?? now + (o.tenor ?? TENOR),
+    expiry: o.expiry ?? (o.tenor ? now + o.tenor : state.expiry),
     validUntil: now + (o.validFor ?? 3600n),
     nonce: o.nonce ?? nonceCounter++,
+    auctionId: state.auctionId,
+    collateralAmount: await ctx.hub.totalShares(vaultId),
+    pairHash: keccak256(AbiCoder.defaultAbiCoder().encode(["tuple(address premiumToken,uint256 strikeLimit,uint256 minPremium,bool enabled)"], [Array.from(pair)])),
+    executor: o.executor ?? ZeroAddress,
+    recipient: o.recipient ?? ctx.marketMaker.address,
   };
 }
 

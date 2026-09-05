@@ -22,4 +22,11 @@ contract MockPriceFeed is IIvyPriceFeed {
         Quote memory q = quotes[underlying][quote];
         return (q.price, q.updatedAt);
     }
+    mapping(bytes32 => uint256) public finalPrices;
+    function setSettlementPrice(address underlying, address quote, uint64 expiry, uint256 price) external {
+        finalPrices[keccak256(abi.encode(underlying, quote, expiry))] = price;
+    }
+    function settlementPrice(address underlying, address quote, uint64 expiry) external view returns (uint256) {
+        return finalPrices[keccak256(abi.encode(underlying, quote, expiry))];
+    }
 }

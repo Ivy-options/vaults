@@ -8,4 +8,5 @@ interface IIvyPriceFeed {
     /// @return price     the price (must be > 0 to be usable)
     /// @return updatedAt unix timestamp of the last update
     function spot(address underlying, address quote) external view returns (uint256 price, uint256 updatedAt);
+    function settlementPrice(address underlying, address quote, uint64 expiry) external view returns (uint256);
 }

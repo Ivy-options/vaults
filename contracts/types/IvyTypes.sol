@@ -19,11 +19,11 @@ struct VaultTerms {
     bool publicDeposits;           // false = only the vault owner may deposit
     ExercisePolicy allowedExercise;
     SettlementPolicy allowedSettlement; // Cash requires priceFeed != 0
-    uint64 maxTenor;               // max seconds from activation to expiry, > 0
+    uint64 expiry;               // fixed absolute Unix timestamp, future at creation
     uint64 auctionStartsAt;        // 0 = manual only; else anyone may open the auction from this time
     uint256 minCollateral;         // shares required to open the auction
     address priceFeed;             // 0 = no oracle checks
-    uint16 maxSpotDeviationBps;    // calls: strike >= spot*(1-bps); puts: strike <= spot*(1+bps)
+    uint16 maxInTheMoneyBps;    // calls: strike >= spot*(1-bps); puts: strike <= spot*(1+bps)
     uint32 maxPriceAge;            // seconds; > 0 when priceFeed != 0
 }
 
@@ -42,9 +42,8 @@ struct PairInput {
 struct TightenableTerms {
     ExercisePolicy allowedExercise;
     SettlementPolicy allowedSettlement;
-    uint64 maxTenor;
     uint256 minCollateral;
-    uint16 maxSpotDeviationBps;
+    uint16 maxInTheMoneyBps;
     uint32 maxPriceAge;
 }
 
@@ -59,6 +58,11 @@ struct Bid {
     uint64 expiry;                 // absolute unix timestamp
     uint64 validUntil;             // signature deadline
     uint256 nonce;                 // free-form, consumed on activation
+    uint256 auctionId;
+    uint256 collateralAmount;
+    bytes32 pairHash;
+    address executor;
+    address recipient;
 }
 
 struct VaultState {
@@ -67,6 +71,11 @@ struct VaultState {
     bool isCall;
     Phase phase;
     uint64 auctionOpenedAt;
+    uint64 exerciseWindow;
+    uint64 auctionTimeout;
+    uint256 auctionId;
+    address executor;
+    address recipient;
     uint256 underlyingUnit;
     // set at activation
     address marketMaker;
@@ -101,7 +110,6 @@ error PairMustBeEnabled();
 error PairUnknown(address quoteToken);
 error PairDisabled(address quoteToken);
 error InvalidStrikeLimit();
-error InvalidTenor();
 error CashSettlementNeedsFeed();
 error FeedNeedsMaxPriceAge();
 error DeviationTooLarge();
@@ -117,7 +125,6 @@ error BadSignature();
 error StyleNotAllowed();
 error SettlementNotAllowed();
 error ExpiryInPast();
-error TenorTooLong();
 error StrikeBelowLimit();
 error StrikeAboveLimit();
 error StrikeOutsideSpotBand();
@@ -134,6 +141,23 @@ error NothingToExercise();
 error SettlementNotReached();
 error NothingToClaim();
 error InsufficientShares();
-error SharesNotSet();
-error SharesAlreadySet();
-error SharesHubMismatch();
+
+struct UnwindAgreement {
+    uint256 vaultId;
+    uint256 nonce;
+    uint64 deadline;
+    uint256 exercisedNotional;
+    uint256 supply;
+    uint256 refund;
+}
+error AdmissionPaused();
+error BindingMismatch();
+error InsufficientAvailable();
+error NotPremiumModule();
+error NotShares();
+error NotExecutor();
+error CommitmentMismatch();
+error AgreementInvalid();
+error ConsentMissing();
+error ReportUnavailable();
+error ReportFinalized();

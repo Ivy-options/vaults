@@ -13,3 +13,5 @@
 /ignition/deployments/chain-31337
 .superpowers/
 .DS_Store
+
+.diffstory/

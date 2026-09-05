@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import {
-  AUCTION_TIMEOUT, ExercisePolicy, Phase, SettlementPolicy, THIRTY_DAYS, WETH_UNIT,
+  AUCTION_TIMEOUT, ExercisePolicy, Phase, SettlementPolicy, WETH_UNIT,
   callPairs, callTerms, createVaultAs, deployIvy, fund,
 } from "./helpers/setup.js";
 
@@ -20,9 +20,8 @@ describe("auction", function () {
   const anyTerms = {
     allowedExercise: ExercisePolicy.Either,
     allowedSettlement: SettlementPolicy.Physical,
-    maxTenor: THIRTY_DAYS,
     minCollateral: 5n * WETH_UNIT,
-    maxSpotDeviationBps: 0,
+    maxInTheMoneyBps: 0,
     maxPriceAge: 0,
   };
 

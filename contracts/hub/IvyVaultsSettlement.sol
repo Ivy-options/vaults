@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IvyVaultsActivation} from "./IvyVaultsActivation.sol";
 import {IIvyVault} from "../interfaces/IIvyVault.sol";
-import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
-import {IvyMath} from "../libraries/IvyMath.sol";
+import {IvyOptionSettlement} from "../libraries/IvyOptionSettlement.sol";
 import "../types/IvyTypes.sol";
 
 /// @dev Exercise, settlement and claims (spec §9, §10).
@@ -17,54 +15,11 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
-        if (msg.sender != s.marketMaker) revert NotMarketMaker();
-        if (amount == 0) revert ZeroAmount();
-        uint256 remaining = s.totalNotional - s.exercisedNotional;
-        if (amount > remaining) revert ExceedsRemaining(remaining);
-        _checkExerciseWindow(s);
-
-        s.exercisedNotional += amount;
-
-        VaultTerms storage t = _terms[vaultId];
-        IIvyVault vault = IIvyVault(s.vault);
-        uint256 paid;
-        uint256 got;
-        if (s.settlement == SettlementType.Physical) {
-            if (s.isCall) {
-                paid = IvyMath.quoteDueCeil(amount, s.strike, s.underlyingUnit);
-                uint256 received = vault.pull(s.quoteToken, msg.sender, paid);
-                if (received < paid) revert ShortReceived(paid, received);
-                got = amount;
-            } else {
-                paid = amount;
-                uint256 received = vault.pull(t.underlying, msg.sender, amount);
-                if (received < amount) revert ShortReceived(amount, received);
-                got = IvyMath.quoteOutFloor(amount, s.strike, s.underlyingUnit);
-            }
-        } else {
-            uint256 spot = _readSpot(t, s.quoteToken);
-            got = s.isCall
-                ? IvyMath.callIntrinsic(amount, s.strike, spot)
-                : IvyMath.putIntrinsic(amount, s.strike, spot, s.underlyingUnit);
-            if (got == 0) revert NothingToExercise();
-        }
-        vault.push(t.collateral, msg.sender, got);
-
+        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, _terms[vaultId], amount);
         emit Exercised(vaultId, amount, paid, got);
         if (s.exercisedNotional == s.totalNotional) _finalize(vaultId, s);
     }
 
-    /// @dev Spec §9.1 timing table. Cash European never exercises (it auto-settles).
-    function _checkExerciseWindow(VaultState storage s) internal view {
-        uint256 ts = block.timestamp;
-        if (s.settlement == SettlementType.Cash) {
-            if (s.style == ExerciseStyle.European) revert ExerciseNotAvailable();
-            if (ts >= s.expiry) revert ExerciseWindowClosed();
-        } else {
-            if (ts > uint256(s.expiry) + exerciseWindow) revert ExerciseWindowClosed();
-            if (s.style == ExerciseStyle.European && ts < s.expiry) revert ExerciseNotOpenYet();
-        }
-    }
 
     function _finalize(uint256 vaultId, VaultState storage s) internal {
         s.phase = Phase.Settled;
@@ -76,7 +31,7 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
     /// @notice First moment `settle` may be called: expiry for cash, expiry + exerciseWindow for physical.
     function settlementTimeOf(uint256 vaultId) public view returns (uint256) {
         VaultState storage s = _state[vaultId];
-        return s.settlement == SettlementType.Cash ? uint256(s.expiry) : uint256(s.expiry) + exerciseWindow;
+        return s.settlement == SettlementType.Cash ? uint256(s.expiry) : uint256(s.expiry) + s.exerciseWindow;
     }
 
     /// @notice Permissionless. Physical: closes the vault. Cash: prices the remaining notional and reserves
@@ -85,84 +40,74 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
         if (block.timestamp < settlementTimeOf(vaultId)) revert SettlementNotReached();
-
-        uint256 remaining = s.totalNotional - s.exercisedNotional;
-        if (s.settlement == SettlementType.Cash && remaining > 0) {
-            VaultTerms storage t = _terms[vaultId];
-            bool grace = block.timestamp >= uint256(s.expiry) + settlementGracePeriod;
-            (bool ok, uint256 spot) = _trySpot(t, s.quoteToken, grace);
-            if (!ok && !grace) revert StalePrice();
-            uint256 payout;
-            if (ok) {
-                payout = s.isCall
-                    ? IvyMath.callIntrinsic(remaining, s.strike, spot)
-                    : IvyMath.putIntrinsic(remaining, s.strike, spot, s.underlyingUnit);
-            }
-            s.pendingPayout += payout;
-            s.exercisedNotional = s.totalNotional;
-        }
+        IvyOptionSettlement.settle(s, _terms[vaultId]);
         _finalize(vaultId, s);
     }
 
-    /// @notice Market maker collects what cash auto-settlement reserved. Pull-based so a failing transfer
+    /// @notice Buyer or executor collects a reserved cash payout or unwind refund for the configured recipient. A failing transfer
     ///         can never block `settle`.
     function claimPayout(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Settled);
         VaultState storage s = _state[vaultId];
-        if (msg.sender != s.marketMaker) revert NotMarketMaker();
-        uint256 amount = s.pendingPayout;
+        if (msg.sender != s.marketMaker && msg.sender != s.executor) revert NotExecutor();
+        IIvyVault vault = IIvyVault(s.vault);
+        address collateral = _terms[vaultId].collateral;
+        uint256 amount = vault.payBuyer(collateral, s.recipient);
+        if (s.premiumToken != collateral) amount += vault.payBuyer(s.premiumToken, s.recipient);
         if (amount == 0) revert NothingToClaim();
         s.pendingPayout = 0;
-        IIvyVault(s.vault).push(_terms[vaultId].collateral, msg.sender, amount);
-        emit PayoutClaimed(vaultId, msg.sender, amount);
+        emit PayoutClaimed(vaultId, s.marketMaker, amount);
     }
 
-    /// @dev Non-reverting feed read. `allowStale` lets an old (but non-zero, non-future) price through.
-    function _trySpot(VaultTerms storage t, address quoteToken, bool allowStale)
-        internal view returns (bool ok, uint256 spot)
-    {
-        try IIvyPriceFeed(t.priceFeed).spot(t.underlying, quoteToken) returns (uint256 price, uint256 updatedAt) {
-            if (price == 0 || updatedAt > block.timestamp) return (false, 0);
-            if (!allowStale && block.timestamp - updatedAt > t.maxPriceAge) return (false, 0);
-            return (true, price);
-        } catch {
-            return (false, 0);
+    function claimPremium(uint256 vaultId) external nonReentrant {
+        _requireExists(vaultId);
+        premiums.claimFor(vaultId, msg.sender);
+    }
+
+    function setExecution(uint256 vaultId, address executor, address recipient) external nonReentrant {
+        _requireExists(vaultId);
+        VaultState storage s = _state[vaultId];
+        if (msg.sender != s.marketMaker) revert NotMarketMaker();
+        if (recipient == address(0)) revert ZeroAddress();
+        s.executor = executor;
+        s.recipient = recipient;
+        emit ExecutionUpdated(vaultId, executor, recipient);
+    }
+
+    function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund) external nonReentrant {
+        _requirePhase(vaultId, Phase.Live);
+        VaultState storage s = _state[vaultId];
+        if (msg.sender != s.owner && msg.sender != s.marketMaker) revert NotVaultOwner();
+        unwind.propose(vaultId, deadline, s.exercisedNotional, shareToken.totalSupply(vaultId), refund);
+    }
+    function approveUnwind(uint256 vaultId, uint256 nonce) external nonReentrant {
+        _requirePhase(vaultId, Phase.Live);
+        unwind.approve(vaultId, nonce, msg.sender, shareToken.balanceOf(msg.sender, vaultId));
+    }
+    function revokeUnwind(uint256 vaultId) external nonReentrant { unwind.revoke(vaultId, msg.sender); }
+    function executeUnwind(uint256 vaultId, uint256 nonce, bytes calldata buyerSignature) external nonReentrant {
+        _requirePhase(vaultId, Phase.Live);
+        VaultState storage s = _state[vaultId];
+        uint256 refund = unwind.refundOf(vaultId);
+        IIvyVault vault = IIvyVault(s.vault);
+        if (refund > 0) {
+            uint256 received = vault.pull(s.premiumToken, msg.sender, refund);
+            if (received < refund) revert ShortReceived(refund, received);
         }
+        // Refund transfers can trigger share callbacks. Validate consent after the last external token transfer.
+        unwind.consume(vaultId, nonce, s.exercisedNotional, shareToken.totalSupply(vaultId), s.marketMaker, buyerSignature);
+        vault.reserveBuyer(s.premiumToken, refund);
+        _finalize(vaultId, s);
+        emit Unwound(vaultId, nonce, refund);
     }
 
     // ------------------------------------------------------------ claims (spec §10)
 
-    /// @notice Burn `shares` and receive the same fraction of every token the vault holds
-    ///         (collateral or settlement proceeds, plus premium), net of any reserved market-maker payout.
+    /// @notice Burn `shares` for proportional unreserved collateral and settlement proceeds.
+    ///         Unpaid activation premium, premium dust and buyer obligations remain reserved.
     function claim(uint256 vaultId, uint256 shares) external nonReentrant {
         _requirePhase(vaultId, Phase.Settled);
-        if (shares == 0) revert ZeroAmount();
-        if (shareToken.balanceOf(msg.sender, vaultId) < shares) revert InsufficientShares();
-        VaultState storage s = _state[vaultId];
-        VaultTerms storage t = _terms[vaultId];
-        uint256 supply = shareToken.totalSupply(vaultId);
-
-        address[3] memory tokens = [t.collateral, s.premiumToken, s.isCall ? s.quoteToken : t.underlying];
-        uint256[3] memory amounts;
-        for (uint256 i = 0; i < 3; ++i) {
-            if (_seenBefore(tokens, i)) continue;
-            uint256 available = IERC20(tokens[i]).balanceOf(s.vault);
-            if (tokens[i] == t.collateral) available -= s.pendingPayout;
-            amounts[i] = (available * shares) / supply;
-        }
-
-        shareToken.burn(msg.sender, vaultId, shares);
-        IIvyVault vault = IIvyVault(s.vault);
-        for (uint256 i = 0; i < 3; ++i) {
-            if (amounts[i] > 0) vault.push(tokens[i], msg.sender, amounts[i]);
-        }
+        IvyOptionSettlement.claim(_state[vaultId], _terms[vaultId], shareToken, vaultId, shares);
         emit Claimed(vaultId, msg.sender, shares);
-    }
-
-    function _seenBefore(address[3] memory tokens, uint256 i) private pure returns (bool) {
-        for (uint256 j = 0; j < i; ++j) {
-            if (tokens[j] == tokens[i]) return true;
-        }
-        return false;
     }
 }

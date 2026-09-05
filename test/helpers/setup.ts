@@ -1,10 +1,10 @@
-import { ZeroAddress } from "ethers";
+import { ZeroAddress, getCreateAddress } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
-import type { network } from "hardhat";
+import { artifacts, type network } from "hardhat";
 
 export type Connection = Awaited<ReturnType<typeof network.create>>;
 
-export const EXERCISE_WINDOW = 6n * 3600n;
+export const EXERCISE_WINDOW = 3600n;
 export const AUCTION_TIMEOUT = 3n * 24n * 3600n;
 export const SETTLEMENT_GRACE = 7n * 24n * 3600n;
 export const THIRTY_DAYS = 30n * 24n * 3600n;
@@ -25,11 +25,11 @@ export interface VaultTermsInput {
   publicDeposits: boolean;
   allowedExercise: number;
   allowedSettlement: number;
-  maxTenor: bigint;
+  expiry: bigint;
   auctionStartsAt: bigint;
   minCollateral: bigint;
   priceFeed: string;
-  maxSpotDeviationBps: number;
+  maxInTheMoneyBps: number;
   maxPriceAge: number;
 }
 
@@ -45,7 +45,7 @@ export interface PairInput {
   terms: PairTermsInput;
 }
 
-/** Deploys tokens, feed, vault implementation, hub implementation and the ERC1967 proxy; grants roles. */
+/** Deploys tokens, feed, linked libraries, fixed vault implementation and immutable peers; grants roles. */
 export async function deployIvy(connection: Connection) {
   const { ethers, networkHelpers } = connection;
   const [admin, bidMaster, marketMaker, alice, bob, carol] = await ethers.getSigners();
@@ -55,34 +55,33 @@ export async function deployIvy(connection: Connection) {
   const dai = await ethers.deployContract("MockERC20", ["Dai", "DAI", 18]);
   const feed = await ethers.deployContract("MockPriceFeed");
   const vaultImpl = await ethers.deployContract("IvyVault");
-  const hubImpl = await ethers.deployContract("IvyVaultsHub");
-
   const vaultImplAddress = await vaultImpl.getAddress();
-  const initData = hubImpl.interface.encodeFunctionData("initialize", [
-    admin.address,
-    vaultImplAddress,
-    EXERCISE_WINDOW,
-    AUCTION_TIMEOUT,
-    SETTLEMENT_GRACE,
-  ]);
-  const proxy = await ethers.deployContract("ERC1967Proxy", [await hubImpl.getAddress(), initData]);
-  const hubAddress = await proxy.getAddress();
-  const hub = await ethers.getContractAt("IvyVaultsHub", hubAddress);
-
-  const shares = await ethers.deployContract("IvyShares", [hubAddress, "ipfs://ivy/{id}.json"]);
-  const sharesAddress = await shares.getAddress();
-  await (await hub.setShares(sharesAddress)).wait();
+  const rules = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyVaultRules")).bytecode, admin).deploy();
+  const settlement = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyOptionSettlement")).bytecode, admin).deploy();
+  const libraries = { IvyVaultRules: await rules.getAddress(), IvyOptionSettlement: await settlement.getAddress() };
+  const nonce = await admin.getNonce();
+  const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map(i => getCreateAddress({ from: admin.address, nonce: nonce + i }));
+  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT], { libraries });
+  const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, unwindAddress, "ipfs://ivy/{id}.json"]);
+  const premiums = await ethers.deployContract("IvyPremiums", [hubAddress, sharesAddress]);
+  const unwind = await ethers.deployContract("IvyUnwind", [hubAddress, sharesAddress]);
+  const defaultExpiry = BigInt(await networkHelpers.time.latest()) + THIRTY_DAYS;
 
   await (await hub.grantRole(await hub.BID_MASTER_ROLE(), bidMaster.address)).wait();
   await (await hub.grantRole(await hub.MARKET_MAKER_ROLE(), marketMaker.address)).wait();
 
   return {
+    libraries,
+    rules,
+    settlement,
     connection,
     ethers,
     networkHelpers,
     hub,
     hubAddress,
-    hubImpl,
+    premiums,
+    unwind,
+    defaultExpiry,
     shares,
     sharesAddress,
     vaultImpl,
@@ -114,11 +113,11 @@ export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Va
     publicDeposits: true,
     allowedExercise: ExercisePolicy.Either,
     allowedSettlement: SettlementPolicy.Physical,
-    maxTenor: THIRTY_DAYS,
+    expiry: ctx.defaultExpiry,
     auctionStartsAt: 0n,
     minCollateral: 0n,
     priceFeed: ZeroAddress,
-    maxSpotDeviationBps: 0,
+    maxInTheMoneyBps: 0,
     maxPriceAge: 0,
     ...o,
   };

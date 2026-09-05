@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IvyVaultRules} from "../libraries/IvyVaultRules.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IvyVaultsHubStorage} from "./IvyVaultsHubStorage.sol";
 import {IIvyVault} from "../interfaces/IIvyVault.sol";
@@ -16,18 +17,24 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     function createVault(VaultTerms calldata terms, PairInput[] calldata pairs)
         external nonReentrant returns (uint256 vaultId, address vault)
     {
-        if (address(shareToken) == address(0)) revert SharesNotSet();
-        _validateTerms(terms, pairs);
+        _admission(0);
+        if (shareToken.hub() != address(this) || premiums.hub() != address(this) || unwind.hub() != address(this)
+            || shareToken.premiums() != address(premiums) || shareToken.unwind() != address(unwind)
+            || premiums.shares() != address(shareToken) || unwind.shares() != address(shareToken)) revert BindingMismatch();
+        IvyVaultRules.validateTerms(terms, pairs);
         bool isCall = terms.collateral == terms.underlying;
 
         vaultId = ++vaultCount;
         vault = Clones.clone(vaultImplementation);
-        IIvyVault(vault).initialize(address(this), vaultId, terms.collateral);
+        IIvyVault(vault).initialize(address(this), vaultId, terms.collateral, address(premiums));
 
         _terms[vaultId] = terms;
         VaultState storage s = _state[vaultId];
         s.vault = vault;
         s.owner = msg.sender;
+        s.expiry = terms.expiry;
+        s.exerciseWindow = exerciseWindow;
+        s.auctionTimeout = auctionTimeout;
         s.isCall = isCall;
         s.phase = Phase.Open;
         s.underlyingUnit = 10 ** IERC20Metadata(terms.underlying).decimals();
@@ -48,31 +55,6 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
         if (terms.auctionStartsAt != 0) emit AuctionScheduled(vaultId, terms.auctionStartsAt);
     }
 
-    function _validateTerms(VaultTerms calldata t, PairInput[] calldata pairs) internal pure {
-        if (t.underlying == address(0) || t.collateral == address(0)) revert ZeroAddress();
-        if (t.maxTenor == 0) revert InvalidTenor();
-        bool isCall = t.collateral == t.underlying;
-        if (t.allowedSettlement != SettlementPolicy.Physical && t.priceFeed == address(0)) revert CashSettlementNeedsFeed();
-        if (t.priceFeed != address(0)) {
-            if (t.maxPriceAge == 0) revert FeedNeedsMaxPriceAge();
-            if (isCall && t.maxSpotDeviationBps > 10_000) revert DeviationTooLarge();
-        }
-        if (pairs.length == 0) revert NoPairs();
-        if (!isCall) {
-            if (pairs.length != 1) revert PutRequiresSinglePair();
-            if (pairs[0].quoteToken != t.collateral) revert PutPairMustBeCollateral();
-        }
-        for (uint256 i = 0; i < pairs.length; ++i) {
-            PairInput calldata p = pairs[i];
-            if (p.quoteToken == address(0) || p.terms.premiumToken == address(0)) revert ZeroAddress();
-            if (isCall && p.quoteToken == t.underlying) revert QuoteIsUnderlying();
-            if (!p.terms.enabled) revert PairMustBeEnabled();
-            if (!isCall && p.terms.strikeLimit == 0) revert InvalidStrikeLimit();
-            for (uint256 j = 0; j < i; ++j) {
-                if (pairs[j].quoteToken == p.quoteToken) revert DuplicatePair(p.quoteToken);
-            }
-        }
-    }
 
     // ------------------------------------------------------------ deposits (spec §6.1)
 
@@ -100,6 +82,7 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     }
 
     function _checkDeposit(uint256 vaultId, address depositor, uint256 amount) internal view {
+        _admission(vaultId);
         _requirePhase(vaultId, Phase.Open);
         if (amount == 0) revert ZeroAmount();
         if (!_terms[vaultId].publicDeposits && depositor != _state[vaultId].owner) revert DepositsNotPublic();
@@ -116,40 +99,14 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     /// @notice Tighten vault-level terms. Every field must be equal or more LP-favourable than today.
     function tightenVaultTerms(uint256 vaultId, TightenableTerms calldata n) external onlyVaultOwner(vaultId) {
         _requirePhase(vaultId, Phase.Open);
-        VaultTerms storage t = _terms[vaultId];
-        if (!(t.allowedExercise == n.allowedExercise || t.allowedExercise == ExercisePolicy.Either)) revert LoosensTerms();
-        if (!(t.allowedSettlement == n.allowedSettlement || t.allowedSettlement == SettlementPolicy.Either)) revert LoosensTerms();
-        if (n.maxTenor == 0) revert InvalidTenor();
-        if (n.maxTenor > t.maxTenor) revert LoosensTerms();
-        if (n.minCollateral < t.minCollateral) revert LoosensTerms();
-        if (t.priceFeed != address(0)) {
-            if (n.maxSpotDeviationBps > t.maxSpotDeviationBps) revert LoosensTerms();
-            if (n.maxPriceAge == 0) revert FeedNeedsMaxPriceAge();
-            if (n.maxPriceAge > t.maxPriceAge) revert LoosensTerms();
-            t.maxSpotDeviationBps = n.maxSpotDeviationBps;
-            t.maxPriceAge = n.maxPriceAge;
-        }
-        t.allowedExercise = n.allowedExercise;
-        t.allowedSettlement = n.allowedSettlement;
-        t.maxTenor = n.maxTenor;
-        t.minCollateral = n.minCollateral;
+        IvyVaultRules.tightenVaultTerms(_terms[vaultId], n);
         emit VaultTermsTightened(vaultId);
     }
 
     /// @notice Tighten one quote token's terms. Premium token is fixed; a disabled pair stays disabled.
     function tightenPairTerms(uint256 vaultId, address quoteToken, PairTerms calldata n) external onlyVaultOwner(vaultId) {
         _requirePhase(vaultId, Phase.Open);
-        PairTerms storage p = _pairTerms[vaultId][quoteToken];
-        if (p.premiumToken == address(0)) revert PairUnknown(quoteToken);
-        if (n.premiumToken != p.premiumToken) revert LoosensTerms();
-        bool isCall = _state[vaultId].isCall;
-        if (isCall ? n.strikeLimit < p.strikeLimit : n.strikeLimit > p.strikeLimit) revert LoosensTerms();
-        if (!isCall && n.strikeLimit == 0) revert InvalidStrikeLimit();
-        if (n.minPremium < p.minPremium) revert LoosensTerms();
-        if (n.enabled && !p.enabled) revert LoosensTerms();
-        p.strikeLimit = n.strikeLimit;
-        p.minPremium = n.minPremium;
-        p.enabled = n.enabled;
+        IvyVaultRules.tightenPairTerms(_pairTerms[vaultId][quoteToken], _state[vaultId].isCall, quoteToken, n);
         emit PairTermsTightened(vaultId, quoteToken);
     }
 
@@ -172,25 +129,29 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
     /// @notice Freeze deposits and start the off-chain auction. Owner any time; anyone once `auctionStartsAt` passed.
     function openAuction(uint256 vaultId) external {
         _requirePhase(vaultId, Phase.Open);
+        _admission(vaultId);
         VaultState storage s = _state[vaultId];
         VaultTerms storage t = _terms[vaultId];
+        if (block.timestamp >= t.expiry) revert ExpiryInPast();
         bool scheduled = t.auctionStartsAt != 0 && block.timestamp >= t.auctionStartsAt;
         if (msg.sender != s.owner && !scheduled) revert AuctionNotStartable();
         uint256 collateral = shareToken.totalSupply(vaultId);
         if (collateral == 0) revert ZeroAmount();
         if (collateral < t.minCollateral) revert BelowMinCollateral(collateral, t.minCollateral);
+        ++s.auctionId;
+        emit AuctionIdentity(vaultId, s.auctionId);
         s.phase = Phase.Auction;
         s.auctionOpenedAt = uint64(block.timestamp);
         emit AuctionOpened(vaultId, collateral);
     }
 
-    /// @notice Bid master any time; owner once `auctionTimeout` has elapsed. Clears the schedule.
+    /// @notice Bid master any time; owner after timeout, at expiry, or during admission pause. Clears the schedule.
     function cancelAuction(uint256 vaultId) external {
         _requirePhase(vaultId, Phase.Auction);
         VaultState storage s = _state[vaultId];
         if (!hasRole(BID_MASTER_ROLE, msg.sender)) {
             if (msg.sender != s.owner) revert NotVaultOwner();
-            if (block.timestamp < uint256(s.auctionOpenedAt) + auctionTimeout) revert AuctionTimeoutNotReached();
+            if (!paused && !vaultPaused[vaultId] && block.timestamp < s.expiry && block.timestamp < uint256(s.auctionOpenedAt) + s.auctionTimeout) revert AuctionTimeoutNotReached();
         }
         s.phase = Phase.Open;
         s.auctionOpenedAt = 0;
