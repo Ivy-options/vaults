@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "check:size": "node scripts/check-size.mjs",
     "operator": "node scripts/operator.mjs",
-    "postcompile": "node scripts/check-size.mjs"
+    "postcompile": "node scripts/check-size.mjs",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.15",

@@ -1,507 +1,967 @@
 <!DOCTYPE html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ivy Vaults</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
-<style>
-  :root {
-    --paper: #FAF8F4;
-    --panel: #F3EFE8;
-    --ink: #1A1A1A;
-    --muted: #5A564E;
-    --faint: #8C8678;
-    --line: #E4DFD5;
-    --line-strong: #CFC8BA;
-    --accent: #C4562B;
-    --accent-soft: #F3DED3;
-    --code-bg: #EEE9E0;
-    --inv-bg: #111113;
-    --inv-panel: #18181B;
-    --inv-ink: #EDE9E1;
-    --inv-muted: #A39D91;
-    --inv-faint: #6E6960;
-    --inv-line: #2A2A2F;
-    --c-lp: #2E8272;
-    --c-owner: #3A67A0;
-    --c-bid: #7A4C8F;
-    --c-mm: #C4562B;
-    --display: "Newsreader", "Times New Roman", Georgia, serif;
-    --body: "Inter", -apple-system, system-ui, Helvetica, Arial, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #0E0E10;
-      --panel: #151518;
-      --ink: #EDE9E1;
-      --muted: #A9A297;
-      --faint: #7B766C;
-      --line: #26262B;
-      --line-strong: #37373D;
-      --accent: #E0764A;
-      --accent-soft: #3A251C;
-      --code-bg: #1B1B1F;
-      --inv-bg: #151519;
-      --inv-panel: #1D1D22;
-      --inv-ink: #EDE9E1;
-      --inv-muted: #A9A297;
-      --inv-faint: #7B766C;
-      --inv-line: #2C2C32;
-      --c-lp: #7FC7B4;
-      --c-owner: #8FB4E6;
-      --c-bid: #C39BD6;
-      --c-mm: #E0764A;
-    }
-  }
-  :root[data-theme="dark"] {
-    --paper: #0E0E10;
-    --panel: #151518;
-    --ink: #EDE9E1;
-    --muted: #A9A297;
-    --faint: #7B766C;
-    --line: #26262B;
-    --line-strong: #37373D;
-    --accent: #E0764A;
-    --accent-soft: #3A251C;
-    --code-bg: #1B1B1F;
-    --inv-bg: #151519;
-    --inv-panel: #1D1D22;
-    --inv-ink: #EDE9E1;
-    --inv-muted: #A9A297;
-    --inv-faint: #7B766C;
-    --inv-line: #2C2C32;
-    --c-lp: #7FC7B4;
-    --c-owner: #8FB4E6;
-    --c-bid: #C39BD6;
-    --c-mm: #E0764A;
-  }
-
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
-  a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
-  a:hover { text-decoration-color: var(--accent); }
-  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  code, .mono { font-family: var(--mono); font-size: 0.86em; }
-  code { background: none; padding: 0; color: inherit; font-weight: 500; }
-  pre { background: var(--code-bg); border: 1px solid var(--line); padding: 16px 18px; overflow-x: auto; margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; }
-  pre code { background: none; padding: 0; font-size: inherit; }
-  p { margin: 0 0 14px; }
-  .muted { color: var(--muted); }
-  .small { font-size: 14px; }
-
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
-  .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
-
-  /* top bar */
-  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--ink); }
-  .brand { display: flex; align-items: baseline; gap: 12px; }
-  .brand .name { font-family: var(--display); font-size: 24px; letter-spacing: 0.04em; }
-  .brand .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
-  .bar nav { display: flex; gap: 22px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
-  .bar nav a { text-decoration: none; color: var(--muted); }
-  .bar nav a:hover { color: var(--accent); }
-  .theme { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--line-strong); border-radius: 2px; padding: 6px 10px; cursor: pointer; line-height: 1; }
-  .theme:hover { color: var(--ink); border-color: var(--ink); }
-
-  /* hero */
-  .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; padding: 72px 0 56px; border-bottom: 1px solid var(--line); align-items: end; }
-  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
-  .kicker::before { content: ""; width: 28px; height: 1px; background: var(--accent); }
-  h1 { font-family: var(--display); font-weight: 400; font-size: clamp(42px, 6.4vw, 76px); line-height: 0.98; letter-spacing: -0.04em; margin: 0 0 28px; max-width: 13ch; text-wrap: balance; }
-  h1 em, h2 em { font-style: italic; font-weight: 300; color: var(--accent); }
-  .lede { font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 56ch; margin: 0; }
-  .figure { border: 1px solid var(--line); background: var(--panel); padding: 18px 18px 14px; }
-  .figure svg { display: block; width: 100%; height: auto; }
-  .figcap { display: flex; justify-content: space-between; gap: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 10px; }
-  .figcap b { color: var(--ink); font-weight: 500; }
-  .sw { display: inline-block; width: 18px; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 6px; }
-  .sw.dash { border-top: 1.5px dashed var(--faint); }
-
-  /* editorial section grid */
-  section { padding: 72px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 200px 1fr; gap: 40px; }
-  .side { position: sticky; top: 28px; align-self: start; }
-  .side .num { font-family: var(--display); font-weight: 300; font-size: 72px; line-height: 0.9; letter-spacing: -0.04em; color: var(--ink); }
-  .side .num i { font-style: normal; color: var(--accent); }
-  .side .rule { width: 32px; height: 1px; background: var(--accent); margin: 16px 0 12px; }
-  .side .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
-  .main { min-width: 0; }
-  h2 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 3.8vw, 44px); line-height: 1.05; letter-spacing: -0.03em; margin: -6px 0 22px; max-width: 22ch; text-wrap: balance; }
-  h3 { font-family: var(--body); font-weight: 600; font-size: 14px; margin: 0 0 8px; }
-  .prose { max-width: 66ch; }
-  .fig { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 30px 0 10px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .fig b { color: var(--ink); font-weight: 500; }
-
-  /* chips and facts */
-  .chip { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 7px 3px; border-radius: 2px; line-height: 1; white-space: nowrap; color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
-  .chip.lp { color: var(--c-lp); background: color-mix(in srgb, var(--c-lp) 14%, transparent); }
-  .chip.owner { color: var(--c-owner); background: color-mix(in srgb, var(--c-owner) 14%, transparent); }
-  .chip.bid { color: var(--c-bid); background: color-mix(in srgb, var(--c-bid) 14%, transparent); }
-  .chip.mm { color: var(--c-mm); background: color-mix(in srgb, var(--c-mm) 14%, transparent); }
-  .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .facts li { display: grid; grid-template-columns: 104px 1fr; gap: 12px; align-items: start; font-size: 14.5px; line-height: 1.5; }
-  .facts li .chip { margin-top: 2px; justify-self: start; }
-  .plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 15px; }
-  .plain li { position: relative; padding-left: 16px; }
-  .plain li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; background: var(--accent); }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 22px; }
-  .grid2 > div { background: var(--paper); padding: 18px 20px; font-size: 14.5px; line-height: 1.55; }
-  .grid2 .k { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--muted); margin: 0 0 18px; }
-  .legend b { font-family: var(--mono); font-weight: 500; color: var(--ink); margin-right: 6px; }
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: st; }
-  .steps li { counter-increment: st; display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; font-size: 15px; line-height: 1.55; }
-  .steps li::before { content: counter(st); font-family: var(--display); font-size: 30px; line-height: 1; color: var(--accent); }
-  .steps li b { font-weight: 600; display: block; margin-bottom: 2px; }
-  .callout { border-left: 2px solid var(--accent); padding: 4px 0 4px 16px; margin-top: 22px; font-size: 14.5px; color: var(--muted); max-width: 66ch; }
-  .callout b { color: var(--ink); }
-
-  /* two-up */
-  .two { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); }
-  .two > div { padding: 24px 26px; }
-  .two > div + div { border-left: 1px solid var(--line); }
-  .two h3 { font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: -0.015em; margin-bottom: 12px; }
-  .two p { font-size: 15px; }
-  .two p:last-child { margin-bottom: 0; }
-  .two .tok { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-
-  /* lifecycle timeline */
-  .timeline { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 18px; }
-  .timeline::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 1px; background: var(--line-strong); }
-  .timeline { gap: 14px; }
-  .step { position: relative; padding: 32px 0 0; display: flex; flex-direction: column; }
-  .step::before { content: ""; position: absolute; top: 3px; left: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); border: 1.5px solid var(--ink); }
-  .step.live::before { background: var(--accent); border-color: var(--accent); }
-  .step .card { background: var(--panel); border: 1px solid var(--line); padding: 18px 18px 16px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
-  .step.live .card { border-top: 2px solid var(--accent); }
-  .step .idx { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; color: var(--faint); }
-  .step .name { font-family: var(--display); font-size: 30px; letter-spacing: -0.02em; line-height: 1; margin: 4px 0 0; }
-  .step .facts li { grid-template-columns: 1fr; gap: 4px; font-size: 14px; }
-  .step .facts { gap: 12px; }
-  .step .exit { margin-top: auto; padding-top: 12px; border-top: 1px dashed var(--line-strong); font-size: 13.5px; color: var(--muted); line-height: 1.5; }
-  .step .exit b { color: var(--ink); font-weight: 500; }
-  .loop { margin-top: 22px; padding-top: 14px; border-top: 1px dashed var(--line-strong); font-family: var(--body); font-size: 14px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .loop b { color: var(--accent); font-weight: 500; }
-
-  /* tables */
-  .tablewrap { overflow-x: auto; border: 1px solid var(--line); }
-  table { width: 100%; border-collapse: collapse; font-size: 14.5px; color: inherit; }
-  th, td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 500; background: var(--panel); }
-  tr:last-child td { border-bottom: 0; }
-  td.k { font-weight: 500; white-space: nowrap; }
-  td code, td .mono { white-space: nowrap; }
-  td .mono.wrapok { white-space: normal; line-height: 1.8; }
-  td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-
-  /* calculator */
-  .calc { border: 1px solid var(--line); }
-  .calc .inputs { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; border-bottom: 1px solid var(--line); background: var(--panel); }
-  .calc .inputs label { display: grid; gap: 6px; padding: 14px 16px; border-right: 1px solid var(--line); font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
-  .calc .inputs label:last-child { border-right: 0; }
-  .calc input, .calc select { font-family: var(--mono); font-size: 15px; padding: 6px 0; border: 0; border-bottom: 1px solid var(--line-strong); background: transparent; color: var(--ink); border-radius: 0; width: 100%; }
-  .calc input:focus, .calc select:focus { outline: none; border-bottom-color: var(--accent); }
-  .calc .body { display: grid; grid-template-columns: 1fr 1fr; }
-  .calc .chart { padding: 18px 18px 12px; border-right: 1px solid var(--line); }
-  .calc .chart svg { display: block; width: 100%; height: auto; }
-  .calc .results { padding: 0; }
-  .calc .results table th:first-child, .calc .results table td:first-child { padding-left: 18px; }
-  .calc .results .big { font-family: var(--display); font-size: 22px; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .calc .results .unit { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.1em; margin-left: 4px; }
-  .calc .results td { padding: 14px 16px; }
-  .calc .results td.mm { color: var(--muted); font-size: 13.5px; }
-  .calc .derived { display: flex; gap: 22px; padding: 12px 18px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
-  .calc .derived b { color: var(--ink); font-weight: 500; }
-
-  /* terms ledger */
-  .terms { border: 1px solid var(--line); }
-  .terms .row { display: grid; grid-template-columns: 240px 1fr 220px; gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14.5px; align-items: baseline; }
-  .terms .row:last-child { border-bottom: 0; }
-  .terms .row.head { background: var(--panel); font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); padding: 9px 18px; }
-  .terms .dir { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
-  .terms .dir.fixed { color: var(--faint); }
-
-  /* market makers */
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
-
-  /* developers (inverted block) */
-  .dev { background: var(--inv-bg); color: var(--inv-ink); border-bottom: 0; border-top: 1px solid var(--inv-line); display: block; }
-  .devgrid { display: grid; grid-template-columns: 200px 1fr; gap: 40px; }
-  .dev .side .num { color: var(--inv-ink); }
-  .dev .side .lbl { color: var(--inv-faint); }
-  .dev h2 { color: var(--inv-ink); }
-  .dev .muted { color: var(--inv-muted); }
-  .dev .fig { color: var(--inv-faint); }
-  .dev .fig b { color: var(--inv-ink); }
-  .dev .chip { color: var(--inv-muted); background: color-mix(in srgb, var(--inv-muted) 16%, transparent); }
-  .dev .chip.lp { color: var(--c-lp); background: color-mix(in srgb, var(--c-lp) 18%, transparent); }
-  .dev .chip.owner { color: var(--c-owner); background: color-mix(in srgb, var(--c-owner) 18%, transparent); }
-  .dev .chip.bid { color: var(--c-bid); background: color-mix(in srgb, var(--c-bid) 18%, transparent); }
-  .dev .chip.mm { color: var(--c-mm); background: color-mix(in srgb, var(--c-mm) 18%, transparent); }
-  .dev code { color: var(--inv-ink); }
-  .contracts { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--inv-line); }
-  .contracts > div { padding: 20px; border-right: 1px solid var(--inv-line); font-size: 14.5px; }
-  .contracts > div:last-child { border-right: 0; }
-  .contracts .name { font-family: var(--display); font-size: 22px; letter-spacing: -0.01em; display: block; margin-bottom: 10px; }
-  .contracts .role { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 8px; }
-  .contracts p { margin: 0; color: var(--inv-muted); line-height: 1.55; }
-  .calls { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--inv-line); }
-  .calls > div { padding: 18px 20px; }
-  .calls > div + div { border-left: 1px solid var(--inv-line); }
-  .calls dl { margin: 0; display: block; font-size: 14px; min-width: 0; }
-  .calls dt { font-family: var(--mono); font-size: 13px; color: var(--inv-ink); overflow-wrap: anywhere; line-height: 1.5; }
-  .calls dd { margin: 4px 0 12px; color: var(--inv-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .calls dd:empty { display: none; }
-  .calls > div { min-width: 0; }
-  .calls .who { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 16px 0 8px; }
-  .calls .who:first-child { margin-top: 0; }
-  .dev .tablewrap { border-color: var(--inv-line); }
-  .dev th { background: var(--inv-panel); color: var(--inv-faint); }
-  .dev th, .dev td { border-color: var(--inv-line); }
-  .dev td { color: var(--inv-ink); }
-  .dev td.muted { color: var(--inv-muted); }
-  .dev pre { background: var(--inv-panel); border-color: var(--inv-line); color: var(--inv-ink); }
-
-  footer { background: var(--inv-bg); color: var(--inv-faint); }
-  footer .wrap { padding-top: 26px; padding-bottom: 44px; border-top: 1px solid var(--inv-line); font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-
-  @media (max-width: 1000px) {
-    .hero { grid-template-columns: 1fr; gap: 36px; }
-    .timeline { grid-template-columns: 1fr 1fr; }
-    .timeline::before { display: none; }
-    .calc .inputs { grid-template-columns: 1fr 1fr; }
-    .calc .inputs label:nth-child(2) { border-right: 0; }
-    .calc .inputs label:nth-child(n+3) { border-top: 1px solid var(--line); }
-    .calc .inputs label:nth-child(4) { border-right: 0; }
-    .calc .body { grid-template-columns: 1fr; }
-    .calc .chart { border-right: 0; border-bottom: 1px solid var(--line); }
-    .split { grid-template-columns: 1fr; }
-    .contracts { grid-template-columns: 1fr 1fr; }
-    .contracts > div:nth-child(2) { border-right: 0; }
-    .contracts > div:nth-child(n+3) { border-top: 1px solid var(--inv-line); }
-    .calls { grid-template-columns: 1fr; }
-    .calls > div + div { border-left: 0; border-top: 1px solid var(--inv-line); }
-    .terms .row { grid-template-columns: 1fr; gap: 4px; }
-  }
-  @media (max-width: 800px) {
-    section { grid-template-columns: 1fr; gap: 18px; padding: 56px 0; }
-    .devgrid { grid-template-columns: 1fr; gap: 18px; }
-    .side { position: static; display: flex; align-items: baseline; gap: 14px; }
-    .side .num { font-size: 40px; }
-    .side .rule { display: none; }
-  }
-  @media (max-width: 600px) {
-    .wrap { padding: 0 20px; }
-    .two { grid-template-columns: 1fr; }
-    .two > div + div { border-left: 0; border-top: 1px solid var(--line); }
-    .timeline { grid-template-columns: 1fr; }
-    .grid2 { grid-template-columns: 1fr; }
-    .facts li { grid-template-columns: 1fr; gap: 4px; }
-    .contracts { grid-template-columns: 1fr; }
-    .contracts > div { border-right: 0; }
-    .contracts > div:nth-child(n+2) { border-top: 1px solid var(--inv-line); }
-    .bar { flex-direction: column; align-items: flex-start; }
-    .calc .inputs { grid-template-columns: 1fr; }
-    .calc .inputs label { border-right: 0; }
-    .calc .inputs label:nth-child(n+2) { border-top: 1px solid var(--line); }
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    a, .bar nav a { transition: color 120ms ease, text-decoration-color 120ms ease; }
-  }
-</style>
-
-<div class="wrap">
-  <header class="bar">
-    <div class="brand"><span class="name">IVY</span><span class="tag">Vaults · Technical Notes</span></div>
-    <nav>
-      <a href="#collateral">Collateral</a>
-      <a href="#lifecycle">Lifecycle</a>
-      <a href="#outcomes">Outcomes</a>
-      <a href="#terms">Terms</a>
-      <a href="#makers">Market makers</a>
-      <a href="#developers">Developers</a>
-      <button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme · light</button>
-    </nav>
-  </header>
-
-  <div class="hero">
-    <div>
-      <div class="kicker">Single-use · Covered calls &amp; cash-secured puts · Physical or cash</div>
-      <h1>A vault sells exactly <em>one</em> option.</h1>
-      <p class="lede">LPs deposit collateral into a new vault. An off-chain auction picks a market maker. The bid master activates the winning bid on-chain, and the premium moves into the vault in that same transaction. Activation holders can claim premium immediately. The buyer or its executor may exercise within the agreed window; after finalization, current shareholders claim the unreserved pool. A vault is never reused.</p>
-    </div>
-    <div class="figure">
-      <svg id="heroChart" viewBox="0 0 420 250" role="img" aria-label="LP total value including earned premium versus spot for a covered call"></svg>
-      <div class="figcap"><span>Fig. 01 · LP total value including earned premium vs. spot</span><span><b>Covered call</b> · 10 WETH · K 3,000 · premium 100</span></div>
-    </div>
-  </div>
-
-  <section id="collateral">
-    <aside class="side"><div class="num">0<i>1</i></div><div class="rule"></div><div class="lbl">Collateral and shares</div></aside>
-    <div class="main">
-      <h2>What goes in, and what you hold.</h2>
-      <div class="two">
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="How Ivy Vaults work: collateral, shares, option auctions, settlement, signed bids and contract entrypoints."
+    />
+    <title>Ivy Vaults · Protocol guide</title>
+    <script>
+      try {
+        if (localStorage.getItem("ivy-theme") === "light")
+          document.documentElement.dataset.theme = "light";
+      } catch (_) {}
+    </script>
+    <link rel="icon" type="image/png" href="assets/ivy-logo.png" />
+    <link rel="stylesheet" href="assets/docs.css" />
+    <script src="assets/docs.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="topbar">
+      <a class="brand" href="#overview" aria-label="Ivy Vaults overview"
+        ><img src="assets/ivy-logo.png" alt="" width="23" height="34" />Ivy
+        <span>Vaults</span></a
+      ><span class="breadcrumb">Documentation / Protocol guide</span
+      ><button
+        class="theme"
+        id="themeToggle"
+        type="button"
+        aria-label="Switch colour theme"
+      >
+        Theme
+      </button>
+    </header>
+    <aside class="rail">
+      <details open id="contents">
+        <summary>On this page</summary>
+        <nav aria-label="Guide sections">
+          <a href="#overview">Overview</a>
+          <a href="#option-basics">The option deal</a>
+          <a href="#collateral">Collateral and shares</a>
+          <a href="#lifecycle">Vault lifecycle</a>
+          <a href="#outcomes">Settlement outcomes</a>
+          <a href="#terms">Vault terms</a>
+          <a href="#makers">Bidding and exercise</a>
+          <a href="#developers">Contracts and entrypoints</a>
+        </nav>
+      </details>
+      <div class="rail-links">
+        <a href="../operations.md">Operator runbook ↗</a
+        ><a href="../../examples/operator/README.md">Request examples ↗</a
+        ><a href="../../README.md">Repository README ↗</a>
+      </div>
+    </aside>
+    <main id="content" class="content" tabindex="-1">
+      <div class="hero" id="overview">
         <div>
-          <div class="tok">collateral == underlying</div>
-          <h3>Covered call</h3>
-          <ul class="plain">
-            <li>Deposit the underlying, for example WETH.</li>
-            <li>Bids quote strike in a listed quote token and premium in that pair’s fixed premium token.</li>
-            <li>Notional equals the collateral. 10 WETH covers 10 calls.</li>
-          </ul>
-        </div>
-        <div>
-          <div class="tok">collateral != underlying</div>
-          <h3>Cash-secured put</h3>
-          <ul class="plain">
-            <li>Deposit the quote token, for example USDC. The underlying is fixed at creation.</li>
-            <li>One pair only.</li>
-            <li>Notional is <code>collateral × 10^decimals / strike</code>. 30,000 USDC at a 3,000 strike covers 10 puts.</li>
-          </ul>
+          <div class="kicker">Protocol guide</div>
+          <h1>Ivy Vaults</h1>
+          <p class="lede">
+            Deposit assets to back one option, earn its premium, and claim what
+            remains when the option ends.
+          </p>
+          <p class="prose">
+            An Ivy vault is a smart contract that holds assets to back a single
+            option sold to a buyer. The buyer pays for the rights that the
+            option gives them, and the people who provide those assets earn that
+            payment. What they receive at the end also depends on the option's
+            terms and whether the buyer uses those rights. Each vault handles
+            one trade; selling another option requires a new vault.
+          </p>
         </div>
       </div>
-      <div class="grid2">
-        <div><div class="k">Shares</div>One share is one smallest unit of collateral, minted on the amount actually received. ERC-1155 on <code>IvyShares</code>, token id = vault id, transferable in every phase. Current holders claim the remaining pool after settlement; activation premium stays with its original holder.</div>
-        <div><div class="k">Kind</div>Read from the two addresses at creation. Same address means covered call, different means cash-secured put. Nobody declares it.</div>
-        <div><div class="k">Approvals</div>Approve the vault address, never the hub. The hub tells the vault to pull and holds no tokens. <code>deposit(amount)</code> on the vault works too.</div>
-        <div><div class="k">Premium</div>Pulled at activation and immediately claimable through <code>claimPremium(vaultId)</code>. Each activation holder keeps its entitlement after transfers or burns. Floor-rounding dust stays reserved permanently.</div>
-      </div>
-    </div>
-  </section>
 
-  <section id="lifecycle">
-    <aside class="side"><div class="num">0<i>2</i></div><div class="rule"></div><div class="lbl">Lifecycle</div></aside>
-    <div class="main">
-      <h2>Four phases, one direction.</h2>
-      <div class="fig"><span>Fig. 02 · Who may act in each phase</span></div>
-      <div class="timeline">
-        <div class="step">
-          <div class="card">
-            <div><div class="idx">PHASE 0</div><div class="name">Open</div></div>
-            <ul class="facts">
-              <li><span class="chip lp">LPs</span><span>Withdraw while Open; deposits also require admission to be unpaused. Non-owners need <code>publicDeposits</code>.</span></li>
-              <li><span class="chip owner">Owner</span><span>May only tighten terms, schedule the auction, transfer ownership.</span></li>
-            </ul>
-            <div class="exit"><b>Exit</b> <code>openAuction</code> by the owner, or by anyone once <code>auctionStartsAt</code> has passed. Needs at least <code>minCollateral</code> and a future exact expiry.</div>
+      <section id="option-basics">
+        <div class="main">
+          <h2>The option deal</h2>
+          <p class="prose">
+            An option gives its buyer a right they can use under agreed
+            conditions, without requiring them to use it. The seller receives an
+            upfront payment, called the <strong>premium</strong>, for taking on
+            the corresponding obligation.
+          </p>
+          <div class="deal-rights" aria-label="Two option types">
+            <div>
+              <span class="deal-label">Call</span
+              ><span
+                >The buyer has the right to <strong>buy</strong> the asset at an
+                agreed price.</span
+              >
+            </div>
+            <div>
+              <span class="deal-label">Put</span
+              ><span
+                >The buyer has the right to <strong>sell</strong> the asset at
+                an agreed price.</span
+              >
+            </div>
           </div>
-        </div>
-        <div class="step">
-          <div class="card">
-            <div><div class="idx">PHASE 1</div><div class="name">Auction</div></div>
-            <ul class="facts">
-              <li><span class="chip lp">LPs</span><span>Funds frozen. No deposits, withdrawals or term changes.</span></li>
-              <li><span class="chip bid">Bid master</span><span>Runs the auction off-chain and submits the winner.</span></li>
-            </ul>
-            <div class="exit"><b>Exit</b> <code>activate(vaultId, bid, signature)</code>. Cancel back to Open: bid master any time, owner after its snapshotted timeout (3 days by default), or immediately when admission is paused or expiry has passed.</div>
-          </div>
-        </div>
-        <div class="step live">
-          <div class="card">
-            <div><div class="idx">PHASE 2</div><div class="name">Live</div></div>
-            <ul class="facts">
-              <li><span class="chip mm">Market maker</span><span><code>exercise(vaultId, amount)</code> inside its window, any amount up to what remains, as often as it likes.</span></li>
-              <li><span class="chip lp">LPs</span><span>Claim activation premium now. Shares still transfer; current holders may vote on an unwind.</span></li>
-            </ul>
-            <div class="exit"><b>Exit</b> <code>settle(vaultId)</code> by anyone at the settlement time, automatically on full exercise, or through a buyer-signed unanimous unwind.</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="card">
-            <div><div class="idx">PHASE 3</div><div class="name">Settled</div></div>
-            <ul class="facts">
-              <li><span class="chip lp">Share holders</span><span><code>claim(vaultId, shares)</code> burns shares for a pro-rata slice of unreserved collateral and proceeds. Premium and buyer reserves are excluded.</span></li>
-              <li><span class="chip mm">Market maker</span><span><code>claimPayout(vaultId)</code> collects a reserved cash payout or unwind refund for the configured recipient.</span></li>
-            </ul>
-            <div class="exit"><b>Terminal.</b> Create a new vault to roll.</div>
-          </div>
-        </div>
-      </div>
-      <div class="callout"><b>Admission pause.</b> Global or per-vault pauses block new creation where applicable, deposits, auction opening and activation. Withdrawals, transfers, exercise, reports, settlement, claims and agreed unwinds remain available. Deadlines never move.</div>
-      <div class="loop"><span class="chip">Legend</span><span class="chip lp">LPs</span><span class="chip owner">Owner</span><span class="chip bid">Bid master</span><span class="chip mm">Market maker</span><span style="margin-left:8px">Cancelling an auction returns the vault to Open. Every other transition is one-way.</span></div>
-    </div>
-  </section>
 
-  <section id="outcomes">
-    <aside class="side"><div class="num">0<i>3</i></div><div class="rule"></div><div class="lbl">Outcomes</div></aside>
-    <div class="main">
-      <h2>LP proceeds, including earned premium.</h2>
-      <div class="legend"><span><b>D</b>call collateral</span><span><b>C</b>put collateral</span><span><b>K</b>strike</span><span><b>N</b>put notional, C / K</span><span><b>S</b>finalized expiry price</span><span><b>f</b>exercised fraction</span><span><b>P</b>premium earned at activation, paid separately</span></div>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Outcome</th><th>Covered call (deposit D underlying)</th><th>Cash-secured put (deposit C quote)</th></tr></thead>
-          <tbody>
-            <tr><td class="k">Not exercised</td><td><span class="mono">D</span> underlying + <span class="mono">P</span></td><td><span class="mono">C</span> quote + <span class="mono">P</span></td></tr>
-            <tr><td class="k">Physical, fraction f</td><td><span class="mono">(1−f)·D</span> underlying + <span class="mono">f·D·K</span> quote + <span class="mono">P</span></td><td><span class="mono">f·N</span> underlying + <span class="mono">C − f·N·K</span> quote + <span class="mono">P</span></td></tr>
-            <tr><td class="k">Cash, unexercised r</td><td><span class="mono">D − r·(S−K)/S</span> underlying + <span class="mono">P</span> <span class="muted small">(payout 0 if S ≤ K)</span></td><td><span class="mono">C − r·(K−S)</span> quote + <span class="mono">P</span> <span class="muted small">(payout 0 if S ≥ K)</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout" style="margin-top:14px"><b>Two separate claims.</b> These formulas and charts show total LP proceeds assuming the same holders throughout, including premium earned at activation. The settlement pool excludes all unpaid premium and buyer reserves. Exercise consideration rounds up and buyer payouts round down; premium entitlement dust remains permanently reserved. Cash rows assume no prior American cash exercise; prior payouts must also be subtracted.</div>
-
-      <div class="fig"><span>Fig. 03 · Settlement outcomes from the contract formulas</span><span>Example inputs · WETH / USDC</span></div>
-      <div class="calc">
-        <div class="inputs">
-          <label>Kind
-            <select id="kind"><option value="call">Covered call · deposit WETH</option><option value="put">Cash-secured put · deposit USDC</option></select>
-          </label>
-          <label><span id="depLabel">Deposit (WETH)</span><input id="dep" type="number" step="any" value="10"></label>
-          <label>Strike (USDC / WETH)<input id="strike" type="number" step="any" value="3000"></label>
-          <label>Premium (USDC / WETH)<input id="prem" type="number" step="any" value="100"></label>
-          <label>Finalized expiry price<input id="spot" type="number" step="any" value="3300"></label>
-        </div>
-        <div class="body">
-          <div class="chart">
-            <svg id="calcChart" viewBox="0 0 420 250" role="img" aria-label="LP total value including earned premium versus spot for the current inputs"></svg>
-            <div class="figcap"><span>LP total value including earned premium, quote terms</span><span><span class="sw"></span>LP total &nbsp; <span class="sw dash"></span>hold collateral</span></div>
+          <div class="deal-block">
+            <h3>Who takes part</h3>
+            <dl class="deal-roles">
+              <div>
+                <dt>Vault owner</dt>
+                <dd>
+                  <p>
+                    Creates the vault and chooses the terms it is willing to
+                    offer. The owner can provide the assets alone or allow other
+                    depositors to join.
+                  </p>
+                </dd>
+              </div>
+              <div>
+                <dt>Liquidity provider <span>LP</span></dt>
+                <dd>
+                  <p>
+                    Deposits assets to back the option and receives shares
+                    recording their interest in the vault. A
+                    <strong>shareholder</strong> is whoever currently owns those
+                    shares, including someone who received them from an earlier
+                    depositor.
+                  </p>
+                </dd>
+              </div>
+              <div>
+                <dt>Market maker <span>Buyer</span></dt>
+                <dd>
+                  <p>
+                    Buys the option and offers a price through a
+                    <strong>bid</strong>, which is a signed proposal for the
+                    trade.
+                  </p>
+                </dd>
+              </div>
+              <div>
+                <dt>Bid master</dt>
+                <dd>
+                  <p>
+                    The authorized auction operator who selects a bid outside
+                    the blockchain and submits it to the contracts.
+                  </p>
+                </dd>
+              </div>
+            </dl>
+            <p class="deal-note">
+              Accepting that bid on-chain is called <strong>activation</strong>.
+              The contracts check its terms, collect the buyer's premium and
+              make the option active.
+            </p>
           </div>
-          <div class="results">
+
+          <div class="deal-block">
+            <h3>Read the terms through one example</h3>
+            <p class="prose">
+              Consider an option covering 10 WETH at an agreed price of 3,000
+              USDC per WETH. Each number describes a different part of the deal.
+            </p>
+            <dl class="deal-example">
+              <div>
+                <dt>Underlying</dt>
+                <dd>
+                  <strong>WETH</strong
+                  ><span>The asset covered by the option.</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Notional</dt>
+                <dd>
+                  <strong>10 WETH</strong
+                  ><span>The quantity of underlying covered.</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Strike</dt>
+                <dd>
+                  <strong>3,000 <small>USDC / WETH</small></strong
+                  ><span
+                    >The agreed exchange price per whole underlying token.</span
+                  >
+                </dd>
+              </div>
+              <div>
+                <dt>Quote token</dt>
+                <dd>
+                  <strong>USDC</strong
+                  ><span>The token used to express the strike.</span>
+                </dd>
+              </div>
+            </dl>
+            <div
+              class="deal-premium"
+              role="group"
+              aria-label="Premium calculation: 100 USDC per WETH multiplied by 10 WETH equals 1,000 USDC"
+            >
+              <div>
+                <span class="deal-label">Premium rate</span
+                ><strong>100 USDC / WETH</strong>
+              </div>
+              <span class="deal-operator" aria-hidden="true">×</span>
+              <div>
+                <span class="deal-label">Notional</span><strong>10 WETH</strong>
+              </div>
+              <span class="deal-operator" aria-hidden="true">=</span>
+              <div>
+                <span class="deal-label">Total premium</span
+                ><strong>1,000 USDC</strong>
+              </div>
+            </div>
+            <p class="deal-note">
+              The buyer pays the premium in the <strong>premium token</strong>.
+              This example uses USDC for both pricing and payment, but the
+              premium token can differ from the quote token. Each permitted
+              combination is called a <strong>quote/premium pair</strong>.
+            </p>
+            <p class="prose">
+              The strike stays fixed even if the market price changes. That
+              changing market price is called the <strong>spot price</strong>,
+              and it determines whether using the option's right is valuable to
+              the buyer.
+            </p>
+          </div>
+
+          <div class="deal-block">
+            <h3>What happens when the buyer uses the option?</h3>
+            <p class="prose">
+              Using the option's right is called <strong>exercise</strong>. Ivy
+              supports two settlement types, which determine whether the parties
+              exchange tokens at the strike or the vault pays the option's
+              value.
+            </p>
+            <div class="deal-compare">
+              <div>
+                <h4>Physical settlement</h4>
+                <p>
+                  The parties exchange the actual tokens at the strike. A call
+                  buyer pays quote tokens and receives underlying; a put buyer
+                  delivers underlying and receives quote tokens.
+                </p>
+              </div>
+              <div>
+                <h4>Cash settlement</h4>
+                <p>
+                  The vault pays the option's value from the deposited assets.
+                  Here, "cash" means a value payment, so it can be paid in
+                  underlying tokens for a call.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="deal-block">
+            <h3>When can the buyer exercise?</h3>
+            <p class="prose">
+              Every option has an exact <strong>expiry</strong> timestamp and an
+              exercise style. The style determines when the buyer may use the
+              right; the settlement type also affects the deadline.
+            </p>
+            <div class="deal-compare">
+              <div>
+                <h4>American</h4>
+                <p>
+                  Allows exercise before expiry. American physical options also
+                  have a limited exercise window after expiry, while American
+                  cash exercise ends at expiry.
+                </p>
+              </div>
+              <div>
+                <h4>European</h4>
+                <p>
+                  Waits until expiry. European physical options have a limited
+                  exercise window after expiry; European cash options settle at
+                  expiry or later without a manual exercise call.
+                </p>
+              </div>
+            </div>
+            <p class="deal-note">
+              The exact deadlines appear in the
+              <a href="#exercise-windows">exercise-window table</a> later in
+              this guide.
+            </p>
+          </div>
+
+          <div class="deal-block">
+            <h3>Who submits the call, and who gets paid?</h3>
+            <p class="prose">
+              The buyer can appoint an <strong>executor</strong> to exercise and
+              claim payouts on its behalf, and choose a
+              <strong>recipient</strong> address that receives those assets.
+              These are separate permissions: the executor can submit the call,
+              but cannot redirect payment to itself unless it is also the
+              buyer's chosen recipient.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="collateral">
+        <div class="main">
+          <h2>Collateral and shares</h2>
+          <p class="prose">
+            The assets LPs deposit are the vault's <strong>collateral</strong>.
+            They back the seller's obligation to the buyer, so earning a premium
+            does not guarantee that LPs will get the same assets or market value
+            back. Depositing the underlying creates a covered call; depositing
+            the quote token creates a cash-secured put. The examples below show
+            how those deposits determine the trade size.
+          </p>
+          <div class="two">
+            <div>
+              <div class="tok">collateral == underlying</div>
+              <h3>Covered call</h3>
+              <ul class="plain">
+                <li>
+                  Deposit the underlying asset, such as WETH, to back the call.
+                  If the buyer physically exercises, the vault delivers that
+                  underlying in exchange for payment at the agreed strike.
+                </li>
+                <li>
+                  Bids quote strike in a listed quote token and premium in that
+                  pair’s fixed premium token.
+                </li>
+                <li>
+                  The option notional equals the underlying deposited, so a
+                  vault holding 10 WETH can sell a call covering 10 WETH.
+                </li>
+              </ul>
+            </div>
+            <div>
+              <div class="tok">collateral != underlying</div>
+              <h3>Cash-secured put</h3>
+              <ul class="plain">
+                <li>
+                  Deposit the quote token, such as USDC, to fund the put. The
+                  underlying asset that the buyer can deliver during physical
+                  exercise is fixed when the vault is created.
+                </li>
+                <li>
+                  A put vault accepts one quote/premium pair, with the
+                  collateral itself serving as the quote token.
+                </li>
+                <li>
+                  The notional is the collateral divided by the strike: 30,000
+                  USDC at 3,000 USDC per WETH backs a put covering 10 WETH. In
+                  raw token units, the calculation is
+                  <code>collateral × underlyingUnit / strike</code>, where
+                  <code>underlyingUnit = 10^underlyingDecimals</code> is the
+                  number of smallest units in one whole underlying token.
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p class="prose">
+            When the option ends, shareholders make a <strong>claim</strong> to
+            collect their portion of the remaining assets. Claiming burns the
+            submitted shares, meaning those shares are removed from circulation.
+            The contracts keep amounts owed as unpaid premium or buyer payments
+            in <strong>reserves</strong>. The remaining, unreserved assets form
+            the settlement pool available to shareholders.
+          </p>
+          <div class="grid2">
+            <div>
+              <div class="k">Shares</div>
+              The vault mints one share for each smallest unit of collateral it
+              actually receives. The <code>IvyShares</code> contract issues them
+              using ERC-1155, a token standard that lets one contract track
+              shares for multiple vaults under separate token IDs. Each token ID
+              matches its vault ID. Shares can be transferred in every phase,
+              carrying the right to claim a proportion of the remaining pool
+              after settlement. Premium already earned at activation belongs to
+              the holder who earned it, even if those shares later change hands.
+            </div>
+            <div>
+              <div class="k">Kind</div>
+              The collateral and underlying addresses determine the option kind
+              at creation. Matching addresses mean a covered call; different
+              addresses mean a cash-secured put.
+            </div>
+            <div>
+              <div class="k">Approvals</div>
+              Before a contract can collect tokens from a wallet, the wallet
+              gives it a token allowance, commonly called an approval. This
+              approval must target the individual vault address, because that
+              contract pulls and holds the assets. The <strong>hub</strong> is
+              the shared contract that coordinates vault operations, but it does
+              not take custody of the tokens. You can deposit through the hub or
+              call <code>deposit(amount)</code> directly on the vault; both
+              routes follow the same deposit rules.
+            </div>
+            <div>
+              <div class="k">Premium</div>
+              The buyer pays the premium when the winning bid is activated. The
+              people holding shares at that moment are the
+              <strong>activation holders</strong>, and they can immediately
+              collect their earned amount through
+              <code>claimPremium(vaultId)</code>. They retain this claim after
+              transferring or burning their shares. The vault sets aside unpaid
+              premium so it cannot be spent on other claims. Small amounts left
+              by rounding each holder's entitlement down, called rounding dust,
+              stay set aside permanently.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="lifecycle">
+        <div class="main">
+          <h2>Vault lifecycle</h2>
+          <p class="prose">
+            Each vault moves through four phases, starting with collateral
+            collection and ending with final claims. Opening the auction fixes
+            the collateral available for bidding; activation then commits the
+            vault to the winning option. The phase determines which actions are
+            available, as described below. Finishing the trade is called
+            finalization: the vault enters Settled, where holders can collect
+            their claims but no new option can begin.
+          </p>
+          <div class="fig"><span>Who can act in each phase</span></div>
+          <div class="timeline">
+            <div class="step">
+              <div class="card">
+                <div>
+                  <div class="idx">PHASE 0</div>
+                  <div class="name">Open</div>
+                </div>
+                <ul class="facts">
+                  <li>
+                    <span class="chip lp">LPs</span
+                    ><span
+                      >LPs can burn shares to withdraw the corresponding
+                      collateral while the vault is Open. Deposits also require
+                      new deposits to be allowed by the guardian, an authorized
+                      account that can pause admission to the protocol or a
+                      particular vault. Anyone other than the owner can deposit
+                      only if <code>publicDeposits</code> was enabled at
+                      creation.</span
+                    >
+                  </li>
+                  <li>
+                    <span class="chip owner">Owner</span
+                    ><span
+                      >The owner can tighten the option terms while the vault is
+                      Open, but cannot relax the protections already offered to
+                      LPs. The owner can also schedule the auction or transfer
+                      vault ownership.</span
+                    >
+                  </li>
+                </ul>
+                <div class="exit">
+                  <b>Opening the auction.</b> The owner calls
+                  <code>openAuction</code>, or anyone can call it once a nonzero
+                  scheduled start time, <code>auctionStartsAt</code>, is
+                  reached. The vault must hold at least the configured minimum
+                  collateral, <code>minCollateral</code>, and expiry must still
+                  be in the future.
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="card">
+                <div>
+                  <div class="idx">PHASE 1</div>
+                  <div class="name">Auction</div>
+                </div>
+                <ul class="facts">
+                  <li>
+                    <span class="chip lp">LPs</span
+                    ><span
+                      >The committed collateral stays fixed during the auction,
+                      so LPs cannot deposit or withdraw and the owner cannot
+                      change the terms. Shares remain transferable even though
+                      collateral cannot leave through a withdrawal.</span
+                    >
+                  </li>
+                  <li>
+                    <span class="chip bid">Bid master</span
+                    ><span
+                      >The bid master runs the auction off-chain and submits the
+                      chosen buyer's signed bid for activation. The contracts
+                      check that bid against the vault's terms before accepting
+                      it.</span
+                    >
+                  </li>
+                </ul>
+                <div class="exit">
+                  <b>Exit</b> <code>activate(vaultId, bid, signature)</code>.
+                  Cancel back to Open: bid master any time, owner after its
+                  timeout recorded when the vault was created, which is 3 days
+                  by default, or immediately when admission is paused or expiry
+                  has passed.
+                </div>
+              </div>
+            </div>
+            <div class="step live">
+              <div class="card">
+                <div>
+                  <div class="idx">PHASE 2</div>
+                  <div class="name">Live</div>
+                </div>
+                <ul class="facts">
+                  <li>
+                    <span class="chip mm">Market maker</span
+                    ><span
+                      ><code>exercise(vaultId, amount)</code> inside its window,
+                      for part or all of the remaining notional, subject to its
+                      exercise style and settlement type.</span
+                    >
+                  </li>
+                  <li>
+                    <span class="chip lp">LPs</span
+                    ><span
+                      >Activation holders can claim the premium without waiting
+                      for expiry. Shares remain transferable, and their current
+                      holders can agree to end the option early through an
+                      <strong>unwind</strong>. The owner or buyer can propose
+                      this agreement, but execution requires the buyer's
+                      signature and approval from every current shareholder,
+                      covering 100% of the outstanding shares.</span
+                    >
+                  </li>
+                </ul>
+                <div class="exit">
+                  <b>Exit</b> <code>settle(vaultId)</code> by anyone at the
+                  settlement time, automatically on full exercise, or through a
+                  buyer-signed unanimous unwind. If the unwind includes a refund
+                  to the buyer, the person executing it supplies that amount
+                  separately in the premium token. Already-earned premium and
+                  completed exercises are preserved.
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="card">
+                <div>
+                  <div class="idx">PHASE 3</div>
+                  <div class="name">Settled</div>
+                </div>
+                <ul class="facts">
+                  <li>
+                    <span class="chip lp">Shareholders</span
+                    ><span
+                      ><code>claim(vaultId, shares)</code> burns shares for a
+                      pro-rata slice of unreserved collateral and proceeds.
+                      Premium and buyer reserves are excluded.</span
+                    >
+                  </li>
+                  <li>
+                    <span class="chip mm">Market maker</span
+                    ><span
+                      ><code>claimPayout(vaultId)</code> collects a reserved
+                      cash payout or unwind refund for the configured
+                      recipient.</span
+                    >
+                  </li>
+                </ul>
+                <div class="exit">
+                  <b>The vault is finished.</b> Claims remain available, but the
+                  vault cannot sell another option. Continuing the strategy
+                  requires creating and funding a new vault.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="callout">
+            <b>Admission pause.</b> Global or per-vault pauses block new
+            creation where applicable, deposits, auction opening and activation.
+            Withdrawals, transfers, exercise, reports, settlement, claims and
+            agreed unwinds remain available. Deadlines never move.
+          </div>
+          <div class="loop">
+            <span class="chip">Legend</span><span class="chip lp">LPs</span
+            ><span class="chip owner">Owner</span
+            ><span class="chip bid">Bid master</span
+            ><span class="chip mm">Market maker</span
+            ><span style="margin-left: 8px"
+              >Cancelling an auction returns the vault to Open. Every other
+              transition is one-way.</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <section id="outcomes">
+        <div class="main">
+          <h2>Settlement outcomes</h2>
+          <p class="prose">
+            Settlement completes the option and determines which assets each
+            side can collect. What an LP receives depends on the option kind,
+            how much the buyer exercises, and whether settlement is physical or
+            cash. Physical exercise exchanges underlying and quote tokens at the
+            strike, so the remaining pool can contain both assets. Cash
+            settlement pays the buyer from the collateral instead. Cash
+            settlement at expiry uses a <strong>finalized expiry price</strong>:
+            a historical price signed by Ivy and published to the price feed,
+            the contract that checks and stores price reports. Once published,
+            that price cannot be replaced. It represents the agreed expiry price
+            even if settlement takes place later. The formulas below include
+            earned premium, although holders claim that premium separately from
+            their share of the settlement pool.
+          </p>
+          <div class="legend">
+            <span><b>D</b>call collateral</span
+            ><span><b>C</b>put collateral</span><span><b>K</b>strike</span
+            ><span><b>N</b>put notional, C / K</span
+            ><span><b>S</b>finalized expiry price</span
+            ><span><b>f</b>exercised fraction</span
+            ><span><b>r</b>remaining underlying notional</span
+            ><span><b>P</b>premium earned at activation, paid separately</span>
+          </div>
+          <div
+            class="tablewrap"
+            tabindex="0"
+            role="region"
+            aria-label="Settlement formulas"
+          >
             <table>
-              <thead><tr><th>LP total, including earned premium</th><th class="num">WETH</th><th class="num">USDC</th><th>Market maker</th></tr></thead>
-              <tbody id="rows"></tbody>
+              <thead>
+                <tr>
+                  <th>Outcome</th>
+                  <th>Covered call (deposit D underlying)</th>
+                  <th>Cash-secured put (deposit C quote)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="k">Not exercised</td>
+                  <td>
+                    <span class="mono">D</span> underlying +
+                    <span class="mono">P</span>
+                  </td>
+                  <td>
+                    <span class="mono">C</span> quote +
+                    <span class="mono">P</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="k">Physical, fraction f</td>
+                  <td>
+                    <span class="mono">(1−f)·D</span> underlying +
+                    <span class="mono">f·D·K</span> quote +
+                    <span class="mono">P</span>
+                  </td>
+                  <td>
+                    <span class="mono">f·N</span> underlying +
+                    <span class="mono">C − f·N·K</span> quote +
+                    <span class="mono">P</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="k">Cash, unexercised r</td>
+                  <td>
+                    <span class="mono">D − r·(S−K)/S</span> underlying +
+                    <span class="mono">P</span>
+                    <span class="muted small">(payout 0 if S ≤ K)</span>
+                  </td>
+                  <td>
+                    <span class="mono">C − r·(K−S)</span> quote +
+                    <span class="mono">P</span>
+                    <span class="muted small">(payout 0 if S ≥ K)</span>
+                  </td>
+                </tr>
+              </tbody>
             </table>
-            <div class="derived"><span>Notional <b id="notional">10 WETH</b></span><span>Premium earned at activation <b id="premTotal">1,000 USDC</b></span><span id="calcNote"></span></div>
+          </div>
+          <div class="callout" style="margin-top: 14px">
+            <b>Two separate claims.</b> These formulas and charts show total LP
+            proceeds assuming the same holders throughout, including premium
+            earned at activation. The settlement pool excludes all unpaid
+            premium and buyer reserves. Exercise consideration rounds up and
+            buyer payouts round down; premium entitlement dust remains
+            permanently reserved. Cash rows assume no prior American cash
+            exercise; prior payouts must also be subtracted.
+          </div>
+
+          <div class="fig">
+            <span>Settlement calculator</span
+            ><span>Example inputs · WETH / USDC</span>
+          </div>
+          <p class="small muted">
+            Illustrative values in whole tokens, assuming the same LPs hold
+            shares throughout. The calculator uses decimal approximations;
+            on-chain raw-unit rounding can differ.
+          </p>
+          <div class="calc">
+            <p id="calcError" class="calc-error" role="status" hidden></p>
+            <div class="inputs">
+              <label
+                >Kind
+                <select id="kind">
+                  <option value="call">Covered call · deposit WETH</option>
+                  <option value="put">Cash-secured put · deposit USDC</option>
+                </select>
+              </label>
+              <label
+                ><span id="depLabel">Deposit (WETH)</span
+                ><input id="dep" type="number" step="any" value="10"
+              /></label>
+              <label
+                >Strike (USDC / WETH)<input
+                  id="strike"
+                  type="number"
+                  step="any"
+                  value="3000"
+              /></label>
+              <label
+                >Premium (USDC / WETH)<input
+                  id="prem"
+                  type="number"
+                  step="any"
+                  value="100"
+              /></label>
+              <label
+                >Finalized expiry price<input
+                  id="spot"
+                  type="number"
+                  step="any"
+                  value="3300"
+              /></label>
+            </div>
+            <div class="body">
+              <div class="chart">
+                <svg
+                  id="calcChart"
+                  viewBox="0 0 420 250"
+                  role="img"
+                  aria-label="LP total value including earned premium versus spot for the current inputs"
+                ></svg>
+                <div class="figcap">
+                  <span
+                    >LP total value including earned premium, quote terms</span
+                  ><span
+                    ><span class="sw"></span>LP total &nbsp;
+                    <span class="sw dash"></span>hold collateral</span
+                  >
+                </div>
+              </div>
+              <div
+                class="results"
+                tabindex="0"
+                role="region"
+                aria-label="Calculated settlement results"
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>LP total, including earned premium</th>
+                      <th class="num">WETH</th>
+                      <th class="num">USDC</th>
+                      <th>Market maker</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rows"></tbody>
+                </table>
+                <div class="derived">
+                  <span>Notional <b id="notional">10 WETH</b></span
+                  ><span
+                    >Premium earned at activation
+                    <b id="premTotal">1,000 USDC</b></span
+                  ><span id="calcNote"></span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <section id="terms">
-    <aside class="side"><div class="num">0<i>4</i></div><div class="rule"></div><div class="lbl">Terms</div></aside>
-    <div class="main">
-      <h2>Terms the owner sets.</h2>
-      <p class="prose">The owner sets terms at creation. While the vault is Open they can only move in the LPs' favour. A bid that fails any check reverts at activation.</p>
-      <div class="terms">
-        <div class="row head"><span>Term</span><span>Check at activation</span><span>Owner may change it</span></div>
-        <div class="row"><span class="mono">strikeLimit</span><span>Per quote token. Calls: <span class="mono">strike ≥ limit</span>. Puts: <span class="mono">strike ≤ limit</span>.</span><span class="chip lp">calls raise · puts lower</span></div>
-        <div class="row"><span class="mono">minPremium</span><span>Per quote token, per one whole underlying.</span><span class="chip lp">raise only</span></div>
-        <div class="row"><span class="mono">minCollateral</span><span>Shares required before the auction can open.</span><span class="chip lp">raise only</span></div>
-        <div class="row"><span class="mono">expiry</span><span>Exact timestamp fixed at creation; opening and activation must occur before it.</span><span class="chip">immutable</span></div>
-        <div class="row"><span class="mono">allowedExercise</span><span>European, American, or Either. Each bid picks one.</span><span class="chip lp">Either → one</span></div>
-        <div class="row"><span class="mono">allowedSettlement</span><span>Physical, Cash, or Either. Cash requires a price feed.</span><span class="chip lp">Either → one</span></div>
-        <div class="row"><span class="mono">priceFeed · maxInTheMoneyBps</span><span>Optional. Calls: <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts: <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both this and <span class="mono">strikeLimit</span> must pass.</span><span class="chip lp">bps lower · feed fixed</span></div>
-        <div class="row"><span class="mono">maxPriceAge</span><span>Activation and American cash exercise reject old spot prices. Finalized expiry reports do not expire.</span><span class="chip lp">lower only, never 0</span></div>
-        <div class="row"><span class="mono">pairs</span><span>Accepted quote tokens, each with its premium token.</span><span class="chip lp">disable only</span></div>
-        <div class="row"><span class="mono">publicDeposits · underlying · collateral</span><span>Who may deposit, and what the vault is.</span><span class="chip">immutable</span></div>
-        <div class="row"><span class="mono">auctionStartsAt</span><span>Time from which anyone may open the auction. 0 = manual only.</span><span class="chip owner">any value while Open</span></div>
-      </div>
-    </div>
-  </section>
+      <section id="terms">
+        <div class="main">
+          <h2>Vault terms</h2>
+          <p class="prose">
+            The earlier sections describe the trade in plain language. This
+            reference maps those choices to the contract fields an owner
+            configures before LPs commit collateral. An option is in the money
+            when exercise has positive value to the buyer: spot is above the
+            strike for a call, or below it for a put. Some fields below use
+            <strong>basis points</strong>, abbreviated bps, where 100 bps equals
+            1%. While the vault remains Open, the owner can tighten the
+            permitted option terms in the directions shown below, such as
+            raising the minimum premium or narrowing the allowed settlement
+            types. The auction schedule can also change, while fields marked
+            immutable stay fixed. Activation checks the winning bid against the
+            current terms and reverts if any required check fails.
+          </p>
+          <div class="terms">
+            <div class="row head">
+              <span>Term</span><span>Check at activation</span
+              ><span>Owner changes</span>
+            </div>
+            <div class="row">
+              <span class="mono">strikeLimit</span
+              ><span
+                >Per quote token. Calls:
+                <span class="mono">strike ≥ limit</span>. Puts:
+                <span class="mono">strike ≤ limit</span>.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">calls raise · puts lower</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">minPremium</span
+              ><span>Per quote token, per one whole underlying.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">raise only</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">minCollateral</span
+              ><span>Shares required before the auction can open.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">raise only</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">expiry</span
+              ><span
+                >Exact timestamp fixed at creation; opening and activation must
+                occur before it.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">allowedExercise</span
+              ><span>European, American, or Either. Each bid picks one.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">Either → one</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">allowedSettlement</span
+              ><span
+                >Physical, Cash, or Either. Cash requires a price feed.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">Either → one</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">priceFeed · maxInTheMoneyBps</span
+              ><span
+                >Optional. Calls:
+                <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts:
+                <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both
+                this and <span class="mono">strikeLimit</span> must pass.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">bps lower · feed fixed</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">maxPriceAge</span
+              ><span
+                >Activation and American cash exercise reject old spot prices.
+                Finalized expiry reports do not expire.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">lower only, never 0</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">pairs</span
+              ><span>Accepted quote tokens, each with its premium token.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip lp">disable only</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">publicDeposits · underlying · collateral</span
+              ><span>Who may deposit, and what the vault is.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">auctionStartsAt</span
+              ><span
+                >Time from which anyone may open the auction. 0 = manual
+                only.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip owner">any value while Open</span></span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <section id="makers">
-    <aside class="side"><div class="num">0<i>5</i></div><div class="rule"></div><div class="lbl">Market makers</div></aside>
-    <div class="main">
-      <h2>Bidding and exercise.</h2>
-      <p class="prose">An auction ID, exact collateral amount, accepted pair hash, expiry and execution settings are signed into every bid. Reopening an auction requires a new bid. A Live vault can end early through an agreement signed by the buyer and approved by all current shares. The executing sponsor funds the agreed refund in the premium token; completed exercises and earned premium are preserved.</p>
-      <div class="split" style="margin-bottom:8px">
-        <ol class="steps">
-          <li><div><b>Sign the bid</b>EIP-712, domain <code>IvyVaultsHub</code> / <code>2</code> / chain id / deployed hub. Needs <code>MARKET_MAKER_ROLE</code>. Nonces are free-form: sign many, the winner is consumed, the rest lapse at <code>validUntil</code> or via <code>cancelBid(nonce)</code>.</div></li>
-          <li><div><b>Approve the vault</b>For the total premium, <code>floor(premium × notional / underlyingUnit)</code>. For physical exercise the executing buyer or executor approves and supplies the consideration.</div></li>
-          <li><div><b>Activation</b>The bid master submits your bid unchanged. The vault pulls the premium in the same transaction.</div></li>
-          <li><div><b>Exercise</b>Inside your window (Fig. 04), any amount up to what remains. Cash payouts come out of collateral. Only the buyer may change its executor or recipient; exercise assets go only to that recipient.</div></li>
-        </ol>
-        <pre><code>struct Bid {
+      <section id="makers">
+        <div class="main">
+          <h2>Bidding and exercise</h2>
+          <p class="prose">
+            A market maker participates as the option buyer by signing a bid for
+            a particular auction and collateral amount. The signature also binds
+            a hash of the accepted token pair, a compact identifier for that
+            exact configuration, along with expiry and execution settings, so
+            the bid master cannot substitute different terms when activating it.
+            Cancelling and reopening an auction changes its ID and requires a
+            new signed bid.
+          </p>
+          <p class="prose">
+            For the unwind agreement introduced in the lifecycle section,
+            consent must reflect current ownership. A share transfer invalidates
+            the sender's and recipient's approvals, and those holders must
+            approve again at their new balances. Holders can revoke approval
+            before execution. Replacing the proposal or exercising more of the
+            option requires fresh agreement on the updated state; proposing an
+            unwind does not suspend ordinary exercise or settlement.
+          </p>
+          <div class="split" style="margin-bottom: 8px">
+            <ol class="steps">
+              <li>
+                <div>
+                  <b>Sign the bid</b>The buyer signs structured trade data using
+                  EIP-712, a signing format that binds the message to a
+                  particular chain and contract. The signature uses the
+                  <code>IvyVaultsHub</code> domain, version <code>2</code>, the
+                  chain ID and the deployed hub address. The buyer must hold
+                  <code>MARKET_MAKER_ROLE</code> for activation. Each bid
+                  includes a buyer-chosen identifier called a nonce. Activating
+                  a bid consumes that nonce so it cannot be used again, and the
+                  buyer can invalidate an unused nonce with
+                  <code>cancelBid(nonce)</code>. Every bid also has a
+                  <code>validUntil</code> deadline.
+                </div>
+              </li>
+              <li>
+                <div>
+                  <b>Approve the vault</b>The buyer approves the vault to
+                  collect the full premium, calculated as
+                  <code>floor(premium × notional / underlyingUnit)</code>. This
+                  approval funds activation only. If the option is physically
+                  exercised later, the buyer or executor making that call must
+                  separately approve and supply the required payment assets.
+                </div>
+              </li>
+              <li>
+                <div>
+                  <b>Activation</b>The bid master submits the signed bid, and
+                  the vault collects the premium in that same transaction. If
+                  the signature, terms or premium funding fail the contract
+                  checks, activation reverts and the vault does not become Live.
+                </div>
+              </li>
+              <li>
+                <div>
+                  <b>Exercise</b>Where manual exercise is supported, the buyer
+                  or its appointed executor can exercise part or all of the
+                  remaining notional within the permitted window. Cash payouts
+                  come from the vault's collateral. Only the buyer can change
+                  the executor or payout recipient, and exercise assets always
+                  go to that configured recipient.
+                </div>
+              </li>
+            </ol>
+            <pre><code>struct Bid {
   uint256 vaultId;
   address marketMaker;
   address quoteToken;
@@ -518,211 +978,342 @@
   address executor;
   address recipient;
 }</code></pre>
-      </div>
-      <p class="prose">For raw token amounts, <code>underlyingUnit = 10 ** underlyingDecimals</code>. Strike and premium are raw payment-token units per whole underlying.</p>
-      <div class="fig"><span>Fig. 04 · Exercise windows and settlement time</span><span><b>exerciseWindow</b> launch default 1 h</span></div>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Style · settlement</th><th>exercise(vaultId, amount)</th><th>settle(vaultId)</th><th>At exercise</th></tr></thead>
-          <tbody>
-            <tr><td class="k">American · Physical</td><td><span class="mono">t &lt; expiry + window</span></td><td><span class="mono">t ≥ expiry + window</span></td><td>Call: pay <span class="mono">ceil(amount·K/underlyingUnit)</span> quote, receive <span class="mono">amount</span> underlying. Put: deliver <span class="mono">amount</span> underlying, receive <span class="mono">floor(amount·K/underlyingUnit)</span> quote.</td></tr>
-            <tr><td class="k">European · Physical</td><td><span class="mono">expiry ≤ t &lt; expiry + window</span></td><td><span class="mono">t ≥ expiry + window</span></td><td>Same as above.</td></tr>
-            <tr><td class="k">American · Cash</td><td><span class="mono">t &lt; expiry</span></td><td><span class="mono">t ≥ expiry</span></td><td>Receive intrinsic value from the collateral at the current fresh spot; reverts if out of the money.</td></tr>
-            <tr><td class="k">European · Cash</td><td>never</td><td><span class="mono">t ≥ expiry</span></td><td>No exercise. <span class="mono">settle</span> prices the remaining notional and reserves your payout; collect it with <span class="mono">claimPayout</span>.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout"><b>Expiry reports are final.</b> Cash settlement uses Ivy’s signed 30-minute average ending at the exact expiry. The feed verifies the signature, not the averaging calculation. Reports are write-once and support multisig contract signers. If Ivy cannot publish, cash vaults remain locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. There is no stale-price or zero-payout fallback.</div>
-    </div>
-  </section>
-</div>
-
-<section class="dev" id="developers">
-  <div class="wrap devgrid">
-    <aside class="side"><div class="num">0<i>6</i></div><div class="rule"></div><div class="lbl">Developers</div></aside>
-    <div class="main">
-      <h2>Six contracts and two fixed libraries.</h2>
-      <div class="contracts">
-        <div><span class="role">Immutable hub</span><span class="name">IvyVaultsHub</span><p>Creates vaults, verifies bids and runs the phase machine. Linked libraries implement term rules and settlement logic. Every token-moving call is <code>nonReentrant</code>.</p></div>
-        <div><span class="role">EIP-1167 clone</span><span class="name">IvyVault</span><p>One per vault. Holds tokens and token-keyed reserves. Ordinary hub transfers spend only unreserved assets; premium payments also obey an independent fixed budget.</p></div>
-        <div><span class="role">ERC-1155</span><span class="name">IvyShares</span><p>LP shares. Only the hub may mint or burn. Pre-update notifications checkpoint activation balances and invalidate unwind votes before balances or receiver callbacks change.</p></div>
-        <div><span class="role">Immutable signer</span><span class="name">IvyPriceFeed</span><p>Separate signed fresh spot and finalized expiry lookups. Prices use quote decimals per whole underlying. Historical prices remain valid for delayed settlement.</p></div>
-      </div>
-
-      <div class="contracts">
-        <div><span class="role">Activation income</span><span class="name">IvyPremiums</span><p>Lazy checkpoints preserve premium ownership. Payments can only start through the guarded hub claim; the vault enforces the premium budget independently.</p></div>
-        <div><span class="role">Shareholder consent</span><span class="name">IvyUnwind</span><p>One active agreement per vault. Transfers invalidate affected votes, replacement supersedes approvals, and normal exercise or settlement remains available.</p></div>
-        <div><span class="role">Linked rules library</span><span class="name">IvyVaultRules</span><p>Creation validation and term tightening. Creation checks admission. Tightening checks the owner and Open phase.</p></div>
-        <div><span class="role">Linked settlement library</span><span class="name">IvyOptionSettlement</span><p>Exercise, cash settlement and residual claims execute against hub storage, under its reentrancy guard. Library addresses are fixed in hub bytecode.</p></div>
-      </div>
-      <div class="fig"><span>Calls by phase</span><span>Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> · <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span></div>
-      <p class="prose">Two libraries deploy first, followed by the vault implementation, hub, shares, premium module, unwind module and signed feed. Addresses are predicted from a fixed nonce sequence; deployment and recovery verify constructor bindings and every embedded library link. There are no upgrade, library or module replacement setters. Admins retain role, metadata and future-default controls; guardians can pause admission.</p>
-      <div class="calls">
-        <div>
-          <dl>
-            <div class="who">Open</div>
-            <dt>createVault(terms, pairs)</dt><dd><span class="chip">anyone</span> caller becomes owner</dd>
-            <dt>deposit(vaultId, amount)</dt><dd>hub path; or <code>vault.deposit(amount)</code></dd>
-            <dt>withdraw(vaultId, shares)</dt><dd><span class="chip lp">share holder</span> 1:1</dd>
-            <dt>tightenVaultTerms · tightenPairTerms</dt><dd><span class="chip owner">owner</span></dd>
-            <dt>scheduleAuction · transferVaultOwnership</dt><dd><span class="chip owner">owner</span></dd>
-            <dt>openAuction(vaultId)</dt><dd><span class="chip owner">owner</span> or <span class="chip">anyone</span> after the schedule</dd>
-            <div class="who">Auction</div>
-            <dt>activate(vaultId, bid, signature)</dt><dd><span class="chip bid">bid master</span></dd>
-            <dt>cancelAuction(vaultId)</dt><dd><span class="chip bid">bid master</span> or <span class="chip owner">owner</span> after timeout, at expiry, or while admission is paused</dd>
-          </dl>
+          </div>
+          <p class="prose">
+            For raw token amounts,
+            <code>underlyingUnit = 10 ** underlyingDecimals</code>. Strike and
+            premium are raw payment-token units per whole underlying.
+          </p>
+          <div class="fig">
+            <span>Exercise windows and settlement time</span
+            ><span><b>exerciseWindow</b> launch default 1 h</span>
+          </div>
+          <div
+            class="tablewrap"
+            tabindex="0"
+            role="region"
+            id="exercise-windows"
+            aria-label="Exercise windows"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th>Style · settlement</th>
+                  <th>exercise(vaultId, amount)</th>
+                  <th>settle(vaultId)</th>
+                  <th>At exercise</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="k">American · Physical</td>
+                  <td><span class="mono">t &lt; expiry + window</span></td>
+                  <td><span class="mono">t ≥ expiry + window</span></td>
+                  <td>
+                    Call: pay
+                    <span class="mono">ceil(amount·K/underlyingUnit)</span>
+                    quote, receive <span class="mono">amount</span> underlying.
+                    Put: deliver <span class="mono">amount</span> underlying,
+                    receive
+                    <span class="mono">floor(amount·K/underlyingUnit)</span>
+                    quote.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="k">European · Physical</td>
+                  <td>
+                    <span class="mono">expiry ≤ t &lt; expiry + window</span>
+                  </td>
+                  <td><span class="mono">t ≥ expiry + window</span></td>
+                  <td>Same as above.</td>
+                </tr>
+                <tr>
+                  <td class="k">American · Cash</td>
+                  <td><span class="mono">t &lt; expiry</span></td>
+                  <td><span class="mono">t ≥ expiry</span></td>
+                  <td>
+                    Receive intrinsic value from the collateral at the current
+                    fresh spot; reverts if out of the money.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="k">European · Cash</td>
+                  <td>never</td>
+                  <td><span class="mono">t ≥ expiry</span></td>
+                  <td>
+                    No exercise. <span class="mono">settle</span> prices the
+                    remaining notional and reserves your payout; collect it with
+                    <span class="mono">claimPayout</span>.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout">
+            <b>Expiry reports are final.</b> Cash settlement uses Ivy’s signed
+            30-minute average ending at the exact expiry. The feed verifies the
+            signature, not the averaging calculation. Reports are write-once and
+            support multisig contract signers. If Ivy cannot publish, cash
+            vaults remain locked until a valid report arrives or the buyer and
+            all current shareholders consent to an unwind. There is no
+            stale-price or zero-payout fallback.
+          </div>
         </div>
-        <div>
-          <dl>
-            <div class="who">Live</div>
-            <dt>exercise(vaultId, amount)</dt><dd><span class="chip mm">buyer or executor</span> caller supplies physical funding</dd>
-            <dt>proposeUnwind · approveUnwind · executeUnwind</dt><dd>owner/buyer proposal, all current shares approve, buyer signs, sponsor funds refund</dd>
-            <dt>claimPremium(vaultId)</dt><dd>activation holder, also after settlement or burning all shares</dd>
-            <dt>settle(vaultId)</dt><dd><span class="chip">anyone</span> at <code>settlementTimeOf</code></dd>
-            <div class="who">Settled</div>
-            <dt>claim(vaultId, shares)</dt><dd><span class="chip lp">share holder</span></dd>
-            <dt>claimPayout(vaultId)</dt><dd><span class="chip mm">buyer or executor</span> cash payout or refund to configured recipient</dd>
-            <div class="who">Admin</div>
-            <dt>setSettings · setURI</dt><dd><span class="chip">admin</span></dd>
-            <dt>setAdmissionPause(vaultId, paused)</dt><dd><span class="chip">guardian</span> zero ID pauses global admission</dd>
-            <div class="who">Views</div>
-            <dt>termsOf · stateOf · pairTermsOf</dt><dd>vault terms, live state, one quote token's terms</dd>
-            <dt>quoteTokensOf · vaultOf · kindOf</dt><dd>listed quote tokens, clone address, call or put</dd>
-            <dt>totalShares · remainingNotional</dt><dd>shares outstanding, notional still exercisable</dd>
-          </dl>
+      </section>
+
+      <section class="dev" id="developers">
+        <div class="devgrid">
+          <div class="main">
+            <h2>Contracts and entrypoints</h2>
+            <p class="prose">
+              The hub coordinates the vault lifecycle, while each vault holds
+              its own tokens and reserves. Separate contracts track transferable
+              shares, premium entitlements, unwind consent and signed prices.
+              The responsibilities below explain which contract owns each part
+              of the process before the entrypoint reference lists the calls
+              available in each phase.
+            </p>
+            <div class="contracts">
+              <div>
+                <span class="role">Immutable hub</span
+                ><span class="name">IvyVaultsHub</span>
+                <p>
+                  Creates vaults, verifies bids and runs the phase machine.
+                  Linked libraries implement term rules and settlement logic.
+                  Token-moving hub entrypoints use <code>nonReentrant</code>.
+                </p>
+              </div>
+              <div>
+                <span class="role">EIP-1167 clone</span
+                ><span class="name">IvyVault</span>
+                <p>
+                  Each vault is an EIP-1167 clone that holds its own tokens and
+                  tracks reserves separately for each token. Ordinary transfers
+                  requested by the hub can spend only unreserved assets, while
+                  premium payments must also stay within an independent fixed
+                  budget.
+                </p>
+              </div>
+              <div>
+                <span class="role">ERC-1155</span
+                ><span class="name">IvyShares</span>
+                <p>
+                  This contract issues the LP shares, with minting and burning
+                  restricted to the hub. Before a balance changes, it notifies
+                  the premium and unwind modules so they can preserve activation
+                  entitlements and invalidate affected votes before receiver
+                  callbacks run.
+                </p>
+              </div>
+              <div>
+                <span class="role">Immutable signer</span
+                ><span class="name">IvyPriceFeed</span>
+                <p>
+                  The feed provides separate lookups for fresh signed spot
+                  prices and finalized expiry prices. Prices are expressed in
+                  the quote token's smallest units per whole underlying token.
+                  Once an expiry price is finalized, it remains available for
+                  settlement even if settlement happens much later.
+                </p>
+              </div>
+            </div>
+
+            <div class="contracts">
+              <div>
+                <span class="role">Activation income</span
+                ><span class="name">IvyPremiums</span>
+                <p>
+                  Lazy checkpoints preserve premium ownership. Payments can only
+                  start through the guarded hub claim; the vault enforces the
+                  premium budget independently.
+                </p>
+              </div>
+              <div>
+                <span class="role">Shareholder consent</span
+                ><span class="name">IvyUnwind</span>
+                <p>
+                  One active agreement per vault. Transfers invalidate affected
+                  votes, replacement supersedes approvals, and normal exercise
+                  or settlement remains available.
+                </p>
+              </div>
+              <div>
+                <span class="role">Linked rules library</span
+                ><span class="name">IvyVaultRules</span>
+                <p>
+                  Creation validation and term tightening. Creation checks
+                  admission. Tightening checks the owner and Open phase.
+                </p>
+              </div>
+              <div>
+                <span class="role">Linked settlement library</span
+                ><span class="name">IvyOptionSettlement</span>
+                <p>
+                  Exercise, cash settlement and residual claims execute against
+                  hub storage, under its reentrancy guard. Library addresses are
+                  fixed in hub bytecode.
+                </p>
+              </div>
+            </div>
+            <div class="fig">
+              <span>Calls by phase</span
+              ><span
+                >Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> ·
+                <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span
+              >
+            </div>
+            <p class="prose">
+              Two libraries deploy first, followed by the vault implementation,
+              hub, shares, premium module, unwind module and signed feed.
+              Addresses are predicted from a fixed nonce sequence; deployment
+              and recovery verify constructor bindings and every embedded
+              library link. There are no upgrade, library or module replacement
+              setters. Admins retain role, metadata and future-default controls;
+              guardians can pause admission.
+            </p>
+            <div class="calls">
+              <div>
+                <dl>
+                  <div class="who">Open</div>
+                  <dt>createVault(terms, pairs)</dt>
+                  <dd><span class="chip">anyone</span> caller becomes owner</dd>
+                  <dt>deposit(vaultId, amount)</dt>
+                  <dd>hub path; or <code>vault.deposit(amount)</code></dd>
+                  <dt>withdraw(vaultId, shares)</dt>
+                  <dd><span class="chip lp">shareholder</span> 1:1</dd>
+                  <dt>tightenVaultTerms · tightenPairTerms</dt>
+                  <dd><span class="chip owner">owner</span></dd>
+                  <dt>scheduleAuction · transferVaultOwnership</dt>
+                  <dd><span class="chip owner">owner</span></dd>
+                  <dt>openAuction(vaultId)</dt>
+                  <dd>
+                    <span class="chip owner">owner</span> or
+                    <span class="chip">anyone</span> after the schedule
+                  </dd>
+                  <div class="who">Auction</div>
+                  <dt>activate(vaultId, bid, signature)</dt>
+                  <dd><span class="chip bid">bid master</span></dd>
+                  <dt>cancelAuction(vaultId)</dt>
+                  <dd>
+                    <span class="chip bid">bid master</span> or
+                    <span class="chip owner">owner</span> after timeout, at
+                    expiry, or while admission is paused
+                  </dd>
+                </dl>
+              </div>
+              <div>
+                <dl>
+                  <div class="who">Live</div>
+                  <dt>exercise(vaultId, amount)</dt>
+                  <dd>
+                    <span class="chip mm">buyer or executor</span> caller
+                    supplies physical funding
+                  </dd>
+                  <dt>proposeUnwind · approveUnwind · executeUnwind</dt>
+                  <dd>
+                    owner/buyer proposal, all current shares approve, buyer
+                    signs, sponsor funds refund
+                  </dd>
+                  <dt>claimPremium(vaultId)</dt>
+                  <dd>
+                    activation holder, also after settlement or burning all
+                    shares
+                  </dd>
+                  <dt>settle(vaultId)</dt>
+                  <dd>
+                    <span class="chip">anyone</span> at
+                    <code>settlementTimeOf</code>
+                  </dd>
+                  <div class="who">Settled</div>
+                  <dt>claim(vaultId, shares)</dt>
+                  <dd><span class="chip lp">shareholder</span></dd>
+                  <dt>claimPayout(vaultId)</dt>
+                  <dd>
+                    <span class="chip mm">buyer or executor</span> cash payout
+                    or refund to configured recipient
+                  </dd>
+                  <div class="who">Admin</div>
+                  <dt>setSettings · setURI</dt>
+                  <dd><span class="chip">admin</span></dd>
+                  <dt>setAdmissionPause(vaultId, paused)</dt>
+                  <dd>
+                    <span class="chip">guardian</span> zero ID pauses global
+                    admission
+                  </dd>
+                  <div class="who">Views</div>
+                  <dt>termsOf · stateOf · pairTermsOf</dt>
+                  <dd>vault terms, live state, one quote token's terms</dd>
+                  <dt>quoteTokensOf · vaultOf · kindOf</dt>
+                  <dd>listed quote tokens, clone address, call or put</dd>
+                  <dt>totalShares · remainingNotional</dt>
+                  <dd>shares outstanding, notional still exercisable</dd>
+                </dl>
+              </div>
+            </div>
+
+            <div class="fig" style="margin-top: 30px">
+              <span>Defaults and events</span
+              ><span>timing defaults are snapshotted at vault creation</span>
+            </div>
+            <div
+              class="tablewrap"
+              tabindex="0"
+              role="region"
+              aria-label="Contract defaults and events"
+            >
+              <table>
+                <tbody>
+                  <tr>
+                    <td class="k">exerciseWindow</td>
+                    <td class="num">3 600 s · 1 h</td>
+                    <td class="muted">Physical exercise grace after expiry.</td>
+                  </tr>
+                  <tr>
+                    <td class="k">auctionTimeout</td>
+                    <td class="num">259 200 s · 3 d</td>
+                    <td class="muted">
+                      After this the owner may cancel a stalled auction.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="k">Operational settlement target</td>
+                    <td class="num">30 min</td>
+                    <td class="muted">
+                      After the physical window closes; after expiry for cash,
+                      subject to report availability.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="k">Selected events</td>
+                    <td colspan="2">
+                      <span class="mono wrapok"
+                        >VaultCreated · Deposited · Withdrawn ·
+                        VaultTermsTightened · PairTermsTightened ·
+                        AuctionScheduled · AuctionOpened · AuctionCancelled ·
+                        Activated · Exercised · Settled · Claimed ·
+                        PayoutClaimed · BidCancelled ·
+                        VaultOwnershipTransferred</span
+                      >
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="muted small" style="margin-top: 14px">
+              See the <a href="../operations.md">operator runbook</a> for
+              deployment, reports, transaction commands and recovery, or the
+              <a href="../../README.md">repository README</a> for build
+              instructions.
+            </p>
+          </div>
         </div>
+      </section>
+    </main>
+    <footer>
+      <div>
+        <span>IVY · Vaults</span
+        ><span>Solidity 0.8.34 · OpenZeppelin 5.6 · Hardhat 3</span>
       </div>
-
-      <div class="fig" style="margin-top:30px"><span>Defaults and events</span><span>timing defaults are snapshotted at vault creation</span></div>
-      <div class="tablewrap">
-        <table>
-          <tbody>
-            <tr><td class="k">exerciseWindow</td><td class="num">3 600 s · 1 h</td><td class="muted">Physical exercise grace after expiry.</td></tr>
-            <tr><td class="k">auctionTimeout</td><td class="num">259 200 s · 3 d</td><td class="muted">After this the owner may cancel a stalled auction.</td></tr>
-            <tr><td class="k">Operational settlement target</td><td class="num">30 min</td><td class="muted">After the physical window closes; after expiry for cash, subject to report availability.</td></tr>
-            <tr><td class="k">Selected events</td><td colspan="2"><span class="mono wrapok">VaultCreated · Deposited · Withdrawn · VaultTermsTightened · PairTermsTightened · AuctionScheduled · AuctionOpened · AuctionCancelled · Activated · Exercised · Settled · Claimed · PayoutClaimed · BidCancelled · VaultOwnershipTransferred</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="muted small" style="margin-top:14px">Repo: <code>contracts/</code>, <code>test/</code> (Hardhat 3, mocha + ethers), <code>scripts/operator.mjs</code> and <code>docs/operations.md</code>. Run <code>npx hardhat test</code>.</p>
-    </div>
-  </div>
-</section>
-<footer><div class="wrap"><span>IVY · Vaults</span><span>Solidity 0.8.34 · OpenZeppelin 5.6 · Hardhat 3</span></div></footer>
-
-<script>
-(function () {
-  var $ = function (id) { return document.getElementById(id); };
-  var fmt = function (x, d) {
-    if (!isFinite(x)) return "–";
-    return x.toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: 0 });
-  };
-  var css = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
-  var root = document.documentElement;
-  var themeBtn = $("themeToggle");
-  try {
-    var saved = localStorage.getItem("ivy-theme");
-    if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
-  } catch (e) {}
-  function currentTheme() {
-    var t = root.getAttribute("data-theme");
-    if (t === "light" || t === "dark") return t;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  function labelTheme() { themeBtn.textContent = "Theme · " + currentTheme(); }
-
-  // LP total value including earned premium (quote terms) as a function of spot, for the fully-in-the-money case.
-  // call: D*min(S,K) + P (hold = D*S).  put: N*min(S,K) + P (hold = C).
-  function drawPayoff(svg, o) {
-    var W = 420, H = 250, L = 52, R = 16, T = 18, B = 34;
-    var K = o.K, P = o.P;
-    var xs = [K * 0.5, K * 1.5];
-    var vault = function (S) { return o.kind === "call" ? o.D * Math.min(S, K) + P : o.N * Math.min(S, K) + P; };
-    var hold = function (S) { return o.kind === "call" ? o.D * S : o.C; };
-    var ys = [];
-    [xs[0], K, xs[1]].forEach(function (S) { ys.push(vault(S)); ys.push(hold(S)); });
-    var y0 = 0, y1 = Math.max.apply(null, ys) * 1.08;
-    var X = function (S) { return L + (S - xs[0]) / (xs[1] - xs[0]) * (W - L - R); };
-    var Y = function (v) { return T + (1 - (v - y0) / (y1 - y0)) * (H - T - B); };
-    var ink = css("--ink"), faint = css("--faint"), line = css("--line-strong"), accent = css("--accent");
-    var pts = function (f) { var s = []; for (var i = 0; i <= 60; i++) { var S = xs[0] + (xs[1] - xs[0]) * i / 60; s.push(X(S).toFixed(1) + "," + Y(f(S)).toFixed(1)); } return s.join(" "); };
-    var ticks = [xs[0], K, xs[1]];
-    var yTicks = [0, y1 / 2, y1];
-    var h = "";
-    // grid
-    yTicks.forEach(function (v) { h += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '" stroke="' + line + '" stroke-width="1"/>'; });
-    // strike marker
-    h += '<line x1="' + X(K).toFixed(1) + '" x2="' + X(K).toFixed(1) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="' + accent + '" stroke-width="1" stroke-dasharray="2 3"/>';
-    // hold line
-    h += '<polyline points="' + pts(hold) + '" fill="none" stroke="' + faint + '" stroke-width="1.2" stroke-dasharray="4 4"/>';
-    // vault line
-    h += '<polyline points="' + pts(vault) + '" fill="none" stroke="' + ink + '" stroke-width="2"/>';
-    // premium bracket at left edge
-    var yb0 = Y(vault(xs[0]) - P), yb1 = Y(vault(xs[0]));
-    h += '<line x1="' + (L + 6) + '" x2="' + (L + 6) + '" y1="' + yb0.toFixed(1) + '" y2="' + yb1.toFixed(1) + '" stroke="' + accent + '" stroke-width="2"/>';
-    h += '<text x="' + (L + 6) + '" y="' + (Math.max(yb0, yb1) + 12).toFixed(1) + '" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + accent + '">P = ' + fmt(P, 0) + '</text>';
-    // axes labels
-    ticks.forEach(function (S) { h += '<text x="' + X(S).toFixed(1) + '" y="' + (H - 12) + '" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + faint + '">' + (S === K ? "K " : "") + fmt(S, 0) + '</text>'; });
-    yTicks.forEach(function (v) { h += '<text x="' + (L - 8) + '" y="' + (Y(v) + 3).toFixed(1) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' + faint + '">' + (v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, 0)) + '</text>'; });
-    h += '<text x="' + (W - R) + '" y="' + (T - 6) + '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="' + faint + '" letter-spacing="1">SPOT →</text>';
-    svg.innerHTML = h;
-  }
-
-  function params() {
-    var kind = $("kind").value;
-    var dep = parseFloat($("dep").value) || 0;
-    var K = parseFloat($("strike").value) || 0;
-    var p = parseFloat($("prem").value) || 0;
-    var S = parseFloat($("spot").value) || 0;
-    var N = kind === "call" ? dep : (K > 0 ? dep / K : 0);
-    return { kind: kind, D: dep, C: dep, K: K, p: p, S: S, N: N, P: p * N };
-  }
-
-  function render() {
-    var o = params();
-    $("depLabel").textContent = o.kind === "call" ? "Deposit (WETH)" : "Deposit (USDC)";
-    var rows;
-    if (o.kind === "call") {
-      var payoutCall = o.S > o.K ? o.N * (o.S - o.K) / o.S : 0;
-      rows = [
-        ["Not exercised", o.D, o.P, "pays premium only"],
-        ["Physical, fully exercised", 0, o.D * o.K + o.P, "pays " + fmt(o.D * o.K, 2) + " USDC, takes " + fmt(o.D, 6) + " WETH"],
-        ["Cash at finalized expiry price", o.D - payoutCall, o.P, payoutCall > 0 ? "receives " + fmt(payoutCall, 6) + " WETH" : "out of the money, receives 0"]
-      ];
-      $("calcNote").textContent = "Cash payout = remaining × (spot − strike) / spot, in WETH.";
-    } else {
-      var payoutPut = o.S < o.K ? o.N * (o.K - o.S) : 0;
-      rows = [
-        ["Not exercised", 0, o.C + o.P, "pays premium only"],
-        ["Physical, fully exercised", o.N, o.C - o.N * o.K + o.P, "delivers " + fmt(o.N, 6) + " WETH, takes " + fmt(o.N * o.K, 2) + " USDC"],
-        ["Cash at finalized expiry price", 0, o.C - payoutPut + o.P, payoutPut > 0 ? "receives " + fmt(payoutPut, 2) + " USDC" : "out of the money, receives 0"]
-      ];
-      $("calcNote").textContent = "Cash payout = remaining × (strike − spot), in USDC.";
-    }
-    $("notional").textContent = fmt(o.N, 6) + " WETH";
-    $("premTotal").textContent = fmt(o.P, 2) + " USDC";
-    var html = "";
-    for (var i = 0; i < rows.length; i++) {
-      html += '<tr><td class="k">' + rows[i][0] + '</td><td class="num"><span class="big">' + fmt(rows[i][1], 6) + '</span></td><td class="num"><span class="big">' + fmt(rows[i][2], 2) + '</span></td><td class="mm">' + rows[i][3] + '</td></tr>';
-    }
-    $("rows").innerHTML = html;
-    if (o.K > 0) drawPayoff($("calcChart"), o);
-  }
-
-  var HERO = { kind: "call", D: 10, C: 10, K: 3000, p: 100, S: 3300, N: 10, P: 1000 };
-  function redrawAll() { render(); drawPayoff($("heroChart"), HERO); }
-  ["kind", "dep", "strike", "prem", "spot"].forEach(function (id) { $(id).addEventListener("input", render); });
-  redrawAll();
-  labelTheme();
-  themeBtn.addEventListener("click", function () {
-    var next = currentTheme() === "dark" ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("ivy-theme", next); } catch (e) {}
-    labelTheme();
-    redrawAll();
-  });
-  if (window.matchMedia) {
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { labelTheme(); redrawAll(); });
-  }
-})();
-</script>
+    </footer>
+  </body>
+</html>

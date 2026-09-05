@@ -1,0 +1,107 @@
+import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { runInNewContext, Script } from "node:vm";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const pagePath = resolve(root, "docs/site/index.html");
+const html = readFileSync(pagePath, "utf8");
+const css = readFileSync(resolve(root, "docs/site/assets/docs.css"), "utf8");
+const js = readFileSync(resolve(root, "docs/site/assets/docs.js"), "utf8");
+const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+assert.equal(new Set(ids).size, ids.length, "Duplicate page IDs");
+assert.match(html, /<html lang="en"/);
+assert.equal((html.match(/<main\b/g) || []).length, 1);
+assert.equal((html.match(/<h1\b/g) || []).length, 1);
+for (const [, url] of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
+  assert.ok(!/^https?:/.test(url), `Page must work offline: ${url}`);
+  const [path, anchor] = url.split("#");
+  if (path)
+    assert.ok(
+      existsSync(resolve(dirname(pagePath), path)),
+      `Missing link: ${url}`
+    );
+  if (!path && anchor)
+    assert.ok(ids.includes(anchor), `Missing anchor: ${url}`);
+}
+for (const [, url] of css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
+  assert.ok(
+    existsSync(resolve(dirname(pagePath), "assets", url)),
+    `Missing CSS asset: ${url}`
+  );
+}
+new Script(js);
+
+// Exercise the display with a small DOM fixture. Expected amounts are independent
+// worked examples, not a second implementation of the settlement formulas.
+const elements = Object.fromEntries(
+  ids.map((id) => [
+    id,
+    {
+      value: "",
+      textContent: "",
+      innerHTML: "",
+      hidden: false,
+      addEventListener() {},
+    },
+  ])
+);
+const inputCallbacks = {};
+for (const id of ["kind", "dep", "strike", "prem", "spot"]) {
+  elements[id].addEventListener = (event, callback) => {
+    inputCallbacks[id] = callback;
+  };
+}
+Object.entries({
+  kind: "call",
+  dep: "10",
+  strike: "3000",
+  prem: "100",
+  spot: "3300",
+}).forEach(([id, value]) => (elements[id].value = value));
+const attributes = new Map([["data-theme", "dark"]]);
+const documentElement = {
+  getAttribute: (key) => attributes.get(key),
+  setAttribute: (key, value) => attributes.set(key, value),
+};
+runInNewContext(js, {
+  document: {
+    documentElement,
+    getElementById: (id) => elements[id],
+    querySelectorAll: () => [],
+  },
+  window: {
+    addEventListener() {},
+    matchMedia: () => ({ matches: true, addEventListener() {} }),
+  },
+  localStorage: { getItem: () => null, setItem() {} },
+  getComputedStyle: () => ({ getPropertyValue: () => "#888" }),
+});
+function update(values) {
+  for (const [id, value] of Object.entries(values)) elements[id].value = value;
+  inputCallbacks.dep();
+}
+assert.equal(elements.notional.textContent, "10 WETH");
+assert.equal(elements.premTotal.textContent, "1,000 USDC");
+assert.match(elements.rows.innerHTML, /31,000/);
+assert.match(elements.rows.innerHTML, /9\.090909/);
+assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
+update({ kind: "put", dep: "30000", spot: "2700" });
+assert.match(elements.rows.innerHTML, /28,000/);
+assert.match(elements.rows.innerHTML, /receives 3,000 USDC/);
+for (const invalid of ["", "0", "-1", "NaN"]) {
+  update({ strike: invalid });
+  assert.equal(elements.calcError.hidden, false);
+  assert.equal(elements.rows.innerHTML, "");
+  assert.equal(elements.calcChart.innerHTML, "");
+  assert.equal(elements.notional.textContent, "Unavailable");
+}
+update({ strike: "3000", prem: "0", spot: "3300" });
+assert.equal(elements.calcError.hidden, true);
+assert.equal(elements.premTotal.textContent, "0 USDC");
+assert.match(elements.rows.innerHTML, /out of the money, receives 0/);
+assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
+console.log(
+  "Docs checks passed: local links, anchors, assets, JavaScript, call/put examples, invalid inputs and recovery."
+);
