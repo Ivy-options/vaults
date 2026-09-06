@@ -505,7 +505,7 @@
                     ><span
                       ><code>exercise(vaultId, amount)</code> inside its window,
                       for part or all of the remaining notional, subject to its
-                      exercise style and settlement type.</span
+                      fixed partial-exercise policy, exercise style and settlement type.</span
                     >
                   </li>
                   <li>
@@ -655,7 +655,8 @@
               Both examples use a strike of 3,000 USDC per WETH and assume no
               earlier exercise. Amounts below exclude the separately earned
               premium. Physical and cash settlement are alternative outcomes
-              determined by the option's agreed settlement type.
+              determined by the option's agreed settlement type. The half-exercise
+              examples assume <code>allowPartialExercise = true</code>.
             </p>
             <div class="deal-compare">
               <div>
@@ -935,7 +936,16 @@
               >
             </div>
             <div class="row">
-              <span class="mono">allowPartialExercise · publicDeposits · underlying · collateral</span
+              <span class="mono">allowPartialExercise</span
+              ><span>Fixed before deposits: true permits partial exercise; false
+                requires all remaining notional in one call.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">publicDeposits · underlying · collateral</span
               ><span>Who may deposit, and what the vault is.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
@@ -1110,7 +1120,7 @@
                 </tr>
                 <tr>
                   <td class="k">American · Cash</td>
-                  <td>Before or after expiry, while Live</td>
+                  <td>Before, at or after expiry, while Live</td>
                   <td><span class="mono">t ≥ expiry</span></td>
                   <td>
                     Receive intrinsic value: fresh spot before expiry; finalized
