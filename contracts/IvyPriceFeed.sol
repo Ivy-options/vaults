@@ -29,7 +29,7 @@ contract IvyPriceFeed is IIvyPriceFeed, EIP712 {
     }
     function publishExpiry(address underlying, address quote, uint64 expiry, uint256 price, uint64 validUntil, bytes calldata signature) external {
         _validate(underlying, quote, price, validUntil);
-        if (expiry == 0 || block.timestamp < expiry) revert SettlementNotReached();
+        if (expiry == 0 || block.timestamp < expiry) revert ExpirationNotReached();
         bytes32 key = keccak256(abi.encode(underlying, quote, expiry));
         if (_final[key] != 0) revert ReportFinalized();
         _verify(keccak256(abi.encode(EXPIRY_TYPEHASH, underlying, quote, expiry, price, validUntil)), signature);

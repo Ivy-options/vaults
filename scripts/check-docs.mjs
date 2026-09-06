@@ -48,7 +48,7 @@ const elements = Object.fromEntries(
   ])
 );
 const inputCallbacks = {};
-for (const id of ["kind", "dep", "strike", "prem", "spot"]) {
+for (const id of ["kind", "dep", "strike", "prem", "spot", "days", "entryPrice"]) {
   elements[id].addEventListener = (event, callback) => {
     inputCallbacks[id] = callback;
   };
@@ -59,6 +59,8 @@ Object.entries({
   strike: "3000",
   prem: "100",
   spot: "3300",
+  days: "30",
+  entryPrice: "3000",
 }).forEach(([id, value]) => (elements[id].value = value));
 const attributes = new Map([["data-theme", "dark"]]);
 const documentElement = {
@@ -82,12 +84,23 @@ function update(values) {
   for (const [id, value] of Object.entries(values)) elements[id].value = value;
   inputCallbacks.dep();
 }
+assert.equal(elements.premiumYield.textContent, "3.33%");
+assert.equal(elements.premiumApr.textContent, "40.56%");
+update({ days: "365", entryPrice: "2000" });
+assert.equal(elements.premiumApr.textContent, "5%");
+update({ spot: "2700" });
+assert.equal(elements.premiumApr.textContent, "5%", "Premium APR uses starting value, not expiry price");
+update({ days: "30", entryPrice: "3000", spot: "3300" });
 assert.equal(elements.notional.textContent, "10 WETH");
 assert.equal(elements.premTotal.textContent, "1,000 USDC");
 assert.match(elements.rows.innerHTML, /31,000/);
 assert.match(elements.rows.innerHTML, /9\.090909/);
 assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
 update({ kind: "put", dep: "30000", spot: "2700" });
+assert.equal(elements.premiumApr.textContent, "40.56%");
+assert.equal(elements.entryPriceField.hidden, true);
+update({ entryPrice: "" });
+assert.equal(elements.calcError.hidden, true, "Puts do not need a WETH entry price");
 assert.match(elements.rows.innerHTML, /28,000/);
 assert.match(elements.rows.innerHTML, /receives 3,000 USDC/);
 for (const invalid of ["", "0", "-1", "NaN"]) {
@@ -102,6 +115,16 @@ assert.equal(elements.calcError.hidden, true);
 assert.equal(elements.premTotal.textContent, "0 USDC");
 assert.match(elements.rows.innerHTML, /out of the money, receives 0/);
 assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
+assert.equal(elements.premiumApr.textContent, "0%");
+for (const field of ["days", "entryPrice"]) {
+  for (const invalid of ["", "0", "-1", "NaN"]) {
+    update({ kind: "call", days: "30", entryPrice: "3000", [field]: invalid });
+    assert.equal(elements.calcError.hidden, false);
+    assert.equal(elements.premiumApr.textContent, "Unavailable");
+  }
+}
+update({ days: "30", entryPrice: "3000", prem: "100" });
+assert.equal(elements.premiumApr.textContent, "40.56%");
 console.log(
   "Docs checks passed: local links, anchors, assets, JavaScript, call/put examples, invalid inputs and recovery."
 );

@@ -22,7 +22,7 @@ describe("signed expiry reports",function(){
     const now=BigInt(await networkHelpers.time.latest()), expiry=now+100n;
     const report={underlying:c.wethAddress,quote:c.usdcAddress,expiry,price:3300n*U,validUntil:expiry+3600n};
     const sig=await signed(c,f,'expiry',report);
-    await expect(f.publishExpiry(...expiryArgs(report),sig)).revertedWithCustomError(f,'SettlementNotReached');
+    await expect(f.publishExpiry(...expiryArgs(report),sig)).revertedWithCustomError(f,'ExpirationNotReached');
     await networkHelpers.time.increaseTo(expiry);
     await f.publishExpiry(...expiryArgs(report),sig);
     await expect(f.publishExpiry(...expiryArgs(report),sig)).revertedWithCustomError(f,'ReportFinalized');
@@ -86,8 +86,11 @@ describe("journaled immutable deployment and manual tooling",function(){
   it("requires explicit USD minimum, computes a call floor, and prepares only simulated calldata",async()=>{
     const c=await deployIvy(connection), artifacts=await loadArtifacts();
     await c.weth.mint(c.alice.address,10n*W);
-    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,priceFeed:ZeroAddress,maxInTheMoneyBps:0,maxPriceAge:0},pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,strikeLimit:0,minPremium:0,enabled:true}}]};
+    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{allowPartialExercise:false,underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,priceFeed:ZeroAddress,maxInTheMoneyBps:0,maxPriceAge:0},pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,strikeLimit:0,minPremium:0,enabled:true}}]};
     const prepared=await prepareVault(c.admin.provider,request);
+    expect(prepared.terms.allowPartialExercise).eq(false);
+    await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:undefined}}), /Missing allowPartialExercise/);
+    await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:"false"}}), /must be boolean/);
     expect(prepared.terms.publicDeposits).eq(false);expect(prepared.pairs[0].terms.strikeLimit).eq(3600n*U);
     const tx=await prepareOperation(c.admin.provider,artifacts,'prepare-vault',request);
     expect(tx.method).eq('createVault');expect(await c.hub.vaultCount()).eq(0n);

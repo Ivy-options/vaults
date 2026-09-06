@@ -16,6 +16,7 @@ enum Phase { Open, Auction, Live, Settled }
 struct VaultTerms {
     address underlying;            // token being optioned
     address collateral;            // == underlying for a covered call; a quote token for a cash-secured put
+    bool allowPartialExercise;     // fixed at creation; false requires exercising all remaining notional
     bool publicDeposits;           // false = only the vault owner may deposit
     ExercisePolicy allowedExercise;
     SettlementPolicy allowedSettlement; // Cash requires priceFeed != 0
@@ -135,10 +136,10 @@ error EmptyNotional();
 error ShortReceived(uint256 expected, uint256 received);
 error ExerciseWindowClosed();
 error ExerciseNotOpenYet();
-error ExerciseNotAvailable();
+error PartialExerciseNotAllowed();
 error ExceedsRemaining(uint256 remaining);
 error NothingToExercise();
-error SettlementNotReached();
+error ExpirationNotReached();
 error NothingToClaim();
 error InsufficientShares();
 

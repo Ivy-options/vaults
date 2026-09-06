@@ -42,7 +42,7 @@ describe('local operator rehearsal', function () {
     const expiry = BigInt(await networkHelpers.time.latest()) + 7200n;
     async function create(isCall: boolean) {
       await op('prepare-vault', owner, {
-        terms: { underlying: w, collateral: isCall ? w : u, ...(isCall ? {} : { publicDeposits: true }),
+        terms: { allowPartialExercise: false, underlying: w, collateral: isCall ? w : u, ...(isCall ? {} : { publicDeposits: true }),
           allowedExercise: 0, allowedSettlement: 1, expiry, auctionStartsAt: 0, priceFeed: plan.addresses.IvyPriceFeed,
           maxInTheMoneyBps: 1000, maxPriceAge: 3600 },
         pairs: [{ quoteToken: u, terms: { premiumToken: u, minPremium: 100n * U, enabled: true } }],
@@ -86,7 +86,7 @@ describe('local operator rehearsal', function () {
     const report = { underlying: w, quote: u, expiry, price: 4000n * U, validUntil: expiry + 90000n };
     await op('publish-expiry', sponsor, { feed: plan.addresses.IvyPriceFeed, report,
       signature: (await typed('typed-report', admin, { kind: 'expiry', feed: plan.addresses.IvyPriceFeed, report })).signature });
-    await op('settle', sponsor, { vaultId: call });
+    await op('expire', sponsor, { vaultId: call });
     await op('claim', owner, { vaultId: call, amount: 10n * W });
     await op('claim-payout', buyer, { vaultId: call });
     expect(await weth.balanceOf(buyer.address)).eq(25n * W / 10n);

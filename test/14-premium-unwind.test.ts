@@ -30,7 +30,7 @@ describe("activation premium and unanimous unwinds", function () {
     expect(await c.premiums.claimable(v.vaultId,c.carol.address)).eq(0n);
     await c.hub.connect(c.alice).claimPremium(v.vaultId);
     await expect(c.hub.connect(c.alice).claimPremium(v.vaultId)).revertedWithCustomError(c.premiums,"NothingToClaim");
-    await at(c,v.bid.expiry+3600n); await c.hub.settle(v.vaultId);
+    await at(c,v.bid.expiry+3600n); await c.hub.expire(v.vaultId);
     await c.hub.connect(c.bob).claim(v.vaultId,4n*W);
     expect(await c.premiums.claimable(v.vaultId,c.bob.address)).eq(400n*U);
     await c.hub.connect(c.carol).claim(v.vaultId,6n*W);
@@ -47,7 +47,7 @@ describe("activation premium and unanimous unwinds", function () {
     expect(await c.premiums.claimable(v.vaultId,c.carol.address)).eq(0n);
     const d = await goLive(c,{deposit:1n,extraDeposits:[{signer:c.bob,amount:2n}]},{premium:W/2n});
     expect((await c.premiums.pools(d.vaultId)).amount).eq(1n);
-    await at(c,d.bid.expiry+3600n); await c.hub.settle(d.vaultId);
+    await at(c,d.bid.expiry+3600n); await c.hub.expire(d.vaultId);
     await c.hub.connect(c.alice).claim(d.vaultId,1n); await c.hub.connect(c.bob).claim(d.vaultId,2n);
     expect(await d.vault.reserved(c.usdcAddress)).eq(1n);
     expect(await c.usdc.balanceOf(d.vaultAddress)).eq(1n);
@@ -168,7 +168,7 @@ describe("admission and delegated execution", function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c,{isCall:false,withFeed:true},{settlement:SettlementType.Cash,style:ExerciseStyle.European});
     await c.feed.setSettlementPrice(c.wethAddress,c.usdcAddress,v.bid.expiry,2700n*U);
-    await at(c,v.bid.expiry); await c.hub.settle(v.vaultId);
+    await at(c,v.bid.expiry); await c.hub.expire(v.vaultId);
     expect(await v.vault.reserved(c.usdcAddress)).eq(4000n*U);
     await c.hub.connect(c.alice).claim(v.vaultId,30000n*U);
     expect(await c.usdc.balanceOf(v.vaultAddress)).eq(4000n*U);

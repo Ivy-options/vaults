@@ -508,6 +508,9 @@ th.num {
   color: var(--muted);
   font-size: 12px;
 }
+.calc .inputs label[hidden] {
+  display: none;
+}
 .calc .inputs label:first-child {
   grid-column: 1/-1;
 }

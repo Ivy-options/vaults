@@ -13,6 +13,7 @@
     "underlying": "WETH_ADDRESS",
     "collateral": "WETH_ADDRESS",
     "publicDeposits": false,
+    "allowPartialExercise": false,
     "allowedExercise": 1,
     "allowedSettlement": 0,
     "expiry": "FUTURE_UNIX_SECONDS",

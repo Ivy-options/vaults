@@ -15,7 +15,7 @@ describe("claim", function () {
   async function expiredCall(ctx: IvyContext) {
     const live = await goLive(ctx, { deposit: 6n * WETH_UNIT, extraDeposits: [{ signer: ctx.bob, amount: 4n * WETH_UNIT }] });
     await at(ctx, live.bid.expiry + EXERCISE_WINDOW + 1n);
-    await ctx.hub.settle(live.vaultId);
+    await ctx.hub.expire(live.vaultId);
     return live;
   }
 
@@ -64,7 +64,7 @@ describe("claim", function () {
     await fund(ctx, weth, marketMaker, vaultAddress, 4n * WETH_UNIT);
     await hub.connect(marketMaker).exercise(vaultId, 4n * WETH_UNIT);
     await at(ctx, bid.expiry + EXERCISE_WINDOW + 1n);
-    await hub.settle(vaultId);
+    await hub.expire(vaultId);
     expect(await usdc.balanceOf(vaultAddress)).to.equal(19_000n * USDC_UNIT);
     expect(await weth.balanceOf(vaultAddress)).to.equal(4n * WETH_UNIT);
 
@@ -83,7 +83,7 @@ describe("claim", function () {
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
     await ctx.feed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 3300n * USDC_UNIT);
     await at(ctx, bid.expiry);
-    await hub.settle(vaultId);
+    await hub.expire(vaultId);
 
     const tx = hub.connect(alice).claim(vaultId, 10n * WETH_UNIT);
     await expect(tx).to.changeTokenBalances(ethers, weth, [alice], [10n * WETH_UNIT - CALL_PAYOUT_ALL]);

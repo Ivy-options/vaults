@@ -40,7 +40,7 @@ Read the [operator runbook](docs/operations.md) and copy the [request examples](
 ```sh
 npm run operator -- prepare-vault request.json
 npm run operator -- inspect-bid activation.json
-npm run operator -- settle settlement.json
+npm run operator -- expire expiration.json
 ```
 
 `--send` explicitly submits through the configured RPC's signer. No automated market-data collection, pricing, bidding, or trading UI is included.
@@ -54,3 +54,7 @@ See the [operator runbook](docs/operations.md) and [public guide](docs/site/inde
 Open [the protocol guide](docs/site/index.html) directly in a browser, or serve the repository root with `python3 -m http.server 8000` and visit `/docs/site/`. Serve the whole repository so the operator runbook and request-example links remain available.
 
 The guide uses local fonts and assets in `docs/site/assets/`. After editing it, run `npm run docs:check` to check links, anchors, assets and calculator examples.
+
+`exercise(vaultId, amount)` uses the buyer’s option right and pays the configured recipient. `expire(vaultId)` permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for `claimPayout`. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses fresh spot. Physical exercise exchanges assets at strike within its exercise window.
+
+Every vault fixes `allowPartialExercise` at creation, before deposits. True permits any valid positive amount up to remaining notional; false requires all remaining notional. The term cannot be tightened or changed later. Operator creation requests must specify it explicitly. Full exercise finalizes automatically; partial exercise leaves the remainder open.

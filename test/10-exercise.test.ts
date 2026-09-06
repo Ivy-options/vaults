@@ -128,7 +128,7 @@ describe("exercise", function () {
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "NothingToExercise");
     });
 
-    it("American cash is open right before expiry and closed at expiry", async function () {
+    it("American cash switches from spot to required expiry reports at expiry", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash });
       await networkHelpers.time.increaseTo(bid.expiry - 3n);
@@ -136,16 +136,16 @@ describe("exercise", function () {
       await at(ctx, bid.expiry - 1n);
       await ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT);
       await at(ctx, bid.expiry);
-      await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ExerciseWindowClosed");
+      await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ReportUnavailable");
     });
 
-    it("European cash cannot be exercised at all", async function () {
+    it("European cash opens at expiry and requires the expiry report", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
       await setSpot(ctx, 3300n * USDC_UNIT);
-      await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ExerciseNotAvailable");
+      await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ExerciseNotOpenYet");
       await at(ctx, bid.expiry);
-      await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ExerciseNotAvailable");
+      await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ReportUnavailable");
     });
 
     it("a stale price reverts", async function () {

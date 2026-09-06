@@ -22,6 +22,7 @@ export const OptionKind = { CoveredCall: 0, CashSecuredPut: 1 } as const;
 export interface VaultTermsInput {
   underlying: string;
   collateral: string;
+  allowPartialExercise: boolean;
   publicDeposits: boolean;
   allowedExercise: number;
   allowedSettlement: number;
@@ -110,6 +111,7 @@ export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Va
   return {
     underlying: ctx.wethAddress,
     collateral: ctx.wethAddress,
+    allowPartialExercise: true,
     publicDeposits: true,
     allowedExercise: ExercisePolicy.Either,
     allowedSettlement: SettlementPolicy.Physical,

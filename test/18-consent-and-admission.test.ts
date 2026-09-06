@@ -55,7 +55,7 @@ describe('contract buyers and admission boundaries', function () {
     await c.hub.connect(c.alice).approveUnwind(v.vaultId, 1);
     await fund(c, c.usdc, c.carol, v.vaultAddress, 100n * U);
     await at(c, v.bid.expiry + 3600n);
-    await c.hub.settle(v.vaultId);
+    await c.hub.expire(v.vaultId);
     const before = await c.usdc.balanceOf(c.carol.address);
     await expect(c.hub.connect(c.carol).executeUnwind(v.vaultId, 1, '0x')).revertedWithCustomError(c.hub, 'WrongPhase');
     expect(await c.usdc.balanceOf(c.carol.address)).eq(before);

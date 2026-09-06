@@ -16,7 +16,7 @@ interface IIvyVaultsHubErrors {
     error LoosensTerms();
     error ExerciseWindowClosed();
     error ExerciseNotOpenYet();
-    error ExerciseNotAvailable();
+    error PartialExerciseNotAllowed();
     error ExceedsRemaining(uint256 remaining);
     error NothingToExercise();
     error InsufficientShares();

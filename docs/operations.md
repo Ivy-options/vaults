@@ -11,7 +11,7 @@ Copy the [example files](../examples/operator/README.md), replace placeholder ad
 ```sh
 npm run operator -- prepare-vault vault.json
 npm run operator -- inspect-bid activation.json
-npm run operator -- settle settlement.json
+npm run operator -- expire expiration.json
 ```
 
 These commands only simulate and print calldata. Review the chain, sender, destination, arguments and simulation result. State can change between preflight and inclusion; contracts recheck their own conditions at execution. Operational USD checks use your supplied valuation and cannot prove that it is current or correct.
@@ -42,7 +42,7 @@ The final journal has `complete: true` only after all constructor bindings verif
 
 ## Prepare, fund and activate
 
-1. Verify supported token addresses, decimals and transfer behaviour, owner balance, commitment size, exact expiry, acceptable option policies and configured feed. Launch vaults default to private deposits; set `terms.publicDeposits: true` explicitly for pooling. The token list in the request is an operational allowlist, not a global on-chain whitelist.
+1. Verify supported token addresses, decimals and transfer behaviour, owner balance, commitment size, exact expiry, acceptable option policies and configured feed. Set `terms.allowPartialExercise` explicitly to a boolean before creating the vault: true permits partial exercise; false requires all remaining notional. This term is immutable, including through tightening. Launch vaults default to private deposits; set `terms.publicDeposits: true` explicitly for pooling. The token list in the request is an operational allowlist, not a global on-chain whitelist.
 2. Set an explicit positive `minTradeUsdE6` appropriate to the offered product. The examples use a configurable illustration, not a protocol minimum. Supply a reviewed collateral USD price and a market quote for every accepted quote token. `prepare-vault` checks the wallet balance and minimum, sets minCollateral to the owner's prepared amount, and translates outOfTheMoneyBps to an absolute strike: rounded up for calls, down for puts. For a pooled offering, this is the opening floor; total committed supply may be larger. Review APR separately using the agreed premium, commitment value and exact duration; the CLI does not price APR or volatility.
 3. Prepare `prepare-vault`, submit the resulting createVault call and read the vault ID/address from its receipt or hub getters. For each depositor run `approve-token` with the collateral token and amount, then `deposit` with that raw amount. Approval must target the clone, never the hub. Direct `vault.deposit(amount)` is also supported, with the same admission rules.
 4. The owner runs `open-auction`. At a nonzero auctionStartsAt, anyone may open it after the scheduled time. Read the auctionId and totalShares after opening. Both become signed commitments. No deposits or withdrawals are available in Auction; transfers remain possible.
@@ -52,7 +52,7 @@ The final journal has `complete: true` only after all constructor bindings verif
 
 A buyer can invalidate its unused nonce with `cancelBid(nonce)` through the ABI. Cancelled or reopened auctions require a new typed bid for the new auctionId, even if size and terms are unchanged.
 
-## Reports, exercise and settlement
+## Reports, exercise and expiration
 
 Use externally prepared report files. A spot report contains `underlying`, `quote`, `price`, `observedAt`, `validUntil`; an expiry report contains `underlying`, `quote`, `expiry`, `price`, `validUntil`. `typed-report` takes `kind: "spot"` or `"expiry"` and returns domain `IvyPriceFeed`, version `1`, chainId and feed address. Have Ivy's configured signer sign it, then place the signature alongside the report and relay with `publish-spot` or `publish-expiry`. Any account can relay.
 
@@ -60,7 +60,7 @@ Ivy operators calculate the 30-minute average ending at the exact expiry. The fe
 
 For physical options, the deadline is `expiry + stateOf(vaultId).exerciseWindow`. American holders may exercise from activation; European holders start at expiry. Both must execute strictly before the deadline. The buyer or its current executor submits `exercise` with underlying amount. The caller must fund and approve the clone: quote tokens for calls, underlying for puts. All output goes to the configured recipient. Only the buyer can use `set-execution` to replace/revoke executor or update recipient; use the zero address to revoke the executor.
 
-American cash exercise is available strictly before expiry using fresh spot; European cash has no manual exercise. Anyone can settle physical options at/after their deadline and cash options at/after expiry. Full exercise finalizes immediately. The operational target is settlement within 30 minutes after the physical window closes, or within 30 minutes after cash expiry subject to report availability. These are monitoring targets, not automatic on-chain execution.
+American cash exercise uses fresh spot before expiry. At/after expiry, both American and European cash exercise use the finalized report for the exact expiry; a zero payout reverts. Cash `expire` processes expiration, including automatic cash exercise where applicable, reserving the remaining buyer payout for `claim-payout`. Anyone can expire physical options at/after their deadline and cash options at/after expiry. Full exercise finalizes immediately. The operational target is settlement within 30 minutes after the physical window closes, or within 30 minutes after cash expiry subject to report availability. These are monitoring targets, not automatic on-chain execution.
 
 After settlement, holders use `claim` with a share amount. This burns shares for proportional unreserved balances. Unpaid premium, permanent premium dust and buyer payouts/refunds stay reserved. `claim-premium` remains available to activation holders after burning every share. The buyer or executor calls `claim-payout`; payment goes to the buyer's current recipient. Read `vault.reserved(token)`, `vault.buyerReserved(token)` and premium-module `claimable(vaultId, holder)` to distinguish obligations; hub `pendingPayout` only tracks collateral cash settlement, not unwind refunds.
 
@@ -97,7 +97,7 @@ All requests include `rpc` and `sender`; hub calls include `hub` and usually `va
 | publish-spot / publish-expiry | feed, report, signature; hub unnecessary |
 | approve-token | token, amount; clone spender is read from hub |
 | deposit / withdraw / exercise / claim | amount (collateral, shares, underlying, shares respectively) |
-| open-auction / cancel-auction / settle / claim-premium / claim-payout | no additional fields |
+| open-auction / cancel-auction / expire / claim-premium / claim-payout | no additional fields |
 | set-execution | executor, recipient |
 | propose-unwind | deadline, refund |
 | typed-unwind / revoke-unwind | no additional fields |

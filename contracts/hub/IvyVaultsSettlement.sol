@@ -10,7 +10,7 @@ import "../types/IvyTypes.sol";
 abstract contract IvyVaultsSettlement is IvyVaultsActivation {
     // ------------------------------------------------------------ exercise (spec §9.1)
 
-    /// @notice Market maker exercises `amount` underlying units. Partial exercise is allowed; the vault settles
+    /// @notice Market maker exercises `amount` underlying units. Partial exercise follows the immutable vault term; the vault finalizes
     ///         automatically once everything is exercised.
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
@@ -28,24 +28,24 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
 
     // ------------------------------------------------------------ settlement (spec §9.2)
 
-    /// @notice First moment `settle` may be called: expiry for cash, expiry + exerciseWindow for physical.
-    function settlementTimeOf(uint256 vaultId) public view returns (uint256) {
+    /// @notice First moment `expire` may be called: expiry for cash, expiry + exerciseWindow for physical.
+    function expirationTimeOf(uint256 vaultId) public view returns (uint256) {
         VaultState storage s = _state[vaultId];
         return s.settlement == SettlementType.Cash ? uint256(s.expiry) : uint256(s.expiry) + s.exerciseWindow;
     }
 
     /// @notice Permissionless. Physical: closes the vault. Cash: prices the remaining notional and reserves
     ///         the market maker's payout (collected via `claimPayout`).
-    function settle(uint256 vaultId) external nonReentrant {
+    function expire(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
-        if (block.timestamp < settlementTimeOf(vaultId)) revert SettlementNotReached();
-        IvyOptionSettlement.settle(s, _terms[vaultId]);
+        if (block.timestamp < expirationTimeOf(vaultId)) revert ExpirationNotReached();
+        IvyOptionSettlement.expire(s, _terms[vaultId]);
         _finalize(vaultId, s);
     }
 
     /// @notice Buyer or executor collects a reserved cash payout or unwind refund for the configured recipient. A failing transfer
-    ///         can never block `settle`.
+    ///         can never block `expire`.
     function claimPayout(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Settled);
         VaultState storage s = _state[vaultId];

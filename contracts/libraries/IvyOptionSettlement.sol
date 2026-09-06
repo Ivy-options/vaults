@@ -19,6 +19,7 @@ library IvyOptionSettlement {
         if (amount == 0) revert ZeroAmount();
         uint256 remaining = s.totalNotional - s.exercisedNotional;
         if (amount > remaining) revert ExceedsRemaining(remaining);
+        if (!t.allowPartialExercise && amount != remaining) revert PartialExerciseNotAllowed();
         _checkExerciseWindow(s);
 
         s.exercisedNotional += amount;
@@ -37,7 +38,7 @@ library IvyOptionSettlement {
                 got = IvyMath.quoteOutFloor(amount, s.strike, s.underlyingUnit);
             }
         } else {
-            uint256 spot = _readSpot(t, s.quoteToken);
+            uint256 spot = block.timestamp < s.expiry ? _readSpot(t, s.quoteToken) : _readExpiryPrice(s, t);
             got = s.isCall
                 ? IvyMath.callIntrinsic(amount, s.strike, spot)
                 : IvyMath.putIntrinsic(amount, s.strike, spot, s.underlyingUnit);
@@ -49,19 +50,17 @@ library IvyOptionSettlement {
     function _checkExerciseWindow(VaultState storage s) private view {
         uint256 ts = block.timestamp;
         if (s.settlement == SettlementType.Cash) {
-            if (s.style == ExerciseStyle.European) revert ExerciseNotAvailable();
-            if (ts >= s.expiry) revert ExerciseWindowClosed();
+            if (s.style == ExerciseStyle.European && ts < s.expiry) revert ExerciseNotOpenYet();
         } else {
             if (ts >= uint256(s.expiry) + s.exerciseWindow) revert ExerciseWindowClosed();
             if (s.style == ExerciseStyle.European && ts < s.expiry) revert ExerciseNotOpenYet();
         }
     }
 
-    function settle(VaultState storage s, VaultTerms storage t) external {
+    function expire(VaultState storage s, VaultTerms storage t) external {
         uint256 remaining = s.totalNotional - s.exercisedNotional;
         if (s.settlement == SettlementType.Cash && remaining > 0) {
-            uint256 spot = IIvyPriceFeed(t.priceFeed).settlementPrice(t.underlying, s.quoteToken, s.expiry);
-            if (spot == 0) revert ReportUnavailable();
+            uint256 spot = _readExpiryPrice(s, t);
             uint256 payout = s.isCall
                 ? IvyMath.callIntrinsic(remaining, s.strike, spot)
                 : IvyMath.putIntrinsic(remaining, s.strike, spot, s.underlyingUnit);
@@ -97,6 +96,11 @@ library IvyOptionSettlement {
             if (tokens[j] == tokens[i]) return true;
         }
         return false;
+    }
+
+    function _readExpiryPrice(VaultState storage s, VaultTerms storage t) private view returns (uint256 price) {
+        price = IIvyPriceFeed(t.priceFeed).settlementPrice(t.underlying, s.quoteToken, s.expiry);
+        if (price == 0) revert ReportUnavailable();
     }
 
     function _readSpot(VaultTerms storage t, address quoteToken) private view returns (uint256) {

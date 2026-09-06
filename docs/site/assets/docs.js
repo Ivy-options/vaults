@@ -191,32 +191,44 @@
     var K = parseFloat($("strike").value);
     var p = parseFloat($("prem").value);
     var S = parseFloat($("spot").value);
+    var days = parseFloat($("days").value);
+    var entryPrice = parseFloat($("entryPrice").value);
     var N = kind === "call" ? dep : K > 0 ? dep / K : 0;
-    return { kind: kind, D: dep, C: dep, K: K, p: p, S: S, N: N, P: p * N };
+    return { kind: kind, D: dep, C: dep, K: K, p: p, S: S, N: N, P: p * N, days: days, entryPrice: entryPrice };
   }
 
   function render() {
     var o = params();
     $("depLabel").textContent =
       o.kind === "call" ? "Deposit (WETH)" : "Deposit (USDC)";
+    $("entryPriceField").hidden = o.kind !== "call";
+    var initialValue = o.kind === "call" ? o.D * o.entryPrice : o.C;
+    var premiumYield = o.P / initialValue * 100;
+    var premiumApr = premiumYield * 365 / o.days;
     var valid =
-      [o.D, o.K, o.p, o.S].every(Number.isFinite) &&
+      [o.D, o.K, o.p, o.S, o.N, o.P, o.days, initialValue, premiumYield, premiumApr].every(Number.isFinite) &&
       o.D > 0 &&
       o.K > 0 &&
       o.S > 0 &&
-      o.p >= 0;
+      o.p >= 0 &&
+      o.days > 0 &&
+      initialValue > 0;
     $("calcError").hidden = valid;
     $("calcError").textContent = valid
       ? ""
-      : "Enter a positive deposit, strike and expiry price, and a non-negative premium.";
+      : "Enter positive deposit, strike, expiry price and days committed, a positive starting WETH price for calls, and a non-negative premium. Values must stay within the calculator’s numeric range.";
     if (!valid) {
       $("rows").innerHTML = "";
       $("calcChart").innerHTML = "";
       $("notional").textContent = "Unavailable";
       $("premTotal").textContent = "Unavailable";
+      $("premiumYield").textContent = "Unavailable";
+      $("premiumApr").textContent = "Unavailable";
       $("calcNote").textContent = "";
       return;
     }
+    $("premiumYield").textContent = fmt(premiumYield, 2) + "%";
+    $("premiumApr").textContent = fmt(premiumApr, 2) + "%";
     var rows;
     if (o.kind === "call") {
       var payoutCall = o.S > o.K ? (o.N * (o.S - o.K)) / o.S : 0;
@@ -287,7 +299,7 @@
   function redrawAll() {
     render();
   }
-  ["kind", "dep", "strike", "prem", "spot"].forEach(function (id) {
+  ["kind", "dep", "strike", "prem", "spot", "days", "entryPrice"].forEach(function (id) {
     $(id).addEventListener("input", render);
   });
   redrawAll();

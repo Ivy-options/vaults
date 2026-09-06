@@ -264,15 +264,15 @@
                 <p>
                   Allows exercise before expiry. American physical options also
                   have a limited exercise window after expiry, while American
-                  cash exercise ends at expiry.
+                  cash exercise switches to the finalized expiry price at expiry.
                 </p>
               </div>
               <div>
                 <h4>European</h4>
                 <p>
                   Waits until expiry. European physical options have a limited
-                  exercise window after expiry; European cash options settle at
-                  expiry or later without a manual exercise call.
+                  exercise window after expiry. European cash options can be exercised
+                  from expiry, or finalized by anyone with expire to reserve the buyer’s payout.
                 </p>
               </div>
             </div>
@@ -522,8 +522,8 @@
                   </li>
                 </ul>
                 <div class="exit">
-                  <b>Exit</b> <code>settle(vaultId)</code> by anyone at the
-                  settlement time, automatically on full exercise, or through a
+                  <b>Exit</b> <code>expire(vaultId)</code> by anyone at the
+                  expiration time; also finalized automatically on full exercise, or through a
                   buyer-signed unanimous unwind. If the unwind includes a refund
                   to the buyer, the person executing it supplies that amount
                   separately in the premium token. Already-earned premium and
@@ -586,92 +586,129 @@
         <div class="main">
           <h2>Settlement outcomes</h2>
           <p class="prose">
-            Settlement completes the option and determines which assets each
-            side can collect. What an LP receives depends on the option kind,
-            how much the buyer exercises, and whether settlement is physical or
-            cash. Physical exercise exchanges underlying and quote tokens at the
-            strike, so the remaining pool can contain both assets. Cash
-            settlement pays the buyer from the collateral instead. Cash
-            settlement at expiry uses a <strong>finalized expiry price</strong>:
-            a historical price signed by Ivy and published to the price feed,
-            the contract that checks and stores price reports. Once published,
-            that price cannot be replaced. It represents the agreed expiry price
-            even if settlement takes place later. The formulas below include
-            earned premium, although holders claim that premium separately from
-            their share of the settlement pool.
+            At settlement, the vault finishes the option and makes the remaining
+            assets available to shareholders. Start with the deposit, work out
+            what the buyer receives, and see what is left for LPs.
+            <strong>Earned premium is claimed separately.</strong>
           </p>
-          <div class="legend">
-            <span><b>D</b>call collateral</span
-            ><span><b>C</b>put collateral</span><span><b>K</b>strike</span
-            ><span><b>N</b>put notional, C / K</span
-            ><span><b>S</b>finalized expiry price</span
-            ><span><b>f</b>exercised fraction</span
-            ><span><b>r</b>remaining underlying notional</span
-            ><span><b>P</b>premium earned at activation, paid separately</span>
-          </div>
+          <p class="prose">
+            A <strong>covered call</strong> starts with underlying tokens, such
+            as WETH. A <strong>cash-secured put</strong> starts with quote tokens,
+            such as USDC. The <strong>strike</strong> is the agreed price per
+            underlying token. The table below describes the whole vault's
+            remaining pool; each shareholder claims their proportional share.
+          </p>
           <div
             class="tablewrap"
             tabindex="0"
             role="region"
-            aria-label="Settlement formulas"
+            aria-label="Settlement outcomes in plain language"
           >
             <table>
               <thead>
                 <tr>
                   <th>Outcome</th>
-                  <th>Covered call (deposit D underlying)</th>
-                  <th>Cash-secured put (deposit C quote)</th>
+                  <th>Covered call · deposit WETH</th>
+                  <th>Cash-secured put · deposit USDC</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="k">Not exercised</td>
+                  <td class="k">No exercise or buyer payout</td>
+                  <td>The deposited WETH stays in the pool.</td>
+                  <td>The deposited USDC stays in the pool.</td>
+                </tr>
+                <tr>
+                  <td class="k">Physical settlement</td>
                   <td>
-                    <span class="mono">D</span> underlying +
-                    <span class="mono">P</span>
+                    The buyer takes the exercised WETH and pays USDC at the
+                    strike. The pool keeps that USDC and any unexercised WETH.
                   </td>
                   <td>
-                    <span class="mono">C</span> quote +
-                    <span class="mono">P</span>
+                    The vault buys the exercised WETH from the buyer at the
+                    strike. The pool keeps that WETH and any unspent USDC.
                   </td>
                 </tr>
                 <tr>
-                  <td class="k">Physical, fraction f</td>
+                  <td class="k">Cash settlement at expiry</td>
                   <td>
-                    <span class="mono">(1−f)·D</span> underlying +
-                    <span class="mono">f·D·K</span> quote +
-                    <span class="mono">P</span>
+                    If the expiry price is above the strike, the buyer receives
+                    the price difference for each remaining WETH covered by the
+                    option, converted to WETH at the expiry price. The pool keeps
+                    the rest of the WETH. If the price is at or below the strike,
+                    there is no expiry payout.
                   </td>
                   <td>
-                    <span class="mono">f·N</span> underlying +
-                    <span class="mono">C − f·N·K</span> quote +
-                    <span class="mono">P</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="k">Cash, unexercised r</td>
-                  <td>
-                    <span class="mono">D − r·(S−K)/S</span> underlying +
-                    <span class="mono">P</span>
-                    <span class="muted small">(payout 0 if S ≤ K)</span>
-                  </td>
-                  <td>
-                    <span class="mono">C − r·(K−S)</span> quote +
-                    <span class="mono">P</span>
-                    <span class="muted small">(payout 0 if S ≥ K)</span>
+                    If the expiry price is below the strike, the buyer receives
+                    the price difference in USDC for each remaining WETH covered
+                    by the option. The pool keeps the rest of the USDC. If the
+                    price is at or above the strike, there is no expiry payout.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <div class="deal-block">
+            <h3>Two worked examples</h3>
+            <p class="prose">
+              Both examples use a strike of 3,000 USDC per WETH and assume no
+              earlier exercise. Amounts below exclude the separately earned
+              premium. Physical and cash settlement are alternative outcomes
+              determined by the option's agreed settlement type.
+            </p>
+            <div class="deal-compare">
+              <div>
+                <h4>Call: deposit 10 WETH</h4>
+                <p>
+                  <strong>Physical:</strong> if the buyer exercises all 10 WETH,
+                  they pay 10 × 3,000 = <strong>30,000 USDC</strong>. That is what
+                  the pool holds. If they exercise half, the pool holds
+                  <strong>5 WETH + 15,000 USDC</strong>.
+                </p>
+                <p>
+                  <strong>Cash, expiry price 3,300:</strong> the buyer's option
+                  value is 10 × (3,300 − 3,000) = 3,000 USDC. Convert that value
+                  to WETH: 3,000 ÷ 3,300 ≈ 0.9091 WETH goes to the buyer.
+                  The pool keeps 10 − 0.9091 ≈ <strong>9.0909 WETH</strong>.
+                </p>
+              </div>
+              <div>
+                <h4>Put: deposit 30,000 USDC</h4>
+                <p>
+                  The deposit covers 30,000 ÷ 3,000 = <strong>10 WETH</strong>.
+                  <strong>Physical:</strong> if the buyer exercises all of it,
+                  the vault pays 30,000 USDC and receives <strong>10 WETH</strong>.
+                  If they exercise half, the pool holds
+                  <strong>5 WETH + 15,000 USDC</strong>.
+                </p>
+                <p>
+                  <strong>Cash, expiry price 2,700:</strong> the buyer receives
+                  10 × (3,000 − 2,700) = 3,000 USDC. The pool keeps
+                  30,000 − 3,000 = <strong>27,000 USDC</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+          <p class="prose">
+            <strong>Which price is used?</strong> Cash settlement at expiry uses
+            the finalized expiry price: a historical price signed by Ivy and
+            published to the price feed, the contract that checks and stores
+            price reports. Once published, it cannot be replaced. Settling later
+            still uses that expiry price, not the current market price.
+          </p>
           <div class="callout" style="margin-top: 14px">
-            <b>Two separate claims.</b> These formulas and charts show total LP
-            proceeds assuming the same holders throughout, including premium
-            earned at activation. The settlement pool excludes all unpaid
-            premium and buyer reserves. Exercise consideration rounds up and
-            buyer payouts round down; premium entitlement dust remains
-            permanently reserved. Cash rows assume no prior American cash
-            exercise; prior payouts must also be subtracted.
+            <b>Pool claim + separate premium claim.</b> Settlement assets go to
+            current shareholders in proportion to their shares. Premium belongs
+            to the holders at activation. If you held the same shares throughout,
+            your total proceeds are your share of the remaining pool plus your
+            earned premium. The calculator below includes both.
+            Unpaid premium and amounts reserved for the buyer are excluded from
+            the pool. If an American cash option was exercised earlier, those
+            payouts also reduce the pool; only the remaining option amount is
+            settled at expiry. Examples ignore token rounding: exercise
+            consideration rounds up, buyer payouts round down, and premium
+            entitlement dust remains permanently reserved.
           </div>
 
           <div class="fig">
@@ -718,6 +755,14 @@
                   step="any"
                   value="3300"
               /></label>
+              <label
+                >Capital committed (days)<input
+                  id="days" type="number" min="0.01" step="any" value="30"
+              /></label>
+              <label id="entryPriceField"
+                >WETH price when committed (USDC)<input
+                  id="entryPrice" type="number" min="0.01" step="any" value="3000"
+              /></label>
             </div>
             <div class="body">
               <div class="chart">
@@ -758,11 +803,28 @@
                   ><span
                     >Premium earned at activation
                     <b id="premTotal">1,000 USDC</b></span
+                  ><span>Premium yield for this period
+                    <b id="premiumYield">–</b></span
+                  ><span>Estimated premium APR
+                    <b id="premiumApr">–</b></span
                   ><span id="calcNote"></span>
                 </div>
               </div>
             </div>
           </div>
+          <p class="small muted">
+            <strong>How to read the APR:</strong> premium yield = total premium
+            ÷ initial deposit value. Estimated premium APR = that yield × 365
+            ÷ days committed. For calls, the initial value is deposited WETH ×
+            its price when committed; for puts, it is the deposited USDC.
+            Include the full time your capital is committed, including any wait
+            before activation. For example, 1,000 USDC premium on 30,000 USDC
+            over 30 days is 3.33% for the period, or 40.56% annualized.
+            This measures premium income only: settlement losses, collateral
+            price changes and costs can reduce total returns below zero.
+            It assumes the same yield can be repeated all year with no idle
+            time or compounding; it is not a guaranteed annual return.
+          </p>
         </div>
       </section>
 
@@ -873,7 +935,7 @@
               >
             </div>
             <div class="row">
-              <span class="mono">publicDeposits · underlying · collateral</span
+              <span class="mono">allowPartialExercise · publicDeposits · underlying · collateral</span
               ><span>Who may deposit, and what the vault is.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
@@ -952,9 +1014,10 @@
               </li>
               <li>
                 <div>
-                  <b>Exercise</b>Where manual exercise is supported, the buyer
-                  or its appointed executor can exercise part or all of the
-                  remaining notional within the permitted window. Cash payouts
+                  <b>Exercise</b>The buyer or its appointed executor can exercise
+                  within the permitted window. The vault’s fixed partial-exercise
+                  policy determines whether an amount may be partial or must consume
+                  all remaining notional. Cash payouts
                   come from the vault's collateral. Only the buyer can change
                   the executor or payout recipient, and exercise assets always
                   go to that configured recipient.
@@ -984,8 +1047,26 @@
             <code>underlyingUnit = 10 ** underlyingDecimals</code>. Strike and
             premium are raw payment-token units per whole underlying.
           </p>
+          <p class="prose">
+            <b>Exercise uses your option right.</b> The buyer or appointed executor
+            calls <code>exercise(vaultId, amount)</code>; payment goes to the configured
+            recipient. <code>allowPartialExercise</code> is fixed at vault creation,
+            before deposits: true allows a positive amount up to the remaining
+            notional; false requires all remaining notional. It cannot be changed
+            through terms tightening. Partial exercise leaves the rest Live;
+            full exercise finalizes the vault.
+          </p>
+          <p class="prose">
+            <b>Expiration processes the remaining position.</b> Anyone can call
+            <code>expire(vaultId)</code> after its deadline. Physical unused rights
+            lapse. For cash, this processes expiration, including automatic cash
+            exercise where applicable: the finalized expiry price determines the
+            remaining payout, reserved for <code>claimPayout</code>. Shareholders
+            can claim the residual assets. Being out of the money before the
+            deadline does not permit expiration.
+          </p>
           <div class="fig">
-            <span>Exercise windows and settlement time</span
+            <span>Exercise windows and expiration time</span
             ><span><b>exerciseWindow</b> launch default 1 h</span>
           </div>
           <div
@@ -1000,7 +1081,7 @@
                 <tr>
                   <th>Style · settlement</th>
                   <th>exercise(vaultId, amount)</th>
-                  <th>settle(vaultId)</th>
+                  <th>expire(vaultId)</th>
                   <th>At exercise</th>
                 </tr>
               </thead>
@@ -1029,21 +1110,20 @@
                 </tr>
                 <tr>
                   <td class="k">American · Cash</td>
-                  <td><span class="mono">t &lt; expiry</span></td>
+                  <td>Before or after expiry, while Live</td>
                   <td><span class="mono">t ≥ expiry</span></td>
                   <td>
-                    Receive intrinsic value from the collateral at the current
-                    fresh spot; reverts if out of the money.
+                    Receive intrinsic value: fresh spot before expiry; finalized
+                    expiry price at/after expiry. Reverts if payout is zero.
                   </td>
                 </tr>
                 <tr>
                   <td class="k">European · Cash</td>
-                  <td>never</td>
+                  <td><span class="mono">t ≥ expiry</span>, while Live</td>
                   <td><span class="mono">t ≥ expiry</span></td>
                   <td>
-                    No exercise. <span class="mono">settle</span> prices the
-                    remaining notional and reserves your payout; collect it with
-                    <span class="mono">claimPayout</span>.
+                    Receive intrinsic value using the finalized expiry price.
+                    Reverts if payout is zero.
                   </td>
                 </tr>
               </tbody>
@@ -1219,10 +1299,10 @@
                     activation holder, also after settlement or burning all
                     shares
                   </dd>
-                  <dt>settle(vaultId)</dt>
+                  <dt>expire(vaultId)</dt>
                   <dd>
                     <span class="chip">anyone</span> at
-                    <code>settlementTimeOf</code>
+                    <code>expirationTimeOf</code>
                   </dd>
                   <div class="who">Settled</div>
                   <dt>claim(vaultId, shares)</dt>

@@ -18,6 +18,7 @@ const fields = (type,value) => Object.fromEntries(type.map(f=>[f.name,required(v
 /** Read-only preflight. USD values use six decimals; token quantities use raw token units. */
 export async function prepareVault(provider, request) {
   const r=request, t={...required(r,'terms'),publicDeposits:r.terms.publicDeposits??false};
+  if(typeof required(t,'allowPartialExercise')!=='boolean') throw new Error('allowPartialExercise must be boolean');
   const pairs=required(r,'pairs').map(p=>({quoteToken:p.quoteToken,terms:{...p.terms}}));
   const allowed=new Set(required(r,'supportedTokens').map(a=>a.toLowerCase()));
   for(const token of [t.underlying,t.collateral,...pairs.flatMap(p=>[p.quoteToken,p.terms.premiumToken])]) if(!allowed.has(token.toLowerCase())) throw new Error(`Unsupported token ${token}`);
@@ -73,13 +74,13 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const amount=await hub.totalShares(r.vaultId), valueUsdE6=amount*price/(10n**BigInt(await token.decimals()));
     if(valueUsdE6<minimum) throw new Error('Below launch USD minimum at activation');
     const notional=s.isCall?amount:amount*s.underlyingUnit/BigInt(r.bid.strike);
-    detail={valueUsdE6,notional,totalPremium:BigInt(r.bid.premium)*notional/s.underlyingUnit};
+    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium:BigInt(r.bid.premium)*notional/s.underlyingUnit};
   } else if(command==='publish-spot'||command==='publish-expiry') {
     target=new Contract(required(r,'feed'),artifacts.IvyPriceFeed.abi,runner);
     const spot=command==='publish-spot', type=spot?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
     method=spot?'publishSpot':'publishExpiry';args=[...type.map(f=>required(r.report,f.name)),r.signature];
   } else {
-    const actions={deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],settle:['settle',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
+    const actions={deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
     if(command==='approve-token') {
       target=new Contract(r.token,['function approve(address,uint256) returns(bool)'],runner);
       method='approve';args=[await hub.vaultOf(r.vaultId),r.amount];
