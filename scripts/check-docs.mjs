@@ -113,7 +113,7 @@ for (const invalid of ["", "0", "-1", "NaN"]) {
 update({ strike: "3000", prem: "0", spot: "3300" });
 assert.equal(elements.calcError.hidden, true);
 assert.equal(elements.premTotal.textContent, "0 USDC");
-assert.match(elements.rows.innerHTML, /out of the money, receives 0/);
+assert.match(elements.rows.innerHTML, /no intrinsic value, receives 0/);
 assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
 assert.equal(elements.premiumApr.textContent, "0%");
 for (const field of ["days", "entryPrice"]) {

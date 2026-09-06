@@ -42,7 +42,7 @@
           <a href="#option-basics">The option deal</a>
           <a href="#collateral">Collateral and shares</a>
           <a href="#lifecycle">Vault lifecycle</a>
-          <a href="#outcomes">Settlement outcomes</a>
+          <a href="#outcomes">What each side receives</a>
           <a href="#terms">Vault terms</a>
           <a href="#makers">Bidding and exercise</a>
           <a href="#developers">Contracts and entrypoints</a>
@@ -284,14 +284,15 @@
           </div>
 
           <div class="deal-block">
-            <h3>Who submits the call, and who gets paid?</h3>
+            <h3 id="execution-permissions">Who submits the call, and who gets paid?</h3>
             <p class="prose">
               The buyer can appoint an <strong>executor</strong> to exercise and
               claim payouts on its behalf, and choose a
               <strong>recipient</strong> address that receives those assets.
               These are separate permissions: the executor can submit the call,
               but cannot redirect payment to itself unless it is also the
-              buyer's chosen recipient.
+              buyer's chosen recipient. Only the buyer can change the executor
+              or recipient.
             </p>
           </div>
         </div>
@@ -358,7 +359,7 @@
             submitted shares, meaning those shares are removed from circulation.
             The contracts keep amounts owed as unpaid premium or buyer payments
             in <strong>reserves</strong>. The remaining, unreserved assets form
-            the settlement pool available to shareholders.
+            the residual pool available to shareholders.
           </p>
           <div class="grid2">
             <div>
@@ -369,14 +370,8 @@
               shares for multiple vaults under separate token IDs. Each token ID
               matches its vault ID. Shares can be transferred in every phase,
               carrying the right to claim a proportion of the remaining pool
-              after settlement. Premium already earned at activation belongs to
-              the holder who earned it, even if those shares later change hands.
-            </div>
-            <div>
-              <div class="k">Kind</div>
-              The collateral and underlying addresses determine the option kind
-              at creation. Matching addresses mean a covered call; different
-              addresses mean a cash-secured put.
+              after finalization. Earned premium is a separate entitlement,
+              described <a href="#premium-ownership">below</a>.
             </div>
             <div>
               <div class="k">Approvals</div>
@@ -390,7 +385,7 @@
               routes follow the same deposit rules.
             </div>
             <div>
-              <div class="k">Premium</div>
+              <div class="k" id="premium-ownership">Premium</div>
               The buyer pays the premium when the winning bid is activated. The
               people holding shares at that moment are the
               <strong>activation holders</strong>, and they can immediately
@@ -511,23 +506,17 @@
                   <li>
                     <span class="chip lp">LPs</span
                     ><span
-                      >Activation holders can claim the premium without waiting
-                      for expiry. Shares remain transferable, and their current
-                      holders can agree to end the option early through an
-                      <strong>unwind</strong>. The owner or buyer can propose
-                      this agreement, but execution requires the buyer's
-                      signature and approval from every current shareholder,
-                      covering 100% of the outstanding shares.</span
+                      ><a href="#premium-ownership">Premium claims</a> are
+                      available immediately. Shares remain transferable, and
+                      holders can consent to an
+                      <a href="#early-exit">early exit by agreement</a>.</span
                     >
                   </li>
                 </ul>
                 <div class="exit">
                   <b>Exit</b> <code>expire(vaultId)</code> by anyone at the
                   expiration time; also finalized automatically on full exercise, or through a
-                  buyer-signed unanimous unwind. If the unwind includes a refund
-                  to the buyer, the person executing it supplies that amount
-                  separately in the premium token. Already-earned premium and
-                  completed exercises are preserved.
+                  <a href="#early-exit">buyer-signed unanimous unwind</a>.
                 </div>
               </div>
             </div>
@@ -566,7 +555,7 @@
           <div class="callout">
             <b>Admission pause.</b> Global or per-vault pauses block new
             creation where applicable, deposits, auction opening and activation.
-            Withdrawals, transfers, exercise, reports, settlement, claims and
+            Withdrawals, transfers, exercise, reports, expiration, claims and
             agreed unwinds remain available. Deadlines never move.
           </div>
           <div class="loop">
@@ -579,14 +568,38 @@
               transition is one-way.</span
             >
           </div>
+          <div class="deal-block" id="early-exit">
+            <h3>Ending early by agreement</h3>
+            <p class="prose">
+              An <strong>unwind</strong> ends a Live option by agreement. The owner
+              or buyer can propose it, but execution requires the buyer’s signature
+              and approval from every current shareholder, covering 100% of the
+              outstanding shares.
+            </p>
+            <p class="prose">
+              Consent must reflect current ownership and the amount already
+              exercised. A share transfer invalidates the sender’s and recipient’s
+              approvals; they must approve again at their new balances. Holders can
+              revoke approval. Replacing the proposal or exercising more of the
+              option requires fresh agreement. A proposal does not suspend
+              ordinary exercise or expiration.
+            </p>
+            <p class="prose">
+              If a refund is agreed, the person executing the unwind supplies it
+              separately in the premium token. The buyer collects it with
+              <code>claimPayout</code>; shareholders claim the remaining pool.
+              <a href="#premium-ownership">Earned premium</a> and completed
+              exercises are preserved.
+            </p>
+          </div>
         </div>
       </section>
 
       <section id="outcomes">
         <div class="main">
-          <h2>Settlement outcomes</h2>
+          <h2>What each side receives</h2>
           <p class="prose">
-            At settlement, the vault finishes the option and makes the remaining
+            Finalization closes the vault and makes its remaining, unreserved
             assets available to shareholders. Start with the deposit, work out
             what the buyer receives, and see what is left for LPs.
             <strong>Earned premium is claimed separately.</strong>
@@ -602,7 +615,7 @@
             class="tablewrap"
             tabindex="0"
             role="region"
-            aria-label="Settlement outcomes in plain language"
+            aria-label="What each side receives"
           >
             <table>
               <thead>
@@ -692,24 +705,16 @@
             </div>
           </div>
           <p class="prose">
-            <strong>Which price is used?</strong> Cash settlement at expiry uses
-            the finalized expiry price: a historical price signed by Ivy and
-            published to the price feed, the contract that checks and stores
-            price reports. Once published, it cannot be replaced. Settling later
-            still uses that expiry price, not the current market price.
+            Cash outcomes use the <a href="#expiry-price">finalized expiry
+            price</a>, even when the transaction is processed later.
           </p>
           <div class="callout" style="margin-top: 14px">
-            <b>Pool claim + separate premium claim.</b> Settlement assets go to
-            current shareholders in proportion to their shares. Premium belongs
-            to the holders at activation. If you held the same shares throughout,
-            your total proceeds are your share of the remaining pool plus your
-            earned premium. The calculator below includes both.
-            Unpaid premium and amounts reserved for the buyer are excluded from
-            the pool. If an American cash option was exercised earlier, those
-            payouts also reduce the pool; only the remaining option amount is
-            settled at expiry. Examples ignore token rounding: exercise
-            consideration rounds up, buyer payouts round down, and premium
-            entitlement dust remains permanently reserved.
+            <b>Pool claim + separate premium claim.</b> The calculator includes
+            both, assuming the same LPs hold shares throughout. The pool excludes
+            unpaid <a href="#premium-ownership">premium</a> and buyer reserves.
+            Earlier exercise payouts also reduce the pool; only the remaining
+            notional is resolved at expiry. Examples ignore token rounding:
+            exercise consideration rounds up and buyer payouts round down.
           </div>
 
           <div class="fig">
@@ -735,12 +740,23 @@
                 ><span id="depLabel">Deposit (WETH)</span
                 ><input id="dep" type="number" step="any" value="10"
               /></label>
+              <label id="entryPriceField"
+                >Today’s WETH Price (USDC)<input
+                  id="entryPrice" type="number" min="0.01" step="any" value="3000"
+              /></label>
               <label
-                >Strike (USDC / WETH)<input
+                >Strike Price (USDC / WETH)<input
                   id="strike"
                   type="number"
                   step="any"
                   value="3000"
+              /></label>
+              <label
+                >WETH Price at Expiration Time (USDC)<input
+                  id="spot"
+                  type="number"
+                  step="any"
+                  value="3300"
               /></label>
               <label
                 >Premium (USDC / WETH)<input
@@ -750,19 +766,8 @@
                   value="100"
               /></label>
               <label
-                >Finalized expiry price<input
-                  id="spot"
-                  type="number"
-                  step="any"
-                  value="3300"
-              /></label>
-              <label
                 >Capital committed (days)<input
                   id="days" type="number" min="0.01" step="any" value="30"
-              /></label>
-              <label id="entryPriceField"
-                >WETH price when committed (USDC)<input
-                  id="entryPrice" type="number" min="0.01" step="any" value="3000"
               /></label>
             </div>
             <div class="body">
@@ -817,7 +822,7 @@
             <strong>How to read the APR:</strong> premium yield = total premium
             ÷ initial deposit value. Estimated premium APR = that yield × 365
             ÷ days committed. For calls, the initial value is deposited WETH ×
-            its price when committed; for puts, it is the deposited USDC.
+            today’s entered WETH price; for puts, it is the deposited USDC.
             Include the full time your capital is committed, including any wait
             before activation. For example, 1,000 USDC premium on 30,000 USDC
             over 30 days is 3.33% for the period, or 40.56% annualized.
@@ -936,7 +941,7 @@
               >
             </div>
             <div class="row">
-              <span class="mono">allowPartialExercise</span
+              <span class="mono" id="partial-exercise">allowPartialExercise</span
               ><span>Fixed before deposits: true permits partial exercise; false
                 requires all remaining notional in one call.</span
               ><span class="term-rule"
@@ -978,15 +983,6 @@
             Cancelling and reopening an auction changes its ID and requires a
             new signed bid.
           </p>
-          <p class="prose">
-            For the unwind agreement introduced in the lifecycle section,
-            consent must reflect current ownership. A share transfer invalidates
-            the sender's and recipient's approvals, and those holders must
-            approve again at their new balances. Holders can revoke approval
-            before execution. Replacing the proposal or exercising more of the
-            option requires fresh agreement on the updated state; proposing an
-            unwind does not suspend ordinary exercise or settlement.
-          </p>
           <div class="split" style="margin-bottom: 8px">
             <ol class="steps">
               <li>
@@ -1022,17 +1018,6 @@
                   checks, activation reverts and the vault does not become Live.
                 </div>
               </li>
-              <li>
-                <div>
-                  <b>Exercise</b>The buyer or its appointed executor can exercise
-                  within the permitted window. The vault’s fixed partial-exercise
-                  policy determines whether an amount may be partial or must consume
-                  all remaining notional. Cash payouts
-                  come from the vault's collateral. Only the buyer can change
-                  the executor or payout recipient, and exercise assets always
-                  go to that configured recipient.
-                </div>
-              </li>
             </ol>
             <pre><code>struct Bid {
   uint256 vaultId;
@@ -1057,23 +1042,31 @@
             <code>underlyingUnit = 10 ** underlyingDecimals</code>. Strike and
             premium are raw payment-token units per whole underlying.
           </p>
+          <h3 id="exercise-and-expiration">Exercise and expiration</h3>
           <p class="prose">
             <b>Exercise uses your option right.</b> The buyer or appointed executor
-            calls <code>exercise(vaultId, amount)</code>; payment goes to the configured
-            recipient. <code>allowPartialExercise</code> is fixed at vault creation,
-            before deposits: true allows a positive amount up to the remaining
-            notional; false requires all remaining notional. It cannot be changed
-            through terms tightening. Partial exercise leaves the rest Live;
+            calls <code>exercise(vaultId, amount)</code> within the period shown below.
+            Physical exercise exchanges assets at the strike; cash exercise pays
+            intrinsic value from the collateral. Payments go to the configured
+            <a href="#execution-permissions">recipient</a>.
+            The vault’s immutable <a href="#partial-exercise">partial-exercise
+            policy</a> determines whether the amount may be partial or must consume
+            all remaining notional. Partial exercise leaves the rest Live;
             full exercise finalizes the vault.
           </p>
           <p class="prose">
             <b>Expiration processes the remaining position.</b> Anyone can call
-            <code>expire(vaultId)</code> after its deadline. Physical unused rights
-            lapse. For cash, this processes expiration, including automatic cash
-            exercise where applicable: the finalized expiry price determines the
-            remaining payout, reserved for <code>claimPayout</code>. Shareholders
-            can claim the residual assets. Being out of the money before the
-            deadline does not permit expiration.
+            <code>expire(vaultId)</code> at or after its deadline. Unused physical
+            option rights lapse. For cash, the finalized expiry price determines
+            any remaining buyer payout, reserved for <code>claimPayout</code>.
+            Shareholders can then claim the residual assets. Being out of the
+            money before the deadline does not permit expiration.
+          </p>
+          <p class="prose">
+            <b>Expiration requires an on-chain transaction.</b> When
+            <code>expire</code> is called, the contract automatically calculates
+            and reserves any cash payout; the passage of time alone does not
+            execute it.
           </p>
           <div class="fig">
             <span>Exercise windows and expiration time</span
@@ -1139,14 +1132,17 @@
               </tbody>
             </table>
           </div>
-          <div class="callout">
-            <b>Expiry reports are final.</b> Cash settlement uses Ivy’s signed
-            30-minute average ending at the exact expiry. The feed verifies the
-            signature, not the averaging calculation. Reports are write-once and
-            support multisig contract signers. If Ivy cannot publish, cash
-            vaults remain locked until a valid report arrives or the buyer and
-            all current shareholders consent to an unwind. There is no
-            stale-price or zero-payout fallback.
+          <div class="callout" id="expiry-price">
+            <b>Which price is used?</b> American cash exercise before expiry uses
+            fresh spot. At or after expiry, cash exercise and expiration use Ivy’s
+            signed 30-minute average ending at the exact expiry. This finalized
+            report is stored in the price feed and cannot be replaced; later
+            transactions use the same historical price, not current spot. The feed
+            verifies the signature, not the averaging calculation, and supports
+            multisig contract signers. If Ivy cannot publish, the remaining cash
+            position stays locked until a valid report arrives or the parties
+            agree to an <a href="#early-exit">unwind</a>. There is no stale-price
+            or zero-payout fallback.
           </div>
         </div>
       </section>
@@ -1202,8 +1198,8 @@
                   The feed provides separate lookups for fresh signed spot
                   prices and finalized expiry prices. Prices are expressed in
                   the quote token's smallest units per whole underlying token.
-                  Once an expiry price is finalized, it remains available for
-                  settlement even if settlement happens much later.
+                  See <a href="#expiry-price">expiry pricing and report
+                  availability</a> for the rules used by cash options.
                 </p>
               </div>
             </div>
@@ -1222,9 +1218,8 @@
                 <span class="role">Shareholder consent</span
                 ><span class="name">IvyUnwind</span>
                 <p>
-                  One active agreement per vault. Transfers invalidate affected
-                  votes, replacement supersedes approvals, and normal exercise
-                  or settlement remains available.
+                  Tracks the active agreement and current-shareholder approvals
+                  for <a href="#early-exit">ending early by agreement</a>.
                 </p>
               </div>
               <div>
@@ -1306,7 +1301,7 @@
                   </dd>
                   <dt>claimPremium(vaultId)</dt>
                   <dd>
-                    activation holder, also after settlement or burning all
+                    activation holder, also after finalization or burning all
                     shares
                   </dd>
                   <dt>expire(vaultId)</dt>
@@ -1363,14 +1358,6 @@
                     <td class="num">259 200 s · 3 d</td>
                     <td class="muted">
                       After this the owner may cancel a stalled auction.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="k">Operational settlement target</td>
-                    <td class="num">30 min</td>
-                    <td class="muted">
-                      After the physical window closes; after expiry for cash,
-                      subject to report availability.
                     </td>
                   </tr>
                   <tr>

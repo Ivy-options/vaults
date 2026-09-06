@@ -216,7 +216,7 @@
     $("calcError").hidden = valid;
     $("calcError").textContent = valid
       ? ""
-      : "Enter positive deposit, strike, expiry price and days committed, a positive starting WETH price for calls, and a non-negative premium. Values must stay within the calculator’s numeric range.";
+      : "Enter positive deposit, strike, expiry price and days committed, a positive value for today’s WETH price for calls, and a non-negative premium. Values must stay within the calculator’s numeric range.";
     if (!valid) {
       $("rows").innerHTML = "";
       $("calcChart").innerHTML = "";
@@ -233,7 +233,7 @@
     if (o.kind === "call") {
       var payoutCall = o.S > o.K ? (o.N * (o.S - o.K)) / o.S : 0;
       rows = [
-        ["Not exercised", o.D, o.P, "pays premium only"],
+        ["Physical, expired without exercise", o.D, o.P, "pays premium only"],
         [
           "Physical, fully exercised",
           0,
@@ -246,15 +246,15 @@
           o.P,
           payoutCall > 0
             ? "receives " + fmt(payoutCall, 6) + " WETH"
-            : "out of the money, receives 0",
+            : "no intrinsic value, receives 0",
         ],
       ];
       $("calcNote").textContent =
-        "Cash payout = remaining × (spot − strike) / spot, in WETH.";
+        "Cash payout = remaining × max(expiry price − strike, 0) / expiry price, in WETH.";
     } else {
       var payoutPut = o.S < o.K ? o.N * (o.K - o.S) : 0;
       rows = [
-        ["Not exercised", 0, o.C + o.P, "pays premium only"],
+        ["Physical, expired without exercise", 0, o.C + o.P, "pays premium only"],
         [
           "Physical, fully exercised",
           o.N,
@@ -271,11 +271,11 @@
           o.C - payoutPut + o.P,
           payoutPut > 0
             ? "receives " + fmt(payoutPut, 2) + " USDC"
-            : "out of the money, receives 0",
+            : "no intrinsic value, receives 0",
         ],
       ];
       $("calcNote").textContent =
-        "Cash payout = remaining × (strike − spot), in USDC.";
+        "Cash payout = remaining × max(strike − expiry price, 0), in USDC.";
     }
     $("notional").textContent = fmt(o.N, 6) + " WETH";
     $("premTotal").textContent = fmt(o.P, 2) + " USDC";
