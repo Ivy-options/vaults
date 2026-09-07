@@ -21,14 +21,14 @@ async function propose(c: IvyContext, id: bigint, refund = 100n * U) {
 }
 
 describe("activation premium and unanimous unwinds", function () {
-  const fixture = () => deployIvy(connection);
-  it("pays activation holders immediately; transferred and burned shares never take their income", async function () {
+  const fixture = async () => { const c = await deployIvy(connection); await c.hub.setTransfersEnabled(true); return c; };
+  it("moves unclaimed income with shares and preserves it after burning", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c,{deposit:6n*W,extraDeposits:[{signer:c.bob,amount:4n*W}]});
     await c.shares.connect(c.alice).safeTransferFrom(c.alice.address,c.carol.address,v.vaultId,6n*W,"0x");
-    expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(600n*U);
-    expect(await c.premiums.claimable(v.vaultId,c.carol.address)).eq(0n);
-    await c.hub.connect(c.alice).claimPremium(v.vaultId);
+    expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(0n);
+    expect(await c.premiums.claimable(v.vaultId,c.carol.address)).eq(600n*U);
+    await c.hub.connect(c.carol).claimPremium(v.vaultId);
     await expect(c.hub.connect(c.alice).claimPremium(v.vaultId)).revertedWithCustomError(c.premiums,"NothingToClaim");
     await at(c,v.bid.expiry+3600n); await c.hub.expire(v.vaultId);
     await c.hub.connect(c.bob).claim(v.vaultId,4n*W);
@@ -43,8 +43,8 @@ describe("activation premium and unanimous unwinds", function () {
     const v = await goLive(c,{deposit:1n,extraDeposits:[{signer:c.bob,amount:2n}]},{premium:W});
     // Three smallest collateral units, three premium units. Change to a nondivisible premium below in a second vault.
     await c.shares.connect(c.bob).safeBatchTransferFrom(c.bob.address,c.carol.address,[v.vaultId,v.vaultId],[1n,1n],"0x");
-    expect(await c.premiums.claimable(v.vaultId,c.bob.address)).eq(2n);
-    expect(await c.premiums.claimable(v.vaultId,c.carol.address)).eq(0n);
+    expect(await c.premiums.claimable(v.vaultId,c.bob.address)).eq(0n);
+    expect(await c.premiums.claimable(v.vaultId,c.carol.address)).eq(2n);
     const d = await goLive(c,{deposit:1n,extraDeposits:[{signer:c.bob,amount:2n}]},{premium:W/2n});
     expect((await c.premiums.pools(d.vaultId)).amount).eq(1n);
     await at(c,d.bid.expiry+3600n); await c.hub.expire(d.vaultId);
@@ -120,7 +120,7 @@ describe("activation premium and unanimous unwinds", function () {
 });
 
 describe("admission and delegated execution", function () {
-  const fixture = () => deployIvy(connection);
+  const fixture = async () => { const c = await deployIvy(connection); await c.hub.setTransfersEnabled(true); return c; };
   it("paused auctions cancel immediately and live options and premium claims remain usable", async function () {
     const c = await networkHelpers.loadFixture(fixture); const v = await goLive(c); const o = await openVault(c);
     await expect(c.hub.connect(c.bob).setAdmissionPause(0,true)).revertedWithCustomError(c.hub,"AccessControlUnauthorizedAccount");

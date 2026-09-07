@@ -8,10 +8,13 @@ import {IvyPremiums} from "./IvyPremiums.sol";
 import {IvyUnwind} from "./IvyUnwind.sol";
 import {NotHub, ZeroAddress} from "./types/IvyTypes.sol";
 
+interface IShareTransferPolicy { function transfersEnabled() external view returns (bool); }
+
 /// @title IvyShares
-/// @notice ERC-1155 LP share token for Ivy vaults. Minted and burned only by the hub; freely transferable.
+/// @notice ERC-1155 LP share token for Ivy vaults. Minted and burned only by the hub; transfers controlled by the hub.
 ///         Token id == vault id. Lives outside the hub so the hub stays under the EIP-170 bytecode limit.
 contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
+    error TransfersDisabled();
     address public immutable override hub;
     address public immutable override premiums;
     address public immutable override unwind;
@@ -50,20 +53,23 @@ contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
     function _update(address from, address to, uint256[] memory ids, uint256[] memory values)
         internal override(ERC1155, ERC1155Supply)
     {
+        if (from != address(0) && to != address(0) && !IShareTransferPolicy(hub).transfersEnabled()) revert TransfersDisabled();
+        if (ids.length != values.length) revert ERC1155InvalidArrayLength(ids.length, values.length);
         if (from != to) {
             for (uint256 i; i < ids.length; ++i) {
                 bool seen;
-                for (uint256 j; j < i; ++j) if (ids[j] == ids[i] && values[j] > 0) { seen = true; break; }
-                if (seen || values[i] == 0) continue;
-                _notify(ids[i], from);
-                _notify(ids[i], to);
+                for (uint256 j; j < i; ++j) if (ids[j] == ids[i]) { seen = true; break; }
+                if (seen) continue;
+                uint256 amount;
+                for (uint256 j = i; j < ids.length; ++j) if (ids[j] == ids[i]) amount += values[j];
+                if (amount == 0) continue;
+                uint256 fromBalance = from == address(0) ? 0 : balanceOf(from, ids[i]);
+                if (from != address(0) && amount > fromBalance) revert ERC1155InsufficientBalance(from, fromBalance, amount, ids[i]);
+                IvyPremiums(premiums).beforeShareUpdate(ids[i], from, to, amount, fromBalance, to == address(0) ? 0 : balanceOf(to, ids[i]));
+                if (from != address(0)) IvyUnwind(unwind).beforeShareUpdate(ids[i], from);
+                if (to != address(0)) IvyUnwind(unwind).beforeShareUpdate(ids[i], to);
             }
         }
         super._update(from, to, ids, values);
-    }
-    function _notify(uint256 id, address holder) private {
-        if (holder == address(0)) return;
-        IvyPremiums(premiums).beforeShareUpdate(id, holder, balanceOf(holder, id));
-        IvyUnwind(unwind).beforeShareUpdate(id, holder);
     }
 }

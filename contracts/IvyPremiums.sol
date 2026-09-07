@@ -5,7 +5,7 @@ import {IIvyShares} from "./interfaces/IIvyShares.sol";
 import {IIvyVault} from "./interfaces/IIvyVault.sol";
 import "./types/IvyTypes.sol";
 
-/// @notice Activation income stays with its original holder. No token movement from share hooks.
+/// @notice Unclaimed premium follows shares; burns preserve credit. No token movement from share hooks.
 contract IvyPremiums {
     address public immutable hub;
     address public immutable shares;
@@ -24,9 +24,15 @@ contract IvyPremiums {
         if (supply == 0) revert ZeroAmount();
         pools[id] = Pool(vault, amount, supply);
     }
-    function beforeShareUpdate(uint256 id, address account, uint256 balance) external {
+    function beforeShareUpdate(uint256 id, address from, address to, uint256 amount, uint256 fromBalance, uint256 toBalance) external {
         if (msg.sender != shares) revert NotShares();
-        _checkpoint(id, account, balance);
+        _checkpoint(id, from, fromBalance);
+        _checkpoint(id, to, toBalance);
+        if (from == address(0) || to == address(0) || from == to || amount == 0) return;
+        uint256 credit = credits[id][from].amount;
+        uint256 moved = amount == fromBalance ? credit : Math.mulDiv(credit, amount, fromBalance);
+        credits[id][from].amount -= moved;
+        credits[id][to].amount += moved;
     }
     function _checkpoint(uint256 id, address account, uint256 balance) private {
         Pool storage p = pools[id];

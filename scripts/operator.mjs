@@ -64,7 +64,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
   }
   let target=hub, method, args, detail;
   if(command==='prepare-vault') {
-    detail=await prepareVault(provider,r); method='createVault';args=[detail.terms,detail.pairs];
+    detail=await prepareVault(provider,r); detail.maxPlatformFeeBps=await hub.platformFeeBps(); method='createVault';args=[detail.terms,detail.pairs];
   } else if(command==='inspect-bid'||command==='activate') {
     method='activate';args=[r.vaultId,r.bid,r.signature];
     const s=await hub.stateOf(r.vaultId), t=await hub.termsOf(r.vaultId);
@@ -74,14 +74,19 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const amount=await hub.totalShares(r.vaultId), valueUsdE6=amount*price/(10n**BigInt(await token.decimals()));
     if(valueUsdE6<minimum) throw new Error('Below launch USD minimum at activation');
     const notional=s.isCall?amount:amount*s.underlyingUnit/BigInt(r.bid.strike);
-    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium:BigInt(r.bid.premium)*notional/s.underlyingUnit};
+    const totalPremium=BigInt(r.bid.premium)*notional/s.underlyingUnit;
+    const platformFeeBps=await hub.platformFeeBps(), maxPlatformFeeBps=await hub.maxPlatformFeeBps(r.vaultId);
+    const platformFee=totalPremium*platformFeeBps/10000n;
+    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,maxPlatformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
   } else if(command==='publish-spot'||command==='publish-expiry') {
     target=new Contract(required(r,'feed'),artifacts.IvyPriceFeed.abi,runner);
     const spot=command==='publish-spot', type=spot?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
     method=spot?'publishSpot':'publishExpiry';args=[...type.map(f=>required(r.report,f.name)),r.signature];
   } else {
-    const actions={deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
-    if(command==='approve-token') {
+    const actions={'set-platform-fee':['setPlatformFeeBps',[r.rateBps]],'set-platform-treasury':['setPlatformTreasury',[r.recipient]],'set-transfers':['setTransfersEnabled',[r.enabled]],deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
+    if(command==='claim-platform-fee') {
+      target=new Contract(await hub.vaultOf(r.vaultId),artifacts.IvyVault.abi,runner);method='claimPlatformFee';args=[];
+    } else if(command==='approve-token') {
       target=new Contract(r.token,['function approve(address,uint256) returns(bool)'],runner);
       method='approve';args=[await hub.vaultOf(r.vaultId),r.amount];
     } else {

@@ -1,6 +1,6 @@
 # Ivy Vaults
 
-Single-use covered-call and cash-secured-put vaults with optional pooling and transferable ERC-1155 shares. An off-chain auction selects a signed buyer bid; activation collects the premium atomically. Activation holders can claim that premium immediately, and current shareholders claim the remaining pool after settlement or a unanimous unwind.
+Single-use covered-call and cash-secured-put vaults with optional pooling and gated ERC-1155 share transfers. An off-chain auction selects a signed buyer bid; activation collects the premium atomically. LPs can claim their net premium immediately, and current shareholders claim the remaining pool after settlement or a unanimous unwind.
 
 The deployment is immutable. There is no hub proxy, upgrade entrypoint, implementation setter, or module rewiring. This build creates a fresh deployment; it cannot upgrade an older hub.
 
@@ -17,7 +17,9 @@ The deployment is immutable. There is no hub proxy, upgrade entrypoint, implemen
 
 The hub links to two separately deployed Solidity libraries. Their addresses are embedded in hub bytecode and cannot be changed. Calls execute against hub storage under its existing authorization and reentrancy guards. The deployment journal verifies the fixed library links along with constructor bindings.
 
-Approve the **vault address**, never the hub. A share represents one raw unit of credited collateral. Transferring shares transfers the residual pool claim; earned activation premium stays with its original holder.
+Approve the **vault address**, never the hub. A share represents one raw unit of credited collateral. Share transfers are disabled by default; the Hub admin can enable them globally. Transfers move the residual pool claim and a proportional portion of the sender’s unclaimed premium. Claimed premium never moves; burning shares preserves unpaid credit.
+
+The Hub’s global `platformFeeBps` starts at zero and is managed by `PLATFORM_FEE_MANAGER_ROLE`. Activation deducts this fee from gross MM premium; LPs immediately claim the net amount. Each vault freezes the current rate as its maximum at creation, rejecting activation above that cap. Fees are reserved separately and anyone can call the vault’s `claimPlatformFee()` to pay its activation-snapshotted treasury. Treasury defaults to the admin and future recipients are admin-configurable. Fees are not refunded on settlement or unwind.
 
 ## Build and verify
 

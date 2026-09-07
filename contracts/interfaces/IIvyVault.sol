@@ -5,7 +5,7 @@ interface IIvyVault {
     function deposit(uint256 amount) external;
     function pull(address token, address from, uint256 amount) external returns (uint256);
     function push(address token, address to, uint256 amount) external;
-    function collectPremium(address token, address from, uint256 amount) external;
+    function collectPremium(address token, address from, uint256 amount, uint256 fee, address treasury) external;
     function payPremium(address to, uint256 amount) external;
     function reserveBuyer(address token, uint256 amount) external;
     function payBuyer(address token, address to) external returns (uint256);

@@ -48,7 +48,7 @@ The final journal has `complete: true` only after all constructor bindings verif
 4. The owner runs `open-auction`. At a nonzero auctionStartsAt, anyone may open it after the scheduled time. Read the auctionId and totalShares after opening. Both become signed commitments. No deposits or withdrawals are available in Auction; transfers remain possible.
 5. If the vault uses a feed, publish a fresh signed spot report before activation. Prepare `typed-bid` with vaultId and the buyer's proposed bid fields. The tool reads exact expiry, current auctionId, collateral amount and accepted pairHash; executor defaults to zero and recipient to the buyer. The buyer reviews all output and signs domain `IvyVaultsHub`, version `2`, chainId and the deployed hub.
 6. The buyer approves the clone for the full premium: `floor(premium × totalNotional / underlyingUnit)`. For puts, notional is `floor(collateral × underlyingUnit / strike)`. `inspect-bid` requires the actual signature, explicit USD minimum and collateral valuation, and simulates activation from the bid master. This verifies current role, signature, policy, oracle and premium-funding conditions. Future physical exercise funding is a separate obligation of the executing caller.
-7. Submit `activate` using that same signed bid. LP activation entitlements become immediately available through `claim-premium`. Transfer recipients do not acquire the sender's earned premium. Keep the signed bid and activation receipt with the launch record.
+7. Submit `activate` using that same signed bid. LP activation entitlements become immediately available through `claim-premium`. When transfers are enabled, recipients acquire the proportional unclaimed premium; already-claimed premium stays paid. Keep the signed bid and activation receipt with the launch record.
 
 A buyer can invalidate its unused nonce with `cancelBid(nonce)` through the ABI. Cancelled or reopened auctions require a new typed bid for the new auctionId, even if size and terms are unchanged.
 
@@ -62,7 +62,7 @@ For physical options, the deadline is `expiry + stateOf(vaultId).exerciseWindow`
 
 American cash exercise uses fresh spot before expiry. At/after expiry, both American and European cash exercise use the finalized report for the exact expiry; a zero payout reverts. Cash `expire` processes expiration, including automatic cash exercise where applicable, reserving the remaining buyer payout for `claim-payout`. Anyone can expire physical options at/after their deadline and cash options at/after expiry. Full exercise finalizes immediately. Expiration requires an on-chain transaction; reaching the deadline alone does not execute it. Cash expiration requires the finalized expiry report.
 
-After settlement, holders use `claim` with a share amount. This burns shares for proportional unreserved balances. Unpaid premium, permanent premium dust and buyer payouts/refunds stay reserved. `claim-premium` remains available to activation holders after burning every share. The buyer or executor calls `claim-payout`; payment goes to the buyer's current recipient. Read `vault.reserved(token)`, `vault.buyerReserved(token)` and premium-module `claimable(vaultId, holder)` to distinguish obligations; hub `pendingPayout` only tracks collateral cash settlement, not unwind refunds.
+After settlement, holders use `claim` with a share amount. This burns shares for proportional unreserved balances. Unpaid premium, permanent premium dust and buyer payouts/refunds stay reserved. `claim-premium` remains available to holders with unpaid credit after burning every share. The buyer or executor calls `claim-payout`; payment goes to the buyer's current recipient. Read `vault.reserved(token)`, `vault.buyerReserved(token)` and premium-module `claimable(vaultId, holder)` to distinguish obligations; hub `pendingPayout` only tracks collateral cash settlement, not unwind refunds.
 
 If Ivy's signer cannot publish, cash vaults remain Live and locked until a valid report or unanimous unwind. A stale or missing feed never settles an obligation to zero. There is no signer replacement or finalized-price correction function.
 
@@ -80,7 +80,7 @@ Every current shareholder reviews and explicitly submits `approve-unwind` with t
 
 The buyer signs the exact active typed agreement. The executing sponsor approves the clone for the refund premium token and submits `execute-unwind` with vaultId, nonce and signature. Execution pulls the full refund, rechecks the current exercise/supply state and unanimous consent after token callbacks, reserves the refund and finalizes. Failures revert funding atomically. Any intervening exercise requires a fresh proposal/signature/approvals because its snapshot changed; normal finalization makes the proposal unusable.
 
-The buyer uses `claim-payout` for the funded refund. Current holders use ordinary `claim` for remaining collateral and completed-exercise proceeds. Original premium entitlements remain separately claimable; an unwind does not claw them back.
+The buyer uses `claim-payout` for the funded refund. Current holders use ordinary `claim` for remaining collateral and completed-exercise proceeds. Unpaid premium entitlements remain separately claimable; an unwind does not claw them back.
 
 ## Command reference
 
@@ -107,3 +107,37 @@ All requests include `rpc` and `sender`; hub calls include `hub` and usually `va
 | grant-role | role string, account; vaultId unnecessary |
 
 Enums: exercise style 0 European / 1 American; exercise policy also 2 Either. Settlement type 0 Physical / 1 Cash; settlement policy also 2 Either. The contract ABI remains available for owner tightening, auction scheduling, ownership transfer, role revocation, metadata and future-default changes. These do not have dedicated CLI commands.
+
+
+## Platform fee and share-transfer administration
+
+Fresh deployments start with transfers disabled, zero platform fee and the admin
+as treasury. DEFAULT_ADMIN_ROLE manages setTransfersEnabled(bool) and
+setPlatformTreasury(address); PLATFORM_FEE_MANAGER_ROLE manages
+setPlatformFeeBps(uint16), bounded by 10,000 bps. The admin initially holds that
+role and controls its membership. Set launch fees before creating vaults.
+
+Each vault snapshots the current rate in maxPlatformFeeBps(vaultId) at creation.
+Activation uses the latest global rate only if it does not exceed this immutable
+cap. A higher rate requires a new vault; reducing the global rate lets an existing
+auction proceed. minPremium and Activated.totalPremium remain gross values.
+Inspect platformFees(vaultId) for the applied rate, amount and recipient.
+
+Fees are deducted in the premium token: floor(gross * rate / 10,000). LP claims
+remain immediate for the net allocation. The vault reserves both allocations;
+platformFeeRemaining is independent of premiumRemaining and buyerReserved.
+Anyone can call the vault's claimPlatformFee() to pay the snapshotted recipient,
+once only. Updating the treasury does not redirect existing fees. A vault cannot
+be its own treasury. Fees remain earned after exercise, expiry or unwind; unwind
+refunds are separately funded.
+
+Enabled share transfers move floor(unclaimed * amount / pre-transfer balance);
+a full transfer moves all credit. Already-claimed amounts never move. Duplicate
+batch IDs are aggregated before proportional accounting. Burns preserve unpaid
+credit, including partial burns. Zero and self-transfers do not move entitlement
+or invalidate unwind consent, but still require transfers enabled.
+
+Operator commands: set-platform-fee (rateBps), set-platform-treasury (recipient),
+set-transfers (enabled), and claim-platform-fee (vaultId). Each takes the usual
+hub and sender fields and simulates before building calldata. Inspect-bid reports
+the gross premium, applied global rate, creation cap, platform fee and net premium.

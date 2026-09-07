@@ -7,7 +7,6 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 
 import {IIvyVaultsHubErrors} from "../interfaces/IIvyVaultsHubErrors.sol";
 import {IIvyVaultsHubEvents} from "../interfaces/IIvyVaultsHubEvents.sol";
-import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
 import {IIvyShares} from "../interfaces/IIvyShares.sol";
 import {IvyPremiums} from "../IvyPremiums.sol";
 import {IvyUnwind} from "../IvyUnwind.sol";
@@ -28,7 +27,20 @@ abstract contract IvyVaultsHubStorage is
     IvyPremiums public immutable premiums;
     IvyUnwind public immutable unwind;
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
+    bytes32 public constant PLATFORM_FEE_MANAGER_ROLE = keccak256("PLATFORM_FEE_MANAGER_ROLE");
+    uint16 public platformFeeBps;
+    address public platformTreasury;
+    mapping(uint256 => uint16) public maxPlatformFeeBps;
+    struct PlatformFee { uint16 rateBps; address recipient; uint256 amount; }
+    mapping(uint256 => PlatformFee) public platformFees;
+    event PlatformFeeBpsUpdated(uint16 oldRate, uint16 newRate);
+    event PlatformTreasuryUpdated(address oldTreasury, address newTreasury);
+    event PlatformFeeAllocated(uint256 indexed vaultId, address indexed recipient, uint16 rateBps, uint256 amount);
+    error InvalidPlatformFee();
+    error PlatformFeeAboveCap();
     bool public paused;
+    bool public transfersEnabled;
+    event TransfersEnabledUpdated(bool enabled);
     mapping(uint256 => bool) public vaultPaused;
     uint64 public exerciseWindow;
     uint64 public auctionTimeout;
@@ -54,6 +66,8 @@ abstract contract IvyVaultsHubStorage is
         auctionTimeout = timeout_;
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GUARDIAN_ROLE, admin);
+        _grantRole(PLATFORM_FEE_MANAGER_ROLE, admin);
+        platformTreasury = admin;
     }
 
     function _admission(uint256 vaultId) internal view {
@@ -121,11 +135,4 @@ abstract contract IvyVaultsHubStorage is
         if (actual != expected) revert WrongPhase(expected, actual);
     }
 
-    /// @dev Fresh spot from the vault's feed. Reverts on zero, future-dated or stale prices.
-    function _readSpot(VaultTerms storage t, address quoteToken) internal view returns (uint256) {
-        (uint256 price, uint256 updatedAt) = IIvyPriceFeed(t.priceFeed).spot(t.underlying, quoteToken);
-        if (price == 0 || updatedAt > block.timestamp) revert InvalidPrice();
-        if (block.timestamp - updatedAt > t.maxPriceAge) revert StalePrice();
-        return price;
-    }
 }

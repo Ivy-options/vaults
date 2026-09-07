@@ -43,7 +43,7 @@ describe("immutable hub", function () {
     await expect(c.shares.mint(c.alice.address,1,1)).revertedWithCustomError(c.shares,"NotHub");
     await expect(c.shares.burn(c.alice.address,1,1)).revertedWithCustomError(c.shares,"NotHub");
     await expect(c.premiums.claimFor(1,c.alice.address)).revertedWithCustomError(c.premiums,"NotHub");
-    await expect(c.premiums.beforeShareUpdate(1,c.alice.address,100)).revertedWithCustomError(c.premiums,"NotShares");
+    await expect(c.premiums.beforeShareUpdate(1,c.alice.address,c.bob.address,100,100,0)).revertedWithCustomError(c.premiums,"NotShares");
     await expect(c.unwind.beforeShareUpdate(1,c.alice.address)).revertedWithCustomError(c.unwind,"NotShares");
     await expect(c.hub.stateOf(99)).revertedWithCustomError(c.hub,"UnknownVault");
     expect(await c.shares.supportsInterface("0xd9b67a26")).eq(true);

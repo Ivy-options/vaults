@@ -2,10 +2,51 @@
 pragma solidity ^0.8.34;
 
 import "../types/IvyTypes.sol";
+import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
+import {IvyMath} from "./IvyMath.sol";
 
 /// @notice Linked vault validation and tightening. Hub entrypoints enforce owner and phase authority.
 /// @dev Storage references address the calling hub under DELEGATECALL. No configurable target or independent state.
 library IvyVaultRules {
+    /// @dev Bid signature and caller authorization are enforced by the hub.
+    function validateBid(VaultState storage s, VaultTerms storage t, PairTerms storage p, Bid calldata bid, uint256 supply) external view {
+        if (p.premiumToken == address(0)) revert PairUnknown(bid.quoteToken);
+        if (!p.enabled) revert PairDisabled(bid.quoteToken);
+        if (t.allowedExercise != ExercisePolicy.Either && uint8(t.allowedExercise) != uint8(bid.style)) {
+            revert StyleNotAllowed();
+        }
+        if (t.allowedSettlement != SettlementPolicy.Either && uint8(t.allowedSettlement) != uint8(bid.settlement)) {
+            revert SettlementNotAllowed();
+        }
+        if (bid.expiry <= block.timestamp) revert ExpiryInPast();
+        if (bid.expiry != t.expiry || bid.auctionId != s.auctionId || bid.collateralAmount != supply
+            || bid.pairHash != keccak256(abi.encode(p))) revert CommitmentMismatch();
+        if (bid.recipient == address(0)) revert ZeroAddress();
+        _checkStrike(s.isCall, t, p, bid.quoteToken, bid.strike);
+        if (bid.premium < p.minPremium) revert PremiumTooLow();
+    }
+    /// @dev Spec §5.1: the configured limit and, when a feed is set, the oracle band. Both must pass.
+    function _checkStrike(bool isCall, VaultTerms storage t, PairTerms storage p, address quoteToken, uint256 strike)
+        private view
+    {
+        if (isCall) {
+            if (strike < p.strikeLimit) revert StrikeBelowLimit();
+        } else {
+            if (strike > p.strikeLimit) revert StrikeAboveLimit();
+        }
+        if (t.priceFeed != address(0)) {
+            uint256 bound = IvyMath.spotBound(isCall, _readSpot(t, quoteToken), t.maxInTheMoneyBps);
+            if (isCall ? strike < bound : strike > bound) revert StrikeOutsideSpotBand();
+        }
+    }
+
+    function _readSpot(VaultTerms storage t, address quoteToken) private view returns (uint256) {
+        (uint256 price, uint256 updatedAt) = IIvyPriceFeed(t.priceFeed).spot(t.underlying, quoteToken);
+        if (price == 0 || updatedAt > block.timestamp) revert InvalidPrice();
+        if (block.timestamp - updatedAt > t.maxPriceAge) revert StalePrice();
+        return price;
+    }
+
     function validateTerms(VaultTerms calldata t, PairInput[] calldata pairs) external view {
         if (t.underlying == address(0) || t.collateral == address(0)) revert ZeroAddress();
         if (t.expiry <= block.timestamp) revert ExpiryInPast();

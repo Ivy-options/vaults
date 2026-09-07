@@ -9,6 +9,21 @@ contract IvyVaultsHub is IvyVaultsSettlement {
     constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
         IvyVaultsHubStorage(admin, implementation, shares_, premiums_, unwind_, window_, timeout_) {}
 
+    function setPlatformFeeBps(uint16 rate) external onlyRole(PLATFORM_FEE_MANAGER_ROLE) {
+        if (rate > 10_000) revert InvalidPlatformFee();
+        emit PlatformFeeBpsUpdated(platformFeeBps, rate);
+        platformFeeBps = rate;
+    }
+    function setPlatformTreasury(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (recipient == address(0)) revert ZeroAddress();
+        emit PlatformTreasuryUpdated(platformTreasury, recipient);
+        platformTreasury = recipient;
+    }
+    function setTransfersEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        transfersEnabled = enabled;
+        emit TransfersEnabledUpdated(enabled);
+    }
+
     function setSettings(uint64 window_, uint64 timeout_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exerciseWindow = window_;
         auctionTimeout = timeout_;

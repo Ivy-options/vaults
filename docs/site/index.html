@@ -390,8 +390,7 @@
               people holding shares at that moment are the
               <strong>activation holders</strong>, and they can immediately
               collect their earned amount through
-              <code>claimPremium(vaultId)</code>. They retain this claim after
-              transferring or burning their shares. The vault sets aside unpaid
+              <code>claimPremium(vaultId)</code>. Unclaimed premium follows transferred shares proportionally; already-claimed premium stays paid. Burning shares preserves unpaid credit. Share transfers start disabled and require the hub admin to enable them. A global platform fee is deducted before LP allocation, with the rate capped at each vault’s creation rate. The vault sets aside unpaid
               premium so it cannot be spent on other claims. Small amounts left
               by rounding each holder's entitlement down, called rounding dust,
               stay set aside permanently.
@@ -465,7 +464,7 @@
                     ><span
                       >The committed collateral stays fixed during the auction,
                       so LPs cannot deposit or withdraw and the owner cannot
-                      change the terms. Shares remain transferable even though
+                      change the terms. If the admin enables transfers, shares remain transferable even though
                       collateral cannot leave through a withdrawal.</span
                     >
                   </li>
@@ -507,7 +506,7 @@
                     <span class="chip lp">LPs</span
                     ><span
                       ><a href="#premium-ownership">Premium claims</a> are
-                      available immediately. Shares remain transferable, and
+                      available immediately. Shares can be transferred when enabled, and
                       holders can consent to an
                       <a href="#early-exit">early exit by agreement</a>.</span
                     >
@@ -709,7 +708,7 @@
             price</a>, even when the transaction is processed later.
           </p>
           <div class="callout" style="margin-top: 14px">
-            <b>Pool claim + separate premium claim.</b> The calculator includes
+            <b>Pool claim + separate premium claim.</b> The calculator assumes a zero platform fee and includes
             both, assuming the same LPs hold shares throughout. The pool excludes
             unpaid <a href="#premium-ownership">premium</a> and buyer reserves.
             Earlier exercise payouts also reduce the pool; only the remaining
@@ -1301,8 +1300,7 @@
                   </dd>
                   <dt>claimPremium(vaultId)</dt>
                   <dd>
-                    activation holder, also after finalization or burning all
-                    shares
+                    holder of unpaid premium credit, also after finalization or burning all shares
                   </dd>
                   <dt>expire(vaultId)</dt>
                   <dd>

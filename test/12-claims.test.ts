@@ -9,7 +9,7 @@ const { ethers, networkHelpers } = connection;
 const CALL_PAYOUT_ALL = 909_090_909_090_909_090n;
 
 describe("claim", function () {
-  const fixture = () => deployIvy(connection);
+  const fixture = async () => { const c = await deployIvy(connection); await c.hub.setTransfersEnabled(true); return c; };
 
   /** alice 6 WETH + bob 4 WETH, physical American call, expires unexercised. */
   async function expiredCall(ctx: IvyContext) {

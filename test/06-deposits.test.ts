@@ -8,6 +8,7 @@ const { networkHelpers } = connection;
 describe("deposits and withdrawals", function () {
   async function fixture() {
     const ctx = await deployIvy(connection);
+    await ctx.hub.setTransfersEnabled(true);
     const v = await createVaultAs(ctx, ctx.alice, callTerms(ctx), callPairs(ctx));
     return { ...ctx, ...v };
   }

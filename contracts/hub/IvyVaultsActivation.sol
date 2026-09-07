@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
+import {IvyVaultRules} from "../libraries/IvyVaultRules.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {IvyVaultsLifecycle} from "./IvyVaultsLifecycle.sol";
 import {IIvyVault} from "../interfaces/IIvyVault.sol";
@@ -27,22 +29,10 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         VaultState storage s = _state[vaultId];
         VaultTerms storage t = _terms[vaultId];
         PairTerms storage p = _pairTerms[vaultId][bid.quoteToken];
-        if (p.premiumToken == address(0)) revert PairUnknown(bid.quoteToken);
-        if (!p.enabled) revert PairDisabled(bid.quoteToken);
-        if (t.allowedExercise != ExercisePolicy.Either && uint8(t.allowedExercise) != uint8(bid.style)) {
-            revert StyleNotAllowed();
-        }
-        if (t.allowedSettlement != SettlementPolicy.Either && uint8(t.allowedSettlement) != uint8(bid.settlement)) {
-            revert SettlementNotAllowed();
-        }
-        if (bid.expiry <= block.timestamp) revert ExpiryInPast();
-        if (bid.expiry != t.expiry || bid.auctionId != s.auctionId || bid.collateralAmount != shareToken.totalSupply(vaultId)
-            || bid.pairHash != keccak256(abi.encode(p))) revert CommitmentMismatch();
-        if (bid.recipient == address(0)) revert ZeroAddress();
-        _checkStrike(s.isCall, t, p, bid.quoteToken, bid.strike);
-        if (bid.premium < p.minPremium) revert PremiumTooLow();
+        uint256 supply = shareToken.totalSupply(vaultId);
+        IvyVaultRules.validateBid(s, t, p, bid, supply);
 
-        uint256 totalNotional = IvyMath.notionalOf(s.isCall, shareToken.totalSupply(vaultId), s.underlyingUnit, bid.strike);
+        uint256 totalNotional = IvyMath.notionalOf(s.isCall, supply, s.underlyingUnit, bid.strike);
         if (totalNotional == 0) revert EmptyNotional();
         uint256 totalPremium = IvyMath.premiumTotal(bid.premium, totalNotional, s.underlyingUnit);
 
@@ -59,8 +49,14 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         s.totalNotional = totalNotional;
         s.phase = Phase.Live;
 
-        premiums.activate(vaultId, s.vault, totalPremium, shareToken.totalSupply(vaultId));
-        IIvyVault(s.vault).collectPremium(p.premiumToken, bid.marketMaker, totalPremium);
+        uint16 feeRate = platformFeeBps;
+        if (feeRate > maxPlatformFeeBps[vaultId]) revert PlatformFeeAboveCap();
+        address treasury = platformTreasury;
+        uint256 fee = Math.mulDiv(totalPremium, feeRate, 10_000);
+        platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);
+        premiums.activate(vaultId, s.vault, totalPremium - fee, supply);
+        IIvyVault(s.vault).collectPremium(p.premiumToken, bid.marketMaker, totalPremium, fee, treasury);
+        emit PlatformFeeAllocated(vaultId, treasury, feeRate, fee);
 
         emit Activated(
             vaultId,
@@ -84,18 +80,4 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         emit BidCancelled(msg.sender, nonce);
     }
 
-    /// @dev Spec §5.1: the configured limit and, when a feed is set, the oracle band. Both must pass.
-    function _checkStrike(bool isCall, VaultTerms storage t, PairTerms storage p, address quoteToken, uint256 strike)
-        internal view
-    {
-        if (isCall) {
-            if (strike < p.strikeLimit) revert StrikeBelowLimit();
-        } else {
-            if (strike > p.strikeLimit) revert StrikeAboveLimit();
-        }
-        if (t.priceFeed != address(0)) {
-            uint256 bound = IvyMath.spotBound(isCall, _readSpot(t, quoteToken), t.maxInTheMoneyBps);
-            if (isCall ? strike < bound : strike > bound) revert StrikeOutsideSpotBand();
-        }
-    }
 }

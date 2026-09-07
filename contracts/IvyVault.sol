@@ -17,6 +17,10 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
     address public premiumToken;
     uint256 public premiumRemaining;
     bool public premiumCollected;
+    uint256 public platformFeeRemaining;
+    address public platformFeeRecipient;
+    error InvalidPlatformFee();
+    event PlatformFeeClaimed(address indexed recipient, uint256 amount);
     mapping(address => uint256) public reserved;
     mapping(address => uint256) public buyerReserved;
     modifier onlyHub() { if (msg.sender != hub) revert NotHub(); _; }
@@ -37,16 +41,29 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
         _checkAvailable(token, amount);
         IERC20(token).safeTransfer(to, amount);
     }
-    function collectPremium(address token, address from, uint256 amount) external onlyHub nonReentrant {
+    function collectPremium(address token, address from, uint256 amount, uint256 fee, address treasury) external onlyHub nonReentrant {
         if (premiumCollected) revert AlreadyInitialized();
+        if (treasury == address(0)) revert ZeroAddress();
+        if (fee > amount || treasury == address(this)) revert InvalidPlatformFee();
+        platformFeeRemaining = fee;
+        platformFeeRecipient = treasury;
         premiumCollected = true;
         premiumToken = token;
         if (amount > 0) {
             uint256 received = _pull(token, from, amount);
             if (received < amount) revert ShortReceived(amount, received);
         }
-        premiumRemaining = amount;
+        premiumRemaining = amount - fee;
         reserved[token] += amount;
+    }
+    /// @notice Anyone may deliver the fee to its immutable activation recipient.
+    function claimPlatformFee() external nonReentrant {
+        uint256 amount = platformFeeRemaining;
+        if (amount == 0) revert NothingToClaim();
+        platformFeeRemaining = 0;
+        reserved[premiumToken] -= amount;
+        IERC20(premiumToken).safeTransfer(platformFeeRecipient, amount);
+        emit PlatformFeeClaimed(platformFeeRecipient, amount);
     }
     function payPremium(address to, uint256 amount) external nonReentrant {
         if (msg.sender != premiums) revert NotPremiumModule();
