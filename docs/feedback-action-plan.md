@@ -32,13 +32,13 @@ sender credit, and cover self-transfers, zero amounts, and duplicate IDs in batc
 transfers. Redemption burns must preserve unpaid premium for separate claiming;
 they must not discard it or redistribute it to other holders.
 
-## 2. Add a platform fee on premium
+## 2. Platform fee on premium — implemented
 
 Confirmed requirements: a portion of the MM-funded premium is collected as the
 platform fee. Store one global fee rate in the Hub, used for all vaults, and
-define a dedicated role authorized to set it. This is a planned contract change.
+define a dedicated role authorized to set it. This contract change is implemented; the requirements below describe the shipped behavior. See [fee operations](operations.md#platform-fee-and-share-transfer-administration).
 
-Proposed implementation:
+Implemented behavior:
 
 - Expose platformFeeBps in the Hub, expressed in basis points (100 bps = 1%).
   Use PLATFORM_FEE_MANAGER_ROLE for setPlatformFeeBps, with role membership
@@ -56,7 +56,7 @@ Proposed implementation:
 - Allocate only lpPremium to the LP premium pool. LPs may claim it immediately
   after activation. Segregate the platform allocation from collateral, buyer
   reserves, LP claims, and final share redemption; collect it exactly once.
-- Retain the current separately funded unwind refund model. Proposed policy:
+- Retain the current separately funded unwind refund model. Implemented policy:
   the platform fee is earned at activation and is not automatically refunded
   on exercise, expiry, or an agreed unwind.
 

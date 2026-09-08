@@ -42,6 +42,9 @@
           <a href="#option-basics">The option deal</a>
           <a href="#collateral">Collateral and shares</a>
           <a href="#lifecycle">Vault lifecycle</a>
+          <a href="#early-exit">Unwind by agreement</a>
+          <a href="#premium-treatment">Cancellation and pause</a>
+          <a href="#platform-fees">Platform fees</a>
           <a href="#outcomes">What each side receives</a>
           <a href="#terms">Vault terms</a>
           <a href="#makers">Bidding and exercise</a>
@@ -302,7 +305,7 @@
         <div class="main">
           <h2>Collateral and shares</h2>
           <p class="prose">
-            The assets LPs deposit are the vault's <strong>collateral</strong>.
+            There are three token roles: <strong>asset/underlying</strong> is the option asset, <strong>quote</strong> measures its strike, and <strong>premium</strong> pays for the option. The deposited backing token is called <strong>collateral</strong>; it is not a fourth independent token.
             They back the seller's obligation to the buyer, so earning a premium
             does not guarantee that LPs will get the same assets or market value
             back. Depositing the underlying creates a covered call; depositing
@@ -321,7 +324,7 @@
                 </li>
                 <li>
                   Bids quote strike in a listed quote token and premium in that
-                  pair’s fixed premium token.
+                  pair’s fixed premium token. Calls may offer multiple pairs before activation; the winning bid selects one.
                 </li>
                 <li>
                   The option notional equals the underlying deposited, so a
@@ -330,7 +333,7 @@
               </ul>
             </div>
             <div>
-              <div class="tok">collateral != underlying</div>
+              <div class="tok">collateral == quote</div>
               <h3>Cash-secured put</h3>
               <ul class="plain">
                 <li>
@@ -353,6 +356,9 @@
               </ul>
             </div>
           </div>
+          <p class="prose">
+            At a strike of 3,000 USDC per WETH, full physical exercise of a 10 WETH call sends 10 WETH to the recipient and collects 30,000 USDC from the caller. For the matching put, the caller delivers 10 WETH and the recipient receives 30,000 USDC. Cash settlement instead pays intrinsic value in collateral: WETH for the call, USDC for the put. “Cash” does not always mean quote tokens. Premium can use either token or a third token; shared token addresses retain separate premium, platform-fee and buyer-reserve budgets.
+          </p>
           <p class="prose">
             When the option ends, shareholders make a <strong>claim</strong> to
             collect their portion of the remaining assets. Claiming burns the
@@ -390,7 +396,7 @@
               people holding shares at that moment are the
               <strong>activation holders</strong>, and they can immediately
               collect their earned amount through
-              <code>claimPremium(vaultId)</code>. Unclaimed premium follows transferred shares proportionally; already-claimed premium stays paid. Burning shares preserves unpaid credit. Share transfers start disabled and require the hub admin to enable them. A global platform fee is deducted before LP allocation, with the rate capped at each vault’s creation rate. The vault sets aside unpaid
+              <code>claimPremium(vaultId)</code>. Unclaimed premium follows transferred shares proportionally; already-claimed premium stays paid. Burning shares preserves unpaid credit. Share transfers start disabled and require the hub admin to enable them. A <a href="#platform-fees">global platform fee</a> is deducted before LP allocation; activation rejects a rate above the vault’s creation-time cap. The vault sets aside unpaid
               premium so it cannot be spent on other claims. Small amounts left
               by rounding each holder's entitlement down, called rounding dust,
               stay set aside permanently.
@@ -568,16 +574,16 @@
             >
           </div>
           <div class="deal-block" id="early-exit">
-            <h3>Ending early by agreement</h3>
+            <h3>Unwind: ending early by agreement</h3>
             <p class="prose">
               An <strong>unwind</strong> ends a Live option by agreement. The owner
               or buyer can propose it, but execution requires the buyer’s signature
               and approval from every current shareholder, covering 100% of the
-              outstanding shares.
+              outstanding shares. The proposal sets a future deadline and a nonce, alongside its exercised-notional, supply and refund snapshot. Execution must occur no later than that deadline, while the vault is still Live.
             </p>
             <p class="prose">
               Consent must reflect current ownership and the amount already
-              exercised. A share transfer invalidates the sender’s and recipient’s
+              exercised. A nonzero transfer to another holder invalidates the sender’s and recipient’s
               approvals; they must approve again at their new balances. Holders can
               revoke approval. Replacing the proposal or exercising more of the
               option requires fresh agreement. A proposal does not suspend
@@ -585,12 +591,48 @@
             </p>
             <p class="prose">
               If a refund is agreed, the person executing the unwind supplies it
-              separately in the premium token. The buyer collects it with
+              separately in the premium token, approving the vault clone before execution. Zero refund is also allowed. The buyer or executor collects a funded refund for the configured recipient with
               <code>claimPayout</code>; shareholders claim the remaining pool.
               <a href="#premium-ownership">Earned premium</a> and completed
-              exercises are preserved.
+              exercises are preserved. Holders separately use <code>claimPremium</code> for unpaid premium, including after burning all their shares.
             </p>
+            <ul class="plain">
+              <li><strong>Zero refund:</strong> propose zero, obtain all current-holder approvals and the buyer signature for that nonce, then execute without refund funding. Holders claim the remaining pool and unpaid premium separately.</li>
+              <li><strong>100 USDC refund:</strong> when premium uses six-decimal USDC, set refund to <code>100000000</code>. The executing sponsor funds 100 USDC; the buyer or executor claims it separately after finalization.</li>
+              <li><strong>Expired or replaced proposal:</strong> while Live, propose again with a future deadline. The new nonce requires fresh approvals and buyer signature. Old consent cannot execute the replacement; the position keeps its normal exercise and expiration deadlines.</li>
+            </ul>
+            <p class="prose">Follow the <a href="../operations.md#prepare-and-execute-a-unanimous-unwind">unwind runbook and commands</a>. Auction cancellation is a separate pre-activation action: no premium has been collected.</p>
           </div>
+        </div>
+      </section>
+
+      <section id="premium-treatment">
+        <div class="main">
+          <h2>Premium on cancellation and pause</h2>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Event</th><th>Premium and fee treatment</th><th>What happens next</th></tr></thead>
+              <tbody>
+                <tr><td>Auction cancelled before activation</td><td>Nothing collected; nothing to refund.</td><td>Returns to Open for withdrawals.</td></tr>
+                <tr><td>Unwind consent revoked, proposal expired or replaced</td><td>Earned premium and fees unchanged.</td><td>The option continues; no refund has been funded.</td></tr>
+                <tr><td>Unwind executed</td><td>LPs retain earned premium; treasury retains fees.</td><td>Sponsor separately funds any negotiated premium-token refund; buyer or executor claims it for the recipient.</td></tr>
+                <tr><td>Admission pause</td><td>Earned premium and claims unchanged.</td><td>Exercise, expiration and agreed unwind remain available; deadlines do not move.</td></tr>
+                <tr><td>Normal exercise or expiration</td><td>Earned premium and fees remain claimable.</td><td>Settlement payments are separate obligations.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="prose">The recommended policy matches current behavior: premium and fees are earned at activation; refunds are separately negotiated and funded. LPs may already have claimed premium, so automatic refunds would need an explicit funding or escrow design and fee policy.</p>
+          <p class="prose">The emergency control currently pauses admissions only. A full execution freeze remains a separate protocol-lead decision requiring a specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.</p>
+        </div>
+      </section>
+
+      <section id="platform-fees">
+        <div class="main">
+          <h2>Platform fees</h2>
+          <p class="prose">The buyer pays gross premium at activation. The vault deducts <code>floor(grossPremium × feeBps / 10,000)</code> in the premium token and allocates the remainder to LPs, who can claim immediately. For 1,000 USDC at 200 bps (2%), the treasury receives 20 USDC and LPs receive 980 USDC. Integer rounding is down to the smallest token unit, leaving any fractional fee unit in the net LP allocation.</p>
+          <p class="prose">The global rate starts at zero. <code>PLATFORM_FEE_MANAGER_ROLE</code> sets it, up to 10,000 bps; the deployment admin initially holds the role and administers its membership. Each vault freezes the current global rate as its maximum at creation. Activation uses the latest global rate, but a rate above that cap blocks activation; it is not silently capped. Lower the rate or create a new vault. <code>minPremium</code> remains a gross threshold.</p>
+          <p class="prose">The treasury initially equals the admin; <code>DEFAULT_ADMIN_ROLE</code> can configure it for future activations. Activation snapshots the applied rate and treasury. Anyone can trigger <code>claimPlatformFee()</code> on the vault, paying that snapshotted treasury once. Later treasury or rate changes do not alter existing fees.</p>
+          <p class="prose">Fee reserves are separate from LP premium and buyer obligations, including when token addresses overlap. Fees remain earned after exercise, expiry or unwind; negotiated refunds require separate funding. The calculator below explicitly assumes zero fees. See <a href="../operations.md#platform-fee-and-share-transfer-administration">fee administration and commands</a>.</p>
         </div>
       </section>
 

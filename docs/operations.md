@@ -4,6 +4,19 @@ Use this runbook to prepare an immutable deployment and operate individual vault
 
 Run `npm ci`, `npm run compile`, `npm run typecheck`, `npm run check:size` and `npm test -- --no-compile` first. Use a Node.js 22.13.0+ runtime and an RPC on a chain compatible with the compiler's Osaka target and transient storage. `npm test -- --no-compile test/17-local-rehearsal.test.ts` runs the complete rehearsal on an ephemeral local EVM; it does not use your configured live RPC or wallets.
 
+Jump to [token roles](#token-roles-and-collateral), [unwind](#prepare-and-execute-a-unanimous-unwind), [premium treatment](#premium-treatment-and-emergency-boundaries), or [platform fees](#platform-fee-and-share-transfer-administration).
+
+## Token roles and collateral
+
+There are three token roles: **asset/underlying** is the option asset, **quote** measures the strike, and **premium** pays for the option. Collateral names the deposited backing token, not a fourth independent token.
+
+| Product (strike 3,000 USDC per WETH) | LP deposit / collateral | Full physical exercise of 10 WETH |
+| --- | --- | --- |
+| Covered call | 10 WETH (underlying) | Caller pays 30,000 USDC; recipient receives 10 WETH. |
+| Cash-secured put | 30,000 USDC (quote) | Caller delivers 10 WETH; recipient receives 30,000 USDC. |
+
+Cash settlement pays intrinsic value in collateral: WETH for this call and USDC for this put. “Cash” does not require a quote-token payout. Calls may list multiple quote/premium pairs before activation; the winning bid chooses one. Puts accept one pair and require quote to equal collateral. Premium may share an address with either token or use another token; overlapping addresses still have separate premium, platform-fee and buyer-reserve budgets. Settlement proceeds belong to the residual pool after reserves, separately from earned premium.
+
 ## Requests and submission
 
 Copy the [example files](../examples/operator/README.md), replace placeholder addresses and timestamps, and use strings for raw integer amounts. A request normally contains `rpc`, `sender`, `hub`, `vaultId` and the command's arguments. IDs and amounts must not be lossy JavaScript numbers. USDC amounts use six decimals: 100 USDC is `"100000000"`. Strike/spot use quote units per whole underlying; premium uses premium-token units per whole underlying.
@@ -72,15 +85,37 @@ A guardian uses `pause` with `vaultId: "0"` for global admission or a specific I
 
 The owner may run `cancel-auction` immediately while admission is paused or once exact expiry has passed. Otherwise the owner waits for the snapshotted auction timeout; a bid master may cancel at any time. Cancellation returns to Open and clears the schedule. Holders can then withdraw. A paused vault must be unpaused to admit another deposit or auction, and an expired vault cannot reopen.
 
+## Premium treatment and emergency boundaries
+
+| Event | Premium and fees | Refund / continuation |
+| --- | --- | --- |
+| Auction cancelled before activation | Nothing collected. | No premium refund; vault returns to Open. |
+| Unwind consent revoked or proposal expired/replaced | Earned LP premium and platform fees remain unchanged. | No refund funded; the Live position continues under its normal deadlines. |
+| Unwind executed | Earned LP premium and platform fees are retained. | Executing sponsor separately funds the negotiated premium-token refund; buyer or executor claims it for the configured recipient. |
+| Admission paused | Earned premium, fee and claim entitlements are unchanged. | Exercise, expiration, claims and agreed unwind continue; deadlines do not move. |
+| Normal exercise or expiration | Earned premium and fees remain retained and claimable. | Settlement obligations are handled separately. |
+
+The recommended policy is the implemented policy: premium and fees are earned at activation, and unwind refunds are negotiated and funded separately. LPs can already have claimed their premium, so an automatic refund cannot assume that money remains in custody. A changed refund policy needs an explicit escrow/funding design and fee treatment before implementation.
+
+The existing emergency control is admission-only. Whether to add a full execution freeze remains a protocol-lead decision. Such a freeze needs a separate specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations; it is not implemented by admission pause.
+
 ## Prepare and execute a unanimous unwind
 
 Only Live vaults use this path. The owner or buyer calls `propose-unwind` with a future `deadline` and refund amount in raw **premium-token** units. Zero refund is allowed. Read the active agreement using `typed-unwind`; the output includes vaultId, nonce, deadline, exercisedNotional, supply and refund, with the chain and module-bound EIP-712 domain.
 
-Every current shareholder reviews and explicitly submits `approve-unwind` with that nonce. Holders may use `revoke-unwind`. Transfers invalidate sender and recipient votes; they must approve again at their new balances. Replacing the proposal increments its nonce and supersedes all previous votes. Neither voting nor replacement blocks ordinary exercise or settlement.
+Every current shareholder reviews and explicitly submits `approve-unwind` with that nonce. Holders may use `revoke-unwind`. Nonzero transfers to another holder invalidate sender and recipient votes; they must approve again at their new balances. Replacing the proposal increments its nonce and supersedes all previous votes. Neither voting nor replacement blocks ordinary exercise or settlement.
 
 The buyer signs the exact active typed agreement. The executing sponsor approves the clone for the refund premium token and submits `execute-unwind` with vaultId, nonce and signature. Execution pulls the full refund, rechecks the current exercise/supply state and unanimous consent after token callbacks, reserves the refund and finalizes. Failures revert funding atomically. Any intervening exercise requires a fresh proposal/signature/approvals because its snapshot changed; normal finalization makes the proposal unusable.
 
-The buyer uses `claim-payout` for the funded refund. Current holders use ordinary `claim` for remaining collateral and completed-exercise proceeds. Unpaid premium entitlements remain separately claimable; an unwind does not claw them back.
+The buyer or its executor uses `claim-payout` for the funded refund, paid to the current configured recipient. Current holders use ordinary `claim` for remaining collateral and completed-exercise proceeds. Unpaid premium entitlements remain separately claimable; an unwind does not claw them back.
+
+### Worked unwind scenarios
+
+- **Zero refund:** while Live, propose `refund: "0"` with a future deadline. Read `typed-unwind`, collect every holder’s `approve-unwind` for its nonce and the buyer’s signature, then execute. No token approval or refund funding is needed. Holders separately run `claim` and, if owed, `claim-premium`; there is no unwind refund to claim.
+- **Funded refund:** with USDC as premium token (six decimals), propose `refund: "100000000"` for 100 USDC. After consent and signature, the executing sponsor runs `approve-token` for USDC and that amount (spender: clone), then `execute-unwind`. The buyer or executor runs `claim-payout`; holders independently claim the residual pool and unpaid premium. Completed exercises are never reversed.
+- **Expired/replaced proposal:** nonce 1 cannot execute after its deadline. While still Live, the owner or buyer proposes again with a future deadline, obtaining nonce 2. Replacing a still-valid proposal has the same nonce effect. Read fresh typed data, obtain a new buyer signature and all current-holder approvals; nonce 1 approvals/signature cannot execute nonce 2. Revoking consent removes that holder’s vote, not the option or anyone’s premium. Execution is permitted at the deadline itself, but not after it.
+
+Use the [operator templates](../examples/operator/README.md) with the command fields below. An unwind is an agreed close of a funded Live option; `cancel-auction` only returns a pre-activation auction to Open.
 
 ## Command reference
 
@@ -123,7 +158,7 @@ cap. A higher rate requires a new vault; reducing the global rate lets an existi
 auction proceed. minPremium and Activated.totalPremium remain gross values.
 Inspect platformFees(vaultId) for the applied rate, amount and recipient.
 
-Fees are deducted in the premium token: floor(gross * rate / 10,000). LP claims
+Fees are deducted in the premium token: floor(gross * rate / 10,000). For example, 1,000 USDC gross premium at 200 bps allocates 20 USDC to the treasury and 980 USDC to LPs. Calculate with raw token integers: rounding is down to the smallest premium-token unit, so any fractional fee unit remains in the net LP allocation. LP claims
 remain immediate for the net allocation. The vault reserves both allocations;
 platformFeeRemaining is independent of premiumRemaining and buyerReserved.
 Anyone can call the vault's claimPlatformFee() to pay the snapshotted recipient,

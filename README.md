@@ -21,6 +21,10 @@ Approve the **vault address**, never the hub. A share represents one raw unit of
 
 The Hub’s global `platformFeeBps` starts at zero and is managed by `PLATFORM_FEE_MANAGER_ROLE`. Activation deducts this fee from gross MM premium; LPs immediately claim the net amount. Each vault freezes the current rate as its maximum at creation, rejecting activation above that cap. Fees are reserved separately and anyone can call the vault’s `claimPlatformFee()` to pay its activation-snapshotted treasury. Treasury defaults to the admin and future recipients are admin-configurable. Fees are not refunded on settlement or unwind.
 
+The three token roles are **asset/underlying, quote and premium**. Collateral is the backing token: underlying for a call, quote for a put. Cash payouts use that collateral too. See [token roles and worked examples](docs/operations.md#token-roles-and-collateral).
+
+Follow the [unwind lifecycle and examples](docs/operations.md#prepare-and-execute-a-unanimous-unwind), [premium treatment on cancellation and pause](docs/operations.md#premium-treatment-and-emergency-boundaries), and [fee formula and administration](docs/operations.md#platform-fee-and-share-transfer-administration).
+
 ## Build and verify
 
 Use Node.js 22.13.0 or newer and the locked dependencies:
