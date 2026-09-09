@@ -57,7 +57,7 @@ describe("signed expiry reports",function(){
 });
 
 describe("journaled immutable deployment and manual tooling",function(){
-  async function fixture(){const [admin]=await ethers.getSigners();const artifacts=await loadArtifacts();const plan=await buildDeploymentPlan({artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address,settlementPublisher:admin.address,settlementMethodology:'synthetic local test observations'});return {admin,artifacts,plan};}
+  async function fixture(){const [admin]=await ethers.getSigners();const artifacts=await loadArtifacts();const plan=await buildDeploymentPlan({artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address});return {admin,artifacts,plan};}
   it("keeps every production contract under EIP-170",async()=>{
     const {artifacts}=await fixture();for(const name of CONTRACTS) expect((artifacts[name].deployedBytecode.length-2)/2,name).at.most(24576);
   });
@@ -72,16 +72,21 @@ describe("journaled immutable deployment and manual tooling",function(){
     journal.steps.IvyVault.runtimeHash='0x'+'00'.repeat(32);
     await rejects(resumeDeployment(admin,plan,journal), new RegExp('Runtime hash changed'));
   });
-  it("requires explicit settlement configuration and verifies both authority bindings",async()=>{
-    const {admin,artifacts,plan}=await networkHelpers.loadFixture(fixture);
-    const config={...plan,artifacts,exerciseWindow:Number(plan.exerciseWindow),auctionTimeout:Number(plan.auctionTimeout)};
-    await rejects(buildDeploymentPlan({...config,settlementPublisher:ZeroAddress}), /Invalid settlementPublisher/);
-    await rejects(buildDeploymentPlan({...config,settlementPublisher:undefined}), /Invalid settlementPublisher/);
-    await rejects(buildDeploymentPlan({...config,settlementMethodology:''}), /Missing settlementMethodology/);
-    await resumeDeployment(admin,plan);
-    const [,other]=await ethers.getSigners();
-    await rejects(verifyBindings(admin.provider,{...plan,admin:other.address}), /Admin role missing/);
-    await rejects(verifyBindings(admin.provider,{...plan,settlementPublisher:other.address}), /Settlement publisher role missing/);
+  it("deploys physical-only without cash configuration and verifies bindings after later opt-in",async()=>{
+    const {admin,plan}=await networkHelpers.loadFixture(fixture);
+    expect(plan.version).eq(5);
+    expect(plan).not.have.property('settlementPublisher');
+    expect(plan.settlementMethodology).eq(undefined);
+    const journal=await resumeDeployment(admin,plan);
+    const hub=await ethers.getContractAt('IvyVaultsHub',plan.addresses.IvyVaultsHub);
+    expect(await hub.cashSettlementEnabled()).eq(false);
+    expect(await hub.settlementPublisherCount()).eq(0n);
+    const [,publisher]=await ethers.getSigners();
+    await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(),publisher.address);
+    expect(await hub.cashSettlementEnabled()).eq(true);
+    await verifyBindings(admin.provider,plan);
+    await resumeDeployment(admin,plan,journal);
+    await rejects(verifyBindings(admin.provider,{...plan,admin:publisher.address}), /Admin role missing/);
   });
   it("rejects nonce drift without starting a deployment",async()=>{
     const {admin,plan}=await networkHelpers.loadFixture(fixture);
@@ -89,8 +94,9 @@ describe("journaled immutable deployment and manual tooling",function(){
     await rejects(resumeDeployment(admin,plan,{}), new RegExp('Nonce drift'));
     expect(await admin.provider!.getCode(plan.addresses.IvyVault)).eq('0x');
   });
-  it("rejects cross-chain plans and journals from other plans",async()=>{
+  it("rejects obsolete or cross-chain plans and journals from other plans",async()=>{
     const {admin,plan}=await networkHelpers.loadFixture(fixture);
+    await rejects(resumeDeployment(admin,{...plan,version:4},{}), /Unsupported deployment plan version/);
     await rejects(resumeDeployment(admin,{...plan,chainId:'1'},{}), new RegExp('Wrong chain'));
     await rejects(resumeDeployment(admin,plan,{planHash:'wrong'}), new RegExp('another plan'));
   });

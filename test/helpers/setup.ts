@@ -47,8 +47,8 @@ export interface PairInput {
   terms: PairTermsInput;
 }
 
-/** Deploys tokens, feed, linked libraries, fixed vault implementation and immutable peers; grants roles. */
-export async function deployIvy(connection: Connection) {
+/** Deploys peers and grants trading roles. Legacy financial scenarios explicitly opt in via the post-deployment grant below. */
+export async function deployIvy(connection: Connection, { enableCashSettlement = true } = {}) {
   const { ethers, networkHelpers } = connection;
   const [admin, bidMaster, marketMaker, alice, bob, carol] = await ethers.getSigners();
 
@@ -63,7 +63,7 @@ export async function deployIvy(connection: Connection) {
   const libraries = { IvyVaultRules: await rules.getAddress(), IvyOptionSettlement: await settlement.getAddress() };
   const nonce = await admin.getNonce();
   const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map(i => getCreateAddress({ from: admin.address, nonce: nonce + i }));
-  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT, admin.address], { libraries });
+  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT], { libraries });
   const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, unwindAddress, "ipfs://ivy/{id}.json"]);
   const premiums = await ethers.deployContract("IvyPremiums", [hubAddress, sharesAddress]);
   const unwind = await ethers.deployContract("IvyUnwind", [hubAddress, sharesAddress]);
@@ -71,6 +71,7 @@ export async function deployIvy(connection: Connection) {
 
   await (await hub.grantRole(await hub.BID_MASTER_ROLE(), bidMaster.address)).wait();
   await (await hub.grantRole(await hub.MARKET_MAKER_ROLE(), marketMaker.address)).wait();
+  if (enableCashSettlement) await (await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), admin.address)).wait();
 
   return {
     libraries,

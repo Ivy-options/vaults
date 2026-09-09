@@ -6,8 +6,8 @@ import "./types/IvyTypes.sol";
 
 /// @notice Immutable factory and rule engine. Defaults only affect newly created vaults.
 contract IvyVaultsHub is IvyVaultsSettlement {
-    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_, address settlementPublisher)
-        IvyVaultsHubStorage(admin, implementation, shares_, premiums_, unwind_, window_, timeout_, settlementPublisher) {}
+    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
+        IvyVaultsHubStorage(admin, implementation, shares_, premiums_, unwind_, window_, timeout_) {}
 
     function setPlatformFeeBps(uint16 rate) external onlyRole(PLATFORM_FEE_MANAGER_ROLE) {
         if (rate > 10_000) revert InvalidPlatformFee();

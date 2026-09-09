@@ -4,7 +4,20 @@ Date: 2026-09-08. Implementation authorized 2026-09-09. The accepted pricing dec
 
 Scope: feedback points 1, 2, 4, 5 and 6. Point 3 (`marketMaker` naming) is explicitly excluded. Point 7 was blank. This plan records responsibilities and acceptance criteria; the linked pricing specification governs the subsequent contract changes.
 
-## Hub-owned pricing revision — 2026-09-09
+## Physical-only deployment revision — 2026-09-09
+
+The user confirmed that the first launch uses physical delivery, with cash support retained for later use. This revision removes the constructor obligation introduced by the Hub-owned pricing implementation. Review this revision from `94aee27`; the accepted policy is recorded in [settlement-pricing-spec.md](settlement-pricing-spec.md#physical-only-launch-and-later-cash-activation).
+
+Acceptance criteria:
+
+- Deploy with no publisher constructor input, no publisher membership and cash disabled; physical operation requires no settlement methodology.
+- Derive cash availability from actual publisher-role membership. Count grants, revocations and renunciations correctly; reject the zero address and avoid duplicate or unrelated-role count changes.
+- Block Cash/Either creation and cash bid activation at zero publishers. Preserve physical activation and fixed physical-only terms.
+- Granting an EOA or optional helper the role enables new cash positions; removing the last member disables new cash positions while preserving existing reports, payments, reserves and recovery rights.
+- Update deployment plans to version 5, default examples to physical delivery and the runbook to explicit later cash activation. Preserve interrupted-deployment verification and require methodology only for cash operations.
+- Test through existing public Hub/vault/helper and operator seams, review Standards and Spec independently, fix actionable feedback, then run compilation, typecheck, full regression tests, size and docs checks.
+
+## Earlier Hub-owned pricing revision — 2026-09-09
 
 The user subsequently replaced the standalone settlement-feed design with Hub-owned storage and publication authority. This revision supersedes the earlier architecture while retaining its price-validation, finality and accounting policies. The current source of truth is [settlement-pricing-spec.md](settlement-pricing-spec.md).
 

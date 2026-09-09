@@ -1,6 +1,5 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import { ZeroAddress } from "ethers";
 import { deployIvy } from "./helpers/setup.js";
 
 describe("Hub-owned settlement prices", function () {
@@ -45,13 +44,13 @@ describe("Hub-owned settlement prices", function () {
     expect(await c.hub.exercisePrice(c.wethAddress, c.usdcAddress)).deep.equal([6000n, now, now + 100n]);
   });
 
-  it("requires a nonzero initial publisher and keeps publisher permissions separate from Hub administration", async function () {
+  it("grants publisher permissions separately from Hub administration and isolates prices between Hubs", async function () {
     const c = await deployIvy(await network.create());
     const args = [c.admin.address, c.vaultImplAddress, c.sharesAddress, await c.premiums.getAddress(), await c.unwind.getAddress(), 1, 1] as const;
-    await expect(c.ethers.deployContract("IvyVaultsHub", [...args, ZeroAddress], { libraries: c.libraries }))
-      .revertedWithCustomError(c.hub, "ZeroAddress");
-    const hub = await c.ethers.deployContract("IvyVaultsHub", [...args, c.bob.address], { libraries: c.libraries });
+    const hub = await c.ethers.deployContract("IvyVaultsHub", [...args], { libraries: c.libraries });
     const role = await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE();
+    expect(await hub.hasRole(role, c.bob.address)).equal(false);
+    await hub.grantRole(role, c.bob.address);
     expect(await hub.hasRole(role, c.bob.address)).equal(true);
     expect(await hub.hasRole(role, c.admin.address)).equal(false);
     expect(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(), c.bob.address)).equal(false);

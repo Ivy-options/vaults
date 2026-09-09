@@ -23,6 +23,7 @@ abstract contract IvyVaultsHubStorage is
     bytes32 public constant BID_MASTER_ROLE = keccak256("BID_MASTER_ROLE");
     bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
     bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE = keccak256("SETTLEMENT_PRICE_PUBLISHER_ROLE");
+    uint256 public settlementPublisherCount;
     SettlementPrices internal _settlementPrices;
 
     address public immutable vaultImplementation;
@@ -55,10 +56,10 @@ abstract contract IvyVaultsHubStorage is
     mapping(address marketMaker => mapping(uint256 nonce => bool)) public usedBidNonces;
     IIvyShares public immutable shareToken;
 
-    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_, address settlementPublisher)
+    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
         EIP712("IvyVaultsHub", "2")
     {
-        if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0) || settlementPublisher == address(0)) revert ZeroAddress();
+        if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) revert ZeroAddress();
         if (implementation.code.length == 0) revert BindingMismatch();
         vaultImplementation = implementation;
         shareToken = IIvyShares(shares_);
@@ -69,8 +70,28 @@ abstract contract IvyVaultsHubStorage is
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GUARDIAN_ROLE, admin);
         _grantRole(PLATFORM_FEE_MANAGER_ROLE, admin);
-        _grantRole(SETTLEMENT_PRICE_PUBLISHER_ROLE, settlementPublisher);
         platformTreasury = admin;
+    }
+
+    /// @notice Publisher membership enables new cash admissions; it does not gate existing positions.
+    function cashSettlementEnabled() public view returns (bool) {
+        return settlementPublisherCount != 0;
+    }
+
+    function _grantRole(bytes32 role, address account) internal override returns (bool changed) {
+        if (role == SETTLEMENT_PRICE_PUBLISHER_ROLE && account == address(0)) revert ZeroAddress();
+        changed = super._grantRole(role, account);
+        if (changed && role == SETTLEMENT_PRICE_PUBLISHER_ROLE) ++settlementPublisherCount;
+    }
+
+    /// @dev Both administrative revocation and self-renunciation use this hook.
+    function _revokeRole(bytes32 role, address account) internal override returns (bool changed) {
+        changed = super._revokeRole(role, account);
+        if (changed && role == SETTLEMENT_PRICE_PUBLISHER_ROLE) --settlementPublisherCount;
+    }
+
+    function _requireCashSettlementEnabled() internal view {
+        if (!cashSettlementEnabled()) revert CashSettlementDisabled();
     }
 
     function _admission(uint256 vaultId) internal view {

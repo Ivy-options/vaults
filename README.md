@@ -37,7 +37,7 @@ npm run check:size
 npm test -- --no-compile
 ```
 
-Solidity 0.8.34 uses optimizer runs 200 and viaIR. The default compiler target is Osaka; deploy only to a chain supporting the emitted opcodes, including transient storage. Tests enforce the 24,576-byte deployed-code limit without unlimited-size settings. `test/17-local-rehearsal.test.ts` rehearses deployment, role-authorized cash settlement and a pooled unanimous unwind on an ephemeral local EVM using the operator transaction builder.
+Solidity 0.8.34 uses optimizer runs 200 and viaIR. The default compiler target is Osaka; deploy only to a chain supporting the emitted opcodes, including transient storage. Tests enforce the 24,576-byte deployed-code limit without unlimited-size settings. `test/17-local-rehearsal.test.ts` rehearses physical-only deployment and delivery, explicit cash enablement and settlement, and a pooled unanimous unwind on an ephemeral local EVM using the operator transaction builder.
 
 ## Manual operations
 
@@ -51,7 +51,9 @@ npm run operator -- expire expiration.json
 
 `--send` explicitly submits through the configured RPC's signer. No automated market-data collection, pricing, bidding, or trading UI is included.
 
-Cash settlement needs the authoritative finalized report for the exact expiry. The Hub stores authoritative prices; cash vaults fix `maxSettlementPriceAge` at creation. The Hub admin can grant its publisher role to an EOA or optional helper contract and rotate publishers; funds remain locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. Revocation stops new publications but does not erase stored observations or final prices. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
+The Hub deploys for physical delivery with no settlement publisher or cash configuration. `cashSettlementEnabled()` is true only while `settlementPublisherCount()` is positive. The Hub admin enables future cash positions by granting the publisher role to an EOA or optional helper. At zero publishers, Cash/Either vault creation and cash bid activation revert; physical vaults remain usable and cannot be converted to cash later.
+
+Cash settlement needs the authoritative finalized report for the exact expiry. The Hub stores authoritative prices; cash vaults fix `maxSettlementPriceAge` at creation. Removing the last publisher stops new cash positions and publication, while existing positions can still use stored observations and finalized prices under their normal rules. Missing reports keep funds locked until a replacement publishes or the buyer and all current shareholders consent to an unwind. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
 
 See the [operator runbook](docs/operations.md) and [public guide](docs/site/index.html).
 
@@ -65,6 +67,6 @@ The guide uses local fonts and assets in `docs/site/assets/`. After editing it, 
 
 Every vault fixes `allowPartialExercise` at creation, before deposits. True permits any valid positive amount up to remaining notional; false requires all remaining notional. The term cannot be tightened or changed later. Operator creation requests must specify it explicitly. Full exercise finalizes automatically; partial exercise leaves the remainder open.
 
-See the [accepted pricing specification](docs/settlement-pricing-spec.md) for publisher governance, observation validity, finality and production methodology requirements. The changed Hub constructor and vault-creation ABI require a new deployment; existing vaults retain their original behavior.
+See the [accepted pricing specification](docs/settlement-pricing-spec.md) for publisher governance, observation validity, finality and production methodology requirements. The Hub constructor no longer accepts a publisher; this deployment ABI change requires a fresh deployment. Existing vaults retain their original behavior.
 
 An EOA with `SETTLEMENT_PRICE_PUBLISHER_ROLE` can publish directly to the Hub. No standalone settlement-price contract is deployed or configured. An optional helper may hold the same role and submit reports; the Hub never reads prices back from that helper.

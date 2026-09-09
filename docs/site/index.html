@@ -1177,6 +1177,15 @@
               </tbody>
             </table>
           </div>
+          <div class="callout" id="cash-availability">
+            <b>Physical delivery at launch.</b> A new Hub has no settlement publisher, so
+            cash support starts disabled. The admin can enable new cash positions later
+            by granting the publisher role to an EOA or optional helper. Without a publisher,
+            only physical vaults can be created and cash bids cannot activate. Existing physical
+            vaults keep their agreed delivery method. Removing the last publisher stops new
+            cash positions; existing positions retain their exercise, expiration and claim rights.
+            See the <a href="../operations.md#enable-cash-after-physical-launch">cash enablement runbook</a>.
+          </div>
           <div class="callout" id="expiry-price">
             <b>Which price is used?</b> Activation may use an indicative spot feed.
             Cash payments use prices stored in the Hub. Publishers hold
@@ -1186,7 +1195,7 @@
             for that exact expiry. There is no indicative-price fallback.
             Operators calculate the agreed 30-minute expiry average off-chain; the Hub
             checks authority and time bindings, not market-data accuracy. Production sources
-            and calculation rules must be approved before launch.
+            and calculation rules must be approved before enabling cash admissions.
             The Hub admin can grant the publisher role to an EOA or optional helper contract. No settlement feed contract is required. A helper submits prices to the Hub; the Hub never reads prices back from it.
             Revocation does not erase observations already published, and finalized expiry
             prices cannot be corrected. Missing reports keep the remaining obligation locked
@@ -1254,7 +1263,8 @@
                 ><span class="name">Hub price registry</span>
                 <p>An authorized EOA or optional helper submits exercise observations and final expiry prices
                   directly to the Hub. Prices use quote-token units per whole underlying. The Hub admin
-                  manages publishers; any one publisher can publish. A multisig can enforce
+                  manages publishers; membership starts empty and the first grant enables new cash positions.
+                  Any one publisher can publish. A multisig can enforce
                   its own signing threshold. See <a href="#expiry-price">pricing and availability</a>.</p>
               </div>
             </div>
@@ -1304,7 +1314,7 @@
             </div>
             <p class="prose">
               Two libraries deploy first, followed by the vault implementation,
-              hub, shares, premium module, unwind module and indicative feed. The Hub constructor grants the initial settlement publisher its role.
+              hub, shares, premium module, unwind module and indicative feed. The Hub constructor has no settlement-publisher input and grants no publisher role.
               Addresses are predicted from a fixed nonce sequence; deployment
               and recovery verify constructor bindings and every embedded
               library link. There are no upgrade, library or module replacement

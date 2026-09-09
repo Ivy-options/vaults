@@ -22,6 +22,20 @@ async function propose(c: IvyContext, id: bigint, refund = 100n * U) {
 
 describe("activation premium and unanimous unwinds", function () {
   const fixture = async () => { const c = await deployIvy(connection); await c.hub.setTransfersEnabled(true); return c; };
+  it("allows unanimous cash unwind after the last publisher leaves without requiring a price report", async function () {
+    const c = await networkHelpers.loadFixture(fixture);
+    const v = await goLive(c, { terms: { allowedSettlement: SettlementType.Cash, maxSettlementPriceAge: 3600 } }, { settlement: SettlementType.Cash });
+    await c.hub.revokeRole(await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), c.admin.address);
+    const { agreement, signature } = await propose(c, v.vaultId);
+    await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce);
+    await fund(c, c.usdc, c.carol, v.vaultAddress, agreement.refund);
+    await c.hub.connect(c.carol).executeUnwind(v.vaultId, agreement.nonce, signature);
+    await c.hub.connect(c.alice).claim(v.vaultId, 10n * W);
+    await c.hub.connect(c.alice).claimPremium(v.vaultId);
+    await expect(c.hub.connect(c.marketMaker).claimPayout(v.vaultId)).changeTokenBalance(c.ethers, c.usdc, c.marketMaker, 100n * U);
+    expect(await c.hub.cashSettlementEnabled()).equal(false);
+    expect((await c.hub.stateOf(v.vaultId)).phase).equal(Phase.Settled);
+  });
   it("moves unclaimed income with shares and preserves it after burning", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c,{deposit:6n*W,extraDeposits:[{signer:c.bob,amount:4n*W}]});

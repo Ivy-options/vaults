@@ -10,7 +10,7 @@ const { ethers, networkHelpers } = connection;
 const W = 10n ** 18n, U = 10n ** 6n;
 
 describe('local operator rehearsal', function () {
-  it('deploys, signs and settles a private cash call, then unwinds a pooled put through prepared operator transactions', async function () {
+  it('settles physical options with cash disabled, then explicitly enables cash settlement and rehearses recovery', async function () {
     const [admin, owner, buyer, lp, sponsor] = await ethers.getSigners();
     const provider = admin.provider!;
     const weth = await ethers.deployContract('MockERC20', ['Wrapped Ether', 'WETH', 18]);
@@ -19,13 +19,15 @@ describe('local operator rehearsal', function () {
     const artifacts = await loadArtifacts();
     const plan = await buildDeploymentPlan({ artifacts, chainId: (await provider.getNetwork()).chainId,
       genesisHash: (await provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(),
-      admin: admin.address, reportSigner: admin.address, settlementPublisher: owner.address,
-      settlementMethodology: 'synthetic local rehearsal observations' });
-    expect(plan.version).eq(4);
+      admin: admin.address, reportSigner: admin.address });
+    expect(plan.version).eq(5);
     expect(plan.steps).length(8);
     expect(plan.addresses).not.have.property('IvySettlementPriceFeed');
     expect((await resumeDeployment(admin, plan)).complete).eq(true);
     const hub: any = new Contract(plan.addresses.IvyVaultsHub, artifacts.IvyVaultsHub.abi, provider);
+    expect(await hub.cashSettlementEnabled()).eq(false);
+    expect(await hub.settlementPublisherCount()).eq(0n);
+    const methodology = 'synthetic local rehearsal observations';
     const premiums: any = new Contract(plan.addresses.IvyPremiums, artifacts.IvyPremiums.abi, provider);
     async function op(command: string, signer: any, values: any = {}) {
       const prepared: any = await prepareOperation(provider, artifacts, command,
@@ -46,12 +48,12 @@ describe('local operator rehearsal', function () {
     await usdc.mint(buyer.address, 2000n * U);
     await usdc.mint(sponsor.address, 100n * U);
     const expiry = BigInt(await networkHelpers.time.latest()) + 7200n;
-    async function create(isCall: boolean) {
+    async function create(isCall: boolean, cash = true) {
       await op('prepare-vault', owner, {
-        settlementMethodology: plan.settlementMethodology,
+        ...(cash ? { settlementMethodology: methodology } : {}),
         terms: { allowPartialExercise: false, underlying: w, collateral: isCall ? w : u, ...(isCall ? {} : { publicDeposits: true }),
-          allowedExercise: 0, allowedSettlement: 1, expiry, auctionStartsAt: 0, priceFeed: plan.addresses.IvyPriceFeed,
-          maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, maxPriceAge: 3600 },
+          allowedExercise: cash ? 0 : 1, allowedSettlement: cash ? 1 : 0, expiry, auctionStartsAt: 0, priceFeed: cash ? plan.addresses.IvyPriceFeed : ZeroAddress,
+          maxSettlementPriceAge: cash ? 3600 : 0, maxInTheMoneyBps: cash ? 1000 : 0, maxPriceAge: cash ? 3600 : 0 },
         pairs: [{ quoteToken: u, terms: { premiumToken: u, minPremium: 100n * U, enabled: true } }],
         collateralAmount: isCall ? 10n * W : 18000n * U, collateralPriceUsdE6: isCall ? 3000n * U : U,
         minTradeUsdE6: 10000n * U, supportedTokens: [w, u], marketQuotes: { [u.toLowerCase()]: { spot: 3000n * U, outOfTheMoneyBps: 0 } }
@@ -64,7 +66,7 @@ describe('local operator rehearsal', function () {
       await op('open-auction', owner, { vaultId });
       await op('approve-token', buyer, { vaultId, token: u, amount: 1000n * U });
       const bid = await typed('typed-bid', buyer, { vaultId, bid: { marketMaker: buyer.address, quoteToken: u,
-        strike: 3000n * U, premium: 100n * U, style: 0, settlement: 1, validUntil: expiry, nonce: vaultId,
+        strike: 3000n * U, premium: 100n * U, style: cash ? 0 : 1, settlement: cash ? 1 : 0, validUntil: expiry, nonce: vaultId,
         executor: ZeroAddress, recipient: buyer.address } });
       const activate = { vaultId, bid: bid.value, signature: bid.signature, minTradeUsdE6: 10000n * U,
         collateralPriceUsdE6: isCall ? 3000n * U : U };
@@ -72,13 +74,29 @@ describe('local operator rehearsal', function () {
       await op('activate', admin, activate);
       return vaultId;
     }
+    const physical = await create(true, false);
+    await usdc.mint(buyer.address, 30000n * U);
+    await op('approve-token', buyer, { vaultId: physical, token: u, amount: 30000n * U });
+    await op('exercise', buyer, { vaultId: physical, amount: 10n * W });
+    await op('claim-premium', owner, { vaultId: physical });
+    await op('claim', owner, { vaultId: physical, amount: 10n * W });
+    expect(await hub.totalShares(physical)).eq(0n);
+    expect(await weth.balanceOf(buyer.address)).eq(10n * W);
+    expect(await hub.cashSettlementEnabled()).eq(false);
+    expect(await hub.settlementPublisherCount()).eq(0n);
+    // Reset the exercised asset balance and fund the subsequent cash examples explicitly.
+    await weth.connect(buyer).transfer(owner.address, 10n * W);
+    await usdc.mint(buyer.address, 1000n * U);
+    await op('grant-settlement-publisher', admin, { account: owner.address });
+    expect(await hub.cashSettlementEnabled()).eq(true);
+    expect(await hub.settlementPublisherCount()).eq(1n);
     const spot = { underlying: w, quote: u, price: 3000n * U, observedAt: BigInt(await networkHelpers.time.latest()), validUntil: expiry };
     await op('publish-spot', sponsor, { feed: plan.addresses.IvyPriceFeed, report: spot,
       signature: (await typed('typed-report', admin, { kind: 'spot', feed: plan.addresses.IvyPriceFeed, report: spot })).signature });
     const call = await create(true), put = await create(false);
     const exerciseReport = { ...spot, observedAt: BigInt(await networkHelpers.time.latest()) };
     const exerciseRequest = { report: exerciseReport,
-      settlementMethodology: plan.settlementMethodology };
+      settlementMethodology: methodology };
     await rejects(op('publish-settlement-exercise', sponsor, exerciseRequest));
     await op('publish-settlement-exercise', owner, exerciseRequest);
     expect((await hub.termsOf(call)).publicDeposits).eq(false);
@@ -102,7 +120,7 @@ describe('local operator rehearsal', function () {
     expect((await hub.stateOf(call)).exercisedNotional).eq(before.exercisedNotional);
     expect(await weth.balanceOf(callAddress)).eq(10n * W);
     const settlementRequest = { report,
-      settlementMethodology: plan.settlementMethodology };
+      settlementMethodology: methodology };
     await rejects(op('publish-settlement-expiry', sponsor, settlementRequest));
     await op('grant-settlement-publisher', admin, { account: sponsor.address });
     await op('revoke-settlement-publisher', admin, { account: owner.address });

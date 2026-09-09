@@ -18,6 +18,7 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
         external nonReentrant returns (uint256 vaultId, address vault)
     {
         _admission(0);
+        if (terms.allowedSettlement != SettlementPolicy.Physical) _requireCashSettlementEnabled();
         if (shareToken.hub() != address(this) || premiums.hub() != address(this) || unwind.hub() != address(this)
             || shareToken.premiums() != address(premiums) || shareToken.unwind() != address(unwind)
             || premiums.shares() != address(shareToken) || unwind.shares() != address(shareToken)) revert BindingMismatch();

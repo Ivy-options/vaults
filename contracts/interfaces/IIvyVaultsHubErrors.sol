@@ -22,6 +22,7 @@ interface IIvyVaultsHubErrors {
     error PairMustBeEnabled();
     error InvalidStrikeLimit();
     error CashSettlementNeedsMaxPriceAge();
+    error CashSettlementDisabled();
     error FeedNeedsMaxPriceAge();
     error DeviationTooLarge();
     error LoosensTerms();

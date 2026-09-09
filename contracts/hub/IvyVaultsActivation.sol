@@ -18,6 +18,7 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
     {
         _admission(vaultId);
         _requirePhase(vaultId, Phase.Auction);
+        if (bid.settlement == SettlementType.Cash) _requireCashSettlementEnabled();
         if (bid.vaultId != vaultId) revert BidVaultMismatch();
         if (!hasRole(MARKET_MAKER_ROLE, bid.marketMaker)) revert NotMarketMaker();
         if (block.timestamp > bid.validUntil) revert BidExpired();

@@ -1,4 +1,4 @@
-import { Contract, ContractFactory, getCreateAddress, getAddress, ZeroAddress, keccak256, toUtf8Bytes } from 'ethers';
+import { Contract, ContractFactory, getCreateAddress, getAddress, keccak256, toUtf8Bytes } from 'ethers';
 export const LIBRARIES = ['IvyVaultRules', 'IvyOptionSettlement'];
 export const CONTRACTS = [...LIBRARIES, 'IvyVault', 'IvyVaultsHub', 'IvyShares', 'IvyPremiums', 'IvyUnwind', 'IvyPriceFeed'];
 export const artifactPath = name => `../artifacts/contracts/${LIBRARIES.includes(name) ? 'libraries/' : ''}${name}.sol/${name}.json`;
@@ -33,12 +33,10 @@ export const json = value => JSON.stringify(value, (_, v) => typeof v === 'bigin
 export const planHash = plan => keccak256(toUtf8Bytes(json(plan)));
 
 /** Build all constructor addresses before sending anything. Artifacts come from the local build. */
-export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, deployer, startNonce, admin, reportSigner, settlementPublisher, settlementMethodology, exerciseWindow = 3600, auctionTimeout = 259200, uri = '' }) {
-  if (!settlementPublisher || getAddress(settlementPublisher) === ZeroAddress) throw new Error('Invalid settlementPublisher');
-  if (typeof settlementMethodology !== 'string' || !settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
+export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, deployer, startNonce, admin, reportSigner, settlementMethodology = /** @type {string | undefined} */ (undefined), exerciseWindow = 3600, auctionTimeout = 259200, uri = '' }) {
   const addresses = Object.fromEntries(CONTRACTS.map((name, i) => [name, getCreateAddress({from:deployer,nonce:startNonce+i})]));
   const a = addresses;
-  const args = [[], [], [], [admin,a.IvyVault,a.IvyShares,a.IvyPremiums,a.IvyUnwind,exerciseWindow,auctionTimeout,settlementPublisher],
+  const args = [[], [], [], [admin,a.IvyVault,a.IvyShares,a.IvyPremiums,a.IvyUnwind,exerciseWindow,auctionTimeout],
     [a.IvyVaultsHub,a.IvyPremiums,a.IvyUnwind,uri], [a.IvyVaultsHub,a.IvyShares], [a.IvyVaultsHub,a.IvyShares], [reportSigner]];
   const steps = [];
   for (let i = 0; i < CONTRACTS.length; ++i) {
@@ -50,7 +48,7 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
     const tx = await new ContractFactory(abi,linkBytecode(artifact,a)).getDeployTransaction(...args[i]);
     steps.push({ name, address:a[name], nonce:startNonce+i, data:tx.data, abi, deployedSize:size, libraryLinks:runtimeLinks(artifact,a) });
   }
-  return {version:4,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementPublisher,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
+  return {version:5,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
 }
 
 async function findCreation(provider, plan, step, startBlock) {
@@ -99,12 +97,12 @@ export async function verifyBindings(provider, plan) {
     }
   }
   const hub=byName.IvyVaultsHub;
-  if (!(await hub.hasRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(),plan.settlementPublisher))) throw new Error('Settlement publisher role missing');
   if(!(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(),plan.admin))) throw new Error('Admin role missing');
 }
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
 export async function resumeDeployment(signer, plan, journal = /** @type {{planHash?: string, startBlock?: number, steps?: Record<string, any>, complete?: boolean}} */ ({}), persist = async (_journal) => {}) {
+  if (plan.version !== 5) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
   const provider = signer.provider;
   if(String((await provider.getNetwork()).chainId) !== plan.chainId || (await provider.getBlock(0)).hash !== plan.genesisHash) throw new Error('Wrong chain');
   if((await signer.getAddress()).toLowerCase() !== plan.deployer.toLowerCase()) throw new Error('Wrong deployer');

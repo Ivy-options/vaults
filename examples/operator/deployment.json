@@ -5,7 +5,5 @@
   "reportSigner": "IVY_SIGNER_OR_ERC1271_ADDRESS",
   "exerciseWindow": 3600,
   "auctionTimeout": 259200,
-  "uri": "",
-  "settlementPublisher": "SETTLEMENT_PUBLISHER_ADDRESS",
-  "settlementMethodology": "APPROVED_PER_PAIR_METHODOLOGY_ARTIFACT_REFERENCE"
+  "uri": ""
 }

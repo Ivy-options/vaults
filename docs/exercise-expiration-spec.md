@@ -4,6 +4,7 @@ Source: the user's approved design in this task. Implement on `develop`, based o
 
 ## Public actions
 
+- New Hubs launch with physical delivery only. A publisher-role grant enables new cash positions; removing the last publisher blocks new cash admissions but does not gate exercise, expiration or claims for already-live cash positions. See [cash availability](settlement-pricing-spec.md#physical-only-launch-and-later-cash-activation).
 - `exercise(vaultId, amount)` uses the buyer's option right and executes the physical exchange or cash payout within the allowed period and the vault's partial-exercise policy.
 - Replace the public `settle(vaultId)` action with `expire(vaultId)`. Expiration processes the entire remaining position after its deadline and makes residual assets claimable. Cash expiration first preserves any buyer payout owed using the finalized price for the exact expiry. It must not depend on buyer participation or successful buyer transfers.
 - Physical American exercise remains available before expiry and through the configured grace window; physical European exercise is available from expiry until the end of that window. Physical expiration is available at expiry plus the exercise window.

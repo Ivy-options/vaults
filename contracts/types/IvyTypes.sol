@@ -125,6 +125,7 @@ error PairUnknown(address quoteToken);
 error PairDisabled(address quoteToken);
 error InvalidStrikeLimit();
 error CashSettlementNeedsMaxPriceAge();
+error CashSettlementDisabled();
 error FeedNeedsMaxPriceAge();
 error DeviationTooLarge();
 error LoosensTerms();
