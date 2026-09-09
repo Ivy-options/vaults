@@ -17,6 +17,10 @@ Acceptance criteria:
 - Gate new Cash/Either creation and cash activation using the flag; preserve publication and all existing settlement/claim/unwind paths while disabled.
 - Update helper interfaces, operator report inputs/previews, manifest version 6, examples and docs. Test per-vault isolation, role/flag independence and recovery; review and fix feedback before final validation.
 
+Completed in `a9ffd7a`. Matching cash vaults now receive separate exercise and final-price transactions. The admin explicitly controls cash admissions through a boolean flag; role changes do not toggle it, and the member counter is removed. Existing positions can publish and settle while cash admissions are disabled.
+
+Validation: all 209 tests passed, together with compilation, type checking, deployed-size and documentation checks. The Hub is 23,126 bytes, below the 24,576-byte limit. Independent Standards and Spec reviewers each returned zero actionable findings and were satisfied; no further code-fix round was needed. The changed price storage and publication/read/helper APIs require a fresh immutable deployment.
+
 ## Earlier physical-only deployment revision — 2026-09-09
 
 The user confirmed that the first launch uses physical delivery, with cash support retained for later use. This revision removes the constructor obligation introduced by the Hub-owned pricing implementation. Review this revision from `94aee27`; the accepted policy is recorded in [settlement-pricing-spec.md](settlement-pricing-spec.md#physical-only-launch-and-later-cash-activation).
