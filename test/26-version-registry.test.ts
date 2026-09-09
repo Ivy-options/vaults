@@ -148,10 +148,23 @@ describe('Deployment through a caching RPC provider', function () {
       const context={chainId:(await provider.getNetwork()).chainId,genesisHash:(await provider.getBlock(0))!.hash,deployer,admin:deployer};
       const registryPlan=await buildRegistryDeploymentPlan({...context,artifact:registryArtifact,startNonce:0});
       expect(await provider.getCode(registryPlan.address)).equal('0x');
-      expect((await resumeRegistryDeployment(signer,registryPlan,registryArtifact)).complete).equal(true);
+      let registryJournal:any;
+      await expect(resumeRegistryDeployment(signer,registryPlan,registryArtifact,{},async journal=>{
+        registryJournal=structuredClone(journal);
+        if(journal.steps?.IvyVaultsRegistry?.hash) throw new Error('lost registry hash');
+      })).rejectedWith('lost registry hash');
+      delete registryJournal.steps.IvyVaultsRegistry.hash;
+      expect((await resumeRegistryDeployment(signer,registryPlan,registryArtifact,registryJournal)).complete).equal(true);
       const hubPlan=await buildDeploymentPlan({...context,artifacts:await loadArtifacts(),reportSigner:deployer,startNonce:1});
       for(const step of hubPlan.steps) expect(await provider.getCode(step.address)).equal('0x');
-      expect((await resumeDeployment(signer,hubPlan)).complete).equal(true);
+      let hubJournal:any;
+      await expect(resumeDeployment(signer,hubPlan,{},async journal=>{
+        hubJournal=structuredClone(journal);
+        if(journal.steps?.IvyVaultRules?.hash) throw new Error('lost library hash');
+      })).rejectedWith('lost library hash');
+      delete hubJournal.steps.IvyVaultRules.hash;
+      expect((await resumeDeployment(signer,hubPlan,hubJournal)).complete).equal(true);
+      expect(Number(BigInt(await provider.send('eth_getTransactionCount',[deployer,'latest'])))).equal(9);
     } finally { provider.destroy(); }
   });
 });

@@ -52,7 +52,9 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
 }
 
 export async function findCreation(provider, plan, step, startBlock) {
-  const latest = await provider.getBlockNumber();
+  // A mined creation may be newer than AbstractProvider's cached block height.
+  const latest = Number(BigInt(await provider.send('eth_blockNumber', [])));
+  if (!Number.isSafeInteger(startBlock) || startBlock < 0 || startBlock > latest) throw new Error('Invalid creation scan start block');
   for(let n = startBlock; n <= latest; n++) {
     const block = await provider.getBlock(n,true);
     for(const tx of block.prefetchedTransactions) {
