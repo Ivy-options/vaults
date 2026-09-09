@@ -22,10 +22,17 @@ export async function setSpot(ctx: IvyContext, price: bigint, ageSeconds = 0n) {
   await (await ctx.feed.set(ctx.wethAddress, ctx.usdcAddress, price, now - ageSeconds)).wait();
 }
 
-/** Writes only the authoritative mock; activation observations remain independent. */
+/** Publishes to the Hub as the authorized EOA; activation observations remain independent. */
 export async function setExercisePrice(ctx: IvyContext, price: bigint, ageSeconds = 0n) {
   const now = BigInt(await ctx.networkHelpers.time.latest());
-  await ctx.settlementFeed.set(ctx.wethAddress, ctx.usdcAddress, price, now - ageSeconds, now + 3600n);
+  await ctx.hub.publishExercisePrice(ctx.wethAddress, ctx.usdcAddress, price, now - ageSeconds, now + 3600n);
+}
+
+/** Reaches expiry when necessary and finalizes the pair once through the Hub publisher API. */
+export async function publishExpiryPrice(ctx: IvyContext, expiry: bigint, price: bigint) {
+  const now = BigInt(await ctx.networkHelpers.time.latest());
+  if (now < expiry) await ctx.networkHelpers.time.setNextBlockTimestamp(expiry);
+  await ctx.hub.publishExpiry(ctx.wethAddress, ctx.usdcAddress, expiry, price, (now > expiry ? now : expiry) + 3600n);
 }
 
 /** Makes the next mined block carry exactly `timestamp`. */
@@ -48,7 +55,7 @@ export interface VaultOptions {
 export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
   const isCall = o.isCall ?? true;
   const feedTerms: Partial<VaultTermsInput> = o.withFeed
-    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, settlementPriceFeed: ctx.settlementFeedAddress, maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, allowedSettlement: SettlementPolicy.Either }
+    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, allowedSettlement: SettlementPolicy.Either }
     : {};
   const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR;
   const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });

@@ -18,9 +18,8 @@ const fields = (type,value) => Object.fromEntries(type.map(f=>[f.name,required(v
 /** Read-only preflight. USD values use six decimals; token quantities use raw token units. */
 export async function prepareVault(provider, request) {
   const r=request, t={...required(r,'terms'),publicDeposits:r.terms.publicDeposits??false};
-  required(t,'settlementPriceFeed'); required(t,'maxSettlementPriceAge');
+  required(t,'maxSettlementPriceAge');
   if (Number(t.allowedSettlement) !== 0) {
-    if (t.settlementPriceFeed === ZeroAddress || await provider.getCode(t.settlementPriceFeed) === '0x') throw new Error('Cash settlement requires a contract settlementPriceFeed');
     if (BigInt(t.maxSettlementPriceAge) <= 0n) throw new Error('Cash settlement requires positive maxSettlementPriceAge');
     if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
   }
@@ -85,13 +84,13 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const platformFee=totalPremium*platformFeeBps/10000n;
     detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,maxPlatformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
   } else if(command==='publish-settlement-exercise'||command==='publish-settlement-expiry') {
-    target=new Contract(required(r,'settlementFeed'),artifacts.IvySettlementPriceFeed.abi,runner);
+    required(r,'hub'); target=hub;
     const exercise=command==='publish-settlement-exercise', type=exercise?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
     method=exercise?'publishExercisePrice':'publishExpiry';args=type.map(f=>required(r.report,f.name));
     if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
-    detail={pricingAuthority:'authoritative cash settlement',settlementFeed:r.settlementFeed,report:fields(type,r.report),units:'integer quote-token units per whole underlying token',settlementMethodology:r.settlementMethodology};
+    detail={pricingAuthority:'authoritative cash settlement',hub:r.hub,report:fields(type,r.report),units:'integer quote-token units per whole underlying token',settlementMethodology:r.settlementMethodology};
   } else if(command==='grant-settlement-publisher'||command==='revoke-settlement-publisher') {
-    target=new Contract(required(r,'settlementFeed'),artifacts.IvySettlementPriceFeed.abi,runner);
+    required(r,'hub'); target=hub;
     method=command==='grant-settlement-publisher'?'grantRole':'revokeRole';
     args=[await target.SETTLEMENT_PRICE_PUBLISHER_ROLE(),required(r,'account')];
     detail={pricingAuthority:'authoritative cash settlement',account:r.account};

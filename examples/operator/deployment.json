@@ -6,7 +6,6 @@
   "exerciseWindow": 3600,
   "auctionTimeout": 259200,
   "uri": "",
-  "settlementAdmin": "SETTLEMENT_ADMIN_MULTISIG_ADDRESS",
   "settlementPublisher": "SETTLEMENT_PUBLISHER_ADDRESS",
   "settlementMethodology": "APPROVED_PER_PAIR_METHODOLOGY_ARTIFACT_REFERENCE"
 }

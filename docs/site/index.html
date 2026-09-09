@@ -945,7 +945,7 @@
             <div class="row">
               <span class="mono">allowedSettlement</span
               ><span
-                >Physical, Cash, or Either. Cash requires a separate settlement feed.</span
+                >Physical, Cash, or Either. Cash requires a positive maximum settlement-price age.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">Either → one</span></span
@@ -973,8 +973,8 @@
               >
             </div>
             <div class="row">
-              <span class="mono">settlementPriceFeed · maxSettlementPriceAge</span>
-              <span>Cash requires a contract feed and positive maximum observation age. Early cash exercise also checks the report’s validity deadline. Expiry prices are final and do not expire.</span>
+              <span class="mono">maxSettlementPriceAge</span>
+              <span>Cash requires a positive maximum age for observations stored in the Hub. Early cash exercise also checks the report’s validity deadline. Expiry prices are final and do not expire.</span>
               <span class="term-rule"><span class="term-rule-label">Owner changes</span><span class="chip lp">immutable</span></span>
             </div>
             <div class="row">
@@ -1179,15 +1179,15 @@
           </div>
           <div class="callout" id="expiry-price">
             <b>Which price is used?</b> Activation may use an indicative spot feed.
-            Cash payments use a separate settlement feed whose publishers hold
+            Cash payments use prices stored in the Hub. Publishers hold
             <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code>. Before expiry, American cash
             exercise requires a fresh observation that is still within its validity deadline.
             At or after expiry, cash exercise and expiration require the write-once price
             for that exact expiry. There is no indicative-price fallback.
-            Operators calculate the agreed 30-minute expiry average off-chain; the feed
+            Operators calculate the agreed 30-minute expiry average off-chain; the Hub
             checks authority and time bindings, not market-data accuracy. Production sources
             and calculation rules must be approved before launch.
-            The feed address is fixed per vault, but its admin can rotate publishers.
+            The Hub admin can grant the publisher role to an EOA or optional helper contract. No settlement feed contract is required. A helper submits prices to the Hub; the Hub never reads prices back from it.
             Revocation does not erase observations already published, and finalized expiry
             prices cannot be corrected. Missing reports keep the remaining obligation locked
             until an authorized publisher supplies the report or the parties agree to an
@@ -1247,13 +1247,13 @@
                 ><span class="name">IvyPriceFeed</span>
                 <p>Signed spot observations constrain activation when enabled.
                   Its legacy expiry API remains available, but new cash vaults use
-                  IvySettlementPriceFeed for every payment.</p>
+                  the Hub’s stored reports for every payment.</p>
               </div>
               <div>
                 <span class="role">Settlement publisher role</span
-                ><span class="name">IvySettlementPriceFeed</span>
-                <p>Authorized publishers submit exercise observations and final expiry prices
-                  directly. Prices use quote-token units per whole underlying. The admin
+                ><span class="name">Hub price registry</span>
+                <p>An authorized EOA or optional helper submits exercise observations and final expiry prices
+                  directly to the Hub. Prices use quote-token units per whole underlying. The Hub admin
                   manages publishers; any one publisher can publish. A multisig can enforce
                   its own signing threshold. See <a href="#expiry-price">pricing and availability</a>.</p>
               </div>
@@ -1304,7 +1304,7 @@
             </div>
             <p class="prose">
               Two libraries deploy first, followed by the vault implementation,
-              hub, shares, premium module, unwind module, indicative feed and settlement feed.
+              hub, shares, premium module, unwind module and indicative feed. The Hub constructor grants the initial settlement publisher its role.
               Addresses are predicted from a fixed nonce sequence; deployment
               and recovery verify constructor bindings and every embedded
               library link. There are no upgrade, library or module replacement

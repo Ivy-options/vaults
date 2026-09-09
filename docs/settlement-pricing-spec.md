@@ -1,10 +1,10 @@
 # Authoritative cash settlement pricing
 
-Status: **accepted for implementation on 2026-09-09 following the user’s instruction to continue with this specification**. This is the Task 3 deliverable in [the stakeholder plan](stakeholder-feedback-task-plan.md). It does not itself authorize a production source, operator or deployment. The policies below define the implementation; production identities and market-data methodology remain deployment-specific choices.
+Status: **revised and authorized on 2026-09-09: the Hub owns settlement prices and publication authority; an EOA or optional helper contract may publish**. This is the Task 3 deliverable in [the stakeholder plan](stakeholder-feedback-task-plan.md). It does not itself authorize a production source, operator or deployment. The policies below define the implementation; production identities and market-data methodology remain deployment-specific choices.
 
 ## Payment authority and routing
 
-Retain both American and European cash options. Separate the indicative activation feed from an authoritative cash settlement feed. An indicative price may constrain the winning strike; it must never authorize a cash payment.
+Retain both American and European cash options. Keep indicative activation pricing separate from the Hub’s authoritative settlement-price registry. An indicative price may constrain the winning strike; it must never authorize a cash payment.
 
 | Action | Required price |
 | --- | --- |
@@ -12,16 +12,15 @@ Retain both American and European cash options. Separate the indicative activati
 | American cash exercise strictly before expiry | Fresh, unexpired authoritative exercise observation |
 | American or European cash exercise at or after expiry | Final authoritative price bound to the exact vault expiry |
 | Cash expiration | The same final authoritative expiry price, for all remaining notional |
-| Physical exercise or expiration | No settlement feed requirement |
+| Physical exercise or expiration | No settlement-price requirement |
 
 There is no fallback from an authoritative report to the indicative feed. Exact expiry is the boundary: even a still-fresh exercise observation cannot pay a cash exercise at that timestamp. Existing authorization, partial-exercise policy, intrinsic-value arithmetic and payout denomination remain unchanged.
 
 ## Minimal public interface
 
-Introduce `IvySettlementPriceFeed` and its read interface separately from `IvyPriceFeed`. Use OpenZeppelin AccessControl and direct publisher transactions, with no new settlement EIP-712 message or permissionless signed-report relay.
+The Hub exposes the following publication and read APIs, with its existing OpenZeppelin AccessControl authority. No standalone settlement feed or read-side source interface is required. The Hub owns report storage, and its settlement library reads that storage directly through storage references passed by the Hub. There are no calls to an external settlement source or back to a Hub read interface during settlement.
 
 ```solidity
-constructor(address admin, address publisher);
 bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE;
 
 function publishExercisePrice(
@@ -41,9 +40,15 @@ function settlementPrice(address underlying, address quote, uint64 expiry)
     external view returns (uint256 price);
 ```
 
-Both publication functions require the publisher role at transaction execution. Constructor identities must be nonzero. Each report requires nonzero, distinct token addresses and a strictly positive price. Emit publication events with the complete observation or expiry binding. Standard role events expose authorization changes.
+Append a nonzero initial `settlementPublisher` argument to the Hub constructor. The Hub grants that account `SETTLEMENT_PRICE_PUBLISHER_ROLE`; the existing Hub `DEFAULT_ADMIN_ROLE` controls its membership. No separate settlement administrator exists. Both publication functions require current publisher membership at transaction execution. Each report requires nonzero, distinct token addresses and a strictly positive price. Emit publication events with the complete observation or expiry binding. Standard role events expose authorization changes.
 
-Add `settlementPriceFeed` and `maxSettlementPriceAge` to vault terms. Any vault permitting cash settlement requires a contract feed address and positive freshness limit. Fix both terms at creation, including across tightening; neither the owner nor governance can redirect an existing vault to another settlement feed. Existing `priceFeed` and `maxPriceAge` retain their separate activation-check meaning and existing tightening rules. A physical-only vault may omit both feeds.
+Remove `settlementPriceFeed` from vault terms. Retain `maxSettlementPriceAge`, positive for any vault permitting cash settlement and immutable across tightening. Existing `priceFeed` and `maxPriceAge` retain their separate optional activation-check meaning and tightening rules. A physical-only vault may use zero for settlement age and omit the indicative feed.
+
+### Interchangeable publishers
+
+An EOA with the Hub role can submit either publication transaction directly. An optional helper contract can hold the exact same role and call the Hub’s publication functions using a minimal write-side interface. The helper may obtain or calculate prices according to its own approved policy; the Hub does not call it, require a reader interface from it, or store it as a vault dependency.
+
+Provide an access-controlled helper example and tests demonstrating EOA and contract publication. An unprivileged caller must not be able to make a trusted helper publish arbitrary reports. The helper is optional and absent from the default deployment sequence. Granting the Hub role to an EOA must be sufficient to complete activation, exercise and expiration without deploying any settlement feed or helper.
 
 ## Exercise observations
 
@@ -71,11 +76,11 @@ Before admitting production cash vaults, publish a methodology record for each s
 
 ## Governance, rotation and trust
 
-Recommend a multisig as `DEFAULT_ADMIN_ROLE` holder and a designated settlement operator, preferably a multisig, as publisher. Standard AccessControl permits multiple publisher accounts; any one can publish. It does not implement a threshold across role holders. A signing threshold, if required, belongs to the publisher multisig.
+The Hub admin manages publication authority. In production it should be a multisig; the designated publisher can be an EOA, a multisig or an optional helper contract. Standard AccessControl permits multiple publisher accounts; any one can publish. It does not implement a threshold across role holders. A signing threshold, if required, belongs to the publisher multisig.
 
-The administrator can grant and revoke publisher authority on this feed, affecting all vaults using it. Granting a replacement and revoking the previous publisher is the recovery procedure; role rotation does not rewrite vault terms. Revocation prevents future publication transactions, including queued ones that execute after revocation. Because there are no signed settlement messages, there are no outstanding settlement signatures to invalidate. Ordinary transaction chain and destination binding applies; a transaction on another chain/feed does not populate this feed's state.
+The Hub administrator can grant and revoke publisher authority, affecting all cash vaults on that Hub. Granting a replacement and revoking the previous publisher is the recovery procedure; role rotation does not rewrite vault terms. Revocation prevents future publication transactions, including queued ones that execute after revocation. Because there are no signed settlement messages, there are no outstanding settlement signatures to invalidate. Ordinary transaction chain and destination binding applies; a transaction on another chain/Hub does not populate this Hub’s state.
 
-Stored exercise observations survive revocation and remain usable until their age or validity limit expires, or a newer observation replaces them. Stored final prices survive permanently. Revocation is not a retroactive data veto. The immutable feed address therefore does **not** imply immutable publisher identity: depositors trust this feed's administrator and every authorized publisher throughout the position. Losing all admin keys prevents governance recovery; losing all publishers with a functioning admin permits rotation.
+Stored exercise observations survive revocation and remain usable until their age or validity limit expires, or a newer observation replaces them. Stored final prices survive permanently. Revocation is not a retroactive data veto. Publisher identity remains mutable: depositors trust the Hub administrator and every authorized publisher throughout the position. Losing all admin keys prevents governance recovery; losing all publishers with a functioning admin permits rotation.
 
 ## Failure and incident procedure
 
@@ -87,17 +92,19 @@ For an erroneous exercise observation, publish a strictly later valid observatio
 
 ## Compatibility and operator tooling
 
-Changing `VaultTerms` changes the vault-creation ABI. Deploy a new immutable hub, associated modules/libraries and authoritative feed using updated artifacts; existing immutable hubs and vaults keep their original pricing behavior. Do not represent deployment as an in-place upgrade or silently migrate existing positions. Update fixture constructors, deployment manifests, binding checks, operator JSON and examples together.
+Changing `VaultTerms` changes the vault-creation ABI. Deploy a new immutable hub, associated modules/libraries using updated artifacts; existing immutable hubs and vaults keep their original pricing behavior. Do not represent deployment as an in-place upgrade or silently migrate existing positions. Update fixture constructors, deployment manifests, binding checks, operator JSON and examples together.
 
-Deployment configuration must specify and verify settlement admin and publisher separately from the indicative feed signer. Operators must see the authority target, ordered pair, units and expiry before publication. Existing indicative signing commands may remain, but must be clearly labeled and must not imply that publishing to the old feed supplies prices to new cash vaults. Provide direct settlement publication commands and a rehearsal from role configuration through expiry publication, permissionless expiration and buyer payout claim.
+Deployment configuration must specify and verify the initial Hub settlement publisher separately from the indicative feed signer. Remove the standalone settlement feed deployment, separate settlement administrator and settlement-feed request/term fields. Increment the deployment manifest version and reject obsolete plans rather than silently treating their source configuration as Hub publication.
+
+Operators must see the Hub target, ordered pair, units and expiry before publication. Existing indicative signing commands may remain, but must be clearly labeled and must not imply that publishing to the old feed supplies prices to cash vaults. Direct settlement publication and role commands now target the Hub. The clean rehearsal must demonstrate EOA publication, missing-report recovery through role rotation, expiration and payout claim without a settlement source contract. Optional helper tests must prove publication and revocation through the same Hub role.
 
 ## Public API test seams and acceptance
 
-Test authorization and read behavior through public feed APIs; test routing and accounting through the public hub and vault APIs.
+Test publication, authorization, reads, routing and accounting through public Hub and vault APIs; test optional helper access control through its public API.
 
 - Publication: unauthorized sender, constructor identities, grant/revoke, replacement publisher, queued-call revocation semantics, invalid token pair, zero price, future/non-increasing observations, expired submission and stored-observation validity after publication.
-- Routing: different indicative and authoritative prices; correct selected quote pair; American exercise immediately before expiry versus exactly at expiry; European pre-expiry rejection; no cross-pair, cross-expiry or different-feed report consumption.
-- Finality: pre-expiry publication rejection, duplicate finalization rejection, late historical recovery, indefinite final-price reads, no indicative update influence, and stored exercise/final observations after role revocation.
+- Routing: different indicative and authoritative prices; correct selected quote pair; American exercise immediately before expiry versus exactly at expiry; European pre-expiry rejection; no cross-pair, cross-expiry or different-Hub report consumption.
+- Finality: pre-expiry publication rejection, duplicate finalization rejection, late historical recovery, indefinite final-price reads, no indicative update influence, and stored exercise/final observations after role revocation; EOA and contract publishers and unauthorized helper callers.
 - Accounting: missing report reverts without releasing buyer obligations; recovery completes payment; partial exercise followed by expiration cannot pay twice; premium, treasury fees and buyer reserves remain isolated; physical behavior remains unchanged.
 - Integration: deployment role bindings, clean local rehearsal, unauthorized tooling publication, missing-report recovery, examples matching ABI; compile, typecheck, full contract tests, deployed-size checks and docs checks.
 

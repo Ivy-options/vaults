@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { EXERCISE_WINDOW, ExerciseStyle, Phase, SettlementType, USDC_UNIT, WETH_UNIT, deployIvy, fund, type IvyContext } from "./helpers/setup.js";
-import { at, goLive, setSpot } from "./helpers/scenarios.js";
+import { at, goLive, setSpot, publishExpiryPrice } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;
@@ -81,8 +81,7 @@ describe("claim", function () {
     const { hub, weth, usdc, alice, marketMaker } = ctx;
     const { vaultId, vaultAddress, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 3300n * USDC_UNIT);
-    await at(ctx, bid.expiry);
+    await publishExpiryPrice(ctx, bid.expiry, 3300n * USDC_UNIT);
     await hub.expire(vaultId);
 
     const tx = hub.connect(alice).claim(vaultId, 10n * WETH_UNIT);

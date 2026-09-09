@@ -1,6 +1,6 @@
 {
   "rpc": "http://127.0.0.1:8545",
-  "sender": "SETTLEMENT_ADMIN_MULTISIG_ADDRESS",
-  "settlementFeed": "SETTLEMENT_FEED_ADDRESS",
-  "account": "PUBLISHER_ADDRESS"
+  "sender": "HUB_ADMIN_ADDRESS",
+  "account": "PUBLISHER_ADDRESS",
+  "hub": "HUB_ADDRESS"
 }

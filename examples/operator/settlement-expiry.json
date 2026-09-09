@@ -1,7 +1,6 @@
 {
   "rpc": "http://127.0.0.1:8545",
   "sender": "SETTLEMENT_PUBLISHER_ADDRESS",
-  "settlementFeed": "SETTLEMENT_FEED_ADDRESS",
   "settlementMethodology": "APPROVED_PER_PAIR_METHODOLOGY_ARTIFACT_REFERENCE",
   "report": {
     "underlying": "WETH_ADDRESS",
@@ -9,5 +8,6 @@
     "price": "4000000000",
     "expiry": "VAULT_EXPIRY_UNIX_SECONDS",
     "validUntil": "SUBMISSION_DEADLINE_UNIX_SECONDS"
-  }
+  },
+  "hub": "HUB_ADDRESS"
 }

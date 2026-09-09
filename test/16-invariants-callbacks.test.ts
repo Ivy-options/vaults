@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 import {network} from 'hardhat';
 import {deployIvy,callTerms,callPairs,createVaultAs,fund,WETH_UNIT as W,USDC_UNIT as U,Phase,SettlementType,ExerciseStyle} from './helpers/setup.js';
-import {openVault,activate,goLive,at} from './helpers/scenarios.js';
+import {openVault,activate,goLive,at,publishExpiryPrice} from './helpers/scenarios.js';
 import {UNWIND_TYPES} from '../scripts/operator.mjs';
 const connection=await network.create();const {ethers,networkHelpers}=connection;
 describe('cross-module callbacks and reserve invariants',function(){
@@ -84,7 +84,7 @@ describe('cross-module callbacks and reserve invariants',function(){
    expect(await v.vault.reserved(c.usdcAddress)).eq(1000n*U-paid);
    expect(await c.hub.totalShares(v.vaultId)).eq(balances.reduce((a,b)=>a+b));
   }
-  if(cash){await c.settlementFeed.setSettlementPrice(c.wethAddress,c.usdcAddress,v.bid.expiry,isCall?3300n*U:2700n*U);await at(c,v.bid.expiry);await c.hub.expire(v.vaultId);}
+  if(cash){await publishExpiryPrice(c, v.bid.expiry, isCall?3300n*U:2700n*U);await c.hub.expire(v.vaultId);}
   else {if(!isCall)await fund(c,c.weth,c.marketMaker,v.vaultAddress,4n*W);await c.hub.connect(c.marketMaker).exercise(v.vaultId,4n*W);await at(c,v.bid.expiry+3600n);await c.hub.expire(v.vaultId);}
   for(let i=0;i<3;i++){if(balances[i]>0n)await c.hub.connect(holders[i]).claim(v.vaultId,balances[i]);if(await c.premiums.claimable(v.vaultId,holders[i].address)>0n)await c.hub.connect(holders[i]).claimPremium(v.vaultId);}
   if(cash)await c.hub.connect(c.marketMaker).claimPayout(v.vaultId);

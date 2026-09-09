@@ -27,7 +27,6 @@
     "priceFeed": "0x0000000000000000000000000000000000000000",
     "maxInTheMoneyBps": 0,
     "maxPriceAge": 0,
-    "settlementPriceFeed": "0x0000000000000000000000000000000000000000",
     "maxSettlementPriceAge": 0
   },
   "pairs": [

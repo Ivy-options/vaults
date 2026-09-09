@@ -19,14 +19,18 @@ describe('local operator rehearsal', function () {
     const artifacts = await loadArtifacts();
     const plan = await buildDeploymentPlan({ artifacts, chainId: (await provider.getNetwork()).chainId,
       genesisHash: (await provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(),
-      admin: admin.address, reportSigner: admin.address, settlementAdmin: admin.address, settlementPublisher: owner.address,
+      admin: admin.address, reportSigner: admin.address, settlementPublisher: owner.address,
       settlementMethodology: 'synthetic local rehearsal observations' });
+    expect(plan.version).eq(4);
+    expect(plan.steps).length(8);
+    expect(plan.addresses).not.have.property('IvySettlementPriceFeed');
     expect((await resumeDeployment(admin, plan)).complete).eq(true);
     const hub: any = new Contract(plan.addresses.IvyVaultsHub, artifacts.IvyVaultsHub.abi, provider);
     const premiums: any = new Contract(plan.addresses.IvyPremiums, artifacts.IvyPremiums.abi, provider);
     async function op(command: string, signer: any, values: any = {}) {
       const prepared: any = await prepareOperation(provider, artifacts, command,
         { sender: signer.address, hub: plan.addresses.IvyVaultsHub, ...values });
+      if (command.includes('settlement')) expect(prepared.to).eq(plan.addresses.IvyVaultsHub);
       await (await signer.sendTransaction({ to: prepared.to, data: prepared.data })).wait();
     }
     async function typed(command: string, signer: any, values: any) {
@@ -47,7 +51,7 @@ describe('local operator rehearsal', function () {
         settlementMethodology: plan.settlementMethodology,
         terms: { allowPartialExercise: false, underlying: w, collateral: isCall ? w : u, ...(isCall ? {} : { publicDeposits: true }),
           allowedExercise: 0, allowedSettlement: 1, expiry, auctionStartsAt: 0, priceFeed: plan.addresses.IvyPriceFeed,
-          settlementPriceFeed: plan.addresses.IvySettlementPriceFeed, maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, maxPriceAge: 3600 },
+          maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, maxPriceAge: 3600 },
         pairs: [{ quoteToken: u, terms: { premiumToken: u, minPremium: 100n * U, enabled: true } }],
         collateralAmount: isCall ? 10n * W : 18000n * U, collateralPriceUsdE6: isCall ? 3000n * U : U,
         minTradeUsdE6: 10000n * U, supportedTokens: [w, u], marketQuotes: { [u.toLowerCase()]: { spot: 3000n * U, outOfTheMoneyBps: 0 } }
@@ -73,7 +77,7 @@ describe('local operator rehearsal', function () {
       signature: (await typed('typed-report', admin, { kind: 'spot', feed: plan.addresses.IvyPriceFeed, report: spot })).signature });
     const call = await create(true), put = await create(false);
     const exerciseReport = { ...spot, observedAt: BigInt(await networkHelpers.time.latest()) };
-    const exerciseRequest = { settlementFeed: plan.addresses.IvySettlementPriceFeed, report: exerciseReport,
+    const exerciseRequest = { report: exerciseReport,
       settlementMethodology: plan.settlementMethodology };
     await rejects(op('publish-settlement-exercise', sponsor, exerciseRequest));
     await op('publish-settlement-exercise', owner, exerciseRequest);
@@ -97,11 +101,11 @@ describe('local operator rehearsal', function () {
     await rejects(op('expire', sponsor, { vaultId: call }));
     expect((await hub.stateOf(call)).exercisedNotional).eq(before.exercisedNotional);
     expect(await weth.balanceOf(callAddress)).eq(10n * W);
-    const settlementRequest = { settlementFeed: plan.addresses.IvySettlementPriceFeed, report,
+    const settlementRequest = { report,
       settlementMethodology: plan.settlementMethodology };
     await rejects(op('publish-settlement-expiry', sponsor, settlementRequest));
-    await op('grant-settlement-publisher', admin, { settlementFeed: plan.addresses.IvySettlementPriceFeed, account: sponsor.address });
-    await op('revoke-settlement-publisher', admin, { settlementFeed: plan.addresses.IvySettlementPriceFeed, account: owner.address });
+    await op('grant-settlement-publisher', admin, { account: sponsor.address });
+    await op('revoke-settlement-publisher', admin, { account: owner.address });
     await rejects(op('publish-settlement-expiry', owner, settlementRequest));
     await op('publish-settlement-expiry', sponsor, settlementRequest);
     await op('expire', sponsor, { vaultId: call });

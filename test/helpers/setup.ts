@@ -32,7 +32,6 @@ export interface VaultTermsInput {
   priceFeed: string;
   maxInTheMoneyBps: number;
   maxPriceAge: number;
-  settlementPriceFeed: string;
   maxSettlementPriceAge: number;
 }
 
@@ -57,7 +56,6 @@ export async function deployIvy(connection: Connection) {
   const usdc = await ethers.deployContract("MockERC20", ["USD Coin", "USDC", 6]);
   const dai = await ethers.deployContract("MockERC20", ["Dai", "DAI", 18]);
   const feed = await ethers.deployContract("MockPriceFeed");
-  const settlementFeed = await ethers.deployContract("MockSettlementPriceFeed");
   const vaultImpl = await ethers.deployContract("IvyVault");
   const vaultImplAddress = await vaultImpl.getAddress();
   const rules = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyVaultRules")).bytecode, admin).deploy();
@@ -65,7 +63,7 @@ export async function deployIvy(connection: Connection) {
   const libraries = { IvyVaultRules: await rules.getAddress(), IvyOptionSettlement: await settlement.getAddress() };
   const nonce = await admin.getNonce();
   const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map(i => getCreateAddress({ from: admin.address, nonce: nonce + i }));
-  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT], { libraries });
+  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT, admin.address], { libraries });
   const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, unwindAddress, "ipfs://ivy/{id}.json"]);
   const premiums = await ethers.deployContract("IvyPremiums", [hubAddress, sharesAddress]);
   const unwind = await ethers.deployContract("IvyUnwind", [hubAddress, sharesAddress]);
@@ -94,8 +92,6 @@ export async function deployIvy(connection: Connection) {
     usdc,
     dai,
     feed,
-    settlementFeed,
-    settlementFeedAddress: await settlementFeed.getAddress(),
     wethAddress: await weth.getAddress(),
     usdcAddress: await usdc.getAddress(),
     daiAddress: await dai.getAddress(),
@@ -124,7 +120,6 @@ export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Va
     auctionStartsAt: 0n,
     minCollateral: 0n,
     priceFeed: ZeroAddress,
-    settlementPriceFeed: ZeroAddress,
     maxSettlementPriceAge: 0,
     maxInTheMoneyBps: 0,
     maxPriceAge: 0,

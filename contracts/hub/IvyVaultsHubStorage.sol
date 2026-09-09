@@ -22,6 +22,8 @@ abstract contract IvyVaultsHubStorage is
 {
     bytes32 public constant BID_MASTER_ROLE = keccak256("BID_MASTER_ROLE");
     bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
+    bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE = keccak256("SETTLEMENT_PRICE_PUBLISHER_ROLE");
+    SettlementPrices internal _settlementPrices;
 
     address public immutable vaultImplementation;
     IvyPremiums public immutable premiums;
@@ -53,10 +55,10 @@ abstract contract IvyVaultsHubStorage is
     mapping(address marketMaker => mapping(uint256 nonce => bool)) public usedBidNonces;
     IIvyShares public immutable shareToken;
 
-    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
+    constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_, address settlementPublisher)
         EIP712("IvyVaultsHub", "2")
     {
-        if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) revert ZeroAddress();
+        if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0) || settlementPublisher == address(0)) revert ZeroAddress();
         if (implementation.code.length == 0) revert BindingMismatch();
         vaultImplementation = implementation;
         shareToken = IIvyShares(shares_);
@@ -67,6 +69,7 @@ abstract contract IvyVaultsHubStorage is
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GUARDIAN_ROLE, admin);
         _grantRole(PLATFORM_FEE_MANAGER_ROLE, admin);
+        _grantRole(SETTLEMENT_PRICE_PUBLISHER_ROLE, settlementPublisher);
         platformTreasury = admin;
     }
 

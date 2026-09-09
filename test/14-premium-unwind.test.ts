@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { ZeroAddress } from "ethers";
 import { deployIvy, fund, WETH_UNIT as W, USDC_UNIT as U, Phase, SettlementType, ExerciseStyle, type IvyContext } from "./helpers/setup.js";
-import { goLive, openVault, makeBid, activate, at } from "./helpers/scenarios.js";
+import { goLive, openVault, makeBid, activate, at, publishExpiryPrice } from "./helpers/scenarios.js";
 import { signBid } from "./helpers/bids.js";
 
 const connection = await network.create();
@@ -167,8 +167,7 @@ describe("admission and delegated execution", function () {
   it("premium plus buyer payout reserves coexist in put collateral", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c,{isCall:false,withFeed:true},{settlement:SettlementType.Cash,style:ExerciseStyle.European});
-    await c.settlementFeed.setSettlementPrice(c.wethAddress,c.usdcAddress,v.bid.expiry,2700n*U);
-    await at(c,v.bid.expiry); await c.hub.expire(v.vaultId);
+    await publishExpiryPrice(c, v.bid.expiry, 2700n*U); await c.hub.expire(v.vaultId);
     expect(await v.vault.reserved(c.usdcAddress)).eq(4000n*U);
     await c.hub.connect(c.alice).claim(v.vaultId,30000n*U);
     expect(await c.usdc.balanceOf(v.vaultAddress)).eq(4000n*U);

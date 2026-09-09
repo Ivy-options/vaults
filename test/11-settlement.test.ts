@@ -4,7 +4,7 @@ import {
   EXERCISE_WINDOW, ExerciseStyle, Phase, SETTLEMENT_GRACE, SettlementType, USDC_UNIT, WETH_UNIT,
   callPairs, callTerms, createVaultAs, deployIvy, fund,
 } from "./helpers/setup.js";
-import { at, goLive, setSpot, setExercisePrice } from "./helpers/scenarios.js";
+import { at, goLive, setSpot, setExercisePrice, publishExpiryPrice } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;
@@ -42,8 +42,7 @@ describe("expire", function () {
     const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
     expect(await hub.expirationTimeOf(vaultId)).to.equal(bid.expiry);
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 3300n * USDC_UNIT);
-    await at(ctx, bid.expiry);
+    await publishExpiryPrice(ctx, bid.expiry, 3300n * USDC_UNIT);
     await expect(hub.connect(alice).expire(vaultId)).to.emit(hub, "Settled").withArgs(vaultId, 10n * WETH_UNIT, 10n * WETH_UNIT, CALL_PAYOUT_ALL);
     expect((await hub.stateOf(vaultId)).pendingPayout).to.equal(CALL_PAYOUT_ALL);
 
@@ -59,8 +58,7 @@ describe("expire", function () {
     const ctx = await networkHelpers.loadFixture(fixture);
     const { vaultId, bid } = await goLive(ctx, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 2700n * USDC_UNIT);
-    await at(ctx, bid.expiry);
+    await publishExpiryPrice(ctx, bid.expiry, 2700n * USDC_UNIT);
     await expect(ctx.hub.expire(vaultId)).to.emit(ctx.hub, "Settled").withArgs(vaultId, 10n * WETH_UNIT, 10n * WETH_UNIT, 3000n * USDC_UNIT);
     await expect(ctx.hub.connect(ctx.marketMaker).claimPayout(vaultId)).to.changeTokenBalances(ethers, ctx.usdc, [ctx.marketMaker], [3000n * USDC_UNIT]);
   });
@@ -69,8 +67,7 @@ describe("expire", function () {
     const ctx = await networkHelpers.loadFixture(fixture);
     const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 2900n * USDC_UNIT);
-    await at(ctx, bid.expiry);
+    await publishExpiryPrice(ctx, bid.expiry, 2900n * USDC_UNIT);
     await expect(ctx.hub.expire(vaultId)).to.emit(ctx.hub, "Settled").withArgs(vaultId, 10n * WETH_UNIT, 10n * WETH_UNIT, 0n);
     await expect(ctx.hub.connect(ctx.marketMaker).claimPayout(vaultId)).to.be.revertedWithCustomError(ctx.hub, "NothingToClaim");
   });
@@ -81,7 +78,7 @@ describe("expire", function () {
     await networkHelpers.time.increaseTo(bid.expiry + 30n * 86400n);
     await expect(ctx.hub.expire(vaultId)).revertedWithCustomError(ctx.hub, "ReportUnavailable");
     expect((await ctx.hub.stateOf(vaultId)).phase).eq(Phase.Live);
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 3300n * USDC_UNIT);
+    await publishExpiryPrice(ctx, bid.expiry, 3300n * USDC_UNIT);
     await setSpot(ctx, 5000n * USDC_UNIT);
     await ctx.hub.expire(vaultId);
     expect((await ctx.hub.stateOf(vaultId)).pendingPayout).eq(CALL_PAYOUT_ALL);
@@ -90,12 +87,10 @@ describe("expire", function () {
   it("cash American: the unexercised remainder auto-settles at expiry", async function () {
     const ctx = await networkHelpers.loadFixture(fixture);
     const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.American });
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 3300n * USDC_UNIT);
     await setExercisePrice(ctx, 3300n * USDC_UNIT);
     await ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 4n * WETH_UNIT);
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
-    await ctx.settlementFeed.setSettlementPrice(ctx.wethAddress, ctx.usdcAddress, bid.expiry, 3300n * USDC_UNIT);
-    await at(ctx, bid.expiry);
+    await publishExpiryPrice(ctx, bid.expiry, 3300n * USDC_UNIT);
     await expect(ctx.hub.expire(vaultId)).to.emit(ctx.hub, "Settled").withArgs(vaultId, 10n * WETH_UNIT, 10n * WETH_UNIT, CALL_PAYOUT_SIX);
   });
 

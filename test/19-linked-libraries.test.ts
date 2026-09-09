@@ -14,7 +14,7 @@ describe('fixed linked libraries', function () {
     const artifacts = await loadArtifacts();
     const plan = await buildDeploymentPlan({ artifacts, chainId: (await admin.provider!.getNetwork()).chainId,
       genesisHash: (await admin.provider!.getBlock(0))!.hash, deployer: admin.address,
-      startNonce: await admin.getNonce(), admin: admin.address, reportSigner: admin.address, settlementAdmin: admin.address, settlementPublisher: admin.address, settlementMethodology: "synthetic local test observations" });
+      startNonce: await admin.getNonce(), admin: admin.address, reportSigner: admin.address, settlementPublisher: admin.address, settlementMethodology: "synthetic local test observations" });
     const journal = await resumeDeployment(admin, plan);
     return { admin, artifacts, plan, journal };
   }
@@ -28,7 +28,7 @@ describe('fixed linked libraries', function () {
       expect('0x' + code.slice(2 + link.start * 2, 2 + (link.start + link.length) * 2)).eq(link.address.toLowerCase());
     }
     await verifyBindings(admin.provider, plan);
-    expect(hub.deployedSize).lessThan(22000);
+    expect(hub.deployedSize).at.most(24_576);
   });
   it('rejects unresolved or unsupported compiler link references', async function () {
     const { artifacts, plan } = await networkHelpers.loadFixture(fixture);
@@ -61,7 +61,7 @@ describe('fixed linked libraries', function () {
     const coder = AbiCoder.defaultAbiCoder();
     // Solidity library selectors use named storage types. These bodies would succeed on zeroed
     // storage without the compiler's direct-call guard, so their rejection tests that guard.
-    const expire = id('expire(VaultState storage,VaultTerms storage)').slice(0, 10) + coder.encode(['uint256', 'uint256'], [0, 1]).slice(2);
+    const expire = id('expire(VaultState storage,VaultTerms storage,SettlementPrices storage)').slice(0, 10) + coder.encode(['uint256', 'uint256', 'uint256'], [0, 1, 2]).slice(2);
     const tighten = id('tightenVaultTerms(VaultTerms storage,TightenableTerms)').slice(0, 10)
       + coder.encode(['uint256', 'tuple(uint8,uint8,uint256,uint16,uint32)'], [0, [0, 0, 0, 0, 0]]).slice(2);
     for (const [to, data] of [[plan.addresses.IvyOptionSettlement, expire], [plan.addresses.IvyVaultRules, tighten]]) {

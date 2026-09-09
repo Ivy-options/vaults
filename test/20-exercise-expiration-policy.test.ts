@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { Interface } from "ethers";
 import { ExerciseStyle, SettlementType, Phase, WETH_UNIT as W, USDC_UNIT as U, deployIvy, fund, callTerms, callPairs, createVaultAs } from "./helpers/setup.js";
-import { at, goLive, setExercisePrice } from "./helpers/scenarios.js";
+import { at, goLive, setExercisePrice, publishExpiryPrice } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;
@@ -21,9 +21,9 @@ describe("exercise policy and expiration", function () {
             else {
               const price = (isCall ? 3300n : 2700n) * U;
               await setExercisePrice(c, price);
-              await c.settlementFeed.setSettlementPrice(c.wethAddress, c.usdcAddress, v.bid.expiry, price);
+              if (style === ExerciseStyle.European) await publishExpiryPrice(c, v.bid.expiry, price);
             }
-            if (style === ExerciseStyle.European) await at(c, v.bid.expiry);
+            if (style === ExerciseStyle.European && settlement === SettlementType.Physical) await at(c, v.bid.expiry);
             if (!allowPartialExercise) {
               await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, 4n * W)).revertedWithCustomError(c.hub, "PartialExerciseNotAllowed");
               expect(await c.hub.remainingNotional(v.vaultId)).eq(10n * W);
@@ -55,8 +55,7 @@ describe("exercise policy and expiration", function () {
     const v = await goLive(c, { isCall: false, withFeed: true }, { style, settlement: SettlementType.Cash, executor: c.bob.address, recipient: c.carol.address });
     // Spot would produce no payout; the exact historical expiry report pays 300 USDC per ETH.
     await setExercisePrice(c, 3300n * U);
-    await c.settlementFeed.setSettlementPrice(c.wethAddress, c.usdcAddress, v.bid.expiry, 2700n * U);
-    await at(c, v.bid.expiry);
+    await publishExpiryPrice(c, v.bid.expiry, 2700n * U);
     await expect(c.hub.connect(c.bob).exercise(v.vaultId, 4n * W)).changeTokenBalances(ethers, c.usdc, [c.carol, v.vaultAddress], [1200n * U, -1200n * U]);
     await expect(c.hub.connect(c.alice).exercise(v.vaultId, W)).revertedWithCustomError(c.hub, "NotExecutor");
     await c.hub.connect(c.alice).expire(v.vaultId);
@@ -74,8 +73,7 @@ describe("exercise policy and expiration", function () {
     await setExercisePrice(c, 2900n * U);
     await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, 10n * W)).revertedWithCustomError(c.hub, "NothingToExercise");
     await expect(c.hub.expire(v.vaultId)).revertedWithCustomError(c.hub, "ExpirationNotReached");
-    await c.settlementFeed.setSettlementPrice(c.wethAddress, c.usdcAddress, v.bid.expiry, 2900n * U);
-    await at(c, v.bid.expiry);
+    await publishExpiryPrice(c, v.bid.expiry, 2900n * U);
     await c.hub.connect(c.carol).expire(v.vaultId);
     expect((await c.hub.stateOf(v.vaultId)).pendingPayout).eq(0n);
     await c.hub.connect(c.alice).claim(v.vaultId, 10n * W);
@@ -83,9 +81,8 @@ describe("exercise policy and expiration", function () {
   it("a blocked cash recipient cannot stop expiration or erase their payout", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c, { withFeed: true, terms: { allowPartialExercise: false } }, { style: ExerciseStyle.European, settlement: SettlementType.Cash, recipient: c.carol.address });
-    await c.settlementFeed.setSettlementPrice(c.wethAddress, c.usdcAddress, v.bid.expiry, 3300n * U);
+    await publishExpiryPrice(c, v.bid.expiry, 3300n * U);
     await c.weth.setBlockedRecipient(c.carol.address, true);
-    await at(c, v.bid.expiry);
     await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, 10n * W)).revertedWithCustomError(c.weth, "RecipientBlocked");
     expect(await c.hub.remainingNotional(v.vaultId)).eq(10n * W);
     await c.hub.connect(c.bob).expire(v.vaultId);

@@ -21,7 +21,7 @@ interface IIvyVaultsHubErrors {
     error PutPairMustBeCollateral();
     error PairMustBeEnabled();
     error InvalidStrikeLimit();
-    error CashSettlementNeedsFeed();
+    error CashSettlementNeedsMaxPriceAge();
     error FeedNeedsMaxPriceAge();
     error DeviationTooLarge();
     error LoosensTerms();
@@ -32,4 +32,5 @@ interface IIvyVaultsHubErrors {
     error NothingToExercise();
     error InsufficientShares();
     error ReportUnavailable();
+    error ReportFinalized();
 }

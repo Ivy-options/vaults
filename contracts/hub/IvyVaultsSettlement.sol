@@ -8,6 +8,30 @@ import "../types/IvyTypes.sol";
 
 /// @dev Exercise, settlement and claims (spec §9, §10).
 abstract contract IvyVaultsSettlement is IvyVaultsActivation {
+    /// @notice The authorized EOA or contract publishes a strictly newer payment observation.
+    function publishExercisePrice(address underlying, address quote, uint256 price, uint64 observedAt, uint64 validUntil)
+        external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
+    {
+        IvyOptionSettlement.publishExercisePrice(_settlementPrices, underlying, quote, price, observedAt, validUntil);
+    }
+
+    /// @notice Finalize one exact pair/expiry at or after expiry. Stored prices cannot be replaced.
+    function publishExpiry(address underlying, address quote, uint64 expiry, uint256 price, uint64 validUntil)
+        external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
+    {
+        IvyOptionSettlement.publishExpiry(_settlementPrices, underlying, quote, expiry, price, validUntil);
+    }
+
+    function exercisePrice(address underlying, address quote) external view returns (uint256 price, uint256 observedAt, uint256 validUntil) {
+        ExercisePriceObservation storage observation = _settlementPrices.exercise[keccak256(abi.encode(underlying, quote))];
+        return (observation.price, observation.observedAt, observation.validUntil);
+    }
+
+    function settlementPrice(address underlying, address quote, uint64 expiry) external view returns (uint256 price) {
+        price = _settlementPrices.expiry[keccak256(abi.encode(underlying, quote, expiry))];
+        if (price == 0) revert ReportUnavailable();
+    }
+
     // ------------------------------------------------------------ exercise (spec §9.1)
 
     /// @notice Market maker exercises `amount` underlying units. Partial exercise follows the immutable vault term; the vault finalizes
@@ -15,7 +39,7 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
-        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, _terms[vaultId], amount);
+        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, _terms[vaultId], _settlementPrices, amount);
         emit Exercised(vaultId, amount, paid, got);
         if (s.exercisedNotional == s.totalNotional) _finalize(vaultId, s);
     }
@@ -40,7 +64,7 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
         if (block.timestamp < expirationTimeOf(vaultId)) revert ExpirationNotReached();
-        IvyOptionSettlement.expire(s, _terms[vaultId]);
+        IvyOptionSettlement.expire(s, _terms[vaultId], _settlementPrices);
         _finalize(vaultId, s);
     }
 

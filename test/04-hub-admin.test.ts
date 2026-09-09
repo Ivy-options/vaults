@@ -30,12 +30,12 @@ describe("immutable hub", function () {
   });
   it("rejects a hub referencing peers bound to another hub", async function () {
     const c = await networkHelpers.loadFixture(fixture);
-    const h = await ethers.deployContract("IvyVaultsHub",[c.admin.address,c.vaultImplAddress,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1], { libraries: c.libraries });
+    const h = await ethers.deployContract("IvyVaultsHub",[c.admin.address,c.vaultImplAddress,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1,c.admin.address], { libraries: c.libraries });
     await expect(h.createVault(callTerms(c),callPairs(c))).revertedWithCustomError(h,"BindingMismatch");
   });
   it("rejects missing implementation and price-feed code", async function () {
     const c = await networkHelpers.loadFixture(fixture);
-    await expect(ethers.deployContract("IvyVaultsHub",[c.admin.address,c.alice.address,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1], { libraries: c.libraries })).revertedWithCustomError(c.hub,"BindingMismatch");
+    await expect(ethers.deployContract("IvyVaultsHub",[c.admin.address,c.alice.address,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1,c.admin.address], { libraries: c.libraries })).revertedWithCustomError(c.hub,"BindingMismatch");
     await expect(c.hub.createVault({...callTerms(c),priceFeed:c.alice.address,maxPriceAge:100},callPairs(c))).revertedWithCustomError(c.hub,"BindingMismatch");
   });
   it("protects minting, burning and module payment entrypoints", async function () {

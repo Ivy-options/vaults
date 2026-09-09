@@ -6,13 +6,12 @@ The deployment is immutable. There is no hub proxy, upgrade entrypoint, implemen
 
 | Contract                      | Responsibility                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------- |
-| `IvyVaultsHub`                | Lifecycle, bids, delegation and guarded public entrypoints                      |
+| `IvyVaultsHub`                | Lifecycle, bids, delegation, guarded entrypoints and role-authorized settlement prices |
 | `IvyVault`                    | Clone custody, token reserves, separate premium and buyer payment budgets       |
 | `IvyShares`                   | ERC-1155 shares and pre-update module notifications                             |
 | `IvyPremiums`                 | Activation entitlements and restricted premium payments                         |
 | `IvyUnwind`                   | One active agreement and current-shareholder consent                            |
 | `IvyPriceFeed`                | Signed indicative activation prices; retained legacy expiry-report API          |
-| `IvySettlementPriceFeed`      | Role-authorized exercise observations and write-once expiry prices              |
 | `IvyVaultRules` library       | Creation validation and owner-authorized term tightening                        |
 | `IvyOptionSettlement` library | Exercise, cash settlement and residual LP claim implementation                  |
 
@@ -52,7 +51,7 @@ npm run operator -- expire expiration.json
 
 `--send` explicitly submits through the configured RPC's signer. No automated market-data collection, pricing, bidding, or trading UI is included.
 
-Cash settlement needs the authoritative finalized report for the exact expiry. Cash vaults fix a separate `settlementPriceFeed` and `maxSettlementPriceAge` at creation. Its admin can rotate publishers; funds remain locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. Revocation stops new publications but does not erase stored observations or final prices. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
+Cash settlement needs the authoritative finalized report for the exact expiry. The Hub stores authoritative prices; cash vaults fix `maxSettlementPriceAge` at creation. The Hub admin can grant its publisher role to an EOA or optional helper contract and rotate publishers; funds remain locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. Revocation stops new publications but does not erase stored observations or final prices. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
 
 See the [operator runbook](docs/operations.md) and [public guide](docs/site/index.html).
 
@@ -62,8 +61,10 @@ Open [the protocol guide](docs/site/index.html) directly in a browser, or serve 
 
 The guide uses local fonts and assets in `docs/site/assets/`. After editing it, run `npm run docs:check` to check links, anchors, assets and calculator examples.
 
-`exercise(vaultId, amount)` uses the buyer’s option right and pays the configured recipient. `expire(vaultId)` permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for `claimPayout`. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses a fresh, unexpired observation from the authoritative settlement feed. Indicative prices never authorize cash payouts. Physical exercise exchanges assets at strike within its exercise window.
+`exercise(vaultId, amount)` uses the buyer’s option right and pays the configured recipient. `expire(vaultId)` permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for `claimPayout`. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses a fresh, unexpired observation stored in the Hub. Indicative prices never authorize cash payouts. Physical exercise exchanges assets at strike within its exercise window.
 
 Every vault fixes `allowPartialExercise` at creation, before deposits. True permits any valid positive amount up to remaining notional; false requires all remaining notional. The term cannot be tightened or changed later. Operator creation requests must specify it explicitly. Full exercise finalizes automatically; partial exercise leaves the remainder open.
 
-See the [accepted pricing specification](docs/settlement-pricing-spec.md) for publisher governance, observation validity, finality and production methodology requirements. The changed vault-creation ABI requires a new deployment; existing vaults retain their original behavior.
+See the [accepted pricing specification](docs/settlement-pricing-spec.md) for publisher governance, observation validity, finality and production methodology requirements. The changed Hub constructor and vault-creation ABI require a new deployment; existing vaults retain their original behavior.
+
+An EOA with `SETTLEMENT_PRICE_PUBLISHER_ROLE` can publish directly to the Hub. No standalone settlement-price contract is deployed or configured. An optional helper may hold the same role and submit reports; the Hub never reads prices back from that helper.

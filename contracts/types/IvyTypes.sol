@@ -19,15 +19,26 @@ struct VaultTerms {
     bool allowPartialExercise;     // fixed at creation; false requires exercising all remaining notional
     bool publicDeposits;           // false = only the vault owner may deposit
     ExercisePolicy allowedExercise;
-    SettlementPolicy allowedSettlement; // Cash requires settlementPriceFeed
+    SettlementPolicy allowedSettlement; // Cash requires maxSettlementPriceAge > 0
     uint64 expiry;               // fixed absolute Unix timestamp, future at creation
     uint64 auctionStartsAt;        // 0 = manual only; else anyone may open the auction from this time
     uint256 minCollateral;         // shares required to open the auction
     address priceFeed;             // 0 = no activation spot checks
     uint16 maxInTheMoneyBps;    // calls: strike >= spot*(1-bps); puts: strike <= spot*(1+bps)
     uint32 maxPriceAge;            // seconds; > 0 when priceFeed != 0
-    address settlementPriceFeed;   // immutable authoritative payment source
     uint32 maxSettlementPriceAge;  // immutable exercise observation age limit
+}
+
+/// @dev Hub-owned authoritative observations shared by every vault with the same pair/expiry.
+struct ExercisePriceObservation {
+    uint256 price;
+    uint64 observedAt;
+    uint64 validUntil;
+}
+
+struct SettlementPrices {
+    mapping(bytes32 pairKey => ExercisePriceObservation) exercise;
+    mapping(bytes32 pairExpiryKey => uint256) expiry;
 }
 
 struct PairTerms {
@@ -113,7 +124,7 @@ error PairMustBeEnabled();
 error PairUnknown(address quoteToken);
 error PairDisabled(address quoteToken);
 error InvalidStrikeLimit();
-error CashSettlementNeedsFeed();
+error CashSettlementNeedsMaxPriceAge();
 error FeedNeedsMaxPriceAge();
 error DeviationTooLarge();
 error LoosensTerms();

@@ -4,7 +4,19 @@ Date: 2026-09-08. Implementation authorized 2026-09-09. The accepted pricing dec
 
 Scope: feedback points 1, 2, 4, 5 and 6. Point 3 (`marketMaker` naming) is explicitly excluded. Point 7 was blank. This plan records responsibilities and acceptance criteria; the linked pricing specification governs the subsequent contract changes.
 
-## Completion record — 2026-09-09
+## Hub-owned pricing revision — 2026-09-09
+
+The user subsequently replaced the standalone settlement-feed design with Hub-owned storage and publication authority. This revision supersedes the earlier architecture while retaining its price-validation, finality and accounting policies. The current source of truth is [settlement-pricing-spec.md](settlement-pricing-spec.md).
+
+Revision acceptance criteria:
+
+- An EOA with the Hub publisher role can publish and complete cash exercise/expiration without any settlement feed or helper contract.
+- An optional access-controlled helper can hold the same role and publish through the Hub’s write-side interface. The Hub never reads prices from it.
+- Remove the standalone settlement feed, its read interface, its deployment, separate settlement administrator and per-vault source address. Retain immutable cash observation age.
+- Preserve exact pair/expiry finality, early-exercise freshness/validity, publisher rotation, locked obligations, premium/fee isolation and indicative-price independence.
+- Update deployment/tooling/examples/docs and review the diff from `f369556`; verify EOA/helper authorization, regressions and deployed Hub size.
+
+## Earlier completion record — 2026-09-09
 
 Tasks 1–7 are implemented, with point 3’s naming change excluded as requested. The implementation retains admission-only pause and separately funded unwind refunds. The accepted pricing specification covers the decisions required by Task 3; new contracts, tooling and examples implement Tasks 4 and 5.
 

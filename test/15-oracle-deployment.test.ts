@@ -57,7 +57,7 @@ describe("signed expiry reports",function(){
 });
 
 describe("journaled immutable deployment and manual tooling",function(){
-  async function fixture(){const [admin]=await ethers.getSigners();const artifacts=await loadArtifacts();const plan=await buildDeploymentPlan({artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address,settlementAdmin:admin.address,settlementPublisher:admin.address,settlementMethodology:'synthetic local test observations'});return {admin,artifacts,plan};}
+  async function fixture(){const [admin]=await ethers.getSigners();const artifacts=await loadArtifacts();const plan=await buildDeploymentPlan({artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address,settlementPublisher:admin.address,settlementMethodology:'synthetic local test observations'});return {admin,artifacts,plan};}
   it("keeps every production contract under EIP-170",async()=>{
     const {artifacts}=await fixture();for(const name of CONTRACTS) expect((artifacts[name].deployedBytecode.length-2)/2,name).at.most(24576);
   });
@@ -75,12 +75,12 @@ describe("journaled immutable deployment and manual tooling",function(){
   it("requires explicit settlement configuration and verifies both authority bindings",async()=>{
     const {admin,artifacts,plan}=await networkHelpers.loadFixture(fixture);
     const config={...plan,artifacts,exerciseWindow:Number(plan.exerciseWindow),auctionTimeout:Number(plan.auctionTimeout)};
-    await rejects(buildDeploymentPlan({...config,settlementAdmin:ZeroAddress}), /Invalid settlementAdmin/);
+    await rejects(buildDeploymentPlan({...config,settlementPublisher:ZeroAddress}), /Invalid settlementPublisher/);
     await rejects(buildDeploymentPlan({...config,settlementPublisher:undefined}), /Invalid settlementPublisher/);
     await rejects(buildDeploymentPlan({...config,settlementMethodology:''}), /Missing settlementMethodology/);
     await resumeDeployment(admin,plan);
     const [,other]=await ethers.getSigners();
-    await rejects(verifyBindings(admin.provider,{...plan,settlementAdmin:other.address}), /Settlement admin role missing/);
+    await rejects(verifyBindings(admin.provider,{...plan,admin:other.address}), /Admin role missing/);
     await rejects(verifyBindings(admin.provider,{...plan,settlementPublisher:other.address}), /Settlement publisher role missing/);
   });
   it("rejects nonce drift without starting a deployment",async()=>{
@@ -97,9 +97,8 @@ describe("journaled immutable deployment and manual tooling",function(){
   it("requires explicit USD minimum, computes a call floor, and prepares only simulated calldata",async()=>{
     const c=await deployIvy(connection), artifacts=await loadArtifacts();
     await c.weth.mint(c.alice.address,10n*W);
-    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{allowPartialExercise:false,underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,priceFeed:ZeroAddress,settlementPriceFeed:ZeroAddress,maxSettlementPriceAge:0,maxInTheMoneyBps:0,maxPriceAge:0},pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,strikeLimit:0,minPremium:0,enabled:true}}]};
-    const cash={...request,terms:{...request.terms,allowedSettlement:1,settlementPriceFeed:c.hubAddress,maxSettlementPriceAge:3600}};
-    await rejects(prepareVault(c.admin.provider,{...cash,terms:{...cash.terms,settlementPriceFeed:ZeroAddress}}), /requires a contract settlementPriceFeed/);
+    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{allowPartialExercise:false,underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,priceFeed:ZeroAddress,maxSettlementPriceAge:0,maxInTheMoneyBps:0,maxPriceAge:0},pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,strikeLimit:0,minPremium:0,enabled:true}}]};
+    const cash={...request,terms:{...request.terms,allowedSettlement:1,maxSettlementPriceAge:3600}};
     await rejects(prepareVault(c.admin.provider,{...cash,terms:{...cash.terms,maxSettlementPriceAge:0}}), /positive maxSettlementPriceAge/);
     await rejects(prepareVault(c.admin.provider,cash), /Missing settlementMethodology/);
     const prepared=await prepareVault(c.admin.provider,request);
