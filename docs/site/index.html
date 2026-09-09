@@ -575,15 +575,15 @@
               ordinary exercise or expiration.
             </p>
             <p class="prose">
-              If a refund is agreed, the person executing the unwind supplies it
-              separately in the premium token, approving the vault clone before execution. Zero refund is also allowed. The buyer or executor collects a funded refund for the configured recipient with
+              If a refund is agreed, each current LP supplies their proportional contribution
+              separately in the premium token, approving the vault clone before funding. Each minimum is rounded up to a raw token unit. The executor provides no tokens. Zero refund is also allowed. The buyer or executor collects a funded refund for the configured recipient with
               <code>claimPayout</code>; shareholders claim the remaining pool.
               <a href="#premium-ownership">Earned premium</a> and completed
               exercises are preserved. Holders separately use <code>claimPremium</code> for unpaid premium, including after burning all their shares.
             </p>
             <ul class="plain">
               <li><strong>Zero refund:</strong> propose zero, obtain all current-holder approvals and the buyer signature for that nonce, then execute without refund funding. Holders claim the remaining pool and unpaid premium separately.</li>
-              <li><strong>100 USDC refund:</strong> when premium uses six-decimal USDC, set refund to <code>100000000</code>. The executing sponsor funds 100 USDC; the buyer or executor claims it separately after finalization.</li>
+              <li><strong>100 USDC refund:</strong> when premium uses six-decimal USDC, set refund to <code>100000000</code>. With a 60/40 share split, the LPs fund 60 and 40 USDC; the buyer or executor claims it separately after finalization.</li>
               <li><strong>Expired or replaced proposal:</strong> while Live, propose again with a future deadline. The new nonce requires fresh approvals and buyer signature. Old consent cannot execute the replacement; the position keeps its normal exercise and expiration deadlines.</li>
             </ul>
             <p class="prose">Follow the <a href="../operations.md#prepare-and-execute-a-unanimous-unwind">unwind runbook and commands</a>. Auction cancellation is a separate pre-activation action: no premium has been collected.</p>
@@ -599,14 +599,14 @@
               <thead><tr><th>Event</th><th>Premium and fee treatment</th><th>What happens next</th></tr></thead>
               <tbody>
                 <tr><td>Auction cancelled before activation</td><td>Nothing collected; nothing to refund.</td><td>Returns to Open for withdrawals.</td></tr>
-                <tr><td>Unwind consent revoked, proposal expired or replaced</td><td>Earned premium and fees unchanged.</td><td>The option continues; no refund has been funded.</td></tr>
-                <tr><td>Unwind executed</td><td>LPs retain earned premium; treasury retains fees.</td><td>Sponsor separately funds any negotiated premium-token refund; buyer or executor claims it for the recipient.</td></tr>
+                <tr><td>Unwind consent revoked, proposal expired or replaced</td><td>Earned premium and fees unchanged.</td><td>The option continues; funders can recover their deposits.</td></tr>
+                <tr><td>Unwind executed</td><td>LPs retain earned premium; treasury retains fees.</td><td>Current LPs separately fund their proportional negotiated premium-token refund; buyer or executor claims it for the recipient.</td></tr>
                 <tr><td>Admission pause</td><td>Earned premium and claims unchanged.</td><td>Exercise, expiration and agreed unwind remain available; deadlines do not move.</td></tr>
                 <tr><td>Normal exercise or expiration</td><td>Earned premium and fees remain claimable.</td><td>Settlement payments are separate obligations.</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="prose">The recommended policy matches current behavior: premium and fees are earned at activation; refunds are separately negotiated and funded. LPs may already have claimed premium, so automatic refunds would need an explicit funding or escrow design and fee policy.</p>
+          <p class="prose">The recommended policy matches current behavior: premium and fees are earned at activation; refunds are separately negotiated and funded. Claimed premium does not waive the current LP’s contribution. Deposits remain individually recoverable before execution; withdrawal revokes current consent. After execution, only excess and apportioned ceiling surplus are recoverable. Recovery remains tied to the funder after share transfers or burns. The final participant recovering ceiling surplus receives rounding dust; the buyer receives exactly the agreed amount. See the unwind runbook for the formula.</p>
           <p class="prose">This implementation retains admission-only emergency pause. A full execution freeze would require a separate specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.</p>
         </div>
       </section>
@@ -1537,7 +1537,7 @@
                   <dt>proposeUnwind · approveUnwind · executeUnwind</dt>
                   <dd>
                     owner/buyer proposal, all current shares approve, buyer
-                    signs, sponsor funds refund
+                    signs, each LP funds proportional refund
                   </dd>
                   <dt>claimPremium(vaultId)</dt>
                   <dd>

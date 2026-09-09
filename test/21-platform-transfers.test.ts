@@ -115,7 +115,8 @@ describe("platform fees and transferable unpaid premium", function () {
     const agreement = {vaultId:a.vaultId,nonce:a.nonce,deadline:a.deadline,exercisedNotional:a.exercisedNotional,supply:a.supply,refund:a.refund};
     const signature = await c.marketMaker.signTypedData({name:"IvyUnwind",version:"1",chainId:(await c.marketMaker.provider!.getNetwork()).chainId,verifyingContract:await c.unwind.getAddress()},UNWIND_TYPES,agreement);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId,a.nonce);
-    await c.usdc.mint(c.carol.address,a.refund);await c.usdc.connect(c.carol).approve(v.vaultAddress,a.refund);
+    await c.usdc.mint(c.alice.address,a.refund);await c.usdc.connect(c.alice).approve(v.vaultAddress,a.refund);
+    await c.hub.connect(c.alice).fundUnwind(v.vaultId,a.nonce,a.refund);
     await c.hub.connect(c.carol).executeUnwind(v.vaultId,a.nonce,signature);
     expect(await v.vault.reserved(c.usdcAddress)).eq(1100n*U);
     await c.hub.connect(c.alice).claim(v.vaultId,30000n*U);

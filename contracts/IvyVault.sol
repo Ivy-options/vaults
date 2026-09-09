@@ -16,6 +16,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
     address public premiums;
     address public premiumToken;
     uint256 public premiumRemaining;
+    uint256 public unwindReserved;
     bool public premiumCollected;
     uint256 public platformFeeRemaining;
     address public platformFeeRecipient;
@@ -71,6 +72,22 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
         premiumRemaining -= amount;
         reserved[premiumToken] -= amount;
         if (amount > 0) IERC20(premiumToken).safeTransfer(to, amount);
+    }
+    function fundUnwind(address from, uint256 amount) external onlyHub nonReentrant returns (uint256 received) {
+        received = _pull(premiumToken, from, amount);
+        if (received < amount) revert ShortReceived(amount, received);
+        unwindReserved += received;
+        reserved[premiumToken] += received;
+    }
+    function returnUnwind(address to, uint256 amount) external onlyHub nonReentrant {
+        unwindReserved -= amount;
+        reserved[premiumToken] -= amount;
+        if (amount > 0) IERC20(premiumToken).safeTransfer(to, amount);
+    }
+    function consumeUnwind(uint256 amount) external onlyHub nonReentrant {
+        unwindReserved -= amount;
+        buyerReserved[premiumToken] += amount;
+        // Both obligations are reserved: conversion must not expose funds to ordinary claims.
     }
     function reserveBuyer(address token, uint256 amount) external onlyHub nonReentrant {
         _checkAvailable(token, amount);

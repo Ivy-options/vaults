@@ -119,18 +119,26 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
         unwind.approve(vaultId, nonce, msg.sender, shareToken.balanceOf(msg.sender, vaultId));
     }
     function revokeUnwind(uint256 vaultId) external nonReentrant { unwind.revoke(vaultId, msg.sender); }
+    /// @notice Each current LP deposits premium tokens into this vault's segregated refund reserve.
+    function fundUnwind(uint256 vaultId, uint256 nonce, uint256 amount) external nonReentrant {
+        _requirePhase(vaultId, Phase.Live);
+        VaultState storage s = _state[vaultId];
+        if (shareToken.balanceOf(msg.sender, vaultId) == 0) revert AgreementInvalid();
+        uint256 revision = unwind.revisions(vaultId, msg.sender);
+        uint256 received = IIvyVault(s.vault).fundUnwind(msg.sender, amount);
+        // A token callback that transfers shares, even away and back, invalidates this funding attempt.
+        unwind.fund(vaultId, nonce, msg.sender, received, s.exercisedNotional, revision);
+    }
+    function withdrawUnwindContribution(uint256 vaultId, uint256 nonce) external nonReentrant {
+        _requireExists(vaultId);
+        uint256 amount = unwind.withdraw(vaultId, nonce, msg.sender);
+        IIvyVault(_state[vaultId].vault).returnUnwind(msg.sender, amount);
+    }
     function executeUnwind(uint256 vaultId, uint256 nonce, bytes calldata buyerSignature) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
-        uint256 refund = unwind.refundOf(vaultId);
-        IIvyVault vault = IIvyVault(s.vault);
-        if (refund > 0) {
-            uint256 received = vault.pull(s.premiumToken, msg.sender, refund);
-            if (received < refund) revert ShortReceived(refund, received);
-        }
-        // Refund transfers can trigger share callbacks. Validate consent after the last external token transfer.
-        unwind.consume(vaultId, nonce, s.exercisedNotional, shareToken.totalSupply(vaultId), s.marketMaker, buyerSignature);
-        vault.reserveBuyer(s.premiumToken, refund);
+        uint256 refund = unwind.consume(vaultId, nonce, s.exercisedNotional, shareToken.totalSupply(vaultId), s.marketMaker, buyerSignature);
+        IIvyVault(s.vault).consumeUnwind(refund);
         _finalize(vaultId, s);
         emit Unwound(vaultId, nonce, refund);
     }

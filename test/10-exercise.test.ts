@@ -83,7 +83,7 @@ describe("exercise", function () {
       await fund(ctx, ctx.usdc, ctx.marketMaker, vaultAddress, 12_000n * USDC_UNIT);
       await ctx.usdc.setFeeBps(100n);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 4n * WETH_UNIT))
-        .to.be.revertedWithCustomError(ctx.hub, "ShortReceived").withArgs(12_000n * USDC_UNIT, 11_880n * USDC_UNIT);
+        .to.be.revertedWithCustomError(await ctx.ethers.getContractAt("IvyVault", vaultAddress), "ShortReceived").withArgs(12_000n * USDC_UNIT, 11_880n * USDC_UNIT);
     });
   });
 

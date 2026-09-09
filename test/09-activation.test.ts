@@ -222,7 +222,7 @@ describe("activate", function () {
       const { vaultId, vaultAddress } = await openVault(ctx);
       await ctx.usdc.setFeeBps(100n);
       await expect(activate(ctx, vaultId, vaultAddress))
-        .to.be.revertedWithCustomError(ctx.hub, "ShortReceived").withArgs(1000n * USDC_UNIT, 990n * USDC_UNIT);
+        .to.be.revertedWithCustomError(await ctx.ethers.getContractAt("IvyVault", vaultAddress), "ShortReceived").withArgs(1000n * USDC_UNIT, 990n * USDC_UNIT);
     });
   });
 });

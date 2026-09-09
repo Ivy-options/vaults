@@ -63,7 +63,7 @@ Validation: 192 tests passed, along with compilation, type checking, deployed-si
 ## Baseline before this work
 
 - Unwind and platform fees already exist in contracts and `docs/operations.md`. The website has an early-exit explanation and brief fee coverage. Improve visibility and completeness rather than reimplementing those features.
-- Premium is collected at activation, net of the platform fee. LP premium can be claimed immediately. An unwind refund is separately funded by its executing sponsor; earned premium and fees are not clawed back.
+- Premium is collected at activation, net of the platform fee. LP premium can be claimed immediately. An unwind refund is separately funded proportionally by current LPs; earned premium and fees are not clawed back.
 - Pause is admission-only. Existing exercise, expiration, claims and agreed unwind remain available, and deadlines do not move.
 - `IvyPriceFeed` has separate spot and finalized expiry reports, but both use one immutable signer. American cash exercise before expiry uses spot, so spot currently also controls payments.
 - Underlying, quote and premium are token roles. Collateral is the backing token: underlying for calls, quote for puts. Token roles may share an address.

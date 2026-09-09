@@ -29,7 +29,8 @@ describe("activation premium and unanimous unwinds", function () {
     await c.hub.revokeRole(await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), c.admin.address);
     const { agreement, signature } = await propose(c, v.vaultId);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce);
-    await fund(c, c.usdc, c.carol, v.vaultAddress, agreement.refund);
+    await fund(c, c.usdc, c.alice, v.vaultAddress, agreement.refund);
+    await c.hub.connect(c.alice).fundUnwind(v.vaultId, agreement.nonce, agreement.refund);
     await c.hub.connect(c.carol).executeUnwind(v.vaultId, agreement.nonce, signature);
     await c.hub.connect(c.alice).claim(v.vaultId, 10n * W);
     await c.hub.connect(c.alice).claimPremium(v.vaultId);
@@ -73,13 +74,14 @@ describe("activation premium and unanimous unwinds", function () {
     await c.hub.connect(c.alice).claimPremium(v.vaultId);
     const {agreement:a,signature} = await propose(c,v.vaultId);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId,a.nonce);
-    await fund(c,c.usdc,c.carol,v.vaultAddress,a.refund);
     await expect(c.hub.connect(c.carol).executeUnwind(v.vaultId,a.nonce,signature)).revertedWithCustomError(c.unwind,"ConsentMissing");
     await c.hub.connect(c.bob).approveUnwind(v.vaultId,a.nonce);
-    await c.usdc.connect(c.carol).approve(v.vaultAddress,0);
-    await expect(c.hub.connect(c.carol).executeUnwind(v.vaultId,a.nonce,signature)).revertedWithCustomError(c.usdc,"ERC20InsufficientAllowance");
+    await expect(c.hub.connect(c.carol).executeUnwind(v.vaultId,a.nonce,signature)).revertedWithCustomError(c.unwind,"FundingMissing");
     expect((await c.hub.stateOf(v.vaultId)).phase).eq(Phase.Live);
-    await c.usdc.connect(c.carol).approve(v.vaultAddress,a.refund);
+    for (const [holder, amount] of [[c.alice,60n*U],[c.bob,40n*U]] as const) {
+      await fund(c,c.usdc,holder,v.vaultAddress,amount);
+      await c.hub.connect(holder).fundUnwind(v.vaultId,a.nonce,amount);
+    }
     await c.hub.connect(c.carol).executeUnwind(v.vaultId,a.nonce,signature);
     expect(await v.vault.reserved(c.usdcAddress)).eq(400n*U+a.refund);
     await c.hub.connect(c.alice).claim(v.vaultId,18_000n*U);

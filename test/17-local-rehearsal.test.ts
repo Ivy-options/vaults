@@ -124,7 +124,11 @@ describe('local operator rehearsal', function () {
     await op('propose-unwind', buyer, { vaultId: put, deadline: expiry, refund: 100n * U });
     const agreement = await typed('typed-unwind', buyer, { vaultId: put });
     for (const signer of [owner, lp]) await op('approve-unwind', signer, { vaultId: put, nonce: agreement.value.nonce });
-    await op('approve-token', sponsor, { vaultId: put, token: u, amount: 100n * U });
+    for (const [signer, amount] of [[owner,60n*U],[lp,40n*U]] as const) {
+      await usdc.mint(signer.address,amount);
+      await op('approve-token', signer, { vaultId: put, token: u, amount });
+      await op('fund-unwind', signer, { vaultId: put, nonce: agreement.value.nonce, amount });
+    }
     await op('execute-unwind', sponsor, { vaultId: put, nonce: agreement.value.nonce, signature: agreement.signature });
     await op('claim-payout', buyer, { vaultId: put });
     for (const [signer, amount] of [[owner, 18000n * U], [lp, 12000n * U]] as any[]) {

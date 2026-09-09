@@ -6,7 +6,7 @@ import {UNWIND_TYPES} from '../scripts/operator.mjs';
 const connection=await network.create();const {ethers,networkHelpers}=connection;
 describe('cross-module callbacks and reserve invariants',function(){
  const fixture=async()=>{const c=await deployIvy(connection);await c.hub.setTransfersEnabled(true);return c;};
- it('checks unanimous consent after refund-token callbacks and rolls back funding and share movement',async()=>{
+ it('checks holder revision after contribution-token callbacks and rolls back funding and share movement',async()=>{
   const c=await networkHelpers.loadFixture(fixture), token=await ethers.deployContract('CallbackToken');
   const v=await openVault(c,{pair:{premiumToken:await token.getAddress()}});
   await token.mint(c.marketMaker.address,1000n*U);await token.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
@@ -19,13 +19,19 @@ describe('cross-module callbacks and reserve invariants',function(){
   await token.mint(c.alice.address,a.refund);await token.connect(c.alice).approve(v.vaultAddress,a.refund);
   await c.shares.connect(c.alice).setApprovalForAll(await token.getAddress(),true);
   await token.arm(c.sharesAddress,c.shares.interface.encodeFunctionData('safeTransferFrom',[c.alice.address,c.carol.address,v.vaultId,W,'0x']));
-  await expect(c.hub.connect(c.alice).executeUnwind(v.vaultId,a.nonce,sig)).revertedWithCustomError(c.unwind,'ConsentMissing');
+  await expect(c.hub.connect(c.alice).fundUnwind(v.vaultId,a.nonce,a.refund)).revertedWithCustomError(c.unwind,'AgreementInvalid');
   expect((await c.hub.stateOf(v.vaultId)).phase).eq(Phase.Live);
   expect(await c.shares.balanceOf(c.carol.address,v.vaultId)).eq(0n);
   expect(await token.balanceOf(c.alice.address)).eq(a.refund);
   expect(await v.vault.reserved(await token.getAddress())).eq(1000n*U);
+  await token.arm(await token.getAddress(),token.interface.encodeFunctionData('roundTrip',[c.sharesAddress,c.alice.address,v.vaultId,W]));
+  await expect(c.hub.connect(c.alice).fundUnwind(v.vaultId,a.nonce,a.refund)).revertedWithCustomError(c.unwind,'AgreementInvalid');
+  expect(await c.shares.balanceOf(c.alice.address,v.vaultId)).eq(10n*W);
   await token.disarm();await c.shares.connect(c.alice).safeTransferFrom(c.alice.address,c.carol.address,v.vaultId,W,'0x');
   for(const holder of [c.alice,c.carol])await c.hub.connect(holder).approveUnwind(v.vaultId,a.nonce);
+  await c.hub.connect(c.alice).fundUnwind(v.vaultId,a.nonce,90n*U);
+  await token.mint(c.carol.address,10n*U);await token.connect(c.carol).approve(v.vaultAddress,10n*U);
+  await c.hub.connect(c.carol).fundUnwind(v.vaultId,a.nonce,10n*U);
   await c.hub.connect(c.alice).executeUnwind(v.vaultId,a.nonce,sig);
   expect((await c.hub.stateOf(v.vaultId)).phase).eq(Phase.Settled);
  });

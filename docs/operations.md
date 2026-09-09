@@ -105,7 +105,7 @@ For physical options, the deadline is `expiry + stateOf(vaultId).exerciseWindow`
 
 American cash exercise uses the authoritative exercise observation before expiry, never the indicative spot feed. At/after expiry, both American and European cash exercise use the finalized report for the exact expiry; a zero payout reverts. Cash `expire` processes expiration, including automatic cash exercise where applicable, reserving the remaining buyer payout for `claim-payout`. Anyone can expire physical options at/after their deadline and cash options at/after expiry. Full exercise finalizes immediately. Expiration requires an on-chain transaction; reaching the deadline alone does not execute it. Cash expiration requires the finalized expiry report.
 
-After settlement, holders use `claim` with a share amount. This burns shares for proportional unreserved balances. Unpaid premium, permanent premium dust and buyer payouts/refunds stay reserved. `claim-premium` remains available to holders with unpaid credit after burning every share. The buyer or executor calls `claim-payout`; payment goes to the buyer's current recipient. Read `vault.reserved(token)`, `vault.buyerReserved(token)` and premium-module `claimable(vaultId, holder)` to distinguish obligations; hub `pendingPayout` only tracks collateral cash settlement, not unwind refunds.
+After settlement, holders use `claim` with a share amount. This burns shares for proportional unreserved balances. Unpaid premium, permanent premium dust, buyer payouts/refunds and recoverable LP unwind contributions stay reserved. `claim-premium` remains available to holders with unpaid credit after burning every share. The buyer or executor calls `claim-payout`; payment goes to the buyer's current recipient. Read `vault.reserved(token)`, `vault.buyerReserved(token)` and premium-module `claimable(vaultId, holder)` to distinguish obligations; hub `pendingPayout` only tracks collateral cash settlement, not unwind refunds.
 
 If settlement reports are unavailable, cash vaults remain Live and locked until a valid report or unanimous unwind. A stale or missing feed never settles an obligation to zero. Publisher rotation is available to the Hub admin; finalized-price correction is not.
 
@@ -120,12 +120,12 @@ The owner may run `cancel-auction` immediately while admission is paused or once
 | Event | Premium and fees | Refund / continuation |
 | --- | --- | --- |
 | Auction cancelled before activation | Nothing collected. | No premium refund; vault returns to Open. |
-| Unwind consent revoked or proposal expired/replaced | Earned LP premium and platform fees remain unchanged. | No refund funded; the Live position continues under its normal deadlines. |
-| Unwind executed | Earned LP premium and platform fees are retained. | Executing sponsor separately funds the negotiated premium-token refund; buyer or executor claims it for the configured recipient. |
+| Unwind consent revoked or proposal expired/replaced | Earned LP premium and platform fees remain unchanged. | Each LP can recover their contribution; the Live position continues under its normal deadlines. |
+| Unwind executed | Earned LP premium and platform fees are retained. | Current LPs separately fund proportional contributions for the negotiated premium-token refund; buyer or executor claims it for the configured recipient. |
 | Admission paused | Earned premium, fee and claim entitlements are unchanged. | Exercise, expiration, claims and agreed unwind continue; deadlines do not move. |
 | Normal exercise or expiration | Earned premium and fees remain retained and claimable. | Settlement obligations are handled separately. |
 
-The recommended policy is the implemented policy: premium and fees are earned at activation, and unwind refunds are negotiated and funded separately. LPs can already have claimed their premium, so an automatic refund cannot assume that money remains in custody. A changed refund policy needs an explicit escrow/funding design and fee treatment before implementation.
+The recommended policy is the implemented policy: premium and fees are earned at activation, and unwind refunds are negotiated and funded separately. LPs can already have claimed their premium, so an automatic refund cannot assume that money remains in custody. Claiming premium does not waive a current shareholder’s refund contribution. Funding is segregated in the vault and never taken from premium, fees or collateral reserves.
 
 This implementation retains admission-only emergency control. Adding a full execution freeze would be a separate product change. Such a freeze needs a separate specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations; it is not implemented by admission pause.
 
@@ -135,14 +135,20 @@ Only Live vaults use this path. The owner or buyer calls `propose-unwind` with a
 
 Every current shareholder reviews and explicitly submits `approve-unwind` with that nonce. Holders may use `revoke-unwind`. Nonzero transfers to another holder invalidate sender and recipient votes; they must approve again at their new balances. Replacing the proposal increments its nonce and supersedes all previous votes. Neither voting nor replacement blocks ordinary exercise or settlement.
 
-The buyer signs the exact active typed agreement. The executing sponsor approves the clone for the refund premium token and submits `execute-unwind` with vaultId, nonce and signature. Execution pulls the full refund, rechecks the current exercise/supply state and unanimous consent after token callbacks, reserves the refund and finalizes. Failures revert funding atomically. Any intervening exercise requires a fresh proposal/signature/approvals because its snapshot changed; normal finalization makes the proposal unusable.
+Each current LP approves the clone for premium tokens and calls `fund-unwind` with the proposal nonce and amount. Their minimum contribution is `ceil(refund × current shares / proposal supply)` in raw token units, readable with `unwind.requiredContribution(vaultId, balance)`. Funding can precede or follow voting and can be topped up. Overfunding by one holder never covers another holder’s missing contribution. Claimed premium stays earned, but its previous withdrawal does not waive this requirement. Funding token callbacks that move the funder’s shares, even away and back, revert the funding transaction.
+
+The buyer signs the exact active typed agreement. Anyone submits `execute-unwind` with vaultId, nonce and signature; the executor supplies no tokens. Execution checks the exercise/supply snapshot, unanimous current consent and each approved holder’s funding, converts exactly the signed refund from the contribution reserve into a buyer reserve and finalizes. No refund token transfer occurs during execution. Any intervening exercise requires a fresh proposal/signature/approvals; normal finalization makes the proposal unusable.
+
+Before execution, a funder can call `withdraw-unwind-contribution` with the original nonce to recover their entire deposit. Withdrawing from the current proposal also revokes that holder’s consent. Recovery remains available after revocation, replacement, deadline expiry, exercise, ordinary settlement and burning every share. Replacing a proposal does not roll old funds into the new nonce. Transfers keep deposits attributable to the original funder; affected holders must approve again and meet their thresholds at their new balances.
+
+After successful execution, deposits above each approved holder’s ceiling remain recoverable. Ceiling rounding may create a surplus over the exact buyer refund: each recovery receives `floor(remaining surplus × holder ceiling / remaining total ceilings)`, then removes that holder’s ceiling from the remaining weight. The final recovering participant receives all residual rounding dust. For example, three equal LPs refunding two raw units each fund one unit: the buyer receives two, the first two recover zero and the last recovers one. Thus rounding dust depends on recovery order; no contribution dust is permanently stranded. Zero-amount recovery transactions still clear the participant’s weight. Deposits from former, unapproved holders remain wholly recoverable and do not share this rounding surplus. All recoveries stay tied to original wallets even after subsequent share transfers or burns. Read `vault.unwindReserved()`, `unwind.contributions(vaultId, nonce, holder)` and completion state to reconcile custody; the contribution getter records original deposit until recovery, not necessarily the amount recoverable after execution.
 
 The buyer or its executor uses `claim-payout` for the funded refund, paid to the current configured recipient. Current holders use ordinary `claim` for remaining collateral and completed-exercise proceeds. Unpaid premium entitlements remain separately claimable; an unwind does not claw them back.
 
 ### Worked unwind scenarios
 
 - **Zero refund:** while Live, propose `refund: "0"` with a future deadline. Read `typed-unwind`, collect every holder’s `approve-unwind` for its nonce and the buyer’s signature, then execute. No token approval or refund funding is needed. Holders separately run `claim` and, if owed, `claim-premium`; there is no unwind refund to claim.
-- **Funded refund:** with USDC as premium token (six decimals), propose `refund: "100000000"` for 100 USDC. After consent and signature, the executing sponsor runs `approve-token` for USDC and that amount (spender: clone), then `execute-unwind`. The buyer or executor runs `claim-payout`; holders independently claim the residual pool and unpaid premium. Completed exercises are never reversed.
+- **Funded refund:** with USDC as premium token (six decimals), propose `refund: "100000000"` for 100 USDC. For a 60/40 share split, the two LPs run `approve-token` (spender: clone) and `fund-unwind` for 60 and 40 USDC respectively. After consent, signature and funding, anyone runs `execute-unwind`. The buyer or executor runs `claim-payout`; holders independently claim the residual pool and unpaid premium. Completed exercises are never reversed.
 - **Expired/replaced proposal:** nonce 1 cannot execute after its deadline. While still Live, the owner or buyer proposes again with a future deadline, obtaining nonce 2. Replacing a still-valid proposal has the same nonce effect. Read fresh typed data, obtain a new buyer signature and all current-holder approvals; nonce 1 approvals/signature cannot execute nonce 2. Revoking consent removes that holder’s vote, not the option or anyone’s premium. Execution is permitted at the deadline itself, but not after it.
 
 Use the [operator templates](../examples/operator/README.md) with the command fields below. An unwind is an agreed close of a funded Live option; `cancel-auction` only returns a pre-activation auction to Open.
@@ -169,7 +175,8 @@ All requests include `rpc` and `sender`; hub calls include `hub` and usually `va
 | set-execution | executor, recipient |
 | propose-unwind | deadline, refund |
 | typed-unwind / revoke-unwind | no additional fields |
-| approve-unwind | nonce |
+| approve-unwind / withdraw-unwind-contribution | nonce |
+| fund-unwind | nonce, amount |
 | execute-unwind | nonce, signature |
 | pause | paused boolean |
 | grant-role | role string, account; vaultId unnecessary |
