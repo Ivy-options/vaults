@@ -4,6 +4,12 @@ Date: 2026-09-08. Implementation authorized 2026-09-09. The accepted pricing dec
 
 Scope: feedback points 1, 2, 4, 5 and 6. Point 3 (`marketMaker` naming) is explicitly excluded. Point 7 was blank. This plan records responsibilities and acceptance criteria; the linked pricing specification governs the subsequent contract changes.
 
+## Completion record — 2026-09-09
+
+Tasks 1–7 are implemented, with point 3’s naming change excluded as requested. The implementation retains admission-only pause and separately funded unwind refunds. The accepted pricing specification covers the decisions required by Task 3; new contracts, tooling and examples implement Tasks 4 and 5.
+
+Validation: 192 tests passed, along with compilation, type checking, deployed-size and documentation checks. Independent Standards and Spec reviews each returned zero findings. The updated pricing, vault-term and fee sections were visually checked. The implementation requires a fresh deployment; production operator identities and per-pair market-data methodology remain deployment prerequisites.
+
 ## Baseline before this work
 
 - Unwind and platform fees already exist in contracts and `docs/operations.md`. The website has an early-exit explanation and brief fee coverage. Improve visibility and completeness rather than reimplementing those features.
