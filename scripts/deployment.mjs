@@ -48,7 +48,7 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
     const tx = await new ContractFactory(abi,linkBytecode(artifact,a)).getDeployTransaction(...args[i]);
     steps.push({ name, address:a[name], nonce:startNonce+i, data:tx.data, abi, deployedSize:size, libraryLinks:runtimeLinks(artifact,a) });
   }
-  return {version:5,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
+  return {version:6,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
 }
 
 async function findCreation(provider, plan, step, startBlock) {
@@ -102,7 +102,7 @@ export async function verifyBindings(provider, plan) {
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
 export async function resumeDeployment(signer, plan, journal = /** @type {{planHash?: string, startBlock?: number, steps?: Record<string, any>, complete?: boolean}} */ ({}), persist = async (_journal) => {}) {
-  if (plan.version !== 5) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
+  if (plan.version !== 6) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
   const provider = signer.provider;
   if(String((await provider.getNetwork()).chainId) !== plan.chainId || (await provider.getBlock(0)).hash !== plan.genesisHash) throw new Error('Wrong chain');
   if((await signer.getAddress()).toLowerCase() !== plan.deployer.toLowerCase()) throw new Error('Wrong deployer');

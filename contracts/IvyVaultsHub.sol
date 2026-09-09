@@ -24,6 +24,13 @@ contract IvyVaultsHub is IvyVaultsSettlement {
         emit TransfersEnabledUpdated(enabled);
     }
 
+    /// @notice Controls new cash admissions. Admins must arrange publisher authority before enabling.
+    /// @dev Existing positions and publisher membership are independent of this flag.
+    function setCashSettlementEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        cashSettlementEnabled = enabled;
+        emit CashSettlementEnabledUpdated(enabled);
+    }
+
     function setSettings(uint64 window_, uint64 timeout_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exerciseWindow = window_;
         auctionTimeout = timeout_;

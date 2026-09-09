@@ -81,7 +81,7 @@ describe("claim", function () {
     const { hub, weth, usdc, alice, marketMaker } = ctx;
     const { vaultId, vaultAddress, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
-    await publishExpiryPrice(ctx, bid.expiry, 3300n * USDC_UNIT);
+    await publishExpiryPrice(ctx, vaultId, 3300n * USDC_UNIT);
     await hub.expire(vaultId);
 
     const tx = hub.connect(alice).claim(vaultId, 10n * WETH_UNIT);

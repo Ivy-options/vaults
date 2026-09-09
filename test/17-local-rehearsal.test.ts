@@ -20,19 +20,29 @@ describe('local operator rehearsal', function () {
     const plan = await buildDeploymentPlan({ artifacts, chainId: (await provider.getNetwork()).chainId,
       genesisHash: (await provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(),
       admin: admin.address, reportSigner: admin.address });
-    expect(plan.version).eq(5);
+    expect(plan.version).eq(6);
     expect(plan.steps).length(8);
     expect(plan.addresses).not.have.property('IvySettlementPriceFeed');
     expect((await resumeDeployment(admin, plan)).complete).eq(true);
     const hub: any = new Contract(plan.addresses.IvyVaultsHub, artifacts.IvyVaultsHub.abi, provider);
     expect(await hub.cashSettlementEnabled()).eq(false);
-    expect(await hub.settlementPublisherCount()).eq(0n);
     const methodology = 'synthetic local rehearsal observations';
     const premiums: any = new Contract(plan.addresses.IvyPremiums, artifacts.IvyPremiums.abi, provider);
     async function op(command: string, signer: any, values: any = {}) {
       const prepared: any = await prepareOperation(provider, artifacts, command,
         { sender: signer.address, hub: plan.addresses.IvyVaultsHub, ...values });
       if (command.includes('settlement')) expect(prepared.to).eq(plan.addresses.IvyVaultsHub);
+      if(command==='set-cash-settlement-enabled') {
+        expect(prepared.detail.currentEnabled).eq(await hub.cashSettlementEnabled());
+        expect(prepared.detail.proposedEnabled).eq(values.enabled);
+        if(values.enabled) expect(prepared.detail.publisherCheck).deep.eq({publisher:values.publisher,authorized:true});
+      }
+      if(command.startsWith('publish-settlement')) {
+        expect(prepared.detail.vaultId).eq(values.vaultId);
+        expect(prepared.detail.underlying).eq(w);
+        expect(prepared.detail.quote).eq(u);
+        expect(prepared.detail.expiry).eq(expiry);
+      }
       await (await signer.sendTransaction({ to: prepared.to, data: prepared.data })).wait();
     }
     async function typed(command: string, signer: any, values: any) {
@@ -83,22 +93,31 @@ describe('local operator rehearsal', function () {
     expect(await hub.totalShares(physical)).eq(0n);
     expect(await weth.balanceOf(buyer.address)).eq(10n * W);
     expect(await hub.cashSettlementEnabled()).eq(false);
-    expect(await hub.settlementPublisherCount()).eq(0n);
     // Reset the exercised asset balance and fund the subsequent cash examples explicitly.
     await weth.connect(buyer).transfer(owner.address, 10n * W);
     await usdc.mint(buyer.address, 1000n * U);
+    await rejects(op('set-cash-settlement-enabled', admin, { enabled: true }), /Missing publisher/);
+    await rejects(op('set-cash-settlement-enabled', admin, { enabled: 'true' }), /enabled must be boolean/);
+    await rejects(op('set-cash-settlement-enabled', admin, { enabled: true, publisher: ZeroAddress }), /Publisher must be nonzero/);
+    await rejects(op('set-cash-settlement-enabled', admin, { enabled: true, publisher: owner.address }), /lacks settlement publisher role/);
     await op('grant-settlement-publisher', admin, { account: owner.address });
+    expect(await hub.cashSettlementEnabled()).eq(false);
+    await rejects(op('set-cash-settlement-enabled', sponsor, { enabled: true, publisher: owner.address }));
+    await op('set-cash-settlement-enabled', admin, { enabled: true, publisher: owner.address });
     expect(await hub.cashSettlementEnabled()).eq(true);
-    expect(await hub.settlementPublisherCount()).eq(1n);
     const spot = { underlying: w, quote: u, price: 3000n * U, observedAt: BigInt(await networkHelpers.time.latest()), validUntil: expiry };
     await op('publish-spot', sponsor, { feed: plan.addresses.IvyPriceFeed, report: spot,
       signature: (await typed('typed-report', admin, { kind: 'spot', feed: plan.addresses.IvyPriceFeed, report: spot })).signature });
     const call = await create(true), put = await create(false);
-    const exerciseReport = { ...spot, observedAt: BigInt(await networkHelpers.time.latest()) };
-    const exerciseRequest = { report: exerciseReport,
+    const exerciseReport = { price: spot.price, validUntil: spot.validUntil, observedAt: BigInt(await networkHelpers.time.latest()) };
+    const exerciseRequest = { vaultId: call, report: exerciseReport,
       settlementMethodology: methodology };
     await rejects(op('publish-settlement-exercise', sponsor, exerciseRequest));
     await op('publish-settlement-exercise', owner, exerciseRequest);
+    expect(await hub.exercisePrice(call)).deep.eq([exerciseReport.price,exerciseReport.observedAt,exerciseReport.validUntil]);
+    expect(await hub.exercisePrice(put)).deep.eq([0n,0n,0n]);
+    await op('set-cash-settlement-enabled', admin, { enabled: false });
+    expect(await hub.cashSettlementEnabled()).eq(false);
     expect((await hub.termsOf(call)).publicDeposits).eq(false);
     await op('claim-premium', owner, { vaultId: call });
     expect(await premiums.claimable(call, owner.address)).eq(0n);
@@ -113,17 +132,18 @@ describe('local operator rehearsal', function () {
       await op('claim-premium', signer, { vaultId: put });
     }
     await networkHelpers.time.increaseTo(expiry + 86400n);
-    const report = { underlying: w, quote: u, expiry, price: 4000n * U, validUntil: expiry + 90000n };
+    const report = { price: 4000n * U, validUntil: expiry + 90000n };
     const before = await hub.stateOf(call);
     const callAddress = await hub.vaultOf(call);
     await rejects(op('expire', sponsor, { vaultId: call }));
     expect((await hub.stateOf(call)).exercisedNotional).eq(before.exercisedNotional);
     expect(await weth.balanceOf(callAddress)).eq(10n * W);
-    const settlementRequest = { report,
+    const settlementRequest = { vaultId: call, report,
       settlementMethodology: methodology };
     await rejects(op('publish-settlement-expiry', sponsor, settlementRequest));
     await op('grant-settlement-publisher', admin, { account: sponsor.address });
     await op('revoke-settlement-publisher', admin, { account: owner.address });
+    expect(await hub.cashSettlementEnabled()).eq(false);
     await rejects(op('publish-settlement-expiry', owner, settlementRequest));
     await op('publish-settlement-expiry', sponsor, settlementRequest);
     await op('expire', sponsor, { vaultId: call });

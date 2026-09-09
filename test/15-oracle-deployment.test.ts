@@ -74,15 +74,16 @@ describe("journaled immutable deployment and manual tooling",function(){
   });
   it("deploys physical-only without cash configuration and verifies bindings after later opt-in",async()=>{
     const {admin,plan}=await networkHelpers.loadFixture(fixture);
-    expect(plan.version).eq(5);
+    expect(plan.version).eq(6);
     expect(plan).not.have.property('settlementPublisher');
     expect(plan.settlementMethodology).eq(undefined);
     const journal=await resumeDeployment(admin,plan);
     const hub=await ethers.getContractAt('IvyVaultsHub',plan.addresses.IvyVaultsHub);
     expect(await hub.cashSettlementEnabled()).eq(false);
-    expect(await hub.settlementPublisherCount()).eq(0n);
     const [,publisher]=await ethers.getSigners();
     await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(),publisher.address);
+    expect(await hub.cashSettlementEnabled()).eq(false);
+    await hub.setCashSettlementEnabled(true);
     expect(await hub.cashSettlementEnabled()).eq(true);
     await verifyBindings(admin.provider,plan);
     await resumeDeployment(admin,plan,journal);
@@ -96,7 +97,7 @@ describe("journaled immutable deployment and manual tooling",function(){
   });
   it("rejects obsolete or cross-chain plans and journals from other plans",async()=>{
     const {admin,plan}=await networkHelpers.loadFixture(fixture);
-    await rejects(resumeDeployment(admin,{...plan,version:4},{}), /Unsupported deployment plan version/);
+    await rejects(resumeDeployment(admin,{...plan,version:5},{}), /Unsupported deployment plan version/);
     await rejects(resumeDeployment(admin,{...plan,chainId:'1'},{}), new RegExp('Wrong chain'));
     await rejects(resumeDeployment(admin,plan,{planHash:'wrong'}), new RegExp('another plan'));
   });

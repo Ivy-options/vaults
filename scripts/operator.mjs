@@ -85,10 +85,28 @@ export async function prepareOperation(provider, artifacts, command, r) {
     detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,maxPlatformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
   } else if(command==='publish-settlement-exercise'||command==='publish-settlement-expiry') {
     required(r,'hub'); target=hub;
-    const exercise=command==='publish-settlement-exercise', type=exercise?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
-    method=exercise?'publishExercisePrice':'publishExpiry';args=type.map(f=>required(r.report,f.name));
+    const vaultId=required(r,'vaultId');
+    const exercise=command==='publish-settlement-exercise';
+    const names=exercise?['price','observedAt','validUntil']:['price','validUntil'];
+    const report=Object.fromEntries(names.map(name=>[name,required(r.report,name)]));
+    const terms=await hub.termsOf(vaultId), state=await hub.stateOf(vaultId);
+    method=exercise?'publishExercisePrice':'publishExpiry';args=[vaultId,...names.map(name=>report[name])];
     if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
-    detail={pricingAuthority:'authoritative cash settlement',hub:r.hub,report:fields(type,r.report),units:'integer quote-token units per whole underlying token',settlementMethodology:r.settlementMethodology};
+    detail={pricingAuthority:'authoritative cash settlement',hub:r.hub,vaultId,underlying:terms.underlying,quote:state.quoteToken,expiry:state.expiry,report,units:'integer quote-token units per whole underlying token',settlementMethodology:r.settlementMethodology};
+  } else if(command==='set-cash-settlement-enabled') {
+    required(r,'hub');
+    const enabled=required(r,'enabled');
+    if(typeof enabled!=='boolean') throw new Error('enabled must be boolean');
+    const currentEnabled=await hub.cashSettlementEnabled();
+    let publisherCheck;
+    if(enabled) {
+      const publisher=required(r,'publisher');
+      if(publisher.toLowerCase()===ZeroAddress.toLowerCase()) throw new Error('Publisher must be nonzero');
+      if(!await hub.hasRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(),publisher)) throw new Error('Nominated publisher lacks settlement publisher role');
+      publisherCheck={publisher,authorized:true};
+    }
+    method='setCashSettlementEnabled';args=[enabled];
+    detail={currentEnabled,proposedEnabled:enabled,publisherCheck};
   } else if(command==='grant-settlement-publisher'||command==='revoke-settlement-publisher') {
     required(r,'hub'); target=hub;
     method=command==='grant-settlement-publisher'?'grantRole':'revokeRole';

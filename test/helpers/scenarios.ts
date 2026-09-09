@@ -23,16 +23,17 @@ export async function setSpot(ctx: IvyContext, price: bigint, ageSeconds = 0n) {
 }
 
 /** Publishes to the Hub as the authorized EOA; activation observations remain independent. */
-export async function setExercisePrice(ctx: IvyContext, price: bigint, ageSeconds = 0n) {
+export async function setExercisePrice(ctx: IvyContext, vaultId: bigint, price: bigint, ageSeconds = 0n) {
   const now = BigInt(await ctx.networkHelpers.time.latest());
-  await ctx.hub.publishExercisePrice(ctx.wethAddress, ctx.usdcAddress, price, now - ageSeconds, now + 3600n);
+  await ctx.hub.publishExercisePrice(vaultId, price, now - ageSeconds, now + 3600n);
 }
 
-/** Reaches expiry when necessary and finalizes the pair once through the Hub publisher API. */
-export async function publishExpiryPrice(ctx: IvyContext, expiry: bigint, price: bigint) {
+/** Reaches expiry when necessary and finalizes one vault once through the Hub publisher API. */
+export async function publishExpiryPrice(ctx: IvyContext, vaultId: bigint, price: bigint) {
+  const expiry = (await ctx.hub.stateOf(vaultId)).expiry;
   const now = BigInt(await ctx.networkHelpers.time.latest());
   if (now < expiry) await ctx.networkHelpers.time.setNextBlockTimestamp(expiry);
-  await ctx.hub.publishExpiry(ctx.wethAddress, ctx.usdcAddress, expiry, price, (now > expiry ? now : expiry) + 3600n);
+  await ctx.hub.publishExpiry(vaultId, price, (now > expiry ? now : expiry) + 3600n);
 }
 
 /** Makes the next mined block carry exactly `timestamp`. */

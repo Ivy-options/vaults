@@ -8,27 +8,37 @@ import "../types/IvyTypes.sol";
 
 /// @dev Exercise, settlement and claims (spec §9, §10).
 abstract contract IvyVaultsSettlement is IvyVaultsActivation {
-    /// @notice The authorized EOA or contract publishes a strictly newer payment observation.
-    function publishExercisePrice(address underlying, address quote, uint256 price, uint64 observedAt, uint64 validUntil)
+    /// @notice The authorized EOA or contract publishes a strictly newer observation for one live cash vault.
+    function publishExercisePrice(uint256 vaultId, uint256 price, uint64 observedAt, uint64 validUntil)
         external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
     {
-        IvyOptionSettlement.publishExercisePrice(_settlementPrices, underlying, quote, price, observedAt, validUntil);
+        _requireCashPublication(vaultId);
+        IvyOptionSettlement.publishExercisePrice(_settlementPrices[vaultId], vaultId, _terms[vaultId].underlying, _state[vaultId].quoteToken, price, observedAt, validUntil);
     }
 
-    /// @notice Finalize one exact pair/expiry at or after expiry. Stored prices cannot be replaced.
-    function publishExpiry(address underlying, address quote, uint64 expiry, uint256 price, uint64 validUntil)
+    /// @notice Finalize one live cash vault at or after its expiry. Stored prices cannot be replaced.
+    function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil)
         external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
     {
-        IvyOptionSettlement.publishExpiry(_settlementPrices, underlying, quote, expiry, price, validUntil);
+        _requireCashPublication(vaultId);
+        VaultState storage s = _state[vaultId];
+        IvyOptionSettlement.publishExpiry(_settlementPrices[vaultId], vaultId, _terms[vaultId].underlying, s.quoteToken, s.expiry, price, validUntil);
     }
 
-    function exercisePrice(address underlying, address quote) external view returns (uint256 price, uint256 observedAt, uint256 validUntil) {
-        ExercisePriceObservation storage observation = _settlementPrices.exercise[keccak256(abi.encode(underlying, quote))];
+    function _requireCashPublication(uint256 vaultId) private view {
+        _requirePhase(vaultId, Phase.Live);
+        if (_state[vaultId].settlement != SettlementType.Cash) revert SettlementNotAllowed();
+    }
+
+    function exercisePrice(uint256 vaultId) external view returns (uint256 price, uint256 observedAt, uint256 validUntil) {
+        _requireExists(vaultId);
+        ExercisePriceObservation storage observation = _settlementPrices[vaultId].exercise;
         return (observation.price, observation.observedAt, observation.validUntil);
     }
 
-    function settlementPrice(address underlying, address quote, uint64 expiry) external view returns (uint256 price) {
-        price = _settlementPrices.expiry[keccak256(abi.encode(underlying, quote, expiry))];
+    function settlementPrice(uint256 vaultId) external view returns (uint256 price) {
+        _requireExists(vaultId);
+        price = _settlementPrices[vaultId].expiry;
         if (price == 0) revert ReportUnavailable();
     }
 
@@ -39,7 +49,7 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
-        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, _terms[vaultId], _settlementPrices, amount);
+        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, _terms[vaultId], _settlementPrices[vaultId], amount);
         emit Exercised(vaultId, amount, paid, got);
         if (s.exercisedNotional == s.totalNotional) _finalize(vaultId, s);
     }
@@ -64,7 +74,7 @@ abstract contract IvyVaultsSettlement is IvyVaultsActivation {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
         if (block.timestamp < expirationTimeOf(vaultId)) revert ExpirationNotReached();
-        IvyOptionSettlement.expire(s, _terms[vaultId], _settlementPrices);
+        IvyOptionSettlement.expire(s, _terms[vaultId], _settlementPrices[vaultId]);
         _finalize(vaultId, s);
     }
 

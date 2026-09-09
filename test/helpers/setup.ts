@@ -47,7 +47,7 @@ export interface PairInput {
   terms: PairTermsInput;
 }
 
-/** Deploys peers and grants trading roles. Legacy financial scenarios explicitly opt in via the post-deployment grant below. */
+/** Deploys peers and grants trading roles. Cash scenarios explicitly grant a publisher and enable admissions. */
 export async function deployIvy(connection: Connection, { enableCashSettlement = true } = {}) {
   const { ethers, networkHelpers } = connection;
   const [admin, bidMaster, marketMaker, alice, bob, carol] = await ethers.getSigners();
@@ -71,7 +71,10 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 
   await (await hub.grantRole(await hub.BID_MASTER_ROLE(), bidMaster.address)).wait();
   await (await hub.grantRole(await hub.MARKET_MAKER_ROLE(), marketMaker.address)).wait();
-  if (enableCashSettlement) await (await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), admin.address)).wait();
+  if (enableCashSettlement) {
+    await (await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), admin.address)).wait();
+    await (await hub.setCashSettlementEnabled(true)).wait();
+  }
 
   return {
     libraries,

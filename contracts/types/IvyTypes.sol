@@ -29,7 +29,7 @@ struct VaultTerms {
     uint32 maxSettlementPriceAge;  // immutable exercise observation age limit
 }
 
-/// @dev Hub-owned authoritative observations shared by every vault with the same pair/expiry.
+/// @dev Hub-owned authoritative observations scoped to one activated cash vault.
 struct ExercisePriceObservation {
     uint256 price;
     uint64 observedAt;
@@ -37,8 +37,8 @@ struct ExercisePriceObservation {
 }
 
 struct SettlementPrices {
-    mapping(bytes32 pairKey => ExercisePriceObservation) exercise;
-    mapping(bytes32 pairExpiryKey => uint256) expiry;
+    ExercisePriceObservation exercise;
+    uint256 expiry;
 }
 
 struct PairTerms {

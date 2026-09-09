@@ -3,11 +3,9 @@
   "sender": "SETTLEMENT_PUBLISHER_ADDRESS",
   "settlementMethodology": "APPROVED_PER_PAIR_METHODOLOGY_ARTIFACT_REFERENCE",
   "report": {
-    "underlying": "WETH_ADDRESS",
-    "quote": "USDC_ADDRESS",
     "price": "4000000000",
-    "expiry": "VAULT_EXPIRY_UNIX_SECONDS",
     "validUntil": "SUBMISSION_DEADLINE_UNIX_SECONDS"
   },
-  "hub": "HUB_ADDRESS"
+  "hub": "HUB_ADDRESS",
+  "vaultId": "LIVE_CASH_VAULT_ID"
 }

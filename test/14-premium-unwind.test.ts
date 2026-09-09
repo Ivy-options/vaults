@@ -25,6 +25,7 @@ describe("activation premium and unanimous unwinds", function () {
   it("allows unanimous cash unwind after the last publisher leaves without requiring a price report", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c, { terms: { allowedSettlement: SettlementType.Cash, maxSettlementPriceAge: 3600 } }, { settlement: SettlementType.Cash });
+    await c.hub.setCashSettlementEnabled(false);
     await c.hub.revokeRole(await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), c.admin.address);
     const { agreement, signature } = await propose(c, v.vaultId);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce);
@@ -181,7 +182,7 @@ describe("admission and delegated execution", function () {
   it("premium plus buyer payout reserves coexist in put collateral", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c,{isCall:false,withFeed:true},{settlement:SettlementType.Cash,style:ExerciseStyle.European});
-    await publishExpiryPrice(c, v.bid.expiry, 2700n*U); await c.hub.expire(v.vaultId);
+    await publishExpiryPrice(c, v.vaultId, 2700n*U); await c.hub.expire(v.vaultId);
     expect(await v.vault.reserved(c.usdcAddress)).eq(4000n*U);
     await c.hub.connect(c.alice).claim(v.vaultId,30000n*U);
     expect(await c.usdc.balanceOf(v.vaultAddress)).eq(4000n*U);

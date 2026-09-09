@@ -23,8 +23,8 @@ abstract contract IvyVaultsHubStorage is
     bytes32 public constant BID_MASTER_ROLE = keccak256("BID_MASTER_ROLE");
     bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
     bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE = keccak256("SETTLEMENT_PRICE_PUBLISHER_ROLE");
-    uint256 public settlementPublisherCount;
-    SettlementPrices internal _settlementPrices;
+    bool public cashSettlementEnabled;
+    mapping(uint256 vaultId => SettlementPrices) internal _settlementPrices;
 
     address public immutable vaultImplementation;
     IvyPremiums public immutable premiums;
@@ -73,25 +73,13 @@ abstract contract IvyVaultsHubStorage is
         platformTreasury = admin;
     }
 
-    /// @notice Publisher membership enables new cash admissions; it does not gate existing positions.
-    function cashSettlementEnabled() public view returns (bool) {
-        return settlementPublisherCount != 0;
-    }
-
     function _grantRole(bytes32 role, address account) internal override returns (bool changed) {
         if (role == SETTLEMENT_PRICE_PUBLISHER_ROLE && account == address(0)) revert ZeroAddress();
-        changed = super._grantRole(role, account);
-        if (changed && role == SETTLEMENT_PRICE_PUBLISHER_ROLE) ++settlementPublisherCount;
-    }
-
-    /// @dev Both administrative revocation and self-renunciation use this hook.
-    function _revokeRole(bytes32 role, address account) internal override returns (bool changed) {
-        changed = super._revokeRole(role, account);
-        if (changed && role == SETTLEMENT_PRICE_PUBLISHER_ROLE) --settlementPublisherCount;
+        return super._grantRole(role, account);
     }
 
     function _requireCashSettlementEnabled() internal view {
-        if (!cashSettlementEnabled()) revert CashSettlementDisabled();
+        if (!cashSettlementEnabled) revert CashSettlementDisabled();
     }
 
     function _admission(uint256 vaultId) internal view {

@@ -17,11 +17,11 @@ contract ExampleSettlementPublisher is Ownable {
         hub = IIvySettlementPricePublication(hub_);
     }
 
-    function publishExercisePrice(address underlying, address quote, uint256 price, uint64 observedAt, uint64 validUntil) external onlyOwner {
-        hub.publishExercisePrice(underlying, quote, price, observedAt, validUntil);
+    function publishExercisePrice(uint256 vaultId, uint256 price, uint64 observedAt, uint64 validUntil) external onlyOwner {
+        hub.publishExercisePrice(vaultId, price, observedAt, validUntil);
     }
 
-    function publishExpiry(address underlying, address quote, uint64 expiry, uint256 price, uint64 validUntil) external onlyOwner {
-        hub.publishExpiry(underlying, quote, expiry, price, validUntil);
+    function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external onlyOwner {
+        hub.publishExpiry(vaultId, price, validUntil);
     }
 }

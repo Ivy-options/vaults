@@ -1178,21 +1178,23 @@
             </table>
           </div>
           <div class="callout" id="cash-availability">
-            <b>Physical delivery at launch.</b> A new Hub has no settlement publisher, so
-            cash support starts disabled. The admin can enable new cash positions later
-            by granting the publisher role to an EOA or optional helper. Without a publisher,
-            only physical vaults can be created and cash bids cannot activate. Existing physical
-            vaults keep their agreed delivery method. Removing the last publisher stops new
-            cash positions; existing positions retain their exercise, expiration and claim rights.
+            <b>Physical delivery at launch.</b> Cash starts with an explicit disabled flag.
+            To enable it, the admin arranges a responsible publisher, grants the role and then
+            switches the flag on. Role grants and revocations do not change the flag automatically.
+            While disabled, only physical vaults can be created and cash bids cannot activate.
+            Existing physical vaults keep their delivery method. Disabling cash preserves publication,
+            exercise, expiration and claims for existing positions.
             See the <a href="../operations.md#enable-cash-after-physical-launch">cash enablement runbook</a>.
           </div>
           <div class="callout" id="expiry-price">
             <b>Which price is used?</b> Activation may use an indicative spot feed.
-            Cash payments use prices stored in the Hub. Publishers hold
+            Every cash vault needs its own price-setting transactions, identified by vault ID.
+            The Hub derives the pair and expiry from the live position and stores that vault's prices.
+            Matching pairs and expiries still have independent reports. Publishers hold
             <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code>. Before expiry, American cash
             exercise requires a fresh observation that is still within its validity deadline.
             At or after expiry, cash exercise and expiration require the write-once price
-            for that exact expiry. There is no indicative-price fallback.
+            for that vault's exact expiry. There is no indicative-price or other-vault fallback.
             Operators calculate the agreed 30-minute expiry average off-chain; the Hub
             checks authority and time bindings, not market-data accuracy. Production sources
             and calculation rules must be approved before enabling cash admissions.
@@ -1262,8 +1264,8 @@
                 <span class="role">Settlement publisher role</span
                 ><span class="name">Hub price registry</span>
                 <p>An authorized EOA or optional helper submits exercise observations and final expiry prices
-                  directly to the Hub. Prices use quote-token units per whole underlying. The Hub admin
-                  manages publishers; membership starts empty and the first grant enables new cash positions.
+                  for each vault ID. Prices use quote-token units per whole underlying. The Hub admin
+                  manages publishers and a separate cash feature flag, which starts disabled.
                   Any one publisher can publish. A multisig can enforce
                   its own signing threshold. See <a href="#expiry-price">pricing and availability</a>.</p>
               </div>

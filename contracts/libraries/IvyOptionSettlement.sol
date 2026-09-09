@@ -13,26 +13,24 @@ import "../types/IvyTypes.sol";
 ///      DELEGATECALL preserves Hub storage, msg.sender and custody authority. No independent payment route.
 library IvyOptionSettlement {
     /// @dev Hub checks publisher authority before delegating here. Observations live in Hub storage.
-    function publishExercisePrice(SettlementPrices storage prices, address underlying, address quote, uint256 price, uint64 observedAt, uint64 validUntil) external {
-        _validateReport(underlying, quote, price, validUntil);
-        bytes32 key = keccak256(abi.encode(underlying, quote));
-        if (observedAt == 0 || observedAt > block.timestamp || observedAt <= prices.exercise[key].observedAt) revert InvalidPrice();
-        prices.exercise[key] = ExercisePriceObservation(price, observedAt, validUntil);
-        emit IIvyVaultsHubEvents.ExercisePricePublished(underlying, quote, price, observedAt, validUntil);
+    function publishExercisePrice(SettlementPrices storage prices, uint256 vaultId, address underlying, address quote, uint256 price, uint64 observedAt, uint64 validUntil) external {
+        _validateReport(price, validUntil);
+        if (observedAt == 0 || observedAt > block.timestamp || observedAt <= prices.exercise.observedAt) revert InvalidPrice();
+        prices.exercise = ExercisePriceObservation(price, observedAt, validUntil);
+        emit IIvyVaultsHubEvents.ExercisePricePublished(vaultId, underlying, quote, price, observedAt, validUntil);
     }
 
     /// @dev Hub checks publisher authority. Revocation does not alter previously finalized prices.
-    function publishExpiry(SettlementPrices storage prices, address underlying, address quote, uint64 expiry, uint256 price, uint64 validUntil) external {
-        _validateReport(underlying, quote, price, validUntil);
+    function publishExpiry(SettlementPrices storage prices, uint256 vaultId, address underlying, address quote, uint64 expiry, uint256 price, uint64 validUntil) external {
+        _validateReport(price, validUntil);
         if (expiry == 0 || block.timestamp < expiry) revert ExpirationNotReached();
-        bytes32 key = keccak256(abi.encode(underlying, quote, expiry));
-        if (prices.expiry[key] != 0) revert ReportFinalized();
-        prices.expiry[key] = price;
-        emit IIvyVaultsHubEvents.ExpiryPublished(underlying, quote, expiry, price, validUntil);
+        if (prices.expiry != 0) revert ReportFinalized();
+        prices.expiry = price;
+        emit IIvyVaultsHubEvents.ExpiryPublished(vaultId, underlying, quote, expiry, price, validUntil);
     }
 
-    function _validateReport(address underlying, address quote, uint256 price, uint64 validUntil) private view {
-        if (underlying == address(0) || quote == address(0) || underlying == quote || price == 0) revert InvalidPrice();
+    function _validateReport(uint256 price, uint64 validUntil) private view {
+        if (price == 0) revert InvalidPrice();
         if (block.timestamp > validUntil) revert BidExpired();
     }
 
@@ -62,7 +60,7 @@ library IvyOptionSettlement {
                 got = IvyMath.quoteOutFloor(amount, s.strike, s.underlyingUnit);
             }
         } else {
-            uint256 spot = block.timestamp < s.expiry ? _readExercisePrice(t, s.quoteToken, prices) : _readExpiryPrice(s, t, prices);
+            uint256 spot = block.timestamp < s.expiry ? _readExercisePrice(t, prices) : _readExpiryPrice(prices);
             got = s.isCall
                 ? IvyMath.callIntrinsic(amount, s.strike, spot)
                 : IvyMath.putIntrinsic(amount, s.strike, spot, s.underlyingUnit);
@@ -84,7 +82,7 @@ library IvyOptionSettlement {
     function expire(VaultState storage s, VaultTerms storage t, SettlementPrices storage prices) external {
         uint256 remaining = s.totalNotional - s.exercisedNotional;
         if (s.settlement == SettlementType.Cash && remaining > 0) {
-            uint256 spot = _readExpiryPrice(s, t, prices);
+            uint256 spot = _readExpiryPrice(prices);
             uint256 payout = s.isCall
                 ? IvyMath.callIntrinsic(remaining, s.strike, spot)
                 : IvyMath.putIntrinsic(remaining, s.strike, spot, s.underlyingUnit);
@@ -122,13 +120,13 @@ library IvyOptionSettlement {
         return false;
     }
 
-    function _readExpiryPrice(VaultState storage s, VaultTerms storage t, SettlementPrices storage prices) private view returns (uint256 price) {
-        price = prices.expiry[keccak256(abi.encode(t.underlying, s.quoteToken, s.expiry))];
+    function _readExpiryPrice(SettlementPrices storage prices) private view returns (uint256 price) {
+        price = prices.expiry;
         if (price == 0) revert ReportUnavailable();
     }
 
-    function _readExercisePrice(VaultTerms storage t, address quoteToken, SettlementPrices storage prices) private view returns (uint256) {
-        ExercisePriceObservation storage observation = prices.exercise[keccak256(abi.encode(t.underlying, quoteToken))];
+    function _readExercisePrice(VaultTerms storage t, SettlementPrices storage prices) private view returns (uint256) {
+        ExercisePriceObservation storage observation = prices.exercise;
         if (observation.price == 0) revert InvalidPrice();
         if (block.timestamp - observation.observedAt > t.maxSettlementPriceAge || block.timestamp > observation.validUntil) revert StalePrice();
         return observation.price;

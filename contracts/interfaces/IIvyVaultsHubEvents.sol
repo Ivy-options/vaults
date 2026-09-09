@@ -4,8 +4,9 @@ pragma solidity ^0.8.34;
 import {OptionKind, ExerciseStyle, SettlementType} from "../types/IvyTypes.sol";
 
 interface IIvyVaultsHubEvents {
-    event ExercisePricePublished(address indexed underlying, address indexed quote, uint256 price, uint64 observedAt, uint64 validUntil);
-    event ExpiryPublished(address indexed underlying, address indexed quote, uint64 indexed expiry, uint256 price, uint64 validUntil);
+    event CashSettlementEnabledUpdated(bool enabled);
+    event ExercisePricePublished(uint256 indexed vaultId, address indexed underlying, address indexed quote, uint256 price, uint64 observedAt, uint64 validUntil);
+    event ExpiryPublished(uint256 indexed vaultId, address indexed underlying, address indexed quote, uint64 expiry, uint256 price, uint64 validUntil);
     event VaultCreated(uint256 indexed vaultId, address indexed vault, address indexed owner, OptionKind kind, address underlying, address collateral);
     event Deposited(uint256 indexed vaultId, address indexed depositor, uint256 amount);
     event Withdrawn(uint256 indexed vaultId, address indexed holder, uint256 shares);

@@ -4,7 +4,20 @@ Date: 2026-09-08. Implementation authorized 2026-09-09. The accepted pricing dec
 
 Scope: feedback points 1, 2, 4, 5 and 6. Point 3 (`marketMaker` naming) is explicitly excluded. Point 7 was blank. This plan records responsibilities and acceptance criteria; the linked pricing specification governs the subsequent contract changes.
 
-## Physical-only deployment revision — 2026-09-09
+## Per-vault prices and explicit cash flag — 2026-09-09
+
+The user requested a separate price-setting transaction for every vault and an explicit cash feature flag instead of tracking publisher membership counts. Review this revision from `faef1c4`. The current policy is [settlement-pricing-spec.md](settlement-pricing-spec.md).
+
+Acceptance criteria:
+
+- Store exercise and final expiry prices by vault ID; matching pairs/expiries have independent reports and may receive different prices.
+- Publication targets an existing Live cash vault and derives its pair/expiry from the activated position. Preserve role authorization, observation freshness, write-once finality and locked missing-report obligations.
+- Keep cash disabled at deployment and introduce an admin-controlled boolean setter/event. Remove the count and automatic grant/revoke/renounce effects on availability.
+- Operators grant a responsible publisher before explicitly enabling cash. The CLI checks a nominated publisher during enable preparation; the on-chain flag remains independent of role membership. Disabling needs no publisher.
+- Gate new Cash/Either creation and cash activation using the flag; preserve publication and all existing settlement/claim/unwind paths while disabled.
+- Update helper interfaces, operator report inputs/previews, manifest version 6, examples and docs. Test per-vault isolation, role/flag independence and recovery; review and fix feedback before final validation.
+
+## Earlier physical-only deployment revision — 2026-09-09
 
 The user confirmed that the first launch uses physical delivery, with cash support retained for later use. This revision removes the constructor obligation introduced by the Hub-owned pricing implementation. Review this revision from `94aee27`; the accepted policy is recorded in [settlement-pricing-spec.md](settlement-pricing-spec.md#physical-only-launch-and-later-cash-activation).
 

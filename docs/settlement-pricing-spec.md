@@ -1,18 +1,18 @@
 # Authoritative cash settlement pricing
 
-Status: **revised and authorized on 2026-09-09: deploy for physical delivery with no settlement publisher; enable new cash positions later by granting the Hub publisher role**. The Hub owns settlement prices and publication authority; an EOA or optional helper contract may publish. This is the Task 3 deliverable in [the stakeholder plan](stakeholder-feedback-task-plan.md). It does not itself authorize a production source, operator or deployment. The policies below define the implementation; production identities and market-data methodology remain deployment-specific choices.
+Status: **revised and authorized on 2026-09-09: every vault receives its own price-setting transactions, and an explicit feature flag controls new cash admissions**. This supersedes shared pair/expiry reports and the publisher-count mechanism. The Hub owns prices and publisher authority; an EOA or optional helper can publish. This implements [the stakeholder plan](stakeholder-feedback-task-plan.md). Production operator identities and market-data methodology remain deployment-specific choices.
 
 ## Physical-only launch and later cash activation
 
-The Hub constructor has no settlement-publisher argument and grants no publisher membership. A fresh Hub exposes `settlementPublisherCount() == 0` and `cashSettlementEnabled() == false`. Physical vault creation, exercise, expiration and claims require no settlement publisher or settlement methodology. The optional indicative activation feed remains independent.
+The Hub constructor has no settlement-publisher argument, grants no publisher membership and leaves `cashSettlementEnabled` false. Physical vault creation, exercise, expiration and claims require no settlement publisher or settlement methodology. The optional indicative activation feed remains independent.
 
-Derive `cashSettlementEnabled()` solely from whether the publisher count is positive; do not maintain a separate feature flag. The existing Hub administrator enables new cash positions by granting `SETTLEMENT_PRICE_PUBLISHER_ROLE` to a nonzero EOA or optional helper contract. Track actual membership changes through the role grant/revoke hooks, including self-renunciation. Duplicate grants, revocation of absent members and changes to other roles must not alter the publisher count. Multiple publishers are supported; removing one disables cash only if it was the last member.
+Use a stored boolean with `setCashSettlementEnabled(bool)` restricted to `DEFAULT_ADMIN_ROLE`, emitting `CashSettlementEnabledUpdated(bool enabled)`. Remove the publisher count and all membership-counting hooks. Grants, revocations and self-renunciation never modify the flag automatically. Publisher authorization remains AccessControl; zero-address publisher grants are rejected.
 
-When no publisher remains, reject creation of both Cash and Either vaults. Independently reject cash bid activation, including in previously created auctions. Physical bid activation remains available, including for existing Either vaults. Existing physical-only vault terms cannot be loosened to permit cash when a publisher is later granted. No cash guard is added to deposits, tightening or auction cancellation; existing admission, phase and timing rules still apply.
+When the flag is false, reject creation of both Cash and Either vaults and cash bid activation, including in previously created auctions. Physical bid activation remains available, including for existing Either vaults. Existing physical-only vault terms cannot be loosened to cash after enablement. Deposits, tightening and auction cancellation retain their existing admission, phase and timing rules.
 
-Publisher availability gates new positions only. Removing the last publisher must not gate exercise, expiration, claims or agreed unwind for existing live positions. Stored exercise observations remain subject to their existing freshness and validity limits; finalized expiry prices remain usable. Missing reports keep obligations locked until an administrator restores a publisher and the required report is supplied. Neither last-member revocation nor renunciation erases a buyer obligation or converts a cash position to physical delivery.
+The flag gates new positions only. Disabling it must not block publication, exercise, expiration, claims or agreed unwind for existing live cash positions. Stored exercise observations retain their freshness and validity limits; finalized expiry prices remain usable. Revocation blocks that publisher's future submissions but does not erase reports or change the flag. Missing reports keep obligations locked until an authorized publisher supplies the missing vault-specific report. Neither flag changes nor role changes convert settlement types or discard obligations.
 
-The count records authorization, not operational health: an offline EOA or a helper unable to submit reports still holds its role until revoked or renounced. Approve the cash methodology before granting the first production publisher; that grant enables new cash admissions immediately.
+Before enabling cash, the admin must arrange an approved methodology and grant the publisher role to a responsible EOA or helper. The contract setter intentionally does not count or discover publishers and can be called independently of membership. The operator command verifies a nominated publisher's current role before preparing enablement; this is a preflight check, not a stored publisher binding or proof of availability. Roles may change after preflight, so the administrator remains responsible for publication coverage. Disabling requires no publisher nomination.
 
 ## Payment authority and routing
 
@@ -21,65 +21,64 @@ Retain both American and European cash options. Keep indicative activation prici
 | Action | Required price |
 | --- | --- |
 | Activation with indicative checks enabled | Fresh `priceFeed.spot(underlying, quote)` under existing activation rules |
-| American cash exercise strictly before expiry | Fresh, unexpired authoritative exercise observation |
-| American or European cash exercise at or after expiry | Final authoritative price bound to the exact vault expiry |
-| Cash expiration | The same final authoritative expiry price, for all remaining notional |
+| American cash exercise strictly before expiry | That vault's fresh, unexpired exercise observation |
+| American or European cash exercise at or after expiry | That vault's finalized price for its fixed expiry |
+| Cash expiration | The same vault-specific final price, for all remaining notional |
 | Physical exercise or expiration | No settlement-price requirement |
 
 There is no fallback from an authoritative report to the indicative feed. Exact expiry is the boundary: even a still-fresh exercise observation cannot pay a cash exercise at that timestamp. Existing authorization, partial-exercise policy, intrinsic-value arithmetic and payout denomination remain unchanged.
 
 ## Minimal public interface
 
-The Hub exposes the following publication and read APIs, with its existing OpenZeppelin AccessControl authority. No standalone settlement feed or read-side source interface is required. The Hub owns report storage, and its settlement library reads that storage directly through storage references passed by the Hub. There are no calls to an external settlement source or back to a Hub read interface during settlement.
+The Hub stores one exercise observation and one final expiry value per vault ID. Its linked settlement library reads that vault's storage reference directly. No shared pair keys, external settlement source or Hub self-call is required. The same numeric vault ID on another Hub refers to independent storage.
 
 ```solidity
 bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE;
-uint256 public settlementPublisherCount;
+bool public cashSettlementEnabled;
 
-function cashSettlementEnabled() public view returns (bool);
+function setCashSettlementEnabled(bool enabled) external;
 
 function publishExercisePrice(
-    address underlying, address quote, uint256 price,
+    uint256 vaultId, uint256 price,
     uint64 observedAt, uint64 validUntil
 ) external;
 
-function exercisePrice(address underlying, address quote)
+function exercisePrice(uint256 vaultId)
     external view returns (uint256 price, uint256 observedAt, uint256 validUntil);
 
-function publishExpiry(
-    address underlying, address quote, uint64 expiry,
-    uint256 price, uint64 validUntil
-) external;
+function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
 
-function settlementPrice(address underlying, address quote, uint64 expiry)
+function settlementPrice(uint256 vaultId)
     external view returns (uint256 price);
 ```
 
-The existing Hub `DEFAULT_ADMIN_ROLE` controls publisher membership after deployment. No separate settlement administrator exists. Both publication functions require current publisher membership at transaction execution. Each report requires nonzero, distinct token addresses and a strictly positive price. Emit publication events with the complete observation or expiry binding. Standard role events expose authorization changes.
+The existing Hub `DEFAULT_ADMIN_ROLE` controls publisher membership after deployment. Both publication functions require current publisher membership and an existing Live vault whose activated settlement type is Cash. Reject unknown, pre-activation, physical and finalized positions. Activation fixes the selected quote and expiry; derive the underlying, quote and expiry from terms/state instead of accepting them from the publisher. Require positive prices. Events include the vault ID and relevant derived pair/expiry metadata. Read APIs reject unknown vault IDs; known vaults without an exercise observation return zeros, while missing final prices revert.
+
+Matching vaults need independent price-setting transactions even when underlying, quote and expiry are identical. Each may receive a different price. Publishing or finalizing one vault cannot populate, replace or block another vault's report. This permits independent approval; it does not assert that different prices represent a common market methodology.
 
 Remove `settlementPriceFeed` from vault terms. Retain `maxSettlementPriceAge`, positive for any vault permitting cash settlement and immutable across tightening. Existing `priceFeed` and `maxPriceAge` retain their separate optional activation-check meaning and tightening rules. A physical-only vault may use zero for settlement age and omit the indicative feed.
 
 ### Interchangeable publishers
 
-An EOA with the Hub role can submit either publication transaction directly. An optional helper contract can hold the exact same role and call the Hub’s publication functions using a minimal write-side interface. The helper may obtain or calculate prices according to its own approved policy; the Hub does not call it, require a reader interface from it, or store it as a vault dependency.
+An EOA with the Hub role can submit either publication transaction directly, specifying the vault ID. An optional helper can hold the same role and call those vault-specific APIs through a minimal write-side interface. The helper may calculate prices under its own approved policy; the Hub never reads prices from it or stores it as a vault dependency.
 
-Provide an access-controlled helper example and tests demonstrating EOA and contract publication. An unprivileged caller must not be able to make a trusted helper publish arbitrary reports. The helper is optional and absent from the default deployment sequence. Granting the Hub role to an EOA must be sufficient to complete activation, exercise and expiration without deploying any settlement feed or helper.
+Provide an access-controlled helper example and tests demonstrating EOA and contract publication. Unprivileged callers must not be able to publish through a trusted helper. The helper remains absent from default deployment. After explicit feature enablement, granting an EOA the role is sufficient for publication without deploying a settlement feed or helper.
 
 ## Exercise observations
 
-Store the latest `(price, observedAt, validUntil)` for each ordered underlying/quote pair. Require `0 < observedAt <= block.timestamp <= validUntil`, and strictly increasing `observedAt` for that pair. Reject an expired submission and any non-increasing observation, including one with the same timestamp and different price.
+Store the latest `(price, observedAt, validUntil)` for each vault. Require `0 < observedAt <= block.timestamp <= validUntil`, and strictly increasing `observedAt` for that vault. Reject expired submissions and non-increasing observations, including equal timestamps with different prices. Different vaults can accept the same observation timestamp.
 
-At consumption require a present, positive price, a nonfuture observation, `block.timestamp - observedAt <= maxSettlementPriceAge`, and `block.timestamp <= validUntil`. The exact freshness and validity boundaries are inclusive. Validity must remain stored and checked during exercise, rather than only at publication. No price selected for another pair is usable.
+At consumption require a present positive price, a nonfuture observation, `block.timestamp - observedAt <= maxSettlementPriceAge`, and `block.timestamp <= validUntil`. Age and validity boundaries are inclusive and are checked during exercise. No other vault's report is usable. Publication after expiry cannot make an exercise observation usable in place of the final expiry price.
 
 A newly published observation affects subsequent eligible exercise transactions only. It cannot change a payment already executed. Publishers must choose observation validity durations compatible with the supported vault freshness limits; a long validity deadline does not bypass a vault's age check.
 
 ## Exact expiry and finality
 
-Key final prices by `(underlying, quote, expiry)`. Require nonzero expiry and `block.timestamp >= expiry`. A publication is accepted only through its `validUntil` submission deadline, inclusively. Once a positive price is stored, reject every second publication for that key, including identical values and administrator submissions. Final prices remain readable indefinitely; the publication deadline does not expire a finalized price.
+Key final prices by vault ID and derive expiry from that vault's activated state. Require `block.timestamp >= expiry`. Accept publication through its `validUntil` deadline inclusively. Once a positive price is stored, reject every second publication for that vault, including identical values. A different vault needs its own finalization. Final prices remain readable indefinitely, including after settlement; submission deadlines do not expire finalized values.
 
 Use immediate write-once finality, without a challenge period. Review the calculation before submitting the transaction. There is no administrative correction or deletion and no retroactive change to completed payouts. A mistaken final report remains the contractual price; incident response cannot promise an on-chain reversal. This irreversible trust choice is part of the accepted implementation policy.
 
-Late historical publication is permitted without an arbitrary settlement cutoff: reconstruct the agreed historical calculation for the original expiry and submit a new transaction with a current submission deadline. Never substitute the current market price or change the expiry to make publication possible.
+Late historical publication remains possible while the cash position is Live, without an arbitrary cutoff. Reconstruct that vault's approved calculation for its original expiry and submit with a current submission deadline. Never substitute a current market price, another vault's report or a different expiry.
 
 ## Price methodology and operational approval
 
@@ -87,11 +86,11 @@ Prices use integer quote-token units per one whole underlying token. For WETH/US
 
 Preserve the existing proposed expiry methodology: a 30-minute average ending at the exact expiry. The production methodology must additionally name the approved data source(s), sampling frequency, weighting, rounding, missing-sample policy and source outage handling. These details are **not currently approved** and must not be invented by deployment tooling. Exercise observations likewise require an approved current-price source and deterministic calculation, timestamp and validity policy. The contracts attest publisher responsibility; they do not prove source accuracy or compute either methodology.
 
-Before enabling production cash admissions, publish a methodology record for each supported pair containing those choices, the responsible operator identity, report evidence retention location and the selected maximum age. Reference that approved methodology artifact in cash-vault preparation and publication requests so operators can recover the exact approved source set and calculation procedure. This is an operational cash-launch prerequisite, not a new on-chain source registry. Physical-only deployment requires no such record. Local tests may use explicit synthetic observations; they do not constitute approval of a production market source.
+Before enabling production cash admissions, record approved methodology, responsible operators, evidence location and freshness configuration. Bind each vault's preparation/publication requests to its intended methodology artifact and retain its calculation evidence. Vaults may share an approved method but still need independent publication. This is an operational prerequisite, not a new on-chain source registry. Physical-only deployment needs no such record; synthetic tests do not approve production sources.
 
 ## Governance, rotation and trust
 
-The Hub admin manages publication authority. In production it should be a multisig; the designated publisher can be an EOA, a multisig or an optional helper contract. Standard AccessControl permits multiple publisher accounts; any one can publish. It does not implement a threshold across role holders. A signing threshold, if required, belongs to the publisher multisig.
+The Hub admin manages the flag and publication authority. In production it should be a multisig; publishers may be EOAs, multisigs or authenticated helpers. Any role holder can publish for any eligible cash vault; there is no new per-vault publisher ACL. Multiple holders do not create an on-chain quorum. A signing threshold belongs to a publisher multisig.
 
 The Hub administrator can grant and revoke publisher authority, affecting all cash vaults on that Hub. Granting a replacement and revoking the previous publisher is the recovery procedure; role rotation does not rewrite vault terms. Revocation prevents future publication transactions, including queued ones that execute after revocation. Because there are no signed settlement messages, there are no outstanding settlement signatures to invalidate. Ordinary transaction chain and destination binding applies; a transaction on another chain/Hub does not populate this Hub’s state.
 
@@ -101,28 +100,32 @@ Stored exercise observations survive revocation and remain usable until their ag
 
 Missing, stale or invalid exercise observations cause cash early exercise to revert. Missing final expiry reports cause cash exercise at/after expiry and cash expiration to revert atomically. Neither condition settles the vault for zero, advances exercised notional, releases collateral to LPs or discards the buyer's outstanding obligation. Independent earned-premium claims remain available under existing rules.
 
-For unavailable publishers, the admin rotates authority and the replacement publishes valid observations or the required historical expiry report. While awaiting recovery, preserve the live position and locked collateral. Existing admission pause does not halt report publication, exercise, expiration, claims or agreed unwind, and it does not extend deadlines. Agreed unwind remains available only under its existing unanimous-consent and separately funded-refund rules; it is not an automatic oracle fallback.
+If publication coverage is lost, explicitly disable new cash admissions as appropriate and rotate authority. The replacement publishes each missing vault-specific report. Recovery publication and existing-position settlement remain available while the flag is false. Preserve locked obligations while awaiting reports. Existing admission pause also leaves publication, exercise, expiration, claims and agreed unwind available and never moves deadlines. Unwind retains unanimous-consent and separately funded-refund requirements; it is not an automatic price fallback.
 
 For an erroneous exercise observation, publish a strictly later valid observation after verification; already completed exercises remain final. For an erroneous finalized expiry report, record the incident and stop new affected admissions as appropriate. No administrator can correct that report within this design. Any off-chain negotiated remedy is outside protocol accounting and cannot seize existing claimant balances.
 
 ## Compatibility and operator tooling
 
-Removing the publisher constructor argument changes the deployment ABI. Deploy a new immutable hub and associated modules/libraries using updated artifacts; existing immutable hubs and vaults keep their original pricing behavior. The earlier removal of the per-vault settlement source also changed `VaultTerms`. Do not represent deployment as an in-place upgrade or silently migrate existing positions. Update fixture constructors, deployment manifests, binding checks, operator JSON and examples together.
+The publication/read/helper APIs and price storage layout change. Use a new immutable deployment with matching artifacts, libraries and helpers. Existing deployments retain their behavior; this is not an in-place upgrade or migration of live positions. The seven-argument Hub constructor remains free of settlement inputs.
 
-Default deployment contains no settlement publisher, automatic role grant or required settlement methodology. Remove the publisher from deployment configuration/plans; any methodology metadata retained there is optional. Retain the separate indicative signer configuration. Use manifest version 5 and reject obsolete plans rather than silently adopting their old constructor. Deployment recovery verifies constructor/module bindings and Hub administration without requiring a publisher or assuming the publisher count remains zero after later role management.
+Default deployment contains no publisher, automatic enablement or required cash methodology. Indicative signer configuration stays separate; deployment methodology metadata is optional. Use manifest version 6 and reject obsolete plans. Recovery verifies immutable bindings and Hub administration without imposing a particular flag or publisher membership state after deployment.
 
-Operators must see the Hub target, ordered pair, units and expiry before publication. Existing indicative signing commands may remain, but must be clearly labeled and must not imply that publishing to the old feed supplies prices to cash vaults. Direct settlement publication and role commands target the Hub. Default request examples prepare physical vaults without settlement configuration. Cash preparation and report publication still require a methodology reference. The clean rehearsal must first complete a physical lifecycle with no publisher, then explicitly grant an EOA the publisher role and demonstrate cash publication, missing-report recovery, expiration and payout claim. Optional helper tests must prove publication and revocation through the same Hub role.
+Add `set-cash-settlement-enabled` to the CLI. Require boolean `enabled`; for true require a nonzero nominated `publisher` with the Hub role. False needs no publisher. Preview current/requested flag state and the checked publisher; the contract receives only the boolean. Role commands remain separate and must not imply automatic enablement.
+
+Publication requests identify `hub`, `vaultId`, `settlementMethodology` and a report containing `price`, `validUntil` and, for exercise observations, `observedAt`. Preview derived underlying, selected quote, vault expiry, units and vault ID. Keep these shapes separate from legacy indicative typed reports. Default examples remain physical; cash examples show grant, explicit enable, creation/activation and then independent publication for each vault. Cash preparation and publication still require methodology references.
+
+The clean rehearsal completes physical delivery with cash disabled, grants a publisher without enabling cash, explicitly enables through the CLI and publishes vault-specific reports. It also disables the flag and verifies publication/recovery, expiration and claims for existing cash positions. Continue testing unauthorized submissions, optional helper authentication and stale-plan rejection.
 
 ## Public API test seams and acceptance
 
 Test publication, authorization, reads, routing and accounting through public Hub and vault APIs; test optional helper access control through its public API.
 
-- Availability: initial zero count/disabled state, no constructor publisher argument, unauthorized grants, zero-address rejection, duplicate grant/revoke, renunciation, multiple members and unrelated roles; Cash/Either creation and cash activation blocked at zero, physical lifecycle available, first grant enables and last removal disables new cash, existing physical terms remain fixed.
-- Publication: unauthorized sender, grant/revoke, replacement publisher, queued-call revocation semantics, invalid token pair, zero price, future/non-increasing observations, expired submission and stored-observation validity after publication.
-- Routing: different indicative and authoritative prices; correct selected quote pair; American exercise immediately before expiry versus exactly at expiry; European pre-expiry rejection; no cross-pair, cross-expiry or different-Hub report consumption.
-- Finality: pre-expiry publication rejection, duplicate finalization rejection, late historical recovery, indefinite final-price reads, no indicative update influence, and stored exercise/final observations after role revocation; EOA and contract publishers and unauthorized helper callers.
-- Accounting: stored prices still authorize existing cash exercise/expiration and claims at zero publishers; missing reports revert without releasing buyer obligations and regrant/report recovery completes payment; partial exercise followed by expiration cannot pay twice; premium, treasury fees and buyer reserves remain isolated; physical behavior remains unchanged.
-- Integration: deployment role bindings, clean local rehearsal, unauthorized tooling publication, missing-report recovery, examples matching ABI; compile, typecheck, full contract tests, deployed-size checks and docs checks.
+- Feature flag: default false, admin-only toggles/events, grants/revokes/renunciation never toggle it, count API removed, disabled Cash/Either creation and cash activation including pending auctions, physical lifecycle and fixed physical-only terms preserved.
+- Publication: EOA/helper current role, helper authentication, unknown/non-Live/physical vault rejection, zero price, nonfuture/increasing observations, inclusive deadlines and vault-derived metadata.
+- Isolation: matching cash vaults need independent reports, accept equal timestamps/different prices and finalize separately; another Hub's same ID cannot supply a report.
+- Routing/finality: no indicative/other-vault fallback, exact-expiry switch, European pre-expiry rejection, early/duplicate finalization rejection, late recovery, indefinite final reads and stored reports after revocation.
+- Accounting: flag-off publication/existing exercise/expiration/claims/unwind remain available; missing reports preserve obligations; partial exercise plus expiration cannot double-pay; premium/fee/buyer reserves stay separate.
+- Integration: boolean and nominated-publisher enable preflight, disabling during outage, role/flag independence, per-vault preview/calldata, rehearsal, matching examples and manifest recovery; compile, typecheck, focused tests during work, final full suite, size and docs checks.
 
 ## Production configuration still required
 
