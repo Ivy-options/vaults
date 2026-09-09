@@ -134,3 +134,24 @@ describe('Release selection at operator boundaries', function () {
     expect(await ctx.hub.vaultCount()).equal(0n);
   });
 });
+
+import { BrowserProvider } from 'ethers';
+
+describe('Deployment through a caching RPC provider', function () {
+  it('verifies freshly mined registry and Hub code even when an earlier latest-code read is cached', async function () {
+    const connection=await network.create();
+    const provider=new BrowserProvider(connection.provider,undefined,{cacheTimeout:2_000});
+    try {
+      const signer=await provider.getSigner();
+      const deployer=await signer.getAddress();
+      const registryArtifact=await artifacts.readArtifact('IvyVaultsRegistry');
+      const context={chainId:(await provider.getNetwork()).chainId,genesisHash:(await provider.getBlock(0))!.hash,deployer,admin:deployer};
+      const registryPlan=await buildRegistryDeploymentPlan({...context,artifact:registryArtifact,startNonce:0});
+      expect(await provider.getCode(registryPlan.address)).equal('0x');
+      expect((await resumeRegistryDeployment(signer,registryPlan,registryArtifact)).complete).equal(true);
+      const hubPlan=await buildDeploymentPlan({...context,artifacts:await loadArtifacts(),reportSigner:deployer,startNonce:1});
+      for(const step of hubPlan.steps) expect(await provider.getCode(step.address)).equal('0x');
+      expect((await resumeDeployment(signer,hubPlan)).complete).equal(true);
+    } finally { provider.destroy(); }
+  });
+});

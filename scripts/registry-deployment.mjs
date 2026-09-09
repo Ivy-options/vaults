@@ -1,5 +1,5 @@
 import { Contract, ContractFactory, getCreateAddress, ZeroHash } from 'ethers';
-import { findCreation, verifyCreation, json, planHash } from './deployment.mjs';
+import { currentCode, findCreation, verifyCreation, json, planHash } from './deployment.mjs';
 
 export async function buildRegistryDeploymentPlan({ artifact, chainId, genesisHash, deployer, startNonce, admin }) {
   const address = getCreateAddress({ from: deployer, nonce: startNonce });
@@ -20,7 +20,7 @@ export async function resumeRegistryDeployment(signer, plan, artifact, journal =
   journal.planHash = digest; journal.startBlock ??= await provider.getBlockNumber(); journal.steps ??= {};
   const step = plan.steps[0], entry = journal.steps.IvyVaultsRegistry ??= {};
   await persist(journal);
-  if (await provider.getCode(plan.address) !== '0x') entry.hash ??= await findCreation(provider, plan, step, journal.startBlock);
+  if (await currentCode(provider, plan.address) !== '0x') entry.hash ??= await findCreation(provider, plan, step, journal.startBlock);
   if (!entry.hash) {
     const nonce = Number(BigInt(await provider.send('eth_getTransactionCount', [plan.deployer, 'pending'])));
     if (nonce !== plan.startNonce) throw new Error('Registry nonce drift');

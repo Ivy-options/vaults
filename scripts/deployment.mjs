@@ -61,13 +61,16 @@ export async function findCreation(provider, plan, step, startBlock) {
   }
   throw new Error(`Cannot verify creation transaction for ${step.name}; refusing to adopt existing code`);
 }
+/** Latest-state evidence must bypass AbstractProvider's short-lived getCode cache. */
+export const currentCode = (provider, address) => provider.send('eth_getCode', [address, 'latest']);
+
 export async function verifyCreation(provider, plan, step, hash) {
   const tx = await provider.getTransaction(hash);
   const receipt = await provider.getTransactionReceipt(hash);
   if(!tx || !receipt || receipt.status !== 1 || tx.to !== null || tx.from.toLowerCase() !== plan.deployer.toLowerCase()
      || tx.nonce !== step.nonce || tx.data !== step.data || tx.value !== 0n || tx.chainId.toString() !== plan.chainId
      || receipt.contractAddress?.toLowerCase() !== step.address.toLowerCase()) throw new Error(`Creation evidence mismatch: ${step.name}`);
-  const code = await provider.getCode(step.address);
+  const code = await currentCode(provider, step.address);
   if(code === '0x' || (code.length-2)/2 !== step.deployedSize) throw new Error(`Runtime mismatch: ${step.name}`);
   return keccak256(code);
 }
@@ -84,11 +87,11 @@ export async function verifyBindings(provider, plan, { requireInitialAdmin = tru
   ];
   for(const [name,field,value] of checks) if((await byName[name][field]()).toLowerCase() !== value.toLowerCase()) throw new Error(`Binding mismatch: ${name}.${field}`);
   for (const name of LIBRARIES) {
-    if (await provider.getCode(a[name]) === '0x') throw new Error(`Library code missing: ${name}`);
+    if (await currentCode(provider, a[name]) === '0x') throw new Error(`Library code missing: ${name}`);
   }
   for (const step of plan.steps) {
     if (!step.libraryLinks.length) continue;
-    const code = await provider.getCode(step.address);
+    const code = await currentCode(provider, step.address);
     for (const link of step.libraryLinks) {
       const embedded = '0x' + code.slice(2 + link.start * 2, 2 + (link.start + link.length) * 2);
       if (embedded.toLowerCase() !== a[link.name].toLowerCase() || link.address.toLowerCase() !== a[link.name].toLowerCase()) {
@@ -114,7 +117,7 @@ export async function resumeDeployment(signer, plan, journal = /** @type {{planH
   await persist(journal);
   for(const step of plan.steps) {
     const entry = journal.steps[step.name] ??= {};
-    const existing = await provider.getCode(step.address);
+    const existing = await currentCode(provider, step.address);
     if(existing !== '0x') {
       entry.hash ??= await findCreation(provider,plan,step,journal.startBlock);
       const runtimeHash = await verifyCreation(provider,plan,step,entry.hash);
