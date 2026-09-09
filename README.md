@@ -11,7 +11,8 @@ The deployment is immutable. There is no hub proxy, upgrade entrypoint, implemen
 | `IvyShares`                   | ERC-1155 shares and pre-update module notifications                             |
 | `IvyPremiums`                 | Activation entitlements and restricted premium payments                         |
 | `IvyUnwind`                   | One active agreement and current-shareholder consent                            |
-| `IvyPriceFeed`                | Ivy-signed fresh spot and write-once expiry reports, including ERC-1271 signers |
+| `IvyPriceFeed`                | Signed indicative activation prices; retained legacy expiry-report API          |
+| `IvySettlementPriceFeed`      | Role-authorized exercise observations and write-once expiry prices              |
 | `IvyVaultRules` library       | Creation validation and owner-authorized term tightening                        |
 | `IvyOptionSettlement` library | Exercise, cash settlement and residual LP claim implementation                  |
 
@@ -37,7 +38,7 @@ npm run check:size
 npm test -- --no-compile
 ```
 
-Solidity 0.8.34 uses optimizer runs 200 and viaIR. The default compiler target is Osaka; deploy only to a chain supporting the emitted opcodes, including transient storage. Tests enforce the 24,576-byte deployed-code limit without unlimited-size settings. `test/17-local-rehearsal.test.ts` rehearses deployment, signed cash settlement and a pooled unanimous unwind on an ephemeral local EVM using the operator transaction builder.
+Solidity 0.8.34 uses optimizer runs 200 and viaIR. The default compiler target is Osaka; deploy only to a chain supporting the emitted opcodes, including transient storage. Tests enforce the 24,576-byte deployed-code limit without unlimited-size settings. `test/17-local-rehearsal.test.ts` rehearses deployment, role-authorized cash settlement and a pooled unanimous unwind on an ephemeral local EVM using the operator transaction builder.
 
 ## Manual operations
 
@@ -51,7 +52,7 @@ npm run operator -- expire expiration.json
 
 `--send` explicitly submits through the configured RPC's signer. No automated market-data collection, pricing, bidding, or trading UI is included.
 
-Cash settlement needs the finalized report for the exact expiry. If Ivy's signer becomes unavailable before publication, funds stay locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
+Cash settlement needs the authoritative finalized report for the exact expiry. Cash vaults fix a separate `settlementPriceFeed` and `maxSettlementPriceAge` at creation. Its admin can rotate publishers; funds remain locked until a valid report arrives or the buyer and all current shareholders consent to an unwind. Revocation stops new publications but does not erase stored observations or final prices. There is no timeout that erases the buyer's obligation. Premium rounding dust stays reserved permanently.
 
 See the [operator runbook](docs/operations.md) and [public guide](docs/site/index.html).
 
@@ -61,6 +62,8 @@ Open [the protocol guide](docs/site/index.html) directly in a browser, or serve 
 
 The guide uses local fonts and assets in `docs/site/assets/`. After editing it, run `npm run docs:check` to check links, anchors, assets and calculator examples.
 
-`exercise(vaultId, amount)` uses the buyer’s option right and pays the configured recipient. `expire(vaultId)` permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for `claimPayout`. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses fresh spot. Physical exercise exchanges assets at strike within its exercise window.
+`exercise(vaultId, amount)` uses the buyer’s option right and pays the configured recipient. `expire(vaultId)` permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for `claimPayout`. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses a fresh, unexpired observation from the authoritative settlement feed. Indicative prices never authorize cash payouts. Physical exercise exchanges assets at strike within its exercise window.
 
 Every vault fixes `allowPartialExercise` at creation, before deposits. True permits any valid positive amount up to remaining notional; false requires all remaining notional. The term cannot be tightened or changed later. Operator creation requests must specify it explicitly. Full exercise finalizes automatically; partial exercise leaves the remainder open.
+
+See the [accepted pricing specification](docs/settlement-pricing-spec.md) for publisher governance, observation validity, finality and production methodology requirements. The changed vault-creation ABI requires a new deployment; existing vaults retain their original behavior.

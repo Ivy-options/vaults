@@ -51,7 +51,11 @@ library IvyVaultRules {
         if (t.underlying == address(0) || t.collateral == address(0)) revert ZeroAddress();
         if (t.expiry <= block.timestamp) revert ExpiryInPast();
         bool isCall = t.collateral == t.underlying;
-        if (t.allowedSettlement != SettlementPolicy.Physical && t.priceFeed == address(0)) revert CashSettlementNeedsFeed();
+        if (t.allowedSettlement != SettlementPolicy.Physical && t.settlementPriceFeed == address(0)) revert CashSettlementNeedsFeed();
+        if (t.settlementPriceFeed != address(0)) {
+            if (t.settlementPriceFeed.code.length == 0) revert BindingMismatch();
+            if (t.maxSettlementPriceAge == 0) revert FeedNeedsMaxPriceAge();
+        }
         if (t.priceFeed != address(0)) {
             if (t.priceFeed.code.length == 0) revert BindingMismatch();
             if (t.maxPriceAge == 0) revert FeedNeedsMaxPriceAge();

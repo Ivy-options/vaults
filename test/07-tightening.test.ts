@@ -19,6 +19,8 @@ describe("tightening", function () {
       ctx.alice,
       callTerms(ctx, {
         priceFeed: ctx.feedAddress,
+        settlementPriceFeed: ctx.settlementFeedAddress,
+        maxSettlementPriceAge: 3600,
         maxPriceAge: 3600,
         maxInTheMoneyBps: 1000,
         allowedSettlement: SettlementPolicy.Either,

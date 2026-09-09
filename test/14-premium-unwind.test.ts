@@ -167,7 +167,7 @@ describe("admission and delegated execution", function () {
   it("premium plus buyer payout reserves coexist in put collateral", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await goLive(c,{isCall:false,withFeed:true},{settlement:SettlementType.Cash,style:ExerciseStyle.European});
-    await c.feed.setSettlementPrice(c.wethAddress,c.usdcAddress,v.bid.expiry,2700n*U);
+    await c.settlementFeed.setSettlementPrice(c.wethAddress,c.usdcAddress,v.bid.expiry,2700n*U);
     await at(c,v.bid.expiry); await c.hub.expire(v.vaultId);
     expect(await v.vault.reserved(c.usdcAddress)).eq(4000n*U);
     await c.hub.connect(c.alice).claim(v.vaultId,30000n*U);

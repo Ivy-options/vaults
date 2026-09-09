@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-/// @notice Price source a vault owner may attach. Implemented later by Ivy; mocked in tests.
+/// @notice Indicative activation source; settlementPrice is retained for legacy callers only.
 interface IIvyPriceFeed {
     /// @notice Spot price of `underlying` denominated in `quote`,
     ///         expressed in quote-token decimals per 1 whole underlying.

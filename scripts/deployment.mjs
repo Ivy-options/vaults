@@ -1,6 +1,6 @@
-import { Contract, ContractFactory, getCreateAddress, getAddress, keccak256, toUtf8Bytes } from 'ethers';
+import { Contract, ContractFactory, getCreateAddress, getAddress, ZeroAddress, keccak256, toUtf8Bytes } from 'ethers';
 export const LIBRARIES = ['IvyVaultRules', 'IvyOptionSettlement'];
-export const CONTRACTS = [...LIBRARIES, 'IvyVault', 'IvyVaultsHub', 'IvyShares', 'IvyPremiums', 'IvyUnwind', 'IvyPriceFeed'];
+export const CONTRACTS = [...LIBRARIES, 'IvyVault', 'IvyVaultsHub', 'IvyShares', 'IvyPremiums', 'IvyUnwind', 'IvyPriceFeed', 'IvySettlementPriceFeed'];
 export const artifactPath = name => `../artifacts/contracts/${LIBRARIES.includes(name) ? 'libraries/' : ''}${name}.sol/${name}.json`;
 
 /** Resolve every compiler-provided link reference; never guess placeholder positions. */
@@ -33,11 +33,15 @@ export const json = value => JSON.stringify(value, (_, v) => typeof v === 'bigin
 export const planHash = plan => keccak256(toUtf8Bytes(json(plan)));
 
 /** Build all constructor addresses before sending anything. Artifacts come from the local build. */
-export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, deployer, startNonce, admin, reportSigner, exerciseWindow = 3600, auctionTimeout = 259200, uri = '' }) {
+export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, deployer, startNonce, admin, reportSigner, settlementAdmin, settlementPublisher, settlementMethodology, exerciseWindow = 3600, auctionTimeout = 259200, uri = '' }) {
+  for (const [name, value] of Object.entries({settlementAdmin, settlementPublisher})) {
+    if (!value || getAddress(value) === ZeroAddress) throw new Error(`Invalid ${name}`);
+  }
+  if (typeof settlementMethodology !== 'string' || !settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
   const addresses = Object.fromEntries(CONTRACTS.map((name, i) => [name, getCreateAddress({from:deployer,nonce:startNonce+i})]));
   const a = addresses;
   const args = [[], [], [], [admin,a.IvyVault,a.IvyShares,a.IvyPremiums,a.IvyUnwind,exerciseWindow,auctionTimeout],
-    [a.IvyVaultsHub,a.IvyPremiums,a.IvyUnwind,uri], [a.IvyVaultsHub,a.IvyShares], [a.IvyVaultsHub,a.IvyShares], [reportSigner]];
+    [a.IvyVaultsHub,a.IvyPremiums,a.IvyUnwind,uri], [a.IvyVaultsHub,a.IvyShares], [a.IvyVaultsHub,a.IvyShares], [reportSigner], [settlementAdmin,settlementPublisher]];
   const steps = [];
   for (let i = 0; i < CONTRACTS.length; ++i) {
     const name = CONTRACTS[i], artifact = artifacts[name];
@@ -48,7 +52,7 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
     const tx = await new ContractFactory(abi,linkBytecode(artifact,a)).getDeployTransaction(...args[i]);
     steps.push({ name, address:a[name], nonce:startNonce+i, data:tx.data, abi, deployedSize:size, libraryLinks:runtimeLinks(artifact,a) });
   }
-  return {version:2,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
+  return {version:3,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementAdmin,settlementPublisher,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
 }
 
 async function findCreation(provider, plan, step, startBlock) {
@@ -96,6 +100,9 @@ export async function verifyBindings(provider, plan) {
       }
     }
   }
+  const settlement=byName.IvySettlementPriceFeed;
+  if (!(await settlement.hasRole(await settlement.DEFAULT_ADMIN_ROLE(),plan.settlementAdmin))) throw new Error('Settlement admin role missing');
+  if (!(await settlement.hasRole(await settlement.SETTLEMENT_PRICE_PUBLISHER_ROLE(),plan.settlementPublisher))) throw new Error('Settlement publisher role missing');
   const hub=byName.IvyVaultsHub;
   if(!(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(),plan.admin))) throw new Error('Admin role missing');
 }

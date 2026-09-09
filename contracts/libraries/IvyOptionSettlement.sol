@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IIvyVault} from "../interfaces/IIvyVault.sol";
 import {IIvyShares} from "../interfaces/IIvyShares.sol";
-import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
+import {IIvySettlementPriceFeed} from "../interfaces/IIvySettlementPriceFeed.sol";
 import {IvyMath} from "./IvyMath.sol";
 import "../types/IvyTypes.sol";
 
@@ -38,7 +38,7 @@ library IvyOptionSettlement {
                 got = IvyMath.quoteOutFloor(amount, s.strike, s.underlyingUnit);
             }
         } else {
-            uint256 spot = block.timestamp < s.expiry ? _readSpot(t, s.quoteToken) : _readExpiryPrice(s, t);
+            uint256 spot = block.timestamp < s.expiry ? _readExercisePrice(t, s.quoteToken) : _readExpiryPrice(s, t);
             got = s.isCall
                 ? IvyMath.callIntrinsic(amount, s.strike, spot)
                 : IvyMath.putIntrinsic(amount, s.strike, spot, s.underlyingUnit);
@@ -99,14 +99,14 @@ library IvyOptionSettlement {
     }
 
     function _readExpiryPrice(VaultState storage s, VaultTerms storage t) private view returns (uint256 price) {
-        price = IIvyPriceFeed(t.priceFeed).settlementPrice(t.underlying, s.quoteToken, s.expiry);
+        price = IIvySettlementPriceFeed(t.settlementPriceFeed).settlementPrice(t.underlying, s.quoteToken, s.expiry);
         if (price == 0) revert ReportUnavailable();
     }
 
-    function _readSpot(VaultTerms storage t, address quoteToken) private view returns (uint256) {
-        (uint256 price, uint256 updatedAt) = IIvyPriceFeed(t.priceFeed).spot(t.underlying, quoteToken);
-        if (price == 0 || updatedAt > block.timestamp) revert InvalidPrice();
-        if (block.timestamp - updatedAt > t.maxPriceAge) revert StalePrice();
+    function _readExercisePrice(VaultTerms storage t, address quoteToken) private view returns (uint256) {
+        (uint256 price, uint256 updatedAt, uint256 validUntil) = IIvySettlementPriceFeed(t.settlementPriceFeed).exercisePrice(t.underlying, quoteToken);
+        if (price == 0 || updatedAt == 0 || updatedAt > block.timestamp) revert InvalidPrice();
+        if (block.timestamp - updatedAt > t.maxSettlementPriceAge || block.timestamp > validUntil) revert StalePrice();
         return price;
     }
 }

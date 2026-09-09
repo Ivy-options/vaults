@@ -5,9 +5,15 @@
   "collateralAmount": "10000000000000000000",
   "collateralPriceUsdE6": "3000000000",
   "minTradeUsdE6": "10000000000",
-  "supportedTokens": ["WETH_ADDRESS", "USDC_ADDRESS"],
+  "supportedTokens": [
+    "WETH_ADDRESS",
+    "USDC_ADDRESS"
+  ],
   "marketQuotes": {
-    "USDC_ADDRESS_LOWERCASE": {"spot": "3000000000", "outOfTheMoneyBps": 2000}
+    "USDC_ADDRESS_LOWERCASE": {
+      "spot": "3000000000",
+      "outOfTheMoneyBps": 2000
+    }
   },
   "terms": {
     "underlying": "WETH_ADDRESS",
@@ -20,10 +26,18 @@
     "auctionStartsAt": "0",
     "priceFeed": "0x0000000000000000000000000000000000000000",
     "maxInTheMoneyBps": 0,
-    "maxPriceAge": 0
+    "maxPriceAge": 0,
+    "settlementPriceFeed": "0x0000000000000000000000000000000000000000",
+    "maxSettlementPriceAge": 0
   },
-  "pairs": [{
-    "quoteToken": "USDC_ADDRESS",
-    "terms": {"premiumToken": "USDC_ADDRESS", "minPremium": "100000000", "enabled": true}
-  }]
+  "pairs": [
+    {
+      "quoteToken": "USDC_ADDRESS",
+      "terms": {
+        "premiumToken": "USDC_ADDRESS",
+        "minPremium": "100000000",
+        "enabled": true
+      }
+    }
+  ]
 }

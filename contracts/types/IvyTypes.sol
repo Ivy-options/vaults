@@ -19,13 +19,15 @@ struct VaultTerms {
     bool allowPartialExercise;     // fixed at creation; false requires exercising all remaining notional
     bool publicDeposits;           // false = only the vault owner may deposit
     ExercisePolicy allowedExercise;
-    SettlementPolicy allowedSettlement; // Cash requires priceFeed != 0
+    SettlementPolicy allowedSettlement; // Cash requires settlementPriceFeed
     uint64 expiry;               // fixed absolute Unix timestamp, future at creation
     uint64 auctionStartsAt;        // 0 = manual only; else anyone may open the auction from this time
     uint256 minCollateral;         // shares required to open the auction
-    address priceFeed;             // 0 = no oracle checks
+    address priceFeed;             // 0 = no activation spot checks
     uint16 maxInTheMoneyBps;    // calls: strike >= spot*(1-bps); puts: strike <= spot*(1+bps)
     uint32 maxPriceAge;            // seconds; > 0 when priceFeed != 0
+    address settlementPriceFeed;   // immutable authoritative payment source
+    uint32 maxSettlementPriceAge;  // immutable exercise observation age limit
 }
 
 struct PairTerms {

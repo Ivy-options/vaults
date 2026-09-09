@@ -306,7 +306,7 @@
           <h2>Collateral and shares</h2>
           <p class="prose">
             There are three token roles: <strong>asset/underlying</strong> is the option asset, <strong>quote</strong> measures its strike, and <strong>premium</strong> pays for the option. The deposited backing token is called <strong>collateral</strong>; it is not a fourth independent token.
-            They back the seller's obligation to the buyer, so earning a premium
+            The deposits back the seller's obligation to the buyer, so earning a premium
             does not guarantee that LPs will get the same assets or market value
             back. Depositing the underlying creates a covered call; depositing
             the quote token creates a cash-secured put. The examples below show
@@ -622,7 +622,7 @@
             </table>
           </div>
           <p class="prose">The recommended policy matches current behavior: premium and fees are earned at activation; refunds are separately negotiated and funded. LPs may already have claimed premium, so automatic refunds would need an explicit funding or escrow design and fee policy.</p>
-          <p class="prose">The emergency control currently pauses admissions only. A full execution freeze remains a separate protocol-lead decision requiring a specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.</p>
+          <p class="prose">This implementation retains admission-only emergency pause. A full execution freeze would require a separate specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.</p>
         </div>
       </section>
 
@@ -945,7 +945,7 @@
             <div class="row">
               <span class="mono">allowedSettlement</span
               ><span
-                >Physical, Cash, or Either. Cash requires a price feed.</span
+                >Physical, Cash, or Either. Cash requires a separate settlement feed.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">Either → one</span></span
@@ -966,12 +966,16 @@
             <div class="row">
               <span class="mono">maxPriceAge</span
               ><span
-                >Activation and American cash exercise reject old spot prices.
-                Finalized expiry reports do not expire.</span
+                >Activation rejects old indicative spot prices. Settlement freshness is configured separately.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">lower only, never 0</span></span
               >
+            </div>
+            <div class="row">
+              <span class="mono">settlementPriceFeed · maxSettlementPriceAge</span>
+              <span>Cash requires a contract feed and positive maximum observation age. Early cash exercise also checks the report’s validity deadline. Expiry prices are final and do not expire.</span>
+              <span class="term-rule"><span class="term-rule-label">Owner changes</span><span class="chip lp">immutable</span></span>
             </div>
             <div class="row">
               <span class="mono">pairs</span
@@ -1157,7 +1161,7 @@
                   <td>Before, at or after expiry, while Live</td>
                   <td><span class="mono">t ≥ expiry</span></td>
                   <td>
-                    Receive intrinsic value: fresh spot before expiry; finalized
+                    Receive intrinsic value: authoritative exercise observation before expiry; finalized
                     expiry price at/after expiry. Reverts if payout is zero.
                   </td>
                 </tr>
@@ -1174,16 +1178,22 @@
             </table>
           </div>
           <div class="callout" id="expiry-price">
-            <b>Which price is used?</b> American cash exercise before expiry uses
-            fresh spot. At or after expiry, cash exercise and expiration use Ivy’s
-            signed 30-minute average ending at the exact expiry. This finalized
-            report is stored in the price feed and cannot be replaced; later
-            transactions use the same historical price, not current spot. The feed
-            verifies the signature, not the averaging calculation, and supports
-            multisig contract signers. If Ivy cannot publish, the remaining cash
-            position stays locked until a valid report arrives or the parties
-            agree to an <a href="#early-exit">unwind</a>. There is no stale-price
-            or zero-payout fallback.
+            <b>Which price is used?</b> Activation may use an indicative spot feed.
+            Cash payments use a separate settlement feed whose publishers hold
+            <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code>. Before expiry, American cash
+            exercise requires a fresh observation that is still within its validity deadline.
+            At or after expiry, cash exercise and expiration require the write-once price
+            for that exact expiry. There is no indicative-price fallback.
+            Operators calculate the agreed 30-minute expiry average off-chain; the feed
+            checks authority and time bindings, not market-data accuracy. Production sources
+            and calculation rules must be approved before launch.
+            The feed address is fixed per vault, but its admin can rotate publishers.
+            Revocation does not erase observations already published, and finalized expiry
+            prices cannot be corrected. Missing reports keep the remaining obligation locked
+            until an authorized publisher supplies the report or the parties agree to an
+            <a href="#early-exit">unwind</a>. Deadlines and earned premium do not change.
+            See the <a href="../settlement-pricing-spec.md">pricing specification</a> and
+            <a href="../operations.md#reports-exercise-and-expiration">publication runbook</a>.
           </div>
         </div>
       </section>
@@ -1195,7 +1205,7 @@
             <p class="prose">
               The hub coordinates the vault lifecycle, while each vault holds
               its own tokens and reserves. Separate contracts track transferable
-              shares, premium entitlements, unwind consent and signed prices.
+              shares, premium entitlements, unwind consent and authorized prices.
               The responsibilities below explain which contract owns each part
               of the process before the entrypoint reference lists the calls
               available in each phase.
@@ -1233,15 +1243,19 @@
                 </p>
               </div>
               <div>
-                <span class="role">Immutable signer</span
+                <span class="role">Indicative price signer</span
                 ><span class="name">IvyPriceFeed</span>
-                <p>
-                  The feed provides separate lookups for fresh signed spot
-                  prices and finalized expiry prices. Prices are expressed in
-                  the quote token's smallest units per whole underlying token.
-                  See <a href="#expiry-price">expiry pricing and report
-                  availability</a> for the rules used by cash options.
-                </p>
+                <p>Signed spot observations constrain activation when enabled.
+                  Its legacy expiry API remains available, but new cash vaults use
+                  IvySettlementPriceFeed for every payment.</p>
+              </div>
+              <div>
+                <span class="role">Settlement publisher role</span
+                ><span class="name">IvySettlementPriceFeed</span>
+                <p>Authorized publishers submit exercise observations and final expiry prices
+                  directly. Prices use quote-token units per whole underlying. The admin
+                  manages publishers; any one publisher can publish. A multisig can enforce
+                  its own signing threshold. See <a href="#expiry-price">pricing and availability</a>.</p>
               </div>
             </div>
 
@@ -1290,7 +1304,7 @@
             </div>
             <p class="prose">
               Two libraries deploy first, followed by the vault implementation,
-              hub, shares, premium module, unwind module and signed feed.
+              hub, shares, premium module, unwind module, indicative feed and settlement feed.
               Addresses are predicted from a fixed nonce sequence; deployment
               and recovery verify constructor bindings and every embedded
               library link. There are no upgrade, library or module replacement

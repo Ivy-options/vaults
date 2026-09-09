@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { EXERCISE_WINDOW, ExerciseStyle, Phase, SettlementType, USDC_UNIT, WETH_UNIT, deployIvy, fund } from "./helpers/setup.js";
-import { at, goLive, setSpot } from "./helpers/scenarios.js";
+import { at, goLive, setExercisePrice } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;
@@ -105,7 +105,7 @@ describe("exercise", function () {
     it("call pays the intrinsic value in underlying at the current spot", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, vaultAddress } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash });
-      await setSpot(ctx, 3300n * USDC_UNIT);
+      await setExercisePrice(ctx, 3300n * USDC_UNIT);
       const tx = ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 4n * WETH_UNIT);
       await expect(tx).to.emit(ctx.hub, "Exercised").withArgs(vaultId, 4n * WETH_UNIT, 0n, 363_636_363_636_363_636n);
       await expect(tx).to.changeTokenBalances(ethers, ctx.weth, [ctx.marketMaker, vaultAddress], [363_636_363_636_363_636n, -363_636_363_636_363_636n]);
@@ -115,7 +115,7 @@ describe("exercise", function () {
     it("put pays the intrinsic value in quote", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, vaultAddress } = await goLive(ctx, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash });
-      await setSpot(ctx, 2700n * USDC_UNIT);
+      await setExercisePrice(ctx, 2700n * USDC_UNIT);
       const tx = ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 4n * WETH_UNIT);
       await expect(tx).to.emit(ctx.hub, "Exercised").withArgs(vaultId, 4n * WETH_UNIT, 0n, 1200n * USDC_UNIT);
       await expect(tx).to.changeTokenBalances(ethers, ctx.usdc, [ctx.marketMaker, vaultAddress], [1200n * USDC_UNIT, -1200n * USDC_UNIT]);
@@ -124,7 +124,7 @@ describe("exercise", function () {
     it("out of the money reverts", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash });
-      await setSpot(ctx, 2900n * USDC_UNIT);
+      await setExercisePrice(ctx, 2900n * USDC_UNIT);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "NothingToExercise");
     });
 
@@ -132,7 +132,7 @@ describe("exercise", function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash });
       await networkHelpers.time.increaseTo(bid.expiry - 3n);
-      await setSpot(ctx, 3300n * USDC_UNIT);
+      await setExercisePrice(ctx, 3300n * USDC_UNIT);
       await at(ctx, bid.expiry - 1n);
       await ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT);
       await at(ctx, bid.expiry);
@@ -142,7 +142,7 @@ describe("exercise", function () {
     it("European cash opens at expiry and requires the expiry report", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
-      await setSpot(ctx, 3300n * USDC_UNIT);
+      await setExercisePrice(ctx, 3300n * USDC_UNIT);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ExerciseNotOpenYet");
       await at(ctx, bid.expiry);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "ReportUnavailable");
@@ -151,7 +151,7 @@ describe("exercise", function () {
     it("a stale price reverts", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
       const { vaultId } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash });
-      await setSpot(ctx, 3300n * USDC_UNIT, 3601n);
+      await setExercisePrice(ctx, 3300n * USDC_UNIT, 3601n);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(ctx.hub, "StalePrice");
     });
   });

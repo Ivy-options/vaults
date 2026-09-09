@@ -1,10 +1,10 @@
 # Stakeholder feedback: developer task plan
 
-Date: 2026-09-08. Status: proposed work, not an approved pricing specification.
+Date: 2026-09-08. Implementation authorized 2026-09-09. The accepted pricing decisions are recorded in [settlement-pricing-spec.md](settlement-pricing-spec.md).
 
-Scope: feedback points 1, 2, 4, 5 and 6. Point 3 (`marketMaker` naming) is explicitly excluded. Point 7 was blank. This plan assigns responsibilities for later work; it does not change contract behavior.
+Scope: feedback points 1, 2, 4, 5 and 6. Point 3 (`marketMaker` naming) is explicitly excluded. Point 7 was blank. This plan records responsibilities and acceptance criteria; the linked pricing specification governs the subsequent contract changes.
 
-## Current baseline
+## Baseline before this work
 
 - Unwind and platform fees already exist in contracts and `docs/operations.md`. The website has an early-exit explanation and brief fee coverage. Improve visibility and completeness rather than reimplementing those features.
 - Premium is collected at activation, net of the platform fee. LP premium can be claimed immediately. An unwind refund is separately funded by its executing sponsor; earned premium and fees are not clawed back.

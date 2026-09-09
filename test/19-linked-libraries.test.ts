@@ -14,7 +14,7 @@ describe('fixed linked libraries', function () {
     const artifacts = await loadArtifacts();
     const plan = await buildDeploymentPlan({ artifacts, chainId: (await admin.provider!.getNetwork()).chainId,
       genesisHash: (await admin.provider!.getBlock(0))!.hash, deployer: admin.address,
-      startNonce: await admin.getNonce(), admin: admin.address, reportSigner: admin.address });
+      startNonce: await admin.getNonce(), admin: admin.address, reportSigner: admin.address, settlementAdmin: admin.address, settlementPublisher: admin.address, settlementMethodology: "synthetic local test observations" });
     const journal = await resumeDeployment(admin, plan);
     return { admin, artifacts, plan, journal };
   }

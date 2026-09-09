@@ -22,6 +22,12 @@ export async function setSpot(ctx: IvyContext, price: bigint, ageSeconds = 0n) {
   await (await ctx.feed.set(ctx.wethAddress, ctx.usdcAddress, price, now - ageSeconds)).wait();
 }
 
+/** Writes only the authoritative mock; activation observations remain independent. */
+export async function setExercisePrice(ctx: IvyContext, price: bigint, ageSeconds = 0n) {
+  const now = BigInt(await ctx.networkHelpers.time.latest());
+  await ctx.settlementFeed.set(ctx.wethAddress, ctx.usdcAddress, price, now - ageSeconds, now + 3600n);
+}
+
 /** Makes the next mined block carry exactly `timestamp`. */
 export async function at(ctx: IvyContext, timestamp: bigint) {
   await ctx.networkHelpers.time.setNextBlockTimestamp(timestamp);
@@ -42,7 +48,7 @@ export interface VaultOptions {
 export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
   const isCall = o.isCall ?? true;
   const feedTerms: Partial<VaultTermsInput> = o.withFeed
-    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, maxInTheMoneyBps: 1000, allowedSettlement: SettlementPolicy.Either }
+    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, settlementPriceFeed: ctx.settlementFeedAddress, maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, allowedSettlement: SettlementPolicy.Either }
     : {};
   const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR;
   const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });

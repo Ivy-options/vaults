@@ -32,6 +32,8 @@ export interface VaultTermsInput {
   priceFeed: string;
   maxInTheMoneyBps: number;
   maxPriceAge: number;
+  settlementPriceFeed: string;
+  maxSettlementPriceAge: number;
 }
 
 export interface PairTermsInput {
@@ -55,6 +57,7 @@ export async function deployIvy(connection: Connection) {
   const usdc = await ethers.deployContract("MockERC20", ["USD Coin", "USDC", 6]);
   const dai = await ethers.deployContract("MockERC20", ["Dai", "DAI", 18]);
   const feed = await ethers.deployContract("MockPriceFeed");
+  const settlementFeed = await ethers.deployContract("MockSettlementPriceFeed");
   const vaultImpl = await ethers.deployContract("IvyVault");
   const vaultImplAddress = await vaultImpl.getAddress();
   const rules = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyVaultRules")).bytecode, admin).deploy();
@@ -91,6 +94,8 @@ export async function deployIvy(connection: Connection) {
     usdc,
     dai,
     feed,
+    settlementFeed,
+    settlementFeedAddress: await settlementFeed.getAddress(),
     wethAddress: await weth.getAddress(),
     usdcAddress: await usdc.getAddress(),
     daiAddress: await dai.getAddress(),
@@ -119,6 +124,8 @@ export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Va
     auctionStartsAt: 0n,
     minCollateral: 0n,
     priceFeed: ZeroAddress,
+    settlementPriceFeed: ZeroAddress,
+    maxSettlementPriceAge: 0,
     maxInTheMoneyBps: 0,
     maxPriceAge: 0,
     ...o,

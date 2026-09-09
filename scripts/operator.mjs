@@ -18,6 +18,12 @@ const fields = (type,value) => Object.fromEntries(type.map(f=>[f.name,required(v
 /** Read-only preflight. USD values use six decimals; token quantities use raw token units. */
 export async function prepareVault(provider, request) {
   const r=request, t={...required(r,'terms'),publicDeposits:r.terms.publicDeposits??false};
+  required(t,'settlementPriceFeed'); required(t,'maxSettlementPriceAge');
+  if (Number(t.allowedSettlement) !== 0) {
+    if (t.settlementPriceFeed === ZeroAddress || await provider.getCode(t.settlementPriceFeed) === '0x') throw new Error('Cash settlement requires a contract settlementPriceFeed');
+    if (BigInt(t.maxSettlementPriceAge) <= 0n) throw new Error('Cash settlement requires positive maxSettlementPriceAge');
+    if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
+  }
   if(typeof required(t,'allowPartialExercise')!=='boolean') throw new Error('allowPartialExercise must be boolean');
   const pairs=required(r,'pairs').map(p=>({quoteToken:p.quoteToken,terms:{...p.terms}}));
   const allowed=new Set(required(r,'supportedTokens').map(a=>a.toLowerCase()));
@@ -40,7 +46,7 @@ export async function prepareVault(provider, request) {
     if(spot<=0n||bps<0n||(!call&&bps>=10000n)) throw new Error('Invalid strike inputs');
     pair.terms.strikeLimit=call?(spot*(10000n+bps)+9999n)/10000n:spot*(10000n-bps)/10000n;
   }
-  return {terms:t,pairs,valueUsdE6};
+  return {terms:t,pairs,valueUsdE6,settlementMethodology:r.settlementMethodology};
 }
 
 export async function prepareOperation(provider, artifacts, command, r) {
@@ -51,7 +57,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
   if(command==='typed-report') {
     if(!['spot','expiry'].includes(r.kind)) throw new Error('Report kind must be spot or expiry');
     const name=r.kind==='spot'?'SpotReport':'ExpiryReport';
-    return {domain:domain('IvyPriceFeed','1',required(r,'feed')),types:{[name]:REPORT_TYPES[name]},value:fields(REPORT_TYPES[name],r.report)};
+    return {pricingAuthority:'legacy/indicative only; does not supply new cash vault settlement prices',domain:domain('IvyPriceFeed','1',required(r,'feed')),types:{[name]:REPORT_TYPES[name]},value:fields(REPORT_TYPES[name],r.report)};
   }
   if(command==='typed-bid') {
     const s=await hub.stateOf(r.vaultId), p=await hub.pairTermsOf(r.vaultId,r.bid.quoteToken);
@@ -78,9 +84,21 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const platformFeeBps=await hub.platformFeeBps(), maxPlatformFeeBps=await hub.maxPlatformFeeBps(r.vaultId);
     const platformFee=totalPremium*platformFeeBps/10000n;
     detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,maxPlatformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
+  } else if(command==='publish-settlement-exercise'||command==='publish-settlement-expiry') {
+    target=new Contract(required(r,'settlementFeed'),artifacts.IvySettlementPriceFeed.abi,runner);
+    const exercise=command==='publish-settlement-exercise', type=exercise?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
+    method=exercise?'publishExercisePrice':'publishExpiry';args=type.map(f=>required(r.report,f.name));
+    if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
+    detail={pricingAuthority:'authoritative cash settlement',settlementFeed:r.settlementFeed,report:fields(type,r.report),units:'integer quote-token units per whole underlying token',settlementMethodology:r.settlementMethodology};
+  } else if(command==='grant-settlement-publisher'||command==='revoke-settlement-publisher') {
+    target=new Contract(required(r,'settlementFeed'),artifacts.IvySettlementPriceFeed.abi,runner);
+    method=command==='grant-settlement-publisher'?'grantRole':'revokeRole';
+    args=[await target.SETTLEMENT_PRICE_PUBLISHER_ROLE(),required(r,'account')];
+    detail={pricingAuthority:'authoritative cash settlement',account:r.account};
   } else if(command==='publish-spot'||command==='publish-expiry') {
     target=new Contract(required(r,'feed'),artifacts.IvyPriceFeed.abi,runner);
     const spot=command==='publish-spot', type=spot?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
+    detail={pricingAuthority:'legacy/indicative only; does not supply new cash vault settlement prices'};
     method=spot?'publishSpot':'publishExpiry';args=[...type.map(f=>required(r.report,f.name)),r.signature];
   } else {
     const actions={'set-platform-fee':['setPlatformFeeBps',[r.rateBps]],'set-platform-treasury':['setPlatformTreasury',[r.recipient]],'set-transfers':['setTransfersEnabled',[r.enabled]],deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};

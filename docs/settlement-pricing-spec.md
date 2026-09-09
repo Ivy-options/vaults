@@ -1,6 +1,6 @@
 # Authoritative cash settlement pricing
 
-Status: **proposed; pricing policy requires protocol acceptance before contract implementation**. This is the Task 3 deliverable in [the stakeholder plan](stakeholder-feedback-task-plan.md). It does not itself authorize a production source, operator or deployment. The policies below are a concrete recommendation for review.
+Status: **accepted for implementation on 2026-09-09 following the user’s instruction to continue with this specification**. This is the Task 3 deliverable in [the stakeholder plan](stakeholder-feedback-task-plan.md). It does not itself authorize a production source, operator or deployment. The policies below define the implementation; production identities and market-data methodology remain deployment-specific choices.
 
 ## Payment authority and routing
 
@@ -57,7 +57,7 @@ A newly published observation affects subsequent eligible exercise transactions 
 
 Key final prices by `(underlying, quote, expiry)`. Require nonzero expiry and `block.timestamp >= expiry`. A publication is accepted only through its `validUntil` submission deadline, inclusively. Once a positive price is stored, reject every second publication for that key, including identical values and administrator submissions. Final prices remain readable indefinitely; the publication deadline does not expire a finalized price.
 
-Recommend immediate write-once finality, without a challenge period. Review the calculation before submitting the transaction. There is no administrative correction or deletion and no retroactive change to completed payouts. A mistaken final report remains the contractual price; incident response cannot promise an on-chain reversal. This irreversible trust choice requires explicit acceptance.
+Use immediate write-once finality, without a challenge period. Review the calculation before submitting the transaction. There is no administrative correction or deletion and no retroactive change to completed payouts. A mistaken final report remains the contractual price; incident response cannot promise an on-chain reversal. This irreversible trust choice is part of the accepted implementation policy.
 
 Late historical publication is permitted without an arbitrary settlement cutoff: reconstruct the agreed historical calculation for the original expiry and submit a new transaction with a current submission deadline. Never substitute the current market price or change the expiry to make publication possible.
 
@@ -101,6 +101,6 @@ Test authorization and read behavior through public feed APIs; test routing and 
 - Accounting: missing report reverts without releasing buyer obligations; recovery completes payment; partial exercise followed by expiration cannot pay twice; premium, treasury fees and buyer reserves remain isolated; physical behavior remains unchanged.
 - Integration: deployment role bindings, clean local rehearsal, unauthorized tooling publication, missing-report recovery, examples matching ABI; compile, typecheck, full contract tests, deployed-size checks and docs checks.
 
-## Acceptance still required
+## Production configuration still required
 
-Protocol approval must confirm the proposed American exercise support, direct role publication, immediate irreversible expiry finality, shared mutable publisher authority, observation-survival policy and locked-obligation recovery behavior before Tasks 4 and 5 proceed. Production readiness separately requires named admin/operator accounts and the approved per-pair methodology and freshness configuration. No approval is implied by this document's existence.
+The implementation retains American exercise support, direct role publication, immediate irreversible expiry finality, shared mutable publisher authority, observation-survival policy and locked-obligation recovery. Production readiness separately requires named admin/operator accounts and the approved per-pair methodology and freshness configuration. Local implementation and tests do not authorize production deployment or price publication.
