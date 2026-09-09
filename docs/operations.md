@@ -33,6 +33,8 @@ Append `--send` only when deliberately submitting. Submission uses `eth_sendTran
 
 ## Deploy and recover
 
+The Hub suite and the permanent release registry have separate deployments and journals. Follow the [release registry guide](version-registry.md) to deploy the directory, register a verified suite, select a recommendation and resolve a particular release. An explicit-Hub request continues to work without registry discovery.
+
 1. Choose a dedicated deployer, Hub administrator and immutable indicative report signer. The Hub administrator should be a multisig in production. A contract indicative signer must implement ERC-1271. No settlement publisher or settlement methodology is needed for physical-only deployment. Compile the exact build you intend to deploy. Use the same build when resuming.
 2. Fill `deployment.json` with RPC, deployer, admin and reportSigner. Defaults are exerciseWindow 3600 seconds and auctionTimeout 259200 seconds. Generate the plan using `node` directly so redirected JSON has no npm command banner:
 

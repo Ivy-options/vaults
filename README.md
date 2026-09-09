@@ -4,6 +4,8 @@ Single-use covered-call and cash-secured-put vaults with optional pooling and ga
 
 The deployment is immutable. There is no hub proxy, upgrade entrypoint, implementation setter, or module rewiring. This build creates a fresh deployment; it cannot upgrade an older hub.
 
+`IvyVaultsRegistry` provides a permanent discovery address for multiple immutable releases. Its administrator can add a release and recommend it for new vaults; registered Hub addresses and manifest hashes cannot be replaced or removed. Transactions continue to target the selected Hub directly. Older vaults keep their original Hub, modules and claim paths. See [release operations and frontend integration](docs/version-registry.md).
+
 | Contract                      | Responsibility                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------- |
 | `IvyVaultsHub`                | Lifecycle, bids, delegation, guarded entrypoints and role-authorized settlement prices |
@@ -14,6 +16,7 @@ The deployment is immutable. There is no hub proxy, upgrade entrypoint, implemen
 | `IvyPriceFeed`                | Signed indicative activation prices; retained legacy expiry-report API          |
 | `IvyVaultRules` library       | Creation validation and owner-authorized term tightening                        |
 | `IvyOptionSettlement` library | Exercise, cash settlement and residual LP claim implementation                  |
+| `IvyVaultsRegistry`           | Separately deployed release directory with permanent registrations and an admin-selected recommendation |
 
 The hub links to two separately deployed Solidity libraries. Their addresses are embedded in hub bytecode and cannot be changed. Calls execute against hub storage under its existing authorization and reentrancy guards. The deployment journal verifies the fixed library links along with constructor bindings.
 

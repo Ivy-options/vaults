@@ -49,6 +49,7 @@
           <a href="#makers">Bidding and exercise</a>
           <a href="#cash-settlement">Optional cash settlement</a>
           <a href="#terms">Vault terms</a>
+          <a href="#versions">Versions and existing vaults</a>
           <a href="#developers">Contracts and entrypoints</a>
         </nav>
       </details>
@@ -1333,6 +1334,50 @@
               >
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="versions">
+        <div class="main">
+          <h2>Versions and existing vaults</h2>
+          <p class="prose">
+            Each Ivy deployment has fixed code and contract bindings. New
+            features can be introduced in a new release, while existing vaults
+            continue through their original Hub. Releasing new code does not
+            migrate deposits or change the code controlling an older position.
+          </p>
+          <div class="deal-compare">
+            <div>
+              <h4>Starting a new vault</h4>
+              <p>The frontend can look up the recommended release through
+                <code>IvyVaultsRegistry</code>, a separately deployed contract
+                with a permanent discovery address. The user selects that
+                release and sends the creation transaction directly to its Hub.</p>
+            </div>
+            <div>
+              <h4>Returning to an existing vault</h4>
+              <p>The position keeps its original chain, Hub address and vault
+                ID. Exercise, expiration and claims continue through that Hub,
+                even after another release becomes recommended. Vault IDs are
+                local to a Hub; two releases can both have a vault numbered 1.</p>
+            </div>
+          </div>
+          <p class="prose">
+            The registry administrator can add a release and change the
+            recommendation. Existing registrations cannot be replaced or
+            deleted, and the registry has no authority over vault funds.
+            Changing the recommendation does not pause an older Hub or prevent
+            direct access to it. Registration identifies a release; it does not
+            prove that the release has been audited.
+          </p>
+          <p class="prose">
+            Fixed code also means a defect in a deployed vault cannot be
+            patched in place. Its original settlement and agreed-unwind rules
+            continue to apply. The administrative powers already described in
+            this guide, including admission pauses, share-transfer controls and
+            optional cash-price publication, remain part of each deployment.
+            See the <a href="../version-registry.md">release and integration guide</a>.
+          </p>
         </div>
       </section>
 

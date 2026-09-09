@@ -3,6 +3,8 @@ import { readFile, writeFile, rename } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { AbiCoder, Contract, Interface, JsonRpcProvider, VoidSigner, ZeroAddress, id, keccak256 } from 'ethers';
 import { CONTRACTS, artifactPath, buildDeploymentPlan, resumeDeployment, json } from './deployment.mjs';
+import { buildRegistryDeploymentPlan, resumeRegistryDeployment } from './registry-deployment.mjs';
+import { REGISTRY_ABI, verifyRelease, resolveRelease } from './releases.mjs';
 export const BID_TYPES = {Bid:[['vaultId','uint256'],['marketMaker','address'],['quoteToken','address'],['strike','uint256'],['premium','uint256'],['style','uint8'],['settlement','uint8'],['expiry','uint64'],['validUntil','uint64'],['nonce','uint256'],['auctionId','uint256'],['collateralAmount','uint256'],['pairHash','bytes32'],['executor','address'],['recipient','address']].map(([name,type])=>({name,type}))};
 export const UNWIND_TYPES = {UnwindAgreement:[['vaultId','uint256'],['nonce','uint256'],['deadline','uint64'],['exercisedNotional','uint256'],['supply','uint256'],['refund','uint256']].map(([name,type])=>({name,type}))};
 export const REPORT_TYPES = {
@@ -48,7 +50,13 @@ export async function prepareVault(provider, request) {
   return {terms:t,pairs,valueUsdE6,settlementMethodology:r.settlementMethodology};
 }
 
+/** @returns {Promise<any>} Prepared calldata or typed data; never sends a transaction. */
 export async function prepareOperation(provider, artifacts, command, r) {
+  let release;
+  if (r.registry && !['register-version','recommend-version'].includes(command)) {
+    release=await resolveRelease(provider,r,artifacts,{allowRecommended:command==='prepare-vault'});
+    r={...r,hub:release.hub}; artifacts=release.artifacts;
+  }
   const chainId=String((await provider.getNetwork()).chainId);
   const runner=new VoidSigner(required(r,'sender'),provider);
   const hub=r.hub?new Contract(r.hub,artifacts.IvyVaultsHub.abi,runner):null;
@@ -68,7 +76,15 @@ export async function prepareOperation(provider, artifacts, command, r) {
     return {domain:domain('IvyUnwind','1',address),types:UNWIND_TYPES,value:fields(UNWIND_TYPES.UnwindAgreement,a)};
   }
   let target=hub, method, args, detail;
-  if(command==='prepare-vault') {
+  if(command==='register-version'||command==='recommend-version') {
+    target=new Contract(required(r,'registry'),REGISTRY_ABI,runner);
+    if(command==='register-version') {
+      const verified=await verifyRelease(provider,required(r,'releaseBundle'),artifacts);
+      if(r.hub && r.hub.toLowerCase()!==verified.hub.toLowerCase()) throw new Error('Hub and release mismatch');
+      method='registerVersion';args=[required(r,'releaseId'),verified.hub,verified.manifestHash];
+      detail={hub:verified.hub,manifestHash:verified.manifestHash,releaseId:r.releaseId};
+    } else { method='setRecommendedVersion';args=[required(r,'releaseId')];detail={hub:await target.hubOf(r.releaseId),releaseId:r.releaseId}; }
+  } else if(command==='prepare-vault') {
     detail=await prepareVault(provider,r); detail.maxPlatformFeeBps=await hub.platformFeeBps(); method='createVault';args=[detail.terms,detail.pairs];
   } else if(command==='inspect-bid'||command==='activate') {
     method='activate';args=[r.vaultId,r.bid,r.signature];
@@ -131,7 +147,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
   }
   await target[method].staticCall(...args);
   const data=target.interface.encodeFunctionData(method,args);
-  return {chainId,from:r.sender,to:await target.getAddress(),data,value:'0',method,detail};
+  return {chainId,from:r.sender,to:await target.getAddress(),data,value:'0',method,detail,...(release?{release:{registry:release.registry,releaseId:release.releaseId,hub:release.hub,manifestHash:release.manifestHash}}:{})};
 }
 
 async function main() {
@@ -140,6 +156,24 @@ async function main() {
   const r=JSON.parse(await readFile(file,'utf8'));
   const provider=new JsonRpcProvider(required(r,'rpc'));
   const artifacts=await loadArtifacts();
+  if(r.releaseBundleFile) r.releaseBundle=JSON.parse(await readFile(r.releaseBundleFile,'utf8'));
+  if(command==='prepare-release-bundle') {
+    const manifest=JSON.parse(await readFile(r.planFile,'utf8'));
+    const journal=JSON.parse(await readFile(r.journalFile,'utf8'));
+    const bundle={format:1,interfaceFormat:'ivy-vaults-v2',manifest,journal,artifacts};
+    await verifyRelease(provider,bundle,artifacts);console.log(json(bundle));return;
+  }
+  if(command==='prepare-registry-deployment'||command==='deploy-registry') {
+    const artifact=JSON.parse(await readFile(new URL('../artifacts/contracts/IvyVaultsRegistry.sol/IvyVaultsRegistry.json',import.meta.url),'utf8'));
+    if(command==='prepare-registry-deployment') {
+      console.log(json(await buildRegistryDeploymentPlan({...r,artifact,chainId:(await provider.getNetwork()).chainId,genesisHash:(await provider.getBlock(0)).hash,startNonce:await provider.getTransactionCount(r.deployer,'pending')})));return;
+    }
+    if(!flags.includes('--send')) throw new Error('Registry deployment requires --send');
+    const plan=JSON.parse(await readFile(r.planFile,'utf8'));
+    let journal={};try {journal=JSON.parse(await readFile(r.journalFile,'utf8'));} catch(e) {if(e.code!=='ENOENT')throw e;}
+    const persist=async j=>{await writeFile(r.journalFile+'.tmp',json(j));await rename(r.journalFile+'.tmp',r.journalFile);};
+    console.log(json(await resumeRegistryDeployment(await provider.getSigner(plan.deployer),plan,artifact,journal,persist)));return;
+  }
   if(command==='prepare-deployment') {
     const plan=await buildDeploymentPlan({...r,artifacts,chainId:(await provider.getNetwork()).chainId,genesisHash:(await provider.getBlock(0)).hash,startNonce:await provider.getTransactionCount(r.deployer,'pending')});
     console.log(json(plan));return;

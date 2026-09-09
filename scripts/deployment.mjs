@@ -51,7 +51,7 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
   return {version:6,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
 }
 
-async function findCreation(provider, plan, step, startBlock) {
+export async function findCreation(provider, plan, step, startBlock) {
   const latest = await provider.getBlockNumber();
   for(let n = startBlock; n <= latest; n++) {
     const block = await provider.getBlock(n,true);
@@ -61,7 +61,7 @@ async function findCreation(provider, plan, step, startBlock) {
   }
   throw new Error(`Cannot verify creation transaction for ${step.name}; refusing to adopt existing code`);
 }
-async function verifyCreation(provider, plan, step, hash) {
+export async function verifyCreation(provider, plan, step, hash) {
   const tx = await provider.getTransaction(hash);
   const receipt = await provider.getTransactionReceipt(hash);
   if(!tx || !receipt || receipt.status !== 1 || tx.to !== null || tx.from.toLowerCase() !== plan.deployer.toLowerCase()
@@ -72,7 +72,7 @@ async function verifyCreation(provider, plan, step, hash) {
   return keccak256(code);
 }
 
-export async function verifyBindings(provider, plan) {
+export async function verifyBindings(provider, plan, { requireInitialAdmin = true } = {}) {
   const a = plan.addresses;
   const byName = Object.fromEntries(plan.steps.map(s => [s.name,new Contract(s.address,s.abi,provider)]));
   const checks = [
@@ -97,7 +97,7 @@ export async function verifyBindings(provider, plan) {
     }
   }
   const hub=byName.IvyVaultsHub;
-  if(!(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(),plan.admin))) throw new Error('Admin role missing');
+  if(requireInitialAdmin && !(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(),plan.admin))) throw new Error('Admin role missing');
 }
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */

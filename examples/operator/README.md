@@ -4,6 +4,12 @@ These files are templates. Replace uppercase address/timestamp/amount placeholde
 
 - `deployment.json`: read-only `prepare-deployment` input. Save its output as deployment-plan.json. It predicts eight deployments, including the two linked libraries before the hub and the indicative feed. Deployment starts physical-only with cashSettlementEnabled false and no settlement publishers. No publisher or settlement methodology is required to deploy; an optional settlementMethodology metadata reference may be saved in the plan.
 - `deployment-run.json`: explicit deployment/resume input. Keep its journal between attempts.
+- `registry-deployment.json`: `prepare-registry-deployment` input for the separate permanent directory. Save the result as `registry-plan.json`; this does not change the eight-contract Hub deployment sequence.
+- `registry-resume.json`: `deploy-registry` input referencing that registry plan and its own recovery journal. Execution requires `--send`.
+- `release-bundle.json`: `prepare-release-bundle` input referencing a completed Hub plan and journal. Run from that release's matching build and save the verified output as `release-1.json`.
+- `registry-register.json`: `register-version` input naming the registry, release ID and saved bundle. Simulation verifies deployment evidence and binds the bundle hash; submission requires `--send`.
+- `registry-recommend.json`: `recommend-version` input. This separate administrative action selects an already registered release; it does not pause or upgrade any Hub.
+- `registry-claim.json`: `claim` through an explicitly selected registry release, with the position's local vault ID and share amount. It still sends directly to the original Hub, regardless of the current recommendation.
 - `vault.json`: private physical covered-call preparation, 10 WETH, 20% OTM, illustrative configurable $10,000 minimum. Token and price inputs must be reviewed for the target chain.
 - `cash-vault.json`: optional cash covered-call preparation after explicit publisher grant and feature activation; includes the required methodology reference and positive observation age.
 - `bid.json`: `typed-bid` input. Copy its complete output `value` into an activation request's `bid` and obtain the buyer signature; `activation.json` shows the envelope.
@@ -16,6 +22,8 @@ These files are templates. Replace uppercase address/timestamp/amount placeholde
 - `unwind-proposal.json`: owner/buyer proposal. After proposing, use the common envelope with `typed-unwind`, sign its output as buyer and collect holder `approve-unwind` transactions with the returned nonce. `unwind-execution.json` is the sponsor's execution request, after premium-token approval.
 
 Use `node scripts/operator.mjs <command> file.json > prepared.json` when capturing JSON to disk. `npm run operator -- ...` also works interactively but adds npm's banner to stdout. No template is submitted unless the operator explicitly uses `--send`.
+
+Follow the [release and integration guide](../../docs/version-registry.md) for the complete registry workflow. For normal operations, add `registry`, `releaseId` and `releaseBundleFile`, or retain an explicit `hub` address. When both are present, they must agree. Only `prepare-vault` may omit `releaseId` to use the recommendation; an existing position always keeps its original Hub and local vault ID. Each CLI invocation prepares anew, so pin the release ID when repeating a prepared request. The current tooling supports bundle format 1 and the `ivy-vaults-v2` interface with Hub manifest format 6; incompatible releases require matching tooling.
 
 Set `terms.allowPartialExercise` explicitly in `vault.json`: false requires full exercise, true permits partial exercise. The choice is fixed before deposits and cannot be changed later.
 
