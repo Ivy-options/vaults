@@ -17,6 +17,10 @@ Acceptance criteria:
 - Update deployment plans to version 5, default examples to physical delivery and the runbook to explicit later cash activation. Preserve interrupted-deployment verification and require methodology only for cash operations.
 - Test through existing public Hub/vault/helper and operator seams, review Standards and Spec independently, fix actionable feedback, then run compilation, typecheck, full regression tests, size and docs checks.
 
+Completed in `b4d059a`. Deployment starts with zero publishers; first-member grants and last-member removals control new cash admissions while existing positions retain their rights. The updated operator rehearsal completes physical delivery before explicitly enabling cash.
+
+Validation: all 207 tests passed, together with compilation, type checking, deployed-size and documentation checks. The Hub is 23,131 bytes, below the 24,576-byte limit. The launch guide was visually checked. Independent Standards and Spec reviewers each returned zero actionable findings and were satisfied; no further code-fix round was needed. This constructor ABI change requires a fresh deployment.
+
 ## Earlier Hub-owned pricing revision — 2026-09-09
 
 The user subsequently replaced the standalone settlement-feed design with Hub-owned storage and publication authority. This revision supersedes the earlier architecture while retaining its price-validation, finality and accounting policies. The current source of truth is [settlement-pricing-spec.md](settlement-pricing-spec.md).
