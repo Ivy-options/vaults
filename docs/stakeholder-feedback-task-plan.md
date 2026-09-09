@@ -16,6 +16,10 @@ Revision acceptance criteria:
 - Preserve exact pair/expiry finality, early-exercise freshness/validity, publisher rotation, locked obligations, premium/fee isolation and indicative-price independence.
 - Update deployment/tooling/examples/docs and review the diff from `f369556`; verify EOA/helper authorization, regressions and deployed Hub size.
 
+Revision completed in `214b23a`. The Hub owns publisher roles and prices; settlement reads its storage directly. An authorized EOA can publish without a settlement contract, and the optional authenticated helper uses the same role. Default deployment now contains eight contracts and uses manifest version 4.
+
+Validation: all 197 tests passed, including EOA/helper authorization, exact-expiry routing, shared Hub prices and operator recovery. Compilation, type checking, documentation checks and deployed-size checks passed; the Hub is 22,842 bytes against the 24,576-byte limit. Independent Standards and Spec reviewers each returned zero findings and were satisfied with the candidate. The constructor and vault-term ABI changes require a fresh deployment.
+
 ## Earlier completion record — 2026-09-09
 
 Tasks 1–7 are implemented, with point 3’s naming change excluded as requested. The implementation retains admission-only pause and separately funded unwind refunds. The accepted pricing specification covers the decisions required by Task 3; new contracts, tooling and examples implement Tasks 4 and 5.
