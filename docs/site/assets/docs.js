@@ -33,7 +33,8 @@
     themeBtn.textContent = "Theme · " + currentTheme();
   }
 
-  // LP total value including earned premium (quote terms) as a function of spot, for the fully-in-the-money case.
+  // LP value with premium (quote terms), assuming full physical exercise when
+  // in the money and no exercise otherwise. Market price only values the tokens.
   // call: D*min(S,K) + P (hold = D*S).  put: N*min(S,K) + P (hold = C).
   function drawPayoff(svg, o) {
     var W = 420,
@@ -190,11 +191,10 @@
     var dep = parseFloat($("dep").value);
     var K = parseFloat($("strike").value);
     var p = parseFloat($("prem").value);
-    var S = parseFloat($("spot").value);
     var days = parseFloat($("days").value);
     var entryPrice = parseFloat($("entryPrice").value);
     var N = kind === "call" ? dep : K > 0 ? dep / K : 0;
-    return { kind: kind, D: dep, C: dep, K: K, p: p, S: S, N: N, P: p * N, days: days, entryPrice: entryPrice };
+    return { kind: kind, D: dep, C: dep, K: K, p: p, N: N, P: p * N, days: days, entryPrice: entryPrice };
   }
 
   function render() {
@@ -206,17 +206,16 @@
     var premiumYield = o.P / initialValue * 100;
     var premiumApr = premiumYield * 365 / o.days;
     var valid =
-      [o.D, o.K, o.p, o.S, o.N, o.P, o.days, initialValue, premiumYield, premiumApr].every(Number.isFinite) &&
+      [o.D, o.K, o.p, o.N, o.P, o.days, initialValue, premiumYield, premiumApr].every(Number.isFinite) &&
       o.D > 0 &&
       o.K > 0 &&
-      o.S > 0 &&
       o.p >= 0 &&
       o.days > 0 &&
       initialValue > 0;
     $("calcError").hidden = valid;
     $("calcError").textContent = valid
       ? ""
-      : "Enter positive deposit, strike, expiry price and days committed, a positive value for today’s WETH price for calls, and a non-negative premium. Values must stay within the calculator’s numeric range.";
+      : "Enter positive deposit, strike and days committed, a positive value for today’s WETH price for calls, and a non-negative premium. Values must stay within the calculator’s numeric range.";
     if (!valid) {
       $("rows").innerHTML = "";
       $("calcChart").innerHTML = "";
@@ -231,32 +230,22 @@
     $("premiumApr").textContent = fmt(premiumApr, 2) + "%";
     var rows;
     if (o.kind === "call") {
-      var payoutCall = o.S > o.K ? (o.N * (o.S - o.K)) / o.S : 0;
       rows = [
-        ["Physical, expired without exercise", o.D, o.P, "pays premium only"],
+        ["Expired without exercise", o.D, o.P, "pays premium only"],
         [
-          "Physical, fully exercised",
+          "Fully exercised",
           0,
           o.D * o.K + o.P,
           "pays " + fmt(o.D * o.K, 2) + " USDC, takes " + fmt(o.D, 6) + " WETH",
         ],
-        [
-          "Cash at finalized expiry price",
-          o.D - payoutCall,
-          o.P,
-          payoutCall > 0
-            ? "receives " + fmt(payoutCall, 6) + " WETH"
-            : "no intrinsic value, receives 0",
-        ],
       ];
       $("calcNote").textContent =
-        "Cash payout = remaining × max(expiry price − strike, 0) / expiry price, in WETH.";
+        "Physical call: exercised WETH leaves the pool; USDC paid at the strike stays for LPs. Premium is claimed separately.";
     } else {
-      var payoutPut = o.S < o.K ? o.N * (o.K - o.S) : 0;
       rows = [
-        ["Physical, expired without exercise", 0, o.C + o.P, "pays premium only"],
+        ["Expired without exercise", 0, o.C + o.P, "pays premium only"],
         [
-          "Physical, fully exercised",
+          "Fully exercised",
           o.N,
           o.C - o.N * o.K + o.P,
           "delivers " +
@@ -265,17 +254,9 @@
             fmt(o.N * o.K, 2) +
             " USDC",
         ],
-        [
-          "Cash at finalized expiry price",
-          0,
-          o.C - payoutPut + o.P,
-          payoutPut > 0
-            ? "receives " + fmt(payoutPut, 2) + " USDC"
-            : "no intrinsic value, receives 0",
-        ],
       ];
       $("calcNote").textContent =
-        "Cash payout = remaining × max(strike − expiry price, 0), in USDC.";
+        "Physical put: USDC paid at the strike leaves the pool; WETH delivered by the buyer stays for LPs. Premium is claimed separately.";
     }
     $("notional").textContent = fmt(o.N, 6) + " WETH";
     $("premTotal").textContent = fmt(o.P, 2) + " USDC";
@@ -299,7 +280,7 @@
   function redrawAll() {
     render();
   }
-  ["kind", "dep", "strike", "prem", "spot", "days", "entryPrice"].forEach(function (id) {
+  ["kind", "dep", "strike", "prem", "days", "entryPrice"].forEach(function (id) {
     $(id).addEventListener("input", render);
   });
   redrawAll();

@@ -48,7 +48,7 @@ const elements = Object.fromEntries(
   ])
 );
 const inputCallbacks = {};
-for (const id of ["kind", "dep", "strike", "prem", "spot", "days", "entryPrice"]) {
+for (const id of ["kind", "dep", "strike", "prem", "days", "entryPrice"]) {
   elements[id].addEventListener = (event, callback) => {
     inputCallbacks[id] = callback;
   };
@@ -58,7 +58,6 @@ Object.entries({
   dep: "10",
   strike: "3000",
   prem: "100",
-  spot: "3300",
   days: "30",
   entryPrice: "3000",
 }).forEach(([id, value]) => (elements[id].value = value));
@@ -86,23 +85,32 @@ function update(values) {
 }
 assert.equal(elements.premiumYield.textContent, "3.33%");
 assert.equal(elements.premiumApr.textContent, "40.56%");
+function resultRows() {
+  return [...elements.rows.innerHTML.matchAll(/<tr>(.*?)<\/tr>/g)].map(([, row]) =>
+    [...row.matchAll(/<td\b[^>]*>(.*?)<\/td>/g)].map(([, cell]) => cell.replace(/<[^>]+>/g, ""))
+  );
+}
+const callRows = [
+  ["Expired without exercise", "10", "1,000", "pays premium only"],
+  ["Fully exercised", "0", "31,000", "pays 30,000 USDC, takes 10 WETH"],
+];
+assert.deepEqual(resultRows(), callRows);
 update({ days: "365", entryPrice: "2000" });
 assert.equal(elements.premiumApr.textContent, "5%");
-update({ spot: "2700" });
-assert.equal(elements.premiumApr.textContent, "5%", "Premium APR uses starting value, not expiry price");
-update({ days: "30", entryPrice: "3000", spot: "3300" });
+assert.deepEqual(resultRows(), callRows, "Valuation and duration do not change physical token exchanges");
+update({ days: "30", entryPrice: "3000" });
 assert.equal(elements.notional.textContent, "10 WETH");
 assert.equal(elements.premTotal.textContent, "1,000 USDC");
-assert.match(elements.rows.innerHTML, /31,000/);
-assert.match(elements.rows.innerHTML, /9\.090909/);
 assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
-update({ kind: "put", dep: "30000", spot: "2700" });
+update({ kind: "put", dep: "30000" });
 assert.equal(elements.premiumApr.textContent, "40.56%");
 assert.equal(elements.entryPriceField.hidden, true);
 update({ entryPrice: "" });
 assert.equal(elements.calcError.hidden, true, "Puts do not need a WETH entry price");
-assert.match(elements.rows.innerHTML, /28,000/);
-assert.match(elements.rows.innerHTML, /receives 3,000 USDC/);
+assert.deepEqual(resultRows(), [
+  ["Expired without exercise", "0", "31,000", "pays premium only"],
+  ["Fully exercised", "10", "1,000", "delivers 10 WETH, takes 30,000 USDC"],
+]);
 for (const invalid of ["", "0", "-1", "NaN"]) {
   update({ strike: invalid });
   assert.equal(elements.calcError.hidden, false);
@@ -110,10 +118,13 @@ for (const invalid of ["", "0", "-1", "NaN"]) {
   assert.equal(elements.calcChart.innerHTML, "");
   assert.equal(elements.notional.textContent, "Unavailable");
 }
-update({ strike: "3000", prem: "0", spot: "3300" });
+update({ strike: "3000", prem: "0" });
 assert.equal(elements.calcError.hidden, true);
 assert.equal(elements.premTotal.textContent, "0 USDC");
-assert.match(elements.rows.innerHTML, /no intrinsic value, receives 0/);
+assert.deepEqual(resultRows(), [
+  ["Expired without exercise", "0", "30,000", "pays premium only"],
+  ["Fully exercised", "10", "0", "delivers 10 WETH, takes 30,000 USDC"],
+]);
 assert.doesNotMatch(elements.calcChart.innerHTML, /NaN|Infinity/);
 assert.equal(elements.premiumApr.textContent, "0%");
 for (const field of ["days", "entryPrice"]) {
