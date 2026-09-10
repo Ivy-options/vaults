@@ -70,11 +70,11 @@
           </p>
           <p class="prose">
             An Ivy vault is a smart contract that holds assets to back a single
-            option sold to a buyer. The buyer pays for the rights that the
-            option gives them, and the people who provide those assets earn that
-            payment. What they receive at the end also depends on the option's
-            terms and whether the buyer uses those rights. Each vault handles
-            one trade; selling another option requires a new vault.
+            option sold to a buyer. The buyer pays for the option's rights, and
+            the people who provide the assets earn that payment. Their final
+            claim depends on the option's terms and whether the buyer exercises.
+            Each vault handles one trade; selling another option requires a new
+            vault.
           </p>
         </div>
       </div>
@@ -112,7 +112,7 @@
                 <dt>Vault owner</dt>
                 <dd>
                   <p>
-                    Creates the vault and chooses the terms it is willing to
+                    Creates the vault and chooses the terms they are willing to
                     offer. The owner can provide the assets alone or allow other
                     depositors to join.
                   </p>
@@ -158,10 +158,10 @@
           </div>
 
           <div class="deal-block">
-            <h3>Read the terms through one example</h3>
+            <h3>An example trade</h3>
             <p class="prose">
               Consider an option covering 10 WETH at an agreed price of 3,000
-              USDC per WETH. Each number describes a different part of the deal.
+              USDC per WETH.
             </p>
             <dl class="deal-example">
               <div>
@@ -221,10 +221,9 @@
               combination is called a <strong>quote/premium pair</strong>.
             </p>
             <p class="prose">
-              The strike stays fixed even if the market price changes. That
-              changing market price is called the <strong>spot price</strong>,
-              and it determines whether using the option's right is valuable to
-              the buyer.
+              The strike stays fixed even if the market price changes. The
+              current market price, or <strong>spot price</strong>, determines
+              whether exercise has value to the buyer.
             </p>
           </div>
 
@@ -293,8 +292,7 @@
             The deposits back the seller's obligation to the buyer, so earning a premium
             does not guarantee that LPs will get the same assets or market value
             back. Depositing the underlying creates a covered call; depositing
-            the quote token creates a cash-secured put. The examples below show
-            how those deposits determine the trade size.
+            the quote token creates a cash-secured put.
           </p>
           <div class="two">
             <div>
@@ -327,7 +325,7 @@
                 </li>
                 <li>
                   A put vault accepts one quote/premium pair, with the
-                  collateral itself serving as the quote token.
+                  collateral itself used as the quote token.
                 </li>
                 <li>
                   The notional is the collateral divided by the strike: 30,000
@@ -380,7 +378,13 @@
               people holding shares at that moment are the
               <strong>activation holders</strong>, and they can immediately
               collect their earned amount through
-              <code>claimPremium(vaultId)</code>. Unclaimed premium follows transferred shares proportionally; already-claimed premium stays paid. Burning shares preserves unpaid credit. Share transfers start disabled and require the hub admin to enable them. A <a href="#platform-fees">global platform fee</a> is deducted before LP allocation; activation rejects a rate above the vault’s creation-time cap. The vault sets aside unpaid
+              <code>claimPremium(vaultId)</code>. Unclaimed premium follows
+              transferred shares proportionally; already-claimed premium stays
+              paid. Burning shares preserves unpaid credit. Share transfers
+              start disabled and require the hub admin to enable them. The vault
+              deducts a <a href="#platform-fees">global platform fee</a> before
+              allocating premium to LPs. Activation rejects a rate above the
+              vault’s creation-time cap. The vault sets aside unpaid
               premium so it cannot be spent on other claims. Small amounts left
               by rounding each holder's entitlement down, called rounding dust,
               stay set aside permanently.
@@ -393,13 +397,12 @@
         <div class="main">
           <h2>Vault lifecycle</h2>
           <p class="prose">
-            Each vault moves through four phases, starting with collateral
-            collection and ending with final claims. Opening the auction fixes
-            the collateral available for bidding; activation then commits the
-            vault to the winning option. The phase determines which actions are
-            available, as described below. Finishing the trade is called
-            finalization: the vault enters Settled, where holders can collect
-            their claims but no new option can begin.
+            Each vault moves through four phases, from collateral collection
+            to final claims. Opening the auction fixes the collateral available
+            for bidding; activation commits the vault to the winning option.
+            Each phase permits the actions listed below. Finalization ends the
+            trade and moves the vault to Settled, where holders can collect
+            their claims but the vault cannot sell another option.
           </p>
           <div class="fig"><span>Who can act in each phase</span></div>
           <div class="timeline">
@@ -414,8 +417,8 @@
                     <span class="chip lp">LPs</span
                     ><span
                       >LPs can burn shares to withdraw the corresponding
-                      collateral while the vault is Open. Deposits also require
-                      new deposits to be allowed by the guardian, an authorized
+                      collateral while the vault is Open. Deposits require
+                      admission to be open. The guardian is an authorized
                       account that can pause admission to the protocol or a
                       particular vault. Anyone other than the owner can deposit
                       only if <code>publicDeposits</code> was enabled at
@@ -564,7 +567,10 @@
               An <strong>unwind</strong> ends a Live option by agreement. The owner
               or buyer can propose it, but execution requires the buyer’s signature
               and approval from every current shareholder, covering 100% of the
-              outstanding shares. The proposal sets a future deadline and a nonce, alongside its exercised-notional, supply and refund snapshot. Execution must occur no later than that deadline, while the vault is still Live.
+              outstanding shares. The proposal records the exercised notional,
+              share supply and refund, along with a nonce and future deadline.
+              Execution must occur no later than that deadline, while the vault
+              is still Live.
             </p>
             <p class="prose">
               Consent must reflect current ownership and the amount already
@@ -575,8 +581,12 @@
               ordinary exercise or expiration.
             </p>
             <p class="prose">
-              If a refund is agreed, each current LP supplies their proportional contribution
-              separately in the premium token, approving the vault clone before funding. Each minimum is rounded up to a raw token unit. The executor provides no tokens. Zero refund is also allowed. The buyer or executor collects a funded refund for the configured recipient with
+              If a refund is agreed, each current LP funds their proportional
+              contribution separately in the premium token. Each LP must approve
+              the vault clone before funding. The minimum contribution is
+              rounded up to a raw token unit. The executor provides no tokens.
+              Zero refund is also allowed. The buyer or executor collects a
+              funded refund for the configured recipient with
               <code>claimPayout</code>; shareholders claim the remaining pool.
               <a href="#premium-ownership">Earned premium</a> and completed
               exercises are preserved. Holders separately use <code>claimPremium</code> for unpaid premium, including after burning all their shares.
@@ -606,8 +616,23 @@
               </tbody>
             </table>
           </div>
-          <p class="prose">The recommended policy matches current behavior: premium and fees are earned at activation; refunds are separately negotiated and funded. Claimed premium does not waive the current LP’s contribution. Deposits remain individually recoverable before execution; withdrawal revokes current consent. After execution, only excess and apportioned ceiling surplus are recoverable. Recovery remains tied to the funder after share transfers or burns. The final participant recovering ceiling surplus receives rounding dust; the buyer receives exactly the agreed amount. See the unwind runbook for the formula.</p>
-          <p class="prose">This implementation retains admission-only emergency pause. A full execution freeze would require a separate specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.</p>
+          <p class="prose">
+            Premium and fees are earned at activation. Refunds are negotiated
+            and funded separately. Claiming premium does not waive the current
+            LP’s contribution. Before execution, each funder can recover their
+            deposit; withdrawing revokes their current consent. After execution,
+            only excess contributions and apportioned ceiling surplus are
+            recoverable. Recovery stays tied to the funder after share transfers
+            or burns. The final participant recovering ceiling surplus receives
+            the rounding dust; the buyer receives exactly the agreed amount.
+            See the unwind runbook for the formula.
+          </p>
+          <p class="prose">
+            The emergency pause applies only to admission. A full execution
+            freeze would require a separate specification for permissions,
+            affected actions, deadlines, resumption and outstanding payment
+            obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.
+          </p>
         </div>
       </section>
 
@@ -615,9 +640,30 @@
         <div class="main">
           <h2>Platform fees</h2>
           <p class="prose">The buyer pays gross premium at activation. The vault deducts <code>floor(grossPremium × feeBps / 10,000)</code> in the premium token and allocates the remainder to LPs, who can claim immediately. For 1,000 USDC at 200 bps (2%), the treasury receives 20 USDC and LPs receive 980 USDC. Integer rounding is down to the smallest token unit, leaving any fractional fee unit in the net LP allocation.</p>
-          <p class="prose">The global rate starts at zero. <code>PLATFORM_FEE_MANAGER_ROLE</code> sets it, up to 10,000 bps; the deployment admin initially holds the role and administers its membership. Each vault freezes the current global rate as its maximum at creation. Activation uses the latest global rate, but a rate above that cap blocks activation; it is not silently capped. Lower the rate or create a new vault. <code>minPremium</code> remains a gross threshold.</p>
-          <p class="prose">The treasury initially equals the admin; <code>DEFAULT_ADMIN_ROLE</code> can configure it for future activations. Activation snapshots the applied rate and treasury. Anyone can trigger <code>claimPlatformFee()</code> on the vault, paying that snapshotted treasury once. Later treasury or rate changes do not alter existing fees.</p>
-          <p class="prose">Fee reserves are separate from LP premium and buyer obligations, including when token addresses overlap. Fees remain earned after exercise, expiry or unwind; negotiated refunds require separate funding. The calculator below explicitly assumes zero fees. See <a href="../operations.md#platform-fee-and-share-transfer-administration">fee administration and commands</a>.</p>
+          <p class="prose">
+            The global rate starts at zero. Accounts with
+            <code>PLATFORM_FEE_MANAGER_ROLE</code> set it, up to 10,000 bps. The
+            deployment admin initially holds the role and administers its
+            membership. Each vault records the current global rate as its
+            maximum at creation. Activation uses the latest global rate and
+            rejects a rate above that cap. Lower the rate or create a new vault.
+            <code>minPremium</code> remains a gross threshold.
+          </p>
+          <p class="prose">
+            The deployment admin is the initial treasury recipient. Accounts
+            with <code>DEFAULT_ADMIN_ROLE</code> can change it for future
+            activations. Activation records the applied rate and treasury.
+            Anyone can trigger <code>claimPlatformFee()</code> on the vault to
+            pay the recorded treasury once. Later treasury or rate changes do
+            not alter existing fees.
+          </p>
+          <p class="prose">
+            Fee reserves are separate from LP premium and buyer obligations,
+            including when token addresses overlap. Fees remain earned after
+            exercise, expiry or unwind; negotiated refunds require separate
+            funding. The calculator below assumes zero fees. See
+            <a href="../operations.md#platform-fee-and-share-transfer-administration">fee administration and commands</a>.
+          </p>
         </div>
       </section>
 
@@ -626,8 +672,7 @@
           <h2>What each side receives</h2>
           <p class="prose">
             Finalization closes the vault and makes its remaining, unreserved
-            assets available to shareholders. Start with the deposit, work out
-            what the buyer receives, and see what is left for LPs.
+            assets available to shareholders.
             <strong>Earned premium is claimed separately.</strong>
           </p>
           <p class="prose">
@@ -832,11 +877,11 @@
         <div class="main">
           <h2>Bidding and exercise</h2>
           <p class="prose">
-            A market maker participates as the option buyer by signing a bid for
-            a particular auction and collateral amount. The signature also binds
-            a hash of the accepted token pair, a compact identifier for that
-            exact configuration, along with expiry and execution settings, so
-            the bid master cannot substitute different terms when activating it.
+            As the option buyer, a market maker signs a bid for a particular
+            auction and collateral amount. The signature also binds the accepted
+            token pair's hash, expiry and execution settings. The hash identifies
+            the exact pair configuration. These commitments prevent the bid
+            master from substituting different terms at activation.
             Cancelling and reopening an auction changes its ID and requires a
             new signed bid.
           </p>
@@ -1008,7 +1053,7 @@
               Role membership and the feature flag are independent. Granting or
               revoking a role never changes the flag; the on-chain setter does
               not check publisher coverage. The operator command checks a
-              nominated publisher’s current role before preparing enablement,
+              nominated publisher’s current role before preparing the transaction,
               but the admin remains responsible for continued publication.
               See the <a href="../operations.md#enable-cash-after-physical-launch">cash enablement runbook</a>.
             </p>
@@ -1195,9 +1240,8 @@
         <div class="main">
           <h2>Vault terms</h2>
           <p class="prose">
-            The earlier sections describe the trade in plain language. This
-            reference maps those choices to the contract fields an owner
-            configures before LPs commit collateral. An option is in the money
+            The owner configures these contract fields before LPs commit
+            collateral. An option is in the money
             when exercise has positive value to the buyer: spot is above the
             strike for a call, or below it for a put. Some fields below use
             <strong>basis points</strong>, abbreviated bps, where 100 bps equals
@@ -1341,9 +1385,9 @@
         <div class="main">
           <h2>Versions and existing vaults</h2>
           <p class="prose">
-            Each Ivy deployment has fixed code and contract bindings. New
-            features can be introduced in a new release, while existing vaults
-            continue through their original Hub. Releasing new code does not
+            Each Ivy deployment has fixed code and contract bindings. A new
+            release can add features while existing vaults continue through
+            their original Hub. Releasing new code does not
             migrate deposits or change the code controlling an older position.
           </p>
           <div class="deal-compare">
@@ -1390,9 +1434,6 @@
               its own tokens and reserves. Separate contracts track transferable
               shares, premium entitlements and unwind consent. The Hub also
               stores the optional cash feature’s authorized prices.
-              The responsibilities below explain which contract owns each part
-              of the process before the entrypoint reference lists the calls
-              available in each phase.
             </p>
             <div class="contracts">
               <div>
@@ -1419,8 +1460,8 @@
                 <span class="role">ERC-1155</span
                 ><span class="name">IvyShares</span>
                 <p>
-                  This contract issues the LP shares, with minting and burning
-                  restricted to the hub. Before a balance changes, it notifies
+                  Issues LP shares. Only the hub can mint or burn them. Before a
+                  balance changes, it notifies
                   the premium and unwind modules so they can preserve activation
                   entitlements and invalidate affected votes before receiver
                   callbacks run.
@@ -1449,8 +1490,8 @@
                 <span class="role">Activation income</span
                 ><span class="name">IvyPremiums</span>
                 <p>
-                  Lazy checkpoints preserve premium ownership. Payments can only
-                  start through the guarded hub claim; the vault enforces the
+                  Lazy checkpoints preserve premium ownership. Only the guarded
+                  hub claim can initiate payments; the vault enforces the
                   premium budget independently.
                 </p>
               </div>
