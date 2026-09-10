@@ -70,7 +70,7 @@ This build supports bundle format 1, Hub deployment manifests in format 6 and th
 
 ## Frontend integration
 
-The transaction frontend is maintained outside this repository. The reusable resolver and operator transaction builder demonstrate the integration contract:
+The dedicated [frontend integration guide](frontend-integration.md) provides implementation examples for release resolution, vault creation, stable identifiers, historical indexing and recommendation changes. The transaction frontend is maintained outside this repository. The reusable resolver and operator transaction builder demonstrate the integration contract:
 
 1. Configure a registry address for each supported chain. Resolve the recommended release only when starting a new position, or let the user select a registered release explicitly.
 2. Load and verify that release's manifest and matching artifacts. An unknown interface format must produce an unsupported-release error rather than use another release's ABI or signing rules.

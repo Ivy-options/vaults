@@ -4,7 +4,7 @@ Single-use covered-call and cash-secured-put vaults with optional pooling and ga
 
 The deployment is immutable. There is no hub proxy, upgrade entrypoint, implementation setter, or module rewiring. This build creates a fresh deployment; it cannot upgrade an older hub.
 
-`IvyVaultsRegistry` provides a permanent discovery address for multiple immutable releases. Its administrator can add a release and recommend it for new vaults; registered Hub addresses and manifest hashes cannot be replaced or removed. Transactions continue to target the selected Hub directly. Older vaults keep their original Hub, modules and claim paths. See [release operations and frontend integration](docs/version-registry.md).
+`IvyVaultsRegistry` provides a permanent discovery address for multiple immutable releases. Its administrator can add a release and recommend it for new vaults; registered Hub addresses and manifest hashes cannot be replaced or removed. Transactions continue to target the selected Hub directly. Older vaults keep their original Hub, modules and claim paths. See the [frontend integration guide](docs/frontend-integration.md) and [release operations](docs/version-registry.md).
 
 | Contract                      | Responsibility                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------- |
@@ -63,6 +63,8 @@ See the [operator runbook](docs/operations.md) and [public guide](docs/site/inde
 ## Documentation
 
 Open [the protocol guide](docs/site/index.html) directly in a browser, or serve the repository root with `python3 -m http.server 8000` and visit `/docs/site/`. Serve the whole repository so the operator runbook and request-example links remain available.
+
+Frontend developers should start with the [frontend integration guide](docs/frontend-integration.md). It covers recommended-release resolution, new-vault creation, historical-vault indexing and stable identifiers across Hub releases.
 
 The guide uses local fonts and assets in `docs/site/assets/`. After editing it, run `npm run docs:check` to check links, anchors, assets and calculator examples.
 
