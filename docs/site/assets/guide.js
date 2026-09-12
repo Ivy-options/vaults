@@ -14,52 +14,6 @@
     value.toLocaleString("en-US", { maximumFractionDigits: 2 });
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const chapters = [$("#overview"), ...$$("main > section")];
-  const summaries = {
-    "option-basics": [
-      "A right for the buyer. A premium for the seller.",
-      "The buyer chooses whether to exercise. The vault backs the other side of that trade.",
-    ],
-    collateral: [
-      "Follow the tokens.",
-      "Follow the tokens from deposit to exercise, then see what shares and premium let you claim.",
-    ],
-    lifecycle: [
-      "One vault. One trade. Four phases.",
-      "Choose a phase to see what becomes possible, and what stays locked.",
-    ],
-    "premium-treatment": [
-      "Earned premium stays earned.",
-      "Cancelling an auction and unwinding a live option are different actions. A pause does not stop the clock.",
-    ],
-    "platform-fees": [
-      "One premium, two allocations.",
-      "The fee comes out of the buyer’s gross premium at activation. LPs can claim the remainder immediately.",
-    ],
-    outcomes: [
-      "Move the price. See the trade-off.",
-      "Premium adds income, but the value of the assets you receive can still fall.",
-    ],
-    makers: [
-      "From signed bid to exercise.",
-      "The bid master submits the chosen bid. The contracts check its terms before the option becomes active.",
-    ],
-    "cash-settlement": [
-      "Settle the difference in collateral.",
-      "Cash settlement is optional. It uses finalized settlement prices, and its exercise rules differ from physical delivery.",
-    ],
-    terms: [
-      "Set the boundaries before deposits.",
-      "The owner chooses the terms. While Open, the owner can tighten protections, but cannot relax them.",
-    ],
-    versions: [
-      "A new version starts with a new vault.",
-      "Existing vaults keep the implementation and modules recorded when they were created.",
-    ],
-    developers: [
-      "The hub coordinates. The vault holds tokens.",
-      "Follow the contract responsibilities before choosing an entrypoint.",
-    ],
-  };
   const diagram = (items, label) =>
     `<div class="concept-flow" role="group" aria-label="${label}">${items
       .map(
@@ -73,45 +27,6 @@
           }`
       )
       .join("")}</div>`;
-  const visualContent = {
-    "option-basics":
-      diagram(
-        [
-          ["LPs deposit", "Assets back the seller’s obligation."],
-          ["Buyer pays", "Premium buys the option’s rights."],
-          ["Option ends", "Shareholders claim the remaining pool."],
-        ],
-        "The option trade"
-      ) +
-      '<div class="choice-pair"><div><span class="coin eth">↑</span><h3>Call = right to buy</h3><p>The buyer can buy the underlying at the strike.</p></div><div><span class="coin usd">↓</span><h3>Put = right to sell</h3><p>The buyer can sell the underlying at the strike.</p></div></div><p class="takeaway">The premium pays LPs for an obligation. It does not guarantee their final return.</p>',
-    "premium-treatment":
-      '<div class="event-list"><div><span class="event-dot"></span><h3>Auction cancelled</h3><p>No premium collected. The vault returns to Open.</p></div><div><span class="event-dot violet"></span><h3>Live option unwound</h3><p>Earned premium and fees stay earned. Any agreed buyer refund is funded separately by current LPs.</p></div><div><span class="event-dot orange"></span><h3>Admission paused</h3><p>Exercise, expiration and claims remain available. Deadlines stay fixed.</p></div></div>',
-    "cash-settlement":
-      diagram(
-        [
-          ["Report price", "The authorized reporter submits a price."],
-          ["Wait & finalize", "The configured dispute process must finish."],
-          ["Settle & claim", "Buyer payout is reserved in collateral."],
-        ],
-        "Cash settlement price flow"
-      ) +
-      '<div class="choice-pair"><div><h3>Physical delivery</h3><p>Exchange underlying and quote tokens at the agreed strike.</p></div><div><h3>Cash settlement</h3><p>Pay the option’s value in the collateral token using the finalized price.</p></div></div><p class="takeaway">European cash options settle from the finalized expiry price. They have no manual exercise.</p>',
-    terms:
-      '<div class="boundary"><span class="boundary-label">CREATED</span><div><strong>Terms set the allowed trade</strong><p>Underlying, token pairs, strike limits, minimum premium, expiry and exercise policy.</p><div class="boundary-inner"><span class="boundary-label">WHILE OPEN</span><strong>Protections can tighten</strong><p>For example, raise the minimum premium or narrow allowed settlement types. Immutable fields stay fixed.</p></div></div></div><p class="takeaway">Activation rejects a winning bid that falls outside the vault’s current terms.</p>',
-    versions:
-      '<div class="choice-pair"><div><span class="chapter-eyebrow">EXISTING VAULT</span><h3>Its recorded contracts</h3><p>Keeps the implementation and settlement modules it started with.</p></div><div><span class="chapter-eyebrow">NEW VAULT</span><h3>The selected version</h3><p>Uses the configured implementation and modules for new creation.</p></div></div><p class="takeaway">Check the individual vault’s recorded configuration when integrating with it.</p>',
-    developers:
-      diagram(
-        [
-          ["IvyVaultsHub", "Coordinates operations and permissions."],
-          ["IvyVault", "Pulls and holds this vault’s tokens."],
-          ["IvyShares", "Tracks ERC-1155 shares by vault ID."],
-        ],
-        "Contract responsibilities, not a token transfer path"
-      ) +
-      '<p class="takeaway">Token approvals target the individual vault address. The hub does not take custody.</p>',
-  };
-
   chapters.forEach((chapter, i) => {
     chapter.classList.add("guide-chapter");
     chapter.dataset.chapter = i;
@@ -124,7 +39,6 @@
     [...main.childNodes].forEach((node) => {
       if (node !== heading) body.append(node);
     });
-    const [title, intro] = summaries[chapter.id];
     main.prepend(
       make(
         "div",
@@ -134,25 +48,21 @@
         ).padStart(2, "0")}</span>`
       )
     );
-    heading.after(
-      make(
-        "div",
-        "chapter-intro",
-        `<p class="visual-title">${title}</p><p>${intro}</p>`
-      )
-    );
-    const stage = make("div", "visual-stage", visualContent[chapter.id] || "");
-    stage.id = `visual-${chapter.id}`;
-    if (chapter.id === "makers") main.append(body);
-    else main.append(stage, body);
+    // Only interactive examples need a generated stage. Explanations live in HTML.
+    if (["collateral", "lifecycle", "outcomes"].includes(chapter.id)) {
+      const stage = make("div", "visual-stage");
+      stage.id = `visual-${chapter.id}`;
+      main.append(stage);
+    }
+    main.append(body);
   });
 
-  // Introduce the visual examples before the continuous reference.
+  // Replace the overview sentence with the same sequence as a diagram.
   const overview = $("#overview > div");
   $(".kicker", overview).textContent = "THE VISUAL GUIDE";
   $("h1", overview).innerHTML =
     "Ivy Vaults,<br><span>one step at a time.</span>";
-  overview.append(
+  $(".lede", overview).replaceWith(
     make(
       "div",
       "overview-journey",
@@ -381,10 +291,6 @@
     };
   });
   setPhase(0);
-
-  const fees = $("#visual-platform-fees");
-  fees.innerHTML =
-    '<span class="stage-label">WORKED EXAMPLE · 2% FEE</span><div class="fee-total"><span>Buyer pays gross premium</span><strong>1,000 <small>USDC</small></strong></div><div class="fee-bar" role="img" aria-label="980 USDC to LPs and 20 USDC to treasury"><span></span><i></i></div><div class="fee-labels"><div><span>98% · LP premium</span><strong>980 USDC</strong></div><div><span>2% · Treasury fee</span><strong>20 USDC</strong></div></div><p class="stage-footnote">Illustrative rate. Activation uses the current global fee rate and rejects it if it exceeds the vault’s creation-time cap.</p>';
 
   // An illustrative price/value chart. Keep the original editable calculator intact.
   const outcomes = $("#visual-outcomes");

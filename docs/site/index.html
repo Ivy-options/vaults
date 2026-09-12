@@ -66,12 +66,9 @@
             remains when the option ends.
           </p>
           <p class="prose">
-            An Ivy vault is a smart contract that holds assets to back a single
-            option sold to a buyer. The buyer pays for the option's rights, and
-            the people who provide the assets earn that payment. Their final
-            claim depends on the option's terms and whether the buyer exercises.
-            Each vault handles one trade; selling another option requires a new
-            vault.
+            An Ivy vault is a smart contract for a single option trade. The
+            depositors’ final claim depends on the option’s terms and whether
+            the buyer exercises. Selling another option requires a new vault.
           </p>
         </div>
       </div>
@@ -85,21 +82,9 @@
             upfront payment, called the <strong>premium</strong>, for taking on
             the corresponding obligation.
           </p>
-          <div class="deal-rights" aria-label="Two option types">
-            <div>
-              <span class="deal-label">Call</span
-              ><span
-                >The buyer has the right to <strong>buy</strong> the asset at an
-                agreed price.</span
-              >
-            </div>
-            <div>
-              <span class="deal-label">Put</span
-              ><span
-                >The buyer has the right to <strong>sell</strong> the asset at
-                an agreed price.</span
-              >
-            </div>
+          <div class="choice-pair" aria-label="Two option types">
+            <div><span class="coin eth" aria-hidden="true">↑</span><h3>Call</h3><p>The buyer has the right to <strong>buy</strong> the underlying at the agreed strike price.</p></div>
+            <div><span class="coin usd" aria-hidden="true">↓</span><h3>Put</h3><p>The buyer has the right to <strong>sell</strong> the underlying at the agreed strike price.</p></div>
           </div>
 
           <div class="deal-block">
@@ -319,6 +304,7 @@
                 <div class="delivery-static"><h4>Call · full physical exercise</h4><p>Vault → recipient: <strong>10 WETH</strong><br>Caller → vault: <strong>30,000 USDC</strong></p></div>
                 <div class="delivery-static"><h4>Put · full physical exercise</h4><p>Vault → recipient: <strong>30,000 USDC</strong><br>Caller → vault: <strong>10 WETH</strong></p></div>
               </div>
+              <p>With <code>allowPartialExercise = true</code>, exercising half leaves <strong>5 WETH + 15,000 USDC</strong> in either pool. If the rest expires unused, those balances remain for LPs to claim. Premium is excluded from these amounts.</p>
               <p>“Cash-secured” describes the put’s collateral. The caller still delivers underlying during physical exercise.</p>
             </div>
 
@@ -573,22 +559,15 @@
       <section id="premium-treatment">
         <div class="main">
           <h2>Premium on cancellation and pause</h2>
-          <div class="tablewrap">
-            <table>
-              <thead><tr><th>Event</th><th>Premium and fee treatment</th><th>What happens next</th></tr></thead>
-              <tbody>
-                <tr><td>Auction cancelled before activation</td><td>Nothing collected; nothing to refund.</td><td>Returns to Open for withdrawals.</td></tr>
-                <tr><td>Unwind consent revoked, proposal expired or replaced</td><td>Earned premium and fees unchanged.</td><td>The option continues; funders can recover their deposits.</td></tr>
-                <tr><td>Unwind executed</td><td>LPs retain earned premium; treasury retains fees.</td><td>Current LPs separately fund their proportional negotiated premium-token refund; buyer or executor claims it for the recipient.</td></tr>
-                <tr><td>Admission pause</td><td>Earned premium and claims unchanged.</td><td>Exercise, expiration and agreed unwind remain available; deadlines do not move.</td></tr>
-                <tr><td>Normal exercise or expiration</td><td>Earned premium and fees remain claimable.</td><td>Settlement payments are separate obligations.</td></tr>
-              </tbody>
-            </table>
+          <div class="event-list">
+            <div><span class="event-dot" aria-hidden="true"></span><h3>Auction cancelled before activation</h3><p>No premium or fee collected; nothing to refund. The vault returns to Open for withdrawals.</p></div>
+            <div><span class="event-dot violet" aria-hidden="true"></span><h3>Unwind consent revoked, proposal expired or replaced</h3><p>Earned premium and fees stay unchanged. The option continues, and funders can recover their deposits.</p></div>
+            <div><span class="event-dot violet" aria-hidden="true"></span><h3>Unwind executed</h3><p>LPs retain earned premium; the treasury retains fees. Current LPs separately fund their proportional negotiated premium-token refund. The buyer or executor claims it for the recipient.</p></div>
+            <div><span class="event-dot orange" aria-hidden="true"></span><h3>Admission paused</h3><p>Earned premium and claims stay unchanged. Exercise, expiration and agreed unwind remain available; deadlines do not move.</p></div>
+            <div><span class="event-dot" aria-hidden="true"></span><h3>Normal exercise or expiration</h3><p>Earned premium and fees remain claimable. Settlement payments are separate obligations.</p></div>
           </div>
           <p class="prose">
-            Premium and fees are earned at activation. Refunds are negotiated
-            and funded separately. Claiming premium does not waive the current
-            LP’s contribution. Before execution, each funder can recover their
+            Claiming premium does not waive the current LP’s refund contribution. Before execution, each funder can recover their
             deposit; withdrawing revokes their current consent. After execution,
             only excess contributions and apportioned ceiling surplus are
             recoverable. Recovery stays tied to the funder after share transfers
@@ -608,7 +587,13 @@
       <section id="platform-fees">
         <div class="main">
           <h2>Platform fees</h2>
-          <p class="prose">The buyer pays gross premium at activation. The vault deducts <code>floor(grossPremium × feeBps / 10,000)</code> in the premium token and allocates the remainder to LPs, who can claim immediately. For 1,000 USDC at 200 bps (2%), the treasury receives 20 USDC and LPs receive 980 USDC. Integer rounding is down to the smallest token unit, leaving any fractional fee unit in the net LP allocation.</p>
+          <p class="prose">At activation, the vault deducts <code>floor(grossPremium × feeBps / 10,000)</code> in the premium token and allocates the remainder to LPs, who can claim immediately. Rounding is down to the smallest token unit, leaving any fractional fee unit in the net LP allocation.</p>
+          <div class="visual-stage" id="visual-platform-fees">
+            <span class="stage-label">WORKED EXAMPLE · 2% FEE</span>
+            <div class="fee-total"><span>Buyer pays gross premium</span><strong>1,000 <small>USDC</small></strong></div>
+            <div class="fee-bar" role="img" aria-label="980 USDC to LPs and 20 USDC to treasury"><span></span><i></i></div>
+            <div class="fee-labels"><div><span>98% · LP premium</span><strong>980 USDC</strong></div><div><span>2% · Treasury fee</span><strong>20 USDC</strong></div></div>
+          </div>
           <p class="prose">
             The global rate starts at zero. Accounts with
             <code>PLATFORM_FEE_MANAGER_ROLE</code> set it, up to 10,000 bps. The
@@ -645,11 +630,8 @@
             <strong>Earned premium is claimed separately.</strong>
           </p>
           <p class="prose">
-            A <strong>covered call</strong> starts with underlying tokens, such
-            as WETH. A <strong>cash-secured put</strong> starts with quote tokens,
-            such as USDC. The <strong>strike</strong> is the agreed price per
-            underlying token. The table below describes the whole vault's
-            remaining pool; each shareholder claims their proportional share.
+            The table describes the whole vault’s remaining pool. Each
+            shareholder claims their proportional share.
           </p>
           <div
             class="tablewrap"
@@ -686,37 +668,7 @@
             </table>
           </div>
 
-          <div class="deal-block">
-            <h3>Two worked examples</h3>
-            <p class="prose">
-              Both examples use a strike of 3,000 USDC per WETH and assume no
-              earlier exercise. Amounts below exclude the separately earned
-              premium. Both follow physical delivery. The half-exercise examples
-              assume <code>allowPartialExercise = true</code>; if the rest expires
-              unused, those mixed token balances remain for LPs to claim.
-            </p>
-            <div class="deal-compare">
-              <div>
-                <h4>Call: deposit 10 WETH</h4>
-                <p>
-                  <strong>Physical:</strong> if the buyer exercises all 10 WETH,
-                  they pay 10 × 3,000 = <strong>30,000 USDC</strong>. That is what
-                  the pool holds. If they exercise half, the pool holds
-                  <strong>5 WETH + 15,000 USDC</strong>.
-                </p>
-              </div>
-              <div>
-                <h4>Put: deposit 30,000 USDC</h4>
-                <p>
-                  The deposit covers 30,000 ÷ 3,000 = <strong>10 WETH</strong>.
-                  <strong>Physical:</strong> if the buyer exercises all of it,
-                  the vault pays 30,000 USDC and receives <strong>10 WETH</strong>.
-                  If they exercise half, the pool holds
-                  <strong>5 WETH + 15,000 USDC</strong>.
-                </p>
-              </div>
-            </div>
-          </div>
+          <p class="prose">Use the <a href="#physical-delivery-example">token-flow example</a> above to compare full and partial exercise for a call or put.</p>
           <div class="callout" style="margin-top: 14px">
             <b>Pool claim + separate premium claim.</b> The calculator assumes a zero platform fee and includes
             both, assuming the same LPs hold shares throughout. The pool excludes
