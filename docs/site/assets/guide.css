@@ -537,7 +537,7 @@ footer {
 }
 .event-list > div {
   display: grid;
-  grid-template-columns: 12px 180px 1fr;
+  grid-template-columns: 12px 220px minmax(0, 1fr);
   gap: 20px;
   padding: 24px 0;
   align-items: baseline;
@@ -547,10 +547,13 @@ footer {
 }
 .event-list h3 {
   font-size: 15px;
+  line-height: 1.45;
+  text-align: start;
   margin: 0;
 }
 .event-list p {
   font-size: 13px;
+  text-align: start;
   color: var(--muted);
   margin: 0;
 }
@@ -802,7 +805,7 @@ footer {
     gap: 14px;
   }
   .event-list > div {
-    grid-template-columns: 12px 140px 1fr;
+    grid-template-columns: 12px 180px minmax(0, 1fr);
     gap: 12px;
   }
   .payoff-layout {
