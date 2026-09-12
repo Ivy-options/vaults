@@ -62,9 +62,9 @@ See the [operator runbook](docs/operations.md) and [public guide](docs/site/inde
 
 ## Documentation
 
-Open [the protocol guide](docs/site/index.html) directly in a browser, or serve the repository root with `python3 -m http.server 8000` and visit `/docs/site/`. Serve the whole repository so the operator runbook and request-example links remain available.
+Open [the protocol guide](docs/site/index.html) directly in a browser, or serve the repository root with `python3 -m http.server 8000` and visit `/docs/site/`. The operator runbook, specifications, release guide and request examples have linked HTML pages. The site includes local downloads for request templates and referenced Solidity examples, so `docs/site/` can also be served on its own.
 
-The guide uses local fonts and assets in `docs/site/assets/`. After editing it, run `npm run docs:check` to check links, anchors, assets and calculator examples.
+The guide uses local fonts and assets in `docs/site/assets/`. After editing a reference document or request template, run `npm run docs:build` to regenerate its HTML page or local download. Run `npm run docs:check` to verify generated pages, HTML-only document links, cross-page anchors, assets and calculator examples.
 
 `exercise(vaultId, amount)` uses the buyer’s option right and pays the configured recipient. `expire(vaultId)` permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for `claimPayout`. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses a fresh, unexpired observation stored in the Hub. Indicative prices never authorize cash payouts. Physical exercise exchanges assets at strike within its exercise window.
 

@@ -1,0 +1,105 @@
+.doc-page {
+  padding-block: 44px;
+}
+.doc-page article {
+  min-width: 0;
+}
+.doc-page h1 {
+  font-size: clamp(30px, 3.5vw, 44px);
+  margin: 0 0 26px;
+}
+.doc-page h2 {
+  font-size: 25px;
+  margin: 44px 0 20px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.doc-page h3 {
+  font-size: 19px;
+  margin: 30px 0 16px;
+}
+.doc-page p,
+.doc-page li {
+  font-size: 14px;
+  text-align: justify;
+}
+.doc-page li {
+  padding-bottom: 10px;
+}
+.doc-page pre {
+  margin: 20px 0;
+}
+.doc-page .tablewrap {
+  margin: 24px 0;
+}
+.doc-page td,
+.doc-page th {
+  overflow-wrap: anywhere;
+}
+.doc-page code {
+  overflow-wrap: anywhere;
+}
+.doc-page blockquote {
+  margin-inline: 0;
+  padding-block: 12px;
+  color: var(--muted);
+}
+.doc-page a[download] {
+  text-decoration-style: dotted;
+}
+.back-guide {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 10px 24px;
+  text-decoration: none;
+}
+.rail nav .subsection-link {
+  padding-left: 24px;
+}
+.topbar .theme {
+  margin-left: auto;
+}
+.doc-page h1,
+.doc-page h2,
+.doc-page h3 {
+  scroll-margin-top: 16px;
+}
+@media (max-width: 760px) {
+  .doc-page {
+    padding-block: 30px;
+  }
+  .doc-page h2 {
+    font-size: 22px;
+  }
+  .doc-page p,
+  .doc-page li {
+    font-size: 13px;
+  }
+  .doc-page pre {
+    padding: 16px;
+  }
+  .back-guide {
+    margin: 0 0 12px;
+  }
+  .rail nav {
+    grid-template-columns: 1fr;
+  }
+  .doc-page table {
+    min-width: 560px;
+  }
+}
+@media print {
+  .doc-page {
+    padding: 0;
+  }
+  .doc-page h2 {
+    break-after: avoid;
+  }
+  .doc-page table {
+    min-width: 0;
+  }
+  footer {
+    margin-left: 0;
+  }
+}

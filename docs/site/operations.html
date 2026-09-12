@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operator runbook · Ivy Vaults</title>
+  <meta name="description" content="Operator runbook for Ivy Vaults.">
+  <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
+  <link rel="icon" type="image/png" href="assets/ivy-logo.png">
+  <link rel="stylesheet" href="assets/docs.css">
+  <link rel="stylesheet" href="assets/guide.css">
+  <link rel="stylesheet" href="assets/reference.css">
+  <script src="assets/reference.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol guide"><img src="assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Operator runbook</span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
+  <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#token-roles-and-collateral">Token roles and collateral</a>
+<a href="#requests-and-submission">Requests and submission</a>
+<a href="#deploy-and-recover">Deploy and recover</a>
+<a href="#prepare-fund-and-activate">Prepare, fund and activate</a>
+<a href="#reports-exercise-and-expiration">Reports, exercise and expiration</a>
+<a href="#enable-cash-after-physical-launch" class="subsection-link">Enable cash after physical launch</a>
+<a href="#eoa-and-optional-contract-publishers" class="subsection-link">EOA and optional contract publishers</a>
+<a href="#publisher-rotation-and-incidents" class="subsection-link">Publisher rotation and incidents</a>
+<a href="#admission-pause-and-stalled-auctions">Admission pause and stalled auctions</a>
+<a href="#premium-treatment-and-emergency-boundaries">Premium treatment and emergency boundaries</a>
+<a href="#prepare-and-execute-a-unanimous-unwind">Prepare and execute a unanimous unwind</a>
+<a href="#worked-unwind-scenarios" class="subsection-link">Worked unwind scenarios</a>
+<a href="#command-reference">Command reference</a>
+<a href="#platform-fee-and-share-transfer-administration">Platform fee and share-transfer administration</a></nav></details></aside>
+  <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="manual-ivy-vault-operations">Operator runbook</h1>
+<p>Use this runbook to prepare an immutable deployment and operate individual vaults. The CLI accepts JSON request files and prints either EIP-712 typed data or a simulated transaction&#39;s calldata. It never signs reports or bids. Wallets or multisigs sign the printed typed data separately.</p>
+<p>Run <code>npm ci</code>, <code>npm run compile</code>, <code>npm run typecheck</code>, <code>npm run check:size</code> and <code>npm test -- --no-compile</code> first. Use a Node.js 22.13.0+ runtime and an RPC on a chain compatible with the compiler&#39;s Osaka target and transient storage. <code>npm test -- --no-compile test/17-local-rehearsal.test.ts</code> runs the complete rehearsal on an ephemeral local EVM; it does not use your configured live RPC or wallets.</p>
+<p>Jump to <a href="#token-roles-and-collateral">token roles</a>, <a href="#prepare-and-execute-a-unanimous-unwind">unwind</a>, <a href="#premium-treatment-and-emergency-boundaries">premium treatment</a>, or <a href="#platform-fee-and-share-transfer-administration">platform fees</a>.</p>
+<h2 id="token-roles-and-collateral">Token roles and collateral</h2>
+<p>There are three token roles: <strong>asset/underlying</strong> is the option asset, <strong>quote</strong> measures the strike, and <strong>premium</strong> pays for the option. Collateral names the deposited backing token, not a fourth independent token.</p>
+<div class="tablewrap" tabindex="0" role="region" aria-label="Operator runbook reference table"><table>
+<thead>
+<tr>
+<th>Product (strike 3,000 USDC per WETH)</th>
+<th>LP deposit / collateral</th>
+<th>Full physical exercise of 10 WETH</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Covered call</td>
+<td>10 WETH (underlying)</td>
+<td>Caller pays 30,000 USDC; recipient receives 10 WETH.</td>
+</tr>
+<tr>
+<td>Cash-secured put</td>
+<td>30,000 USDC (quote)</td>
+<td>Caller delivers 10 WETH; recipient receives 30,000 USDC.</td>
+</tr>
+</tbody></table>
+</div>
+<p>Cash settlement pays intrinsic value in collateral: WETH for this call and USDC for this put. “Cash” does not require a quote-token payout. Calls may list multiple quote/premium pairs before activation; the winning bid chooses one. Puts accept one pair and require quote to equal collateral. Premium may share an address with either token or use another token; overlapping addresses still have separate premium, platform-fee and buyer-reserve budgets. Settlement proceeds belong to the residual pool after reserves, separately from earned premium.</p>
+<h2 id="requests-and-submission">Requests and submission</h2>
+<p>Copy the <a href="operator-examples.html">example files</a>, replace placeholder addresses and timestamps, and use strings for raw integer amounts. A request normally contains <code>rpc</code>, <code>sender</code>, <code>hub</code>, <code>vaultId</code> and the command&#39;s arguments. IDs and amounts must not be lossy JavaScript numbers. USDC amounts use six decimals: 100 USDC is <code>&quot;100000000&quot;</code>. Strike/spot use quote units per whole underlying; premium uses premium-token units per whole underlying.</p>
+<pre><code class="language-sh">npm run operator -- prepare-vault vault.json
+npm run operator -- inspect-bid activation.json
+npm run operator -- expire expiration.json
+</code></pre>
+<p>These commands only simulate and print calldata. Review the chain, sender, destination, arguments and simulation result. State can change between preflight and inclusion; contracts recheck their own conditions at execution. Operational USD checks use your supplied valuation and cannot prove that it is current or correct.</p>
+<p>Append <code>--send</code> only when deliberately submitting. Submission uses <code>eth_sendTransaction</code> through an RPC-managed signer returned by <code>eth_accounts</code>; the RPC must expose the requested sender. The CLI does not load private keys or wallet secrets. For a hardware wallet or Safe, submit the printed transaction through that wallet&#39;s normal workflow. <code>inspect-bid</code> and <code>typed-*</code> commands cannot send transactions.</p>
+<h2 id="deploy-and-recover">Deploy and recover</h2>
+<p>The Hub suite and the permanent release registry have separate deployments and journals. Follow the <a href="releases.html">release registry guide</a> to deploy the directory, register a verified suite, select a recommendation and resolve a particular release. An explicit-Hub request continues to work without registry discovery.</p>
+<ol>
+<li><p>Choose a dedicated deployer, Hub administrator and immutable indicative report signer. The Hub administrator should be a multisig in production. A contract indicative signer must implement ERC-1271. No settlement publisher or settlement methodology is needed for physical-only deployment. Compile the exact build you intend to deploy. Use the same build when resuming.</p>
+</li>
+<li><p>Fill <a href="assets/requests/deployment.json" download><code>deployment.json</code></a> with RPC, deployer, admin and reportSigner. Defaults are exerciseWindow 3600 seconds and auctionTimeout 259200 seconds. Generate the plan using <code>node</code> directly so redirected JSON has no npm command banner:</p>
+<pre><code class="language-sh">node scripts/operator.mjs prepare-deployment deployment.json &gt; deployment-plan.json
+</code></pre>
+</li>
+<li><p>Inspect <code>addresses</code>, <code>steps</code>, chainId, genesisHash and starting nonce. The fixed order is IvyVaultRules, IvyOptionSettlement, IvyVault, IvyVaultsHub, IvyShares, IvyPremiums, IvyUnwind, IvyPriceFeed. The two libraries must be deployed first; the plan links their predicted addresses into hub bytecode and records every runtime link offset. Do not use the deployer for unrelated transactions during the sequence.</p>
+</li>
+<li><p>Fill <a href="assets/requests/deployment-run.json" download><code>deployment-run.json</code></a> with RPC, <code>planFile</code> and <code>journalFile</code>. Explicit execution, when approved for the target network, is:</p>
+<pre><code class="language-sh">node scripts/operator.mjs deploy deployment-run.json --send
+</code></pre>
+</li>
+<li><p>Keep the plan and journal. On interruption, rerun the same command with the same files and build. The journal is persisted before submission, after the hash is obtained and after verified inclusion. Existing steps require matching creation data, sender, nonce, receipt, runtime evidence and peer bindings, including all embedded hub library links. Missing submission hashes are recoverable from chain history starting at the journal&#39;s start block. Nonce drift, wrong-chain evidence or unknown/replaced pending transactions stop recovery; investigate that transaction instead of deleting the journal or guessing a new sequence.</p>
+</li>
+</ol>
+<p>Plans from earlier builds cannot be reused with this eight-step manifest-v6 build, which uses per-vault publication APIs and an explicit cash flag. Generate a fresh plan for an unexecuted deployment. An interrupted deployment must be recovered using its original build and plan; do not swap builds halfway through the sequence.</p>
+<p>The final journal has <code>complete: true</code> only after constructor bindings, library links and Hub administration verify. The constructor grants no settlement publisher and <code>cashSettlementEnabled()</code> starts false. Deployment performs no automatic enablement. Journal recovery remains valid after later role/flag changes and requires no publisher. Use role-management commands for publisher recovery and the separate cash-flag command for admission control. The administrator receives DEFAULT_ADMIN_ROLE and GUARDIAN_ROLE initially. Grant <code>BID_MASTER_ROLE</code> to the auction operator and <code>MARKET_MAKER_ROLE</code> to each accepted buyer before trading, using <code>grant-role</code> requests with <code>role</code> and <code>account</code>. Role strings are hashed by the CLI; manage DEFAULT_ADMIN_ROLE through its exact zero bytes32 using the contract ABI, not the string-hashing command. There are no wiring, library replacement or upgrade transactions after deployment. Library calls preserve Hub storage and authority.</p>
+<h2 id="prepare-fund-and-activate">Prepare, fund and activate</h2>
+<ol>
+<li>Verify supported token addresses, decimals and transfer behaviour, owner balance, commitment size, exact expiry and acceptable option policies. For physical launch, use <code>terms.allowedSettlement: 0</code> and <code>terms.maxSettlementPriceAge: 0</code>; no settlement publisher or methodology is required. For Cash or Either, first verify <code>cashSettlementEnabled()</code> and supply positive <code>terms.maxSettlementPriceAge</code> plus <code>settlementMethodology</code>. The age limit stays fixed through tightening. <code>terms.priceFeed</code> and <code>terms.maxPriceAge</code> independently configure optional indicative activation checks; any settlement policy can omit that feed. Do not supply the removed <code>settlementPriceFeed</code> field. Set <code>terms.allowPartialExercise</code> explicitly to a boolean before creating the vault: true permits partial exercise; false requires all remaining notional. This term is immutable, including through tightening. Launch vaults default to private deposits; set <code>terms.publicDeposits: true</code> explicitly for pooling. The token list in the request is an operational allowlist, not a global on-chain whitelist.</li>
+<li>Set an explicit positive <code>minTradeUsdE6</code> appropriate to the offered product. The examples use a configurable illustration, not a protocol minimum. Supply a reviewed collateral USD price and a market quote for every accepted quote token. <code>prepare-vault</code> checks the wallet balance and minimum, sets minCollateral to the owner&#39;s prepared amount, and translates outOfTheMoneyBps to an absolute strike: rounded up for calls, down for puts. For a pooled offering, this is the opening floor; total committed supply may be larger. Review APR separately using the agreed premium, commitment value and exact duration; the CLI does not price APR or volatility.</li>
+<li>Prepare <code>prepare-vault</code>, submit the resulting createVault call and read the vault ID/address from its receipt or hub getters. For each depositor run <code>approve-token</code> with the collateral token and amount, then <code>deposit</code> with that raw amount. Approval must target the clone, never the hub. Direct <code>vault.deposit(amount)</code> is also supported, with the same admission rules.</li>
+<li>The owner runs <code>open-auction</code>. At a nonzero auctionStartsAt, anyone may open it after the scheduled time. Read the auctionId and totalShares after opening. Both become signed commitments. No deposits or withdrawals are available in Auction; transfers remain possible when enabled by the admin.</li>
+<li>If the vault uses an indicative feed, publish a fresh signed spot report before activation. Prepare <code>typed-bid</code> with vaultId and the buyer&#39;s proposed bid fields. The tool reads exact expiry, current auctionId, collateral amount and accepted pairHash; executor defaults to zero and recipient to the buyer. The buyer reviews all output and signs domain <code>IvyVaultsHub</code>, version <code>2</code>, chainId and the deployed hub.</li>
+<li>The buyer approves the clone for the full premium: <code>floor(premium × totalNotional / underlyingUnit)</code>. For puts, notional is <code>floor(collateral × underlyingUnit / strike)</code>. <code>inspect-bid</code> requires the actual signature, explicit USD minimum and collateral valuation, and simulates activation from the bid master. This verifies current role, signature, policy, oracle and premium-funding conditions. Future physical exercise funding is a separate obligation of the executing caller.</li>
+<li>Submit <code>activate</code> using that same signed bid. LP activation entitlements become immediately available through <code>claim-premium</code>. When transfers are enabled, recipients acquire the proportional unclaimed premium; already-claimed premium stays paid. Keep the signed bid and activation receipt with the launch record.</li>
+</ol>
+<p>A buyer can invalidate its unused nonce with <code>cancelBid(nonce)</code> through the ABI. Cancelled or reopened auctions require a new typed bid for the new auctionId, even if size and terms are unchanged.</p>
+<h2 id="reports-exercise-and-expiration">Reports, exercise and expiration</h2>
+<p>Use externally prepared report files and verify the target Hub (or indicative feed for signed spot reports) before submission. Prices are raw quote-token units per whole underlying: WETH/USDC at 2,500 USDC per WETH is <code>2500000000</code>.</p>
+<p><strong>Indicative activation reports:</strong> <code>typed-report</code> with <code>kind: &quot;spot&quot;</code> produces domain <code>IvyPriceFeed</code>, version <code>1</code>, chainId and indicative feed address. Its immutable signer signs; anyone may relay with <code>publish-spot</code>. The legacy <code>kind: &quot;expiry&quot;</code> / <code>publish-expiry</code> signing path remains for the old feed API. It does not supply authoritative prices to new cash vaults.</p>
+<p><strong>Authoritative exercise observations:</strong> the publisher uses <code>publish-settlement-exercise</code>, with <code>hub</code>, <code>vaultId</code>, <code>settlementMethodology</code> and <code>report: { price, observedAt, validUntil }</code>. This directly calls the Hub, without a separate EIP-712 signature. The target must be an existing Live cash vault. Its underlying, selected quote and expiry are derived from Hub state and displayed in the preview. Before expiry, American cash exercise checks the vault&#39;s immutable maximum age and the observation&#39;s validity deadline. Timestamps must be positive, nonfuture and strictly increasing for that vault. Age and validity bounds are inclusive; a long validity deadline never bypasses age.</p>
+<p><strong>Authoritative expiry reports:</strong> the publisher uses <code>publish-settlement-expiry</code>, with <code>hub</code>, <code>vaultId</code>, <code>settlementMethodology</code> and <code>report: { price, validUntil }</code>. Publish for a Live cash vault at/after its fixed expiry and no later than <code>validUntil</code>. Positive final prices are write-once per vault, with no administrator correction. Even vaults sharing a pair and expiry need separate transactions and can receive different prices. Delayed settlement reads that vault&#39;s finalized price indefinitely. For late publication, submit its approved historical calculation with a current deadline. Verify the derived pair, expiry, units and vault ID before sending.</p>
+<p>Before enabling production cash admissions, approve methodology naming the responsible operator, sources, sampling, weighting, rounding, missing-data/outage rules, evidence retention and freshness configuration. The expiry methodology uses a 30-minute average ending at the vault&#39;s exact expiry; exercise observations need an approved current-price calculation and validity policy. Reference the intended artifact using <code>settlementMethodology</code> in each vault&#39;s preparation and publication requests, retaining vault-specific evidence. A common methodology still requires separate publications. Physical deployment needs no methodology. Contracts and CLI do not verify source accuracy or calculate the average; synthetic examples are local rehearsal only.</p>
+<h3 id="enable-cash-after-physical-launch">Enable cash after physical launch</h3>
+<p>Cash support starts with an explicit false flag. Prepare the cash methodology and operator, then use <code>grant-settlement-publisher</code> to grant a nonzero EOA or authenticated helper the role. This does not enable cash. Next, the Hub admin uses <code>set-cash-settlement-enabled</code> with <code>hub</code>, <code>enabled: true</code> and <code>publisher</code>. The CLI verifies that nominated address has the role and previews current/requested flag values. The contract receives only <code>setCashSettlementEnabled(true)</code>. Verify the resulting flag before creating Cash/Either vaults.</p>
+<p>The flag setter is admin-only and intentionally independent of role membership; direct contract calls do not enforce the CLI&#39;s nominated-publisher check. Administrators are responsible for arranging and maintaining publication coverage. Granting, revoking or renouncing a role never changes the flag. If coverage is lost, explicitly disable new admissions as appropriate and rotate authority. The CLI preflight is a point-in-time check, not proof that the publisher is online or will keep its role.</p>
+<p>Use <code>set-cash-settlement-enabled</code> with <code>enabled: false</code> to disable new Cash/Either creation and cash activation, including pending auctions. Disabling needs no publisher input. Physical bids remain valid, including in existing Either vaults, and existing physical-only terms cannot be loosened to cash. Publication, exercise, expiration, claims and agreed unwind for existing cash positions remain available while disabled. Role revocation affects only future submissions by that publisher; stored reports retain their rules. Missing reports require an authorized publisher to submit each missing vault&#39;s report. No flag change releases reserves or erases obligations.</p>
+<h3 id="eoa-and-optional-contract-publishers">EOA and optional contract publishers</h3>
+<p>For the direct EOA path, grant the EOA the Hub&#39;s publisher role after deployment and explicitly enable cash admissions. That EOA submits <code>publish-settlement-exercise</code> and <code>publish-settlement-expiry</code> for each activated cash vault ID. No settlement feed address, interface implementation or helper deployment is needed. Each vault has independent stored reports, including vaults with identical pairs and expiries.</p>
+<p>For an optional contract publisher, grant the same Hub role to an access-controlled helper. The helper obtains or calculates the report under its own approved policy and calls the Hub’s publication functions. The Hub checks the helper’s address as caller; it never calls the helper to read a price. Helpers must authenticate upstream callers before forwarding values. Granting an unrestricted forwarding contract the role would let anyone publish through it. The optional <a href="assets/source/ExampleSettlementPublisher.sol" download>ExampleSettlementPublisher</a> uses owner access control to authenticate publication and the <a href="assets/source/IIvySettlementPricePublication.sol" download>write-side interface</a> to submit it. These examples and tests show this trust boundary; no production data source is implied.</p>
+<h3 id="publisher-rotation-and-incidents">Publisher rotation and incidents</h3>
+<p>On the Hub, <code>DEFAULT_ADMIN_ROLE</code> controls <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code>. Use <code>grant-settlement-publisher</code> and <code>revoke-settlement-publisher</code> with <code>hub</code> and <code>account</code>; the role is checked when publication executes. Any authorized publisher may publish; multiple role holders do not create an on-chain quorum. A publisher multisig applies its own threshold.</p>
+<p>If a publisher becomes unavailable, the Hub admin grants a replacement and revokes the old publisher. Verify the target Hub and resulting memberships. Already published exercise observations remain usable until age/validity limits expire or a newer observation replaces them. Finalized expiry prices survive permanently. Revocation stops future publications; it cannot undo completed payments. Missing reports preserve the buyer’s obligation and keep collateral locked until a valid report or agreed unwind. Admission pause leaves publication and existing position management available.</p>
+<p>Verify calculations before final publication. An incorrect exercise observation can be superseded by a later verified observation; an incorrect finalized expiry price cannot be corrected. Record the incident and pause new affected admissions as appropriate. Never promise a reversal of completed payouts or substitute a current price for an unavailable historical report. Losing all Hub admin keys prevents publisher-governance recovery. These trust boundaries are detailed in the <a href="settlement-pricing.html">pricing specification</a>.</p>
+<p>For physical options, the deadline is <code>expiry + stateOf(vaultId).exerciseWindow</code>. American holders may exercise from activation; European holders start at expiry. Both must execute strictly before the deadline. The buyer or its current executor submits <code>exercise</code> with underlying amount. The caller must fund and approve the clone: quote tokens for calls, underlying for puts. All output goes to the configured recipient. Only the buyer can use <code>set-execution</code> to replace/revoke executor or update recipient; use the zero address to revoke the executor.</p>
+<p>American cash exercise uses the authoritative exercise observation before expiry, never the indicative spot feed. At/after expiry, both American and European cash exercise use the finalized report for the exact expiry; a zero payout reverts. Cash <code>expire</code> processes expiration, including automatic cash exercise where applicable, reserving the remaining buyer payout for <code>claim-payout</code>. Anyone can expire physical options at/after their deadline and cash options at/after expiry. Full exercise finalizes immediately. Expiration requires an on-chain transaction; reaching the deadline alone does not execute it. Cash expiration requires the finalized expiry report.</p>
+<p>After settlement, holders use <code>claim</code> with a share amount. This burns shares for proportional unreserved balances. Unpaid premium, permanent premium dust, buyer payouts/refunds and recoverable LP unwind contributions stay reserved. <code>claim-premium</code> remains available to holders with unpaid credit after burning every share. The buyer or executor calls <code>claim-payout</code>; payment goes to the buyer&#39;s current recipient. Read <code>vault.reserved(token)</code>, <code>vault.buyerReserved(token)</code> and premium-module <code>claimable(vaultId, holder)</code> to distinguish obligations; hub <code>pendingPayout</code> only tracks collateral cash settlement, not unwind refunds.</p>
+<p>If settlement reports are unavailable, cash vaults remain Live and locked until a valid report or unanimous unwind. A stale or missing feed never settles an obligation to zero. Publisher rotation is available to the Hub admin; finalized-price correction is not.</p>
+<h2 id="admission-pause-and-stalled-auctions">Admission pause and stalled auctions</h2>
+<p>A guardian uses <code>pause</code> with <code>vaultId: &quot;0&quot;</code> for global admission or a specific ID for that vault. Creation, deposits, opening and activation are blocked as applicable. Existing withdrawals, transfers, exercise, reports, settlement, claims and agreed unwinds continue; deadlines do not change.</p>
+<p>The owner may run <code>cancel-auction</code> immediately while admission is paused or once exact expiry has passed. Otherwise the owner waits for the snapshotted auction timeout; a bid master may cancel at any time. Cancellation returns to Open and clears the schedule. Holders can then withdraw. A paused vault must be unpaused to admit another deposit or auction, and an expired vault cannot reopen.</p>
+<h2 id="premium-treatment-and-emergency-boundaries">Premium treatment and emergency boundaries</h2>
+<div class="tablewrap" tabindex="0" role="region" aria-label="Operator runbook reference table"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Premium and fees</th>
+<th>Refund / continuation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auction cancelled before activation</td>
+<td>Nothing collected.</td>
+<td>No premium refund; vault returns to Open.</td>
+</tr>
+<tr>
+<td>Unwind consent revoked or proposal expired/replaced</td>
+<td>Earned LP premium and platform fees remain unchanged.</td>
+<td>Each LP can recover their contribution; the Live position continues under its normal deadlines.</td>
+</tr>
+<tr>
+<td>Unwind executed</td>
+<td>Earned LP premium and platform fees are retained.</td>
+<td>Current LPs separately fund proportional contributions for the negotiated premium-token refund; buyer or executor claims it for the configured recipient.</td>
+</tr>
+<tr>
+<td>Admission paused</td>
+<td>Earned premium, fee and claim entitlements are unchanged.</td>
+<td>Exercise, expiration, claims and agreed unwind continue; deadlines do not move.</td>
+</tr>
+<tr>
+<td>Normal exercise or expiration</td>
+<td>Earned premium and fees remain retained and claimable.</td>
+<td>Settlement obligations are handled separately.</td>
+</tr>
+</tbody></table>
+</div>
+<p>The recommended policy is the implemented policy: premium and fees are earned at activation, and unwind refunds are negotiated and funded separately. LPs can already have claimed their premium, so an automatic refund cannot assume that money remains in custody. Claiming premium does not waive a current shareholder’s refund contribution. Funding is segregated in the vault and never taken from premium, fees or collateral reserves.</p>
+<p>This implementation retains admission-only emergency control. Adding a full execution freeze would be a separate product change. Such a freeze needs a separate specification for permissions, affected actions, deadlines, resumption and outstanding payment obligations; it is not implemented by admission pause.</p>
+<h2 id="prepare-and-execute-a-unanimous-unwind">Prepare and execute a unanimous unwind</h2>
+<p>Only Live vaults use this path. The owner or buyer calls <code>propose-unwind</code> with a future <code>deadline</code> and refund amount in raw <strong>premium-token</strong> units. Zero refund is allowed. Read the active agreement using <code>typed-unwind</code>; the output includes vaultId, nonce, deadline, exercisedNotional, supply and refund, with the chain and module-bound EIP-712 domain.</p>
+<p>Every current shareholder reviews and explicitly submits <code>approve-unwind</code> with that nonce. Holders may use <code>revoke-unwind</code>. Nonzero transfers to another holder invalidate sender and recipient votes; they must approve again at their new balances. Replacing the proposal increments its nonce and supersedes all previous votes. Neither voting nor replacement blocks ordinary exercise or settlement.</p>
+<p>Each current LP approves the clone for premium tokens and calls <code>fund-unwind</code> with the proposal nonce and amount. Their minimum contribution is <code>ceil(refund × current shares / proposal supply)</code> in raw token units, readable with <code>unwind.requiredContribution(vaultId, balance)</code>. Funding can precede or follow voting and can be topped up. Overfunding by one holder never covers another holder’s missing contribution. Claimed premium stays earned, but its previous withdrawal does not waive this requirement. Funding token callbacks that move the funder’s shares, even away and back, revert the funding transaction.</p>
+<p>The buyer signs the exact active typed agreement. Anyone submits <code>execute-unwind</code> with vaultId, nonce and signature; the executor supplies no tokens. Execution checks the exercise/supply snapshot, unanimous current consent and each approved holder’s funding, converts exactly the signed refund from the contribution reserve into a buyer reserve and finalizes. No refund token transfer occurs during execution. Any intervening exercise requires a fresh proposal/signature/approvals; normal finalization makes the proposal unusable.</p>
+<p>Before execution, a funder can call <code>withdraw-unwind-contribution</code> with the original nonce to recover their entire deposit. Withdrawing from the current proposal also revokes that holder’s consent. Recovery remains available after revocation, replacement, deadline expiry, exercise, ordinary settlement and burning every share. Replacing a proposal does not roll old funds into the new nonce. Transfers keep deposits attributable to the original funder; affected holders must approve again and meet their thresholds at their new balances.</p>
+<p>After successful execution, deposits above each approved holder’s ceiling remain recoverable. Ceiling rounding may create a surplus over the exact buyer refund: each recovery receives <code>floor(remaining surplus × holder ceiling / remaining total ceilings)</code>, then removes that holder’s ceiling from the remaining weight. The final recovering participant receives all residual rounding dust. For example, three equal LPs refunding two raw units each fund one unit: the buyer receives two, the first two recover zero and the last recovers one. Thus rounding dust depends on recovery order; no contribution dust is permanently stranded. Zero-amount recovery transactions still clear the participant’s weight. Deposits from former, unapproved holders remain wholly recoverable and do not share this rounding surplus. All recoveries stay tied to original wallets even after subsequent share transfers or burns. Read <code>vault.unwindReserved()</code>, <code>unwind.contributions(vaultId, nonce, holder)</code> and completion state to reconcile custody; the contribution getter records original deposit until recovery, not necessarily the amount recoverable after execution.</p>
+<p>The buyer or its executor uses <code>claim-payout</code> for the funded refund, paid to the current configured recipient. Current holders use ordinary <code>claim</code> for remaining collateral and completed-exercise proceeds. Unpaid premium entitlements remain separately claimable; an unwind does not claw them back.</p>
+<h3 id="worked-unwind-scenarios">Worked unwind scenarios</h3>
+<ul>
+<li><strong>Zero refund:</strong> while Live, propose <code>refund: &quot;0&quot;</code> with a future deadline. Read <code>typed-unwind</code>, collect every holder’s <code>approve-unwind</code> for its nonce and the buyer’s signature, then execute. No token approval or refund funding is needed. Holders separately run <code>claim</code> and, if owed, <code>claim-premium</code>; there is no unwind refund to claim.</li>
+<li><strong>Funded refund:</strong> with USDC as premium token (six decimals), propose <code>refund: &quot;100000000&quot;</code> for 100 USDC. For a 60/40 share split, the two LPs run <code>approve-token</code> (spender: clone) and <code>fund-unwind</code> for 60 and 40 USDC respectively. After consent, signature and funding, anyone runs <code>execute-unwind</code>. The buyer or executor runs <code>claim-payout</code>; holders independently claim the residual pool and unpaid premium. Completed exercises are never reversed.</li>
+<li><strong>Expired/replaced proposal:</strong> nonce 1 cannot execute after its deadline. While still Live, the owner or buyer proposes again with a future deadline, obtaining nonce 2. Replacing a still-valid proposal has the same nonce effect. Read fresh typed data, obtain a new buyer signature and all current-holder approvals; nonce 1 approvals/signature cannot execute nonce 2. Revoking consent removes that holder’s vote, not the option or anyone’s premium. Execution is permitted at the deadline itself, but not after it.</li>
+</ul>
+<p>Use the <a href="operator-examples.html">operator templates</a> with the command fields below. An unwind is an agreed close of a funded Live option; <code>cancel-auction</code> only returns a pre-activation auction to Open.</p>
+<h2 id="command-reference">Command reference</h2>
+<p>All requests include <code>rpc</code> and <code>sender</code>; hub calls include <code>hub</code> and usually <code>vaultId</code>. Transaction commands simulate first; add <code>--send</code> only for explicit submission.</p>
+<div class="tablewrap" tabindex="0" role="region" aria-label="Operator runbook reference table"><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Additional request fields</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>prepare-deployment</td>
+<td>deployer, admin, reportSigner; optional exerciseWindow, auctionTimeout, uri, settlementMethodology metadata</td>
+</tr>
+<tr>
+<td>deploy</td>
+<td>planFile, journalFile; sender/hub unnecessary; requires --send</td>
+</tr>
+<tr>
+<td>prepare-vault</td>
+<td>terms, pairs, supportedTokens, collateralAmount, collateralPriceUsdE6, minTradeUsdE6, marketQuotes; cash also settlementMethodology</td>
+</tr>
+<tr>
+<td>typed-bid</td>
+<td>bid: marketMaker, quoteToken, strike, premium, style, settlement, validUntil, nonce; optional executor, recipient</td>
+</tr>
+<tr>
+<td>inspect-bid / activate</td>
+<td>complete bid, signature, collateralPriceUsdE6, minTradeUsdE6</td>
+</tr>
+<tr>
+<td>typed-report</td>
+<td>feed, kind, report; indicative/legacy feed only</td>
+</tr>
+<tr>
+<td>publish-spot / publish-expiry</td>
+<td>feed, report, signature; indicative/legacy feed only</td>
+</tr>
+<tr>
+<td>publish-settlement-exercise / publish-settlement-expiry</td>
+<td>hub, vaultId, settlementMethodology, report containing price/times; authorized publisher sender, no signature</td>
+</tr>
+<tr>
+<td>grant-settlement-publisher / revoke-settlement-publisher</td>
+<td>hub, account; Hub admin sender</td>
+</tr>
+<tr>
+<td>set-cash-settlement-enabled</td>
+<td>hub, enabled boolean; enabling also publisher with role; Hub admin sender</td>
+</tr>
+<tr>
+<td>approve-token</td>
+<td>token, amount; clone spender is read from hub</td>
+</tr>
+<tr>
+<td>deposit / withdraw / exercise / claim</td>
+<td>amount (collateral, shares, underlying, shares respectively)</td>
+</tr>
+<tr>
+<td>open-auction / cancel-auction / expire / claim-premium / claim-payout</td>
+<td>no additional fields</td>
+</tr>
+<tr>
+<td>set-execution</td>
+<td>executor, recipient</td>
+</tr>
+<tr>
+<td>propose-unwind</td>
+<td>deadline, refund</td>
+</tr>
+<tr>
+<td>typed-unwind / revoke-unwind</td>
+<td>no additional fields</td>
+</tr>
+<tr>
+<td>approve-unwind / withdraw-unwind-contribution</td>
+<td>nonce</td>
+</tr>
+<tr>
+<td>fund-unwind</td>
+<td>nonce, amount</td>
+</tr>
+<tr>
+<td>execute-unwind</td>
+<td>nonce, signature</td>
+</tr>
+<tr>
+<td>pause</td>
+<td>paused boolean</td>
+</tr>
+<tr>
+<td>grant-role</td>
+<td>role string, account; vaultId unnecessary</td>
+</tr>
+</tbody></table>
+</div>
+<p>Enums: exercise style 0 European / 1 American; exercise policy also 2 Either. Settlement type 0 Physical / 1 Cash; settlement policy also 2 Either. The contract ABI remains available for owner tightening, auction scheduling, ownership transfer, role revocation, metadata and future-default changes. These do not have dedicated CLI commands.</p>
+<h2 id="platform-fee-and-share-transfer-administration">Platform fee and share-transfer administration</h2>
+<p>Fresh deployments start with transfers disabled, zero platform fee and the admin
+as treasury. DEFAULT_ADMIN_ROLE manages setTransfersEnabled(bool) and
+setPlatformTreasury(address); PLATFORM_FEE_MANAGER_ROLE manages
+setPlatformFeeBps(uint16), bounded by 10,000 bps. The admin initially holds that
+role and controls its membership. Set launch fees before creating vaults.</p>
+<p>Each vault snapshots the current rate in maxPlatformFeeBps(vaultId) at creation.
+Activation uses the latest global rate only if it does not exceed this immutable
+cap. A higher rate requires a new vault; reducing the global rate lets an existing
+auction proceed. minPremium and Activated.totalPremium remain gross values.
+Inspect platformFees(vaultId) for the applied rate, amount and recipient.</p>
+<p>Fees are deducted in the premium token: floor(gross * rate / 10,000). For example, 1,000 USDC gross premium at 200 bps allocates 20 USDC to the treasury and 980 USDC to LPs. Calculate with raw token integers: rounding is down to the smallest premium-token unit, so any fractional fee unit remains in the net LP allocation. LP claims
+remain immediate for the net allocation. The vault reserves both allocations;
+platformFeeRemaining is independent of premiumRemaining and buyerReserved.
+Anyone can call the vault&#39;s claimPlatformFee() to pay the snapshotted recipient,
+once only. Updating the treasury does not redirect existing fees. A vault cannot
+be its own treasury. Fees remain earned after exercise, expiry or unwind; unwind
+refunds are separately funded.</p>
+<p>Enabled share transfers move floor(unclaimed * amount / pre-transfer balance);
+a full transfer moves all credit. Already-claimed amounts never move. Duplicate
+batch IDs are aggregated before proportional accounting. Burns preserve unpaid
+credit, including partial burns. Zero and self-transfers do not move entitlement
+or invalidate unwind consent, but still require transfers enabled.</p>
+<p>Operator commands: set-platform-fee (rateBps), set-platform-treasury (recipient),
+set-transfers (enabled), and claim-platform-fee (vaultId). Each takes the usual
+hub and sender fields and simulates before building calldata. Inspect-bid reports
+the gross premium, applied global rate, creation cap, platform fee and net premium.</p>
+</article></main>
+  <footer><a href="index.html">Ivy Vaults · Protocol guide</a></footer>
+</body>
+</html>

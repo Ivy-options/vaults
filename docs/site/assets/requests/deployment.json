@@ -1,0 +1,9 @@
+{
+  "rpc": "http://127.0.0.1:8545",
+  "deployer": "DEPLOYER_ADDRESS",
+  "admin": "ADMIN_ADDRESS",
+  "reportSigner": "IVY_SIGNER_OR_ERC1271_ADDRESS",
+  "exerciseWindow": 3600,
+  "auctionTimeout": 259200,
+  "uri": ""
+}

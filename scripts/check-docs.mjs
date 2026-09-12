@@ -3,35 +3,61 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext, Script } from "node:vm";
+import { buildDocs } from "./build-docs.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pagePath = resolve(root, "docs/site/index.html");
 const html = readFileSync(pagePath, "utf8");
-const css = readFileSync(resolve(root, "docs/site/assets/docs.css"), "utf8");
-const js = readFileSync(resolve(root, "docs/site/assets/docs.js"), "utf8");
-const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
-assert.equal(new Set(ids).size, ids.length, "Duplicate page IDs");
-assert.match(html, /<html lang="en"/);
-assert.equal((html.match(/<main\b/g) || []).length, 1);
-assert.equal((html.match(/<h1\b/g) || []).length, 1);
-for (const [, url] of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
-  assert.ok(!/^https?:/.test(url), `Page must work offline: ${url}`);
-  const [path, anchor] = url.split("#");
-  if (path)
-    assert.ok(
-      existsSync(resolve(dirname(pagePath), path)),
-      `Missing link: ${url}`
+const site = dirname(pagePath);
+const pages = [pagePath, ...buildDocs({ check: true })];
+const pageIds = new Map(
+  pages.map((path) => {
+    const content = readFileSync(path, "utf8");
+    const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map(
+      (match) => match[1]
     );
-  if (!path && anchor)
-    assert.ok(ids.includes(anchor), `Missing anchor: ${url}`);
+    assert.equal(new Set(ids).size, ids.length, `Duplicate IDs: ${path}`);
+    assert.match(content, /<html lang="en"/);
+    assert.equal((content.match(/<main\b/g) || []).length, 1, path);
+    assert.equal((content.match(/<h1\b/g) || []).length, 1, path);
+    return [path, ids];
+  })
+);
+for (const path of pages) {
+  const content = readFileSync(path, "utf8");
+  for (const [, url] of content.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
+    assert.ok(!/^(?:https?:)?\/\//.test(url), `Page must work offline: ${url}`);
+    assert.ok(!/\.md(?:$|#|\?)/i.test(url), `Markdown link: ${path}: ${url}`);
+    const [target, anchor] = url.split("#");
+    const destination = target
+      ? resolve(dirname(path), decodeURIComponent(target))
+      : path;
+    assert.ok(
+      destination.startsWith(site + "/"),
+      `Link leaves standalone site: ${url}`
+    );
+    assert.ok(existsSync(destination), `Missing link: ${path}: ${url}`);
+    if (anchor)
+      assert.ok(
+        pageIds.get(destination)?.includes(decodeURIComponent(anchor)),
+        `Missing anchor: ${path}: ${url}`
+      );
+  }
 }
-for (const [, url] of css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
-  assert.ok(
-    existsSync(resolve(dirname(pagePath), "assets", url)),
-    `Missing CSS asset: ${url}`
-  );
+for (const file of ["docs.css", "guide.css", "reference.css"]) {
+  const css = readFileSync(resolve(site, "assets", file), "utf8");
+  for (const [, url] of css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
+    assert.ok(
+      existsSync(resolve(site, "assets", url)),
+      `Missing CSS asset: ${url}`
+    );
+  }
 }
-new Script(js);
+const ids = pageIds.get(pagePath);
+const js = readFileSync(resolve(site, "assets/docs.js"), "utf8");
+for (const file of ["docs.js", "guide.js", "reference.js"]) {
+  new Script(readFileSync(resolve(site, "assets", file), "utf8"));
+}
 
 // Exercise the display with a small DOM fixture. Expected amounts are independent
 // worked examples, not a second implementation of the settlement formulas.
@@ -137,5 +163,5 @@ for (const field of ["days", "entryPrice"]) {
 update({ days: "30", entryPrice: "3000", prem: "100" });
 assert.equal(elements.premiumApr.textContent, "40.56%");
 console.log(
-  "Docs checks passed: local links, anchors, assets, JavaScript, call/put examples, invalid inputs and recovery."
+  "Docs checks passed: seven HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, call/put examples, invalid inputs and recovery."
 );

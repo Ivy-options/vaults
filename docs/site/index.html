@@ -16,7 +16,9 @@
     </script>
     <link rel="icon" type="image/png" href="assets/ivy-logo.png" />
     <link rel="stylesheet" href="assets/docs.css" />
+    <link rel="stylesheet" href="assets/guide.css" />
     <script src="assets/docs.js" defer></script>
+    <script src="assets/guide.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
@@ -53,11 +55,6 @@
           <a href="#developers">Contracts and entrypoints</a>
         </nav>
       </details>
-      <div class="rail-links">
-        <a href="../operations.md">Operator runbook ↗</a
-        ><a href="../../examples/operator/README.md">Request examples ↗</a
-        ><a href="../../README.md">Repository README ↗</a>
-      </div>
     </aside>
     <main id="content" class="content" tabindex="-1">
       <div class="hero" id="overview">
@@ -287,107 +284,79 @@
       <section id="collateral">
         <div class="main">
           <h2>Collateral and shares</h2>
-          <p class="prose">
-            There are three token roles: <strong>asset/underlying</strong> is the option asset, <strong>quote</strong> measures its strike, and <strong>premium</strong> pays for the option. The deposited backing token is called <strong>collateral</strong>; it is not a fourth independent token.
-            The deposits back the seller's obligation to the buyer, so earning a premium
-            does not guarantee that LPs will get the same assets or market value
-            back. Depositing the underlying creates a covered call; depositing
-            the quote token creates a cash-secured put.
-          </p>
-          <div class="two">
-            <div>
-              <div class="tok">collateral == underlying</div>
-              <h3>Covered call</h3>
-              <ul class="plain">
-                <li>
-                  Deposit the underlying asset, such as WETH, to back the call.
-                  If the buyer physically exercises, the vault delivers that
-                  underlying in exchange for payment at the agreed strike.
-                </li>
-                <li>
-                  Bids quote strike in a listed quote token and premium in that
-                  pair’s fixed premium token. Calls may offer multiple pairs before activation; the winning bid selects one.
-                </li>
-                <li>
-                  The option notional equals the underlying deposited, so a
-                  vault holding 10 WETH can sell a call covering 10 WETH.
-                </li>
-              </ul>
+
+          <div class="collateral-guide">
+            <p class="example-context">The token examples below use WETH as underlying and USDC as quote.</p>
+            <div class="token-roles" aria-label="Three token roles">
+              <div><span class="role-symbol" aria-hidden="true">◇</span><h3>Underlying</h3><strong>WETH</strong><p>The asset covered by the option.</p></div>
+              <div><span class="role-symbol" aria-hidden="true">$</span><h3>Quote</h3><strong>USDC</strong><p>The token used to express the strike.</p></div>
+              <div><span class="role-symbol" aria-hidden="true">＋</span><h3>Premium</h3><strong>The buyer’s payment</strong><p>Can use either token or a third token.</p></div>
             </div>
-            <div>
-              <div class="tok">collateral == quote</div>
-              <h3>Cash-secured put</h3>
-              <ul class="plain">
-                <li>
-                  Deposit the quote token, such as USDC, to fund the put. The
-                  underlying asset that the buyer can deliver during physical
-                  exercise is fixed when the vault is created.
-                </li>
-                <li>
-                  A put vault accepts one quote/premium pair, with the
-                  collateral itself used as the quote token.
-                </li>
-                <li>
-                  The notional is the collateral divided by the strike: 30,000
-                  USDC at 3,000 USDC per WETH backs a put covering 10 WETH. In
-                  raw token units, the calculation is
-                  <code>collateral × underlyingUnit / strike</code>, where
-                  <code>underlyingUnit = 10^underlyingDecimals</code> is the
-                  number of smallest units in one whole underlying token.
-                </li>
-              </ul>
+            <p class="collateral-definition"><strong>Collateral is the token deposited to back the option.</strong> It fills one of the roles above; it is not a fourth independent token.</p>
+
+            <div class="reading-block">
+              <h3>What does the vault hold?</h3>
+              <div class="tablewrap" tabindex="0" role="region" aria-label="Covered call and cash-secured put comparison">
+                <table class="collateral-comparison">
+                  <caption>Example: 10 WETH notional at a strike of 3,000 USDC per WETH.</caption>
+                  <thead><tr><th scope="col">The trade</th><th scope="col">Covered call</th><th scope="col">Cash-secured put</th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row">Deposit</th><td><strong>10 WETH</strong><span>Underlying backs the call.</span></td><td><strong>30,000 USDC</strong><span>Quote tokens fund the put.</span></td></tr>
+                    <tr><th scope="row">Notional</th><td><strong>10 WETH</strong><span>Equals the underlying deposited.</span></td><td><strong>10 WETH</strong><span>30,000 USDC ÷ 3,000 USDC per WETH.</span></td></tr>
+                    <tr><th scope="row">Token pairs</th><td>May list multiple quote/premium pairs. The winning bid selects one.</td><td>One quote/premium pair. Collateral is the quote token.</td></tr>
+                    <tr><th scope="row">Fixed terms</th><td>Each listed pair fixes its premium token. Bids quote strike in that pair’s quote token.</td><td>The underlying the buyer can deliver is fixed when the vault is created.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="notional-equation"><span>Put notional · raw token units</span><code>collateral × underlyingUnit / strike</code><p><code>underlyingUnit = 10^underlyingDecimals</code>, the number of smallest units in one whole underlying token.</p></div>
+              <p>These deposits back the seller’s obligation. Earning a premium does not guarantee that LPs get the same assets or market value back.</p>
             </div>
-          </div>
-          <p class="prose">
-            At a strike of 3,000 USDC per WETH, full physical exercise of a 10 WETH call sends 10 WETH to the recipient and collects 30,000 USDC from the caller. For the matching put, the caller delivers 10 WETH and the recipient receives 30,000 USDC. “Cash-secured” describes the put’s quote-token collateral; the buyer still delivers underlying when exercising. Premium can use either token or a third token; shared token addresses retain separate premium, platform-fee and buyer-reserve budgets.
-          </p>
-          <p class="prose">
-            When the option ends, shareholders make a <strong>claim</strong> to
-            collect their portion of the remaining assets. Claiming burns the
-            submitted shares, meaning those shares are removed from circulation.
-            The contracts keep amounts owed as unpaid premium or buyer payments
-            in <strong>reserves</strong>. The remaining, unreserved assets form
-            the residual pool available to shareholders.
-          </p>
-          <div class="grid2">
-            <div>
-              <div class="k">Shares</div>
-              The vault mints one share for each smallest unit of collateral it
-              actually receives. The <code>IvyShares</code> contract issues them
-              using ERC-1155, a token standard that lets one contract track
-              shares for multiple vaults under separate token IDs. Each token ID
-              matches its vault ID. Shares can be transferred in every phase,
-              carrying the right to claim a proportion of the remaining pool
-              after finalization. Earned premium is a separate entitlement,
-              described <a href="#premium-ownership">below</a>.
+
+            <div class="reading-block">
+              <h3>What moves when the buyer exercises?</h3>
+              <p>For an option covering 10 WETH at a strike of 3,000 USDC per WETH:</p>
+              <div id="physical-delivery-example">
+                <div class="delivery-static"><h4>Call · full physical exercise</h4><p>Vault → recipient: <strong>10 WETH</strong><br>Caller → vault: <strong>30,000 USDC</strong></p></div>
+                <div class="delivery-static"><h4>Put · full physical exercise</h4><p>Vault → recipient: <strong>30,000 USDC</strong><br>Caller → vault: <strong>10 WETH</strong></p></div>
+              </div>
+              <p>“Cash-secured” describes the put’s collateral. The caller still delivers underlying during physical exercise.</p>
             </div>
-            <div>
-              <div class="k">Approvals</div>
-              Before a contract can collect tokens from a wallet, the wallet
-              gives it a token allowance, commonly called an approval. This
-              approval must target the individual vault address, because that
-              contract pulls and holds the assets. The <strong>hub</strong> is
-              the shared contract that coordinates vault operations, but it does
-              not take custody of the tokens. You can deposit through the hub or
-              call <code>deposit(amount)</code> directly on the vault; both
-              routes follow the same deposit rules.
+
+            <div class="reading-block">
+              <h3>Deposit assets. Receive shares.</h3>
+              <div class="share-issuance" aria-label="Share issuance and identification">
+                <div><span>Vault actually receives</span><strong>1 raw unit</strong><span>of collateral</span></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>IvyShares mints</span><strong>1 share</strong><span>for that vault</span></div><span class="reading-arrow" aria-hidden="true">·</span><div><span>Share token ID</span><strong>Vault ID</strong><span>ERC-1155</span></div>
+              </div>
+              <p><code>IvyShares</code> uses ERC-1155 to track shares in multiple vaults under separate token IDs.</p>
+              <div class="share-claim-example"><div class="share-ring" role="img" aria-label="25 percent of shares gives 25 percent of the unreserved pool"><strong>25<span>%</span></strong></div><div><h4>25% of the shares → 25% of the remaining pool</h4><p>After finalization, shareholders claim their proportion of the unreserved assets. Claiming burns the submitted shares, removing them from circulation.</p></div></div>
+              <p>Share transfers start disabled. Once the hub admin enables them, shares can move in every phase and carry the right to the residual pool. Earned premium has separate entitlement rules below.</p>
             </div>
-            <div>
-              <div class="k" id="premium-ownership">Premium</div>
-              The buyer pays the premium when the winning bid is activated. The
-              people holding shares at that moment are the
-              <strong>activation holders</strong>, and they can immediately
-              collect their earned amount through
-              <code>claimPremium(vaultId)</code>. Unclaimed premium follows
-              transferred shares proportionally; already-claimed premium stays
-              paid. Burning shares preserves unpaid credit. Share transfers
-              start disabled and require the hub admin to enable them. The vault
-              deducts a <a href="#platform-fees">global platform fee</a> before
-              allocating premium to LPs. Activation rejects a rate above the
-              vault’s creation-time cap. The vault sets aside unpaid
-              premium so it cannot be spent on other claims. Small amounts left
-              by rounding each holder's entitlement down, called rounding dust,
-              stay set aside permanently.
+
+            <div class="reading-block">
+              <h3>Approve the vault that holds your tokens.</h3>
+              <p>An approval is the token allowance that lets a contract collect tokens from your wallet.</p>
+              <div class="custody-route" aria-label="Approve the vault; deposit directly or through the hub">
+                <div><span>Your wallet</span><strong>Approve the vault address</strong></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>The individual vault</span><strong>Pulls and holds the tokens</strong></div>
+              </div>
+              <dl class="fact-rows"><div><dt>Through the hub</dt><dd>The hub coordinates vault operations; it does not hold the tokens.</dd></div><div><dt>Directly on the vault</dt><dd>Call <code>deposit(amount)</code>. Both routes follow the same deposit rules.</dd></div></dl>
+            </div>
+
+            <div class="reading-block" id="premium-ownership">
+              <h3>Premium is earned at activation.</h3>
+              <ol class="premium-sequence">
+                <li><span class="sequence-number" aria-hidden="true">01</span><div><h4>The buyer pays</h4><p>The winning bid is activated and the buyer pays its premium.</p></div></li>
+                <li><span class="sequence-number" aria-hidden="true">02</span><div><h4>The fee is deducted</h4><p>The vault deducts the <a href="#platform-fees">global platform fee</a>. Activation rejects a rate above the vault’s creation-time cap.</p></div></li>
+                <li><span class="sequence-number" aria-hidden="true">03</span><div><h4>Activation holders can claim</h4><p>Whoever holds shares at activation earns the net premium. They can collect immediately with <code>claimPremium(vaultId)</code>.</p></div></li>
+              </ol>
+              <h4>What happens to unpaid premium?</h4>
+              <dl class="fact-rows"><div><dt>Shares transferred</dt><dd>Unclaimed premium follows the shares proportionally. Already-claimed premium stays paid.</dd></div><div><dt>Shares burned</dt><dd>Unpaid credit is preserved.</dd></div><div><dt>Entitlement rounded down</dt><dd>The small remainder, called rounding dust, stays set aside permanently.</dd></div></dl>
+            </div>
+
+            <div class="reading-block reserve-explainer">
+              <h3>What is left for the final claim?</h3>
+              <div class="reserve-equation" aria-label="Vault assets minus reserved amounts equals the residual pool"><div><span>Held by the vault</span><strong>Assets</strong></div><span class="reading-arrow" aria-hidden="true">−</span><div><span>Still owed</span><strong>Reserves</strong></div><span class="reading-arrow" aria-hidden="true">=</span><div><span>For shareholders</span><strong>Residual pool</strong></div></div>
+              <p>The vault keeps unpaid premium, platform fees and buyer payments in separate reserves. Those amounts cannot be spent on the shareholders’ pool claims.</p>
+              <p>Even when token addresses overlap, premium, platform-fee and buyer-reserve budgets stay separate.</p>
             </div>
           </div>
         </div>
@@ -596,7 +565,7 @@
               <li><strong>100 USDC refund:</strong> when premium uses six-decimal USDC, set refund to <code>100000000</code>. With a 60/40 share split, the LPs fund 60 and 40 USDC; the buyer or executor claims it separately after finalization.</li>
               <li><strong>Expired or replaced proposal:</strong> while Live, propose again with a future deadline. The new nonce requires fresh approvals and buyer signature. Old consent cannot execute the replacement; the position keeps its normal exercise and expiration deadlines.</li>
             </ul>
-            <p class="prose">Follow the <a href="../operations.md#prepare-and-execute-a-unanimous-unwind">unwind runbook and commands</a>. Auction cancellation is a separate pre-activation action: no premium has been collected.</p>
+            <p class="prose">Follow the <a href="operations.html#prepare-and-execute-a-unanimous-unwind">unwind runbook and commands</a>. Auction cancellation is a separate pre-activation action: no premium has been collected.</p>
           </div>
         </div>
       </section>
@@ -631,7 +600,7 @@
             The emergency pause applies only to admission. A full execution
             freeze would require a separate specification for permissions,
             affected actions, deadlines, resumption and outstanding payment
-            obligations. See the <a href="../operations.md#premium-treatment-and-emergency-boundaries">operating policy</a>.
+            obligations. See the <a href="operations.html#premium-treatment-and-emergency-boundaries">operating policy</a>.
           </p>
         </div>
       </section>
@@ -662,7 +631,7 @@
             including when token addresses overlap. Fees remain earned after
             exercise, expiry or unwind; negotiated refunds require separate
             funding. The calculator below assumes zero fees. See
-            <a href="../operations.md#platform-fee-and-share-transfer-administration">fee administration and commands</a>.
+            <a href="operations.html#platform-fee-and-share-transfer-administration">fee administration and commands</a>.
           </p>
         </div>
       </section>
@@ -876,147 +845,77 @@
       <section id="makers">
         <div class="main">
           <h2>Bidding and exercise</h2>
-          <p class="prose">
-            As the option buyer, a market maker signs a bid for a particular
-            auction and collateral amount. The signature also binds the accepted
-            token pair's hash, expiry and execution settings. The hash identifies
-            the exact pair configuration. These commitments prevent the bid
-            master from substituting different terms at activation.
-            Cancelling and reopening an auction changes its ID and requires a
-            new signed bid.
-          </p>
-          <div class="split" style="margin-bottom: 8px">
-            <ol class="steps">
-              <li>
-                <div>
-                  <b>Sign the bid</b>The buyer signs structured trade data using
-                  EIP-712, a signing format that binds the message to a
-                  particular chain and contract. The signature uses the
-                  <code>IvyVaultsHub</code> domain, version <code>2</code>, the
-                  chain ID and the deployed hub address. The buyer must hold
-                  <code>MARKET_MAKER_ROLE</code> for activation. Each bid
-                  includes a buyer-chosen identifier called a nonce. Activating
-                  a bid consumes that nonce so it cannot be used again, and the
-                  buyer can invalidate an unused nonce with
-                  <code>cancelBid(nonce)</code>. Every bid also has a
-                  <code>validUntil</code> deadline.
-                </div>
-              </li>
-              <li>
-                <div>
-                  <b>Approve the vault</b>The buyer approves the vault to
-                  collect the full premium, calculated as
-                  <code>floor(premium × notional / underlyingUnit)</code>. This
-                  approval funds activation only. If the option is physically
-                  exercised later, the buyer or executor making that call must
-                  separately approve and supply the required payment assets.
-                </div>
-              </li>
-              <li>
-                <div>
-                  <b>Activation</b>The bid master submits the signed bid, and
-                  the vault collects the premium in that same transaction. If
-                  the signature, terms or premium funding fail the contract
-                  checks, activation reverts and the vault does not become Live.
-                </div>
-              </li>
+          <div class="bid-guide">
+            <ol class="bid-process" aria-label="From signed bid to activation">
+              <li><span class="sequence-number">01 · BUYER</span><h3>Sign the bid</h3><p>Sign the trade’s terms for this auction using EIP-712.</p><code>MARKET_MAKER_ROLE</code><span class="process-note">The buyer needs this role for activation.</span></li>
+              <li><span class="sequence-number">02 · BUYER</span><h3>Approve the vault</h3><p>Allow the individual vault to collect the full premium.</p><span class="process-note">This allowance funds activation only.</span></li>
+              <li><span class="sequence-number">03 · BID MASTER</span><h3>Submit for activation</h3><p>Submit the signed bid. The vault checks it and collects premium in the same transaction.</p></li>
             </ol>
-            <pre><code>struct Bid {
-  uint256 vaultId;
-  address marketMaker;
-  address quoteToken;
-  uint256 strike;       // quote per 1 underlying
-  uint256 premium;      // premiumToken per 1 underlying
-  uint8   style;        // 0 European, 1 American
-  uint8   settlement;   // 0 Physical, 1 Cash
-  uint64  expiry;       // unix seconds
-  uint64  validUntil;   // signature deadline
-  uint256 nonce;
-  uint256 auctionId;
-  uint256 collateralAmount;
-  bytes32 pairHash;
-  address executor;
-  address recipient;
-}</code></pre>
-          </div>
-          <p class="prose">
-            At launch the bid selects <code>settlement = 0</code> for physical
-            delivery. The value <code>1</code> is reserved for the
-            <a href="#cash-settlement">optional cash feature</a> when enabled.
-            For raw token amounts,
-            <code>underlyingUnit = 10 ** underlyingDecimals</code>. Strike and
-            premium are raw payment-token units per whole underlying.
-          </p>
-          <h3 id="exercise-and-expiration">Exercise and expiration</h3>
-          <p class="prose">
-            <b>Exercise uses your option right.</b> The buyer or appointed executor
-            calls <code>exercise(vaultId, amount)</code> within the period shown below.
-            The caller supplies quote tokens for a call or underlying for a put,
-            exchanging assets at the strike. Payments go to the configured
-            <a href="#execution-permissions">recipient</a>.
-            The vault’s immutable <a href="#partial-exercise">partial-exercise
-            policy</a> determines whether the amount may be partial or must consume
-            all remaining notional. Partial exercise leaves the rest Live;
-            full exercise finalizes the vault.
-          </p>
-          <p class="prose">
-            <b>Expiration processes the remaining position.</b> Anyone can call
-            <code>expire(vaultId)</code> at or after its deadline. Unused physical
-            option rights lapse, and shareholders can claim the residual assets.
-            No settlement price is needed. Being out of the
-            money before the deadline does not permit expiration.
-          </p>
-          <p class="prose">
-            <b>Expiration requires an on-chain transaction.</b> When
-            <code>expire</code> is called after the exercise window, the vault
-            becomes Settled and opens residual claims. The passage of time alone
-            does not execute that transaction.
-          </p>
-          <div class="fig">
-            <span>Exercise windows and expiration time</span
-            ><span><b>exerciseWindow</b> launch default 1 h</span>
-          </div>
-          <div
-            class="tablewrap"
-            tabindex="0"
-            role="region"
-            id="exercise-windows"
-            aria-label="Exercise windows"
-          >
-            <table>
-              <thead>
-                <tr>
-                  <th>Style · settlement</th>
-                  <th>exercise(vaultId, amount)</th>
-                  <th>expire(vaultId)</th>
-                  <th>At exercise</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="k">American · Physical</td>
-                  <td><span class="mono">t &lt; expiry + window</span></td>
-                  <td><span class="mono">t ≥ expiry + window</span></td>
-                  <td>
-                    Call: pay
-                    <span class="mono">ceil(amount·K/underlyingUnit)</span>
-                    quote, receive <span class="mono">amount</span> underlying.
-                    Put: deliver <span class="mono">amount</span> underlying,
-                    receive
-                    <span class="mono">floor(amount·K/underlyingUnit)</span>
-                    quote.
-                  </td>
-                </tr>
-                <tr>
-                  <td class="k">European · Physical</td>
-                  <td>
-                    <span class="mono">expiry ≤ t &lt; expiry + window</span>
-                  </td>
-                  <td><span class="mono">t ≥ expiry + window</span></td>
-                  <td>Same as above.</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="activation-checks" aria-label="Activation outcomes"><div><span class="check-symbol" aria-hidden="true">✓</span><div><h4>Signature, terms and funding pass</h4><p>The option becomes Live.</p></div></div><div><span class="check-symbol" aria-hidden="true">×</span><div><h4>Any of those checks fail</h4><p>Activation reverts. The vault does not become Live.</p></div></div></div>
+
+            <div class="reading-block">
+              <h3>The signature belongs to one chain and hub.</h3>
+              <div class="signature-domain" aria-label="EIP-712 signing domain"><div><span>Domain</span><code>IvyVaultsHub</code></div><div><span>Version</span><code>2</code></div><div><span>Network</span><strong>Chain ID</strong></div><div><span>Contract</span><strong>Deployed hub address</strong></div></div>
+              <p>EIP-712 binds the structured message to that chain and contract. The signed fields below prevent the bid master from substituting different terms at activation.</p>
+
+              <h3>What the buyer signs</h3>
+              <div class="bid-field-groups">
+                <div><h4>The auction and buyer</h4><dl class="bid-fields">
+                  <div><dt><code>vaultId</code><small>uint256</small></dt><dd>The vault being bid on.</dd></div>
+                  <div><dt><code>auctionId</code><small>uint256</small></dt><dd>The particular auction.</dd></div>
+                  <div><dt><code>collateralAmount</code><small>uint256</small></dt><dd>The committed collateral amount.</dd></div>
+                  <div><dt><code>marketMaker</code><small>address</small></dt><dd>The option buyer.</dd></div>
+                </dl></div>
+                <div><h4>Tokens and price</h4><dl class="bid-fields">
+                  <div><dt><code>quoteToken</code><small>address</small></dt><dd>The token used to quote the strike.</dd></div>
+                  <div><dt><code>pairHash</code><small>bytes32</small></dt><dd>Identifies the exact accepted token-pair configuration.</dd></div>
+                  <div><dt><code>strike</code><small>uint256</small></dt><dd>Raw quote-token units per whole underlying.</dd></div>
+                  <div><dt><code>premium</code><small>uint256</small></dt><dd>Raw premium-token units per whole underlying.</dd></div>
+                </dl></div>
+                <div><h4>Timing and option rules</h4><dl class="bid-fields">
+                  <div><dt><code>style</code><small>uint8</small></dt><dd><code>0</code> European · <code>1</code> American.</dd></div>
+                  <div><dt><code>settlement</code><small>uint8</small></dt><dd><code>0</code> Physical at launch. <code>1</code> for <a href="#cash-settlement">optional cash settlement</a> when enabled.</dd></div>
+                  <div><dt><code>expiry</code><small>uint64</small></dt><dd>Option expiry, in Unix seconds.</dd></div>
+                  <div><dt><code>validUntil</code><small>uint64</small></dt><dd>The signature’s deadline.</dd></div>
+                </dl></div>
+                <div><h4>Use and execution</h4><dl class="bid-fields">
+                  <div><dt><code>nonce</code><small>uint256</small></dt><dd>A buyer-chosen identifier, consumed at activation.</dd></div>
+                  <div><dt><code>executor</code><small>address</small></dt><dd>The appointed caller.</dd></div>
+                  <div><dt><code>recipient</code><small>address</small></dt><dd>The configured payment recipient.</dd></div>
+                </dl></div>
+              </div>
+              <dl class="fact-rows"><div><dt>Bid activated</dt><dd>Its nonce is consumed and cannot be reused.</dd></div><div><dt>Unused bid cancelled</dt><dd>The buyer invalidates its nonce with <code>cancelBid(nonce)</code>.</dd></div><div><dt>Auction cancelled and reopened</dt><dd>The auction ID changes. The buyer must sign a new bid.</dd></div></dl>
+            </div>
+
+            <div class="reading-block">
+              <h3>Premium approval and exercise payment are separate.</h3>
+              <div class="payment-stages"><div><span class="sequence-number">AT ACTIVATION</span><h4>Buyer → vault</h4><p>Approve the full premium:</p><code>floor(premium × notional / underlyingUnit)</code></div><div><span class="sequence-number">AT PHYSICAL EXERCISE</span><h4>Caller → vault → recipient</h4><p>The buyer or executor making the call separately approves and supplies the payment assets.</p></div></div>
+              <p class="unit-note"><code>underlyingUnit = 10 ** underlyingDecimals</code>. This is the number of raw units in one whole underlying token.</p>
+            </div>
+
+            <div class="reading-block" id="exercise-and-expiration">
+              <h3>Exercise and expiration</h3>
+              <div class="option-endings">
+                <div><span class="sequence-number">EXERCISE</span><h4>Use the option right</h4><dl class="fact-rows"><div><dt>Who calls?</dt><dd>The buyer or appointed executor.</dd></div><div><dt>Entrypoint</dt><dd><code>exercise(vaultId, amount)</code></dd></div><div><dt>Who pays?</dt><dd>The caller supplies quote tokens for a call, or underlying for a put.</dd></div><div><dt>Who receives?</dt><dd>The configured <a href="#execution-permissions">recipient</a>. Assets exchange at the strike.</dd></div></dl><div class="ending-states"><span>Partial exercise → rest stays <strong>Live</strong></span><span>Full exercise → vault is <strong>Settled</strong></span></div><p>The immutable <a href="#partial-exercise">partial-exercise policy</a> determines whether partial amounts are allowed or all remaining notional must be exercised.</p></div>
+                <div><span class="sequence-number">EXPIRATION</span><h4>Close unused physical rights</h4><dl class="fact-rows"><div><dt>Who calls?</dt><dd>Anyone, at or after the expiration deadline.</dd></div><div><dt>Entrypoint</dt><dd><code>expire(vaultId)</code></dd></div><div><dt>What happens?</dt><dd>Unused rights lapse. The vault becomes Settled and shareholders can claim the residual assets.</dd></div><div><dt>Price required?</dt><dd>No settlement price is needed for physical expiration.</dd></div></dl><p>Being out of the money before the deadline does not permit expiration.</p></div>
+              </div>
+              <div class="expiration-route" aria-label="Time alone does not settle the vault"><div><span>Deadline reached</span><strong>Expiration is allowed</strong></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>Someone calls expire</span><strong>On-chain transaction</strong></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>Vault becomes Settled</span><strong>Residual claims open</strong></div></div>
+              <p>Time passing alone does not submit that transaction.</p>
+            </div>
+
+            <div class="reading-block" id="exercise-windows">
+              <h3>Physical exercise windows</h3>
+              <p class="unit-note"><code>exerciseWindow</code> has a launch default of 1 hour. <code>t</code> is the current timestamp.</p>
+              <div class="window-schedule" role="group" aria-label="Physical exercise timing">
+                <div class="window-heading"><span></span><span>Before expiry</span><span>From expiry to window end</span><span>At or after window end</span></div>
+                <div class="window-row"><strong>American</strong><span class="window-open window-before">Exercise allowed</span><span class="window-open window-after">Exercise allowed</span><span>Anyone can expire</span></div>
+                <div class="window-row"><strong>European</strong><span>Wait</span><span class="window-open">Exercise allowed</span><span>Anyone can expire</span></div>
+              </div>
+              <dl class="fact-rows"><div><dt>American exercise</dt><dd><code>t &lt; expiry + exerciseWindow</code></dd></div><div><dt>European exercise</dt><dd><code>expiry ≤ t &lt; expiry + exerciseWindow</code></dd></div><div><dt>Expiration · both styles</dt><dd><code>t ≥ expiry + exerciseWindow</code></dd></div></dl>
+              <h4 class="payment-formula-title">Payment at physical exercise</h4>
+              <dl class="fact-rows"><div><dt>Call</dt><dd>Caller pays <code>ceil(amount × K / underlyingUnit)</code> quote. Recipient receives <code>amount</code> underlying.</dd></div><div><dt>Put</dt><dd>Caller delivers <code>amount</code> underlying. Recipient receives <code>floor(amount × K / underlyingUnit)</code> quote.</dd></div></dl>
+              <p class="unit-note"><code>K</code> is the strike. Call consideration rounds up; put payments round down.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -1055,7 +954,7 @@
               not check publisher coverage. The operator command checks a
               nominated publisher’s current role before preparing the transaction,
               but the admin remains responsible for continued publication.
-              See the <a href="../operations.md#enable-cash-after-physical-launch">cash enablement runbook</a>.
+              See the <a href="operations.html#enable-cash-after-physical-launch">cash enablement runbook</a>.
             </p>
             <div class="callout">
               <b>Disabling affects new positions.</b> With the flag off, new
@@ -1227,9 +1126,9 @@
               blocks this recovery or changes deadlines and earned premium.
             </p>
             <p class="prose">
-              See the <a href="../settlement-pricing-spec.md">pricing specification</a>
+              See the <a href="settlement-pricing.html">pricing specification</a>
               for the complete rules and the
-              <a href="../operations.md#reports-exercise-and-expiration">publication runbook</a>
+              <a href="operations.html#reports-exercise-and-expiration">publication runbook</a>
               for report preparation and recovery.
             </p>
           </div>
@@ -1420,7 +1319,7 @@
             continue to apply. The administrative powers already described in
             this guide, including admission pauses, share-transfer controls and
             optional cash-price publication, remain part of each deployment.
-            See the <a href="../version-registry.md">release and integration guide</a>.
+            See the <a href="releases.html">release and integration guide</a>.
           </p>
         </div>
       </section>
@@ -1666,9 +1565,9 @@
               </table>
             </div>
             <p class="muted small" style="margin-top: 14px">
-              See the <a href="../operations.md">operator runbook</a> for
+              See the <a href="operations.html">operator runbook</a> for
               deployment, reports, transaction commands and recovery, or the
-              <a href="../../README.md">repository README</a> for build
+              <a href="project-setup.html#build-and-verify">project setup guide</a> for build
               instructions.
             </p>
           </div>

@@ -1,0 +1,12 @@
+{
+  "rpc": "http://127.0.0.1:8545",
+  "sender": "SETTLEMENT_PUBLISHER_ADDRESS",
+  "settlementMethodology": "APPROVED_PER_PAIR_METHODOLOGY_ARTIFACT_REFERENCE",
+  "report": {
+    "price": "4000000000",
+    "observedAt": "OBSERVATION_UNIX_SECONDS",
+    "validUntil": "EXERCISE_OBSERVATION_VALID_UNTIL_UNIX_SECONDS"
+  },
+  "hub": "HUB_ADDRESS",
+  "vaultId": "LIVE_CASH_VAULT_ID"
+}
