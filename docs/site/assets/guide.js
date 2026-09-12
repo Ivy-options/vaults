@@ -49,7 +49,7 @@
       )
     );
     // Only interactive examples need a generated stage. Explanations live in HTML.
-    if (["collateral", "lifecycle", "outcomes"].includes(chapter.id)) {
+    if (["collateral", "lifecycle"].includes(chapter.id)) {
       const stage = make("div", "visual-stage");
       stage.id = `visual-${chapter.id}`;
       main.append(stage);
@@ -59,9 +59,6 @@
 
   // Replace the overview sentence with the same sequence as a diagram.
   const overview = $("#overview > div");
-  $(".kicker", overview).textContent = "THE VISUAL GUIDE";
-  $("h1", overview).innerHTML =
-    "Ivy Vaults,<br><span>one step at a time.</span>";
   $(".lede", overview).replaceWith(
     make(
       "div",
@@ -291,58 +288,6 @@
     };
   });
   setPhase(0);
-
-  // An illustrative price/value chart. Keep the original editable calculator intact.
-  const outcomes = $("#visual-outcomes");
-  outcomes.innerHTML = `<div class="stage-top"><span class="stage-label">LP VALUE · PRICE EXPLORER</span><div class="segmented" role="group" aria-label="Payoff option type"><button type="button" data-payoff="call" aria-pressed="true">Call</button><button type="button" data-payoff="put" aria-pressed="false">Put</button></div></div><div class="payoff-layout"><div><svg class="explorer-chart" viewBox="0 0 560 290" role="img" aria-label="LP total value with premium versus holding collateral"><g class="chart-grid"><path d="M55 25V242H530 M55 169H530 M55 97H530 M55 25H530"/></g><text x="14" y="246">0</text><text x="8" y="173">15k</text><text x="8" y="101">30k</text><text x="8" y="29">45k</text><text x="55" y="272">1,500</text><text x="292.5" y="272" text-anchor="middle">3,000 strike</text><text x="530" y="272" text-anchor="end">4,500</text><path class="strike-guide" d="M292.5 25V242"/><path class="hold-path"/><path class="vault-path" d="M55 164.84L292.5 92.51H530"/><path class="price-guide"/><circle class="value-dot" r="6"/></svg><div class="chart-legend"><span><i></i>LP value + premium</span><span><i></i>Hold collateral</span></div></div><div class="value-readout" role="status"><span>LP total value</span><strong id="explorer-value"></strong><span>USDC equivalent</span><div><span>Compared with holding</span><b id="explorer-difference"></b></div></div></div><label class="price-label" for="market-price">Illustrative WETH price <output id="market-output"></output></label><input id="market-price" type="range" min="1500" max="4500" step="50" value="3500"><div class="range-ends"><span>1,500 USDC</span><span>4,500 USDC</span></div><p class="takeaway" id="payoff-takeaway"></p><p class="stage-footnote">10 WETH notional · 3,000 USDC strike · 1,000 USDC premium · zero platform fee. Assumes full physical exercise when in the money, no exercise otherwise, and the same holders throughout. Exercise is the buyer’s choice. Total value includes separately claimed premium. This is asset value, not profit.</p>`;
-  let payoffKind = "call";
-  function renderPayoff() {
-    const spot = Number($("#market-price").value);
-    const total = 10 * Math.min(spot, 3000) + 1000;
-    const hold = payoffKind === "call" ? 10 * spot : 30000;
-    const difference = total - hold;
-    const x = 55 + ((spot - 1500) / 3000) * 475;
-    const y = 242 - (total / 45000) * 217;
-    $(".hold-path").setAttribute(
-      "d",
-      payoffKind === "call" ? "M55 169.67L530 25" : "M55 97.33H530"
-    );
-    $(".price-guide").setAttribute("d", `M${x} 25V242`);
-    $(".value-dot").setAttribute("cx", x);
-    $(".value-dot").setAttribute("cy", y);
-    $("#explorer-value").textContent = number(total);
-    $("#explorer-difference").textContent = `${
-      difference > 0 ? "+" : difference < 0 ? "−" : ""
-    }${number(Math.abs(difference))} USDC`;
-    $("#market-output").textContent = `${number(spot)} USDC`;
-    $("#market-price").setAttribute(
-      "aria-valuetext",
-      `${number(spot)} USDC per WETH`
-    );
-    $("#payoff-takeaway").textContent =
-      payoffKind === "call"
-        ? spot > 3000
-          ? "Above the strike, this model exchanges the WETH for USDC. The LP’s upside is capped."
-          : "At or below the strike, this model leaves the WETH in the pool. Its market value still moves."
-        : spot < 3000
-        ? "Below the strike, this model buys WETH at 3,000 USDC. The received WETH is worth less at the market price."
-        : "At or above the strike, this model leaves the USDC collateral in the pool. LPs also earn the premium.";
-    $$("[data-payoff]").forEach((button) =>
-      button.setAttribute(
-        "aria-pressed",
-        String(button.dataset.payoff === payoffKind)
-      )
-    );
-  }
-  $$("[data-payoff]").forEach(
-    (button) =>
-      (button.onclick = () => {
-        payoffKind = button.dataset.payoff;
-        renderPayoff();
-      })
-  );
-  $("#market-price").oninput = renderPayoff;
-  renderPayoff();
 
   document.body.classList.add("guide-ready");
   requestAnimationFrame(followAnchor);

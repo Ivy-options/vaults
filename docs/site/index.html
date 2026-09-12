@@ -41,7 +41,7 @@
         <summary>On this page</summary>
         <nav aria-label="Guide sections">
           <a href="#overview">Overview</a>
-          <a href="#option-basics">The option deal</a>
+          <a href="#participants">Roles and permissions</a>
           <a href="#collateral">Collateral and shares</a>
           <a href="#lifecycle">Vault lifecycle</a>
           <a href="#early-exit">Unwind by agreement</a>
@@ -73,22 +73,10 @@
         </div>
       </div>
 
-      <section id="option-basics">
+      <section id="participants">
         <div class="main">
-          <h2>The option deal</h2>
-          <p class="prose">
-            An option gives its buyer a right they can use under agreed
-            conditions, without requiring them to use it. The seller receives an
-            upfront payment, called the <strong>premium</strong>, for taking on
-            the corresponding obligation.
-          </p>
-          <div class="choice-pair" aria-label="Two option types">
-            <div><span class="coin eth" aria-hidden="true">↑</span><h3>Call</h3><p>The buyer has the right to <strong>buy</strong> the underlying at the agreed strike price.</p></div>
-            <div><span class="coin usd" aria-hidden="true">↓</span><h3>Put</h3><p>The buyer has the right to <strong>sell</strong> the underlying at the agreed strike price.</p></div>
-          </div>
-
+          <h2>Roles and permissions</h2>
           <div class="deal-block">
-            <h3>Who takes part</h3>
             <dl class="deal-roles">
               <div>
                 <dt>Vault owner</dt>
@@ -116,9 +104,8 @@
                 <dt>Market maker <span>Buyer</span></dt>
                 <dd>
                   <p>
-                    Buys the option and offers a price through a
-                    <strong>bid</strong>, which is a signed proposal for the
-                    trade.
+                    Signs a bid for the vault’s auction. Activation requires
+                    <code>MARKET_MAKER_ROLE</code>.
                   </p>
                 </dd>
               </div>
@@ -133,126 +120,13 @@
               </div>
             </dl>
             <p class="deal-note">
-              Accepting that bid on-chain is called <strong>activation</strong>.
-              The contracts check its terms, collect the buyer's premium and
-              make the option active.
+              At activation, the contracts validate the selected bid, collect
+              the buyer’s premium and move the vault to Live.
             </p>
           </div>
 
           <div class="deal-block">
-            <h3>An example trade</h3>
-            <p class="prose">
-              Consider an option covering 10 WETH at an agreed price of 3,000
-              USDC per WETH.
-            </p>
-            <dl class="deal-example">
-              <div>
-                <dt>Underlying</dt>
-                <dd>
-                  <strong>WETH</strong
-                  ><span>The asset covered by the option.</span>
-                </dd>
-              </div>
-              <div>
-                <dt>Notional</dt>
-                <dd>
-                  <strong>10 WETH</strong
-                  ><span>The quantity of underlying covered.</span>
-                </dd>
-              </div>
-              <div>
-                <dt>Strike</dt>
-                <dd>
-                  <strong>3,000 <small>USDC / WETH</small></strong
-                  ><span
-                    >The agreed exchange price per whole underlying token.</span
-                  >
-                </dd>
-              </div>
-              <div>
-                <dt>Quote token</dt>
-                <dd>
-                  <strong>USDC</strong
-                  ><span>The token used to express the strike.</span>
-                </dd>
-              </div>
-            </dl>
-            <div
-              class="deal-premium"
-              role="group"
-              aria-label="Premium calculation: 100 USDC per WETH multiplied by 10 WETH equals 1,000 USDC"
-            >
-              <div>
-                <span class="deal-label">Premium rate</span
-                ><strong>100 USDC / WETH</strong>
-              </div>
-              <span class="deal-operator" aria-hidden="true">×</span>
-              <div>
-                <span class="deal-label">Notional</span><strong>10 WETH</strong>
-              </div>
-              <span class="deal-operator" aria-hidden="true">=</span>
-              <div>
-                <span class="deal-label">Total premium</span
-                ><strong>1,000 USDC</strong>
-              </div>
-            </div>
-            <p class="deal-note">
-              The buyer pays the premium in the <strong>premium token</strong>.
-              This example uses USDC for both pricing and payment, but the
-              premium token can differ from the quote token. Each permitted
-              combination is called a <strong>quote/premium pair</strong>.
-            </p>
-            <p class="prose">
-              The strike stays fixed even if the market price changes. The
-              current market price, or <strong>spot price</strong>, determines
-              whether exercise has value to the buyer.
-            </p>
-          </div>
-
-          <div class="deal-block">
-            <h3>What happens when the buyer uses the option?</h3>
-            <p class="prose">
-              Using the option's right is called <strong>exercise</strong>.
-              With <strong>physical delivery</strong>, the parties exchange the
-              actual tokens at the agreed strike. A call buyer pays quote tokens
-              and receives underlying; a put buyer delivers underlying and
-              receives quote tokens. The agreed strike fixes this exchange;
-              physical exercise and expiration need no settlement-price report.
-            </p>
-          </div>
-
-          <div class="deal-block">
-            <h3>When can the buyer exercise?</h3>
-            <p class="prose">
-              Every option has an exact <strong>expiry</strong> timestamp and an
-              exercise style. The style determines when the buyer may use the
-              right. Physical delivery includes a limited exercise window after expiry.
-            </p>
-            <div class="deal-compare">
-              <div>
-                <h4>American</h4>
-                <p>
-                  Allows exercise while Live before expiry and during the
-                  limited exercise window afterward.
-                </p>
-              </div>
-              <div>
-                <h4>European</h4>
-                <p>
-                  Waits until expiry, then allows exercise during the limited
-                  exercise window. The buyer cannot exercise before expiry.
-                </p>
-              </div>
-            </div>
-            <p class="deal-note">
-              The exact deadlines appear in the
-              <a href="#exercise-windows">exercise-window table</a> later in
-              this guide.
-            </p>
-          </div>
-
-          <div class="deal-block">
-            <h3 id="execution-permissions">Who submits the call, and who gets paid?</h3>
+            <h3 id="execution-permissions">Executor and recipient</h3>
             <p class="prose">
               The buyer can appoint an <strong>executor</strong> to exercise and
               claim payouts on its behalf, and choose a
@@ -273,11 +147,10 @@
           <div class="collateral-guide">
             <p class="example-context">The token examples below use WETH as underlying and USDC as quote.</p>
             <div class="token-roles" aria-label="Three token roles">
-              <div><span class="role-symbol" aria-hidden="true">◇</span><h3>Underlying</h3><strong>WETH</strong><p>The asset covered by the option.</p></div>
-              <div><span class="role-symbol" aria-hidden="true">$</span><h3>Quote</h3><strong>USDC</strong><p>The token used to express the strike.</p></div>
-              <div><span class="role-symbol" aria-hidden="true">＋</span><h3>Premium</h3><strong>The buyer’s payment</strong><p>Can use either token or a third token.</p></div>
+              <div><span class="role-symbol" aria-hidden="true">◇</span><h3>Underlying</h3><strong>WETH</strong><p>Fixed when the vault is created.</p></div>
+              <div><span class="role-symbol" aria-hidden="true">$</span><h3>Quote</h3><strong>USDC</strong><p>Bids must use a listed quote/premium pair.</p></div>
+              <div><span class="role-symbol" aria-hidden="true">＋</span><h3>Premium</h3><strong>Fixed per pair</strong><p>Can use underlying, quote or a third token.</p></div>
             </div>
-            <p class="collateral-definition"><strong>Collateral is the token deposited to back the option.</strong> It fills one of the roles above; it is not a fourth independent token.</p>
 
             <div class="reading-block">
               <h3>What does the vault hold?</h3>
@@ -305,7 +178,6 @@
                 <div class="delivery-static"><h4>Put · full physical exercise</h4><p>Vault → recipient: <strong>30,000 USDC</strong><br>Caller → vault: <strong>10 WETH</strong></p></div>
               </div>
               <p>With <code>allowPartialExercise = true</code>, exercising half leaves <strong>5 WETH + 15,000 USDC</strong> in either pool. If the rest expires unused, those balances remain for LPs to claim. Premium is excluded from these amounts.</p>
-              <p>“Cash-secured” describes the put’s collateral. The caller still delivers underlying during physical exercise.</p>
             </div>
 
             <div class="reading-block">
@@ -320,7 +192,6 @@
 
             <div class="reading-block">
               <h3>Approve the vault that holds your tokens.</h3>
-              <p>An approval is the token allowance that lets a contract collect tokens from your wallet.</p>
               <div class="custody-route" aria-label="Approve the vault; deposit directly or through the hub">
                 <div><span>Your wallet</span><strong>Approve the vault address</strong></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>The individual vault</span><strong>Pulls and holds the tokens</strong></div>
               </div>
@@ -848,7 +719,7 @@
             <div class="reading-block" id="exercise-and-expiration">
               <h3>Exercise and expiration</h3>
               <div class="option-endings">
-                <div><span class="sequence-number">EXERCISE</span><h4>Use the option right</h4><dl class="fact-rows"><div><dt>Who calls?</dt><dd>The buyer or appointed executor.</dd></div><div><dt>Entrypoint</dt><dd><code>exercise(vaultId, amount)</code></dd></div><div><dt>Who pays?</dt><dd>The caller supplies quote tokens for a call, or underlying for a put.</dd></div><div><dt>Who receives?</dt><dd>The configured <a href="#execution-permissions">recipient</a>. Assets exchange at the strike.</dd></div></dl><div class="ending-states"><span>Partial exercise → rest stays <strong>Live</strong></span><span>Full exercise → vault is <strong>Settled</strong></span></div><p>The immutable <a href="#partial-exercise">partial-exercise policy</a> determines whether partial amounts are allowed or all remaining notional must be exercised.</p></div>
+                <div><span class="sequence-number">EXERCISE</span><h4>Execute against the vault</h4><dl class="fact-rows"><div><dt>Who calls?</dt><dd>The buyer or appointed executor.</dd></div><div><dt>Entrypoint</dt><dd><code>exercise(vaultId, amount)</code></dd></div><div><dt>Who pays?</dt><dd>The caller supplies quote tokens for a call, or underlying for a put.</dd></div><div><dt>Who receives?</dt><dd>The configured <a href="#execution-permissions">recipient</a>. Assets exchange at the strike.</dd></div></dl><div class="ending-states"><span>Partial exercise → rest stays <strong>Live</strong></span><span>Full exercise → vault is <strong>Settled</strong></span></div><p>The immutable <a href="#partial-exercise">partial-exercise policy</a> determines whether partial amounts are allowed or all remaining notional must be exercised.</p></div>
                 <div><span class="sequence-number">EXPIRATION</span><h4>Close unused physical rights</h4><dl class="fact-rows"><div><dt>Who calls?</dt><dd>Anyone, at or after the expiration deadline.</dd></div><div><dt>Entrypoint</dt><dd><code>expire(vaultId)</code></dd></div><div><dt>What happens?</dt><dd>Unused rights lapse. The vault becomes Settled and shareholders can claim the residual assets.</dd></div><div><dt>Price required?</dt><dd>No settlement price is needed for physical expiration.</dd></div></dl><p>Being out of the money before the deadline does not permit expiration.</p></div>
               </div>
               <div class="expiration-route" aria-label="Time alone does not settle the vault"><div><span>Deadline reached</span><strong>Expiration is allowed</strong></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>Someone calls expire</span><strong>On-chain transaction</strong></div><span class="reading-arrow" aria-hidden="true">→</span><div><span>Vault becomes Settled</span><strong>Residual claims open</strong></div></div>
@@ -876,12 +747,10 @@
         <div class="main">
           <h2>Optional cash settlement</h2>
           <p class="prose">
-            Cash settlement pays the option’s intrinsic value from collateral
-            instead of exchanging the full underlying and quote amounts at the
-            strike. It is implemented for future use and <strong>disabled by
-            default</strong>. The physical delivery flow above works without a
-            settlement publisher. The following rules apply to cash positions
-            only after the administrator enables the feature.
+            Cash payouts use the vault’s collateral token and the Hub’s stored
+            settlement prices. The feature is implemented but <strong>disabled
+            by default</strong>; the rules below apply after the administrator
+            enables it. Physical delivery needs no settlement publisher.
           </p>
 
           <div class="deal-block" id="cash-availability">
@@ -1092,11 +961,7 @@
           <h2>Vault terms</h2>
           <p class="prose">
             The owner configures these contract fields before LPs commit
-            collateral. An option is in the money
-            when exercise has positive value to the buyer: spot is above the
-            strike for a call, or below it for a put. Some fields below use
-            <strong>basis points</strong>, abbreviated bps, where 100 bps equals
-            1%. While the vault remains Open, the owner can tighten the
+            collateral. While the vault remains Open, the owner can tighten the
             permitted option terms in the directions shown below, such as
             raising the minimum premium or narrowing the allowed settlement
             types. The auction schedule can also change, while fields marked
