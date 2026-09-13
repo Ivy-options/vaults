@@ -9,7 +9,6 @@ export const BID_TYPES = {Bid:[['vaultId','uint256'],['marketMaker','address'],[
 export const UNWIND_TYPES = {UnwindAgreement:[['vaultId','uint256'],['nonce','uint256'],['deadline','uint64'],['exercisedNotional','uint256'],['supply','uint256'],['refund','uint256']].map(([name,type])=>({name,type}))};
 export const REPORT_TYPES = {
   SpotReport:[['underlying','address'],['quote','address'],['price','uint256'],['observedAt','uint64'],['validUntil','uint64']].map(([name,type])=>({name,type})),
-  ExpiryReport:[['underlying','address'],['quote','address'],['expiry','uint64'],['price','uint256'],['validUntil','uint64']].map(([name,type])=>({name,type})),
 };
 export async function loadArtifacts() {
   return Object.fromEntries(await Promise.all(CONTRACTS.map(async name=>[name,JSON.parse(await readFile(new URL(artifactPath(name),import.meta.url),'utf8'))])));
@@ -62,9 +61,8 @@ export async function prepareOperation(provider, artifacts, command, r) {
   const hub=r.hub?new Contract(r.hub,artifacts.IvyVaultsHub.abi,runner):null;
   const domain=(name,version,address)=>({name,version,chainId,verifyingContract:address});
   if(command==='typed-report') {
-    if(!['spot','expiry'].includes(r.kind)) throw new Error('Report kind must be spot or expiry');
-    const name=r.kind==='spot'?'SpotReport':'ExpiryReport';
-    return {pricingAuthority:'legacy/indicative only; does not supply new cash vault settlement prices',domain:domain('IvyPriceFeed','1',required(r,'feed')),types:{[name]:REPORT_TYPES[name]},value:fields(REPORT_TYPES[name],r.report)};
+    if(r.kind!=='spot') throw new Error('Report kind must be spot');
+    return {pricingAuthority:'indicative activation only; does not supply cash vault settlement prices',domain:domain('IvyPriceFeed','1',required(r,'feed')),types:REPORT_TYPES,value:fields(REPORT_TYPES.SpotReport,r.report)};
   }
   if(command==='typed-bid') {
     const s=await hub.stateOf(r.vaultId), p=await hub.pairTermsOf(r.vaultId,r.bid.quoteToken);
@@ -128,11 +126,10 @@ export async function prepareOperation(provider, artifacts, command, r) {
     method=command==='grant-settlement-publisher'?'grantRole':'revokeRole';
     args=[await target.SETTLEMENT_PRICE_PUBLISHER_ROLE(),required(r,'account')];
     detail={pricingAuthority:'authoritative cash settlement',account:r.account};
-  } else if(command==='publish-spot'||command==='publish-expiry') {
+  } else if(command==='publish-spot') {
     target=new Contract(required(r,'feed'),artifacts.IvyPriceFeed.abi,runner);
-    const spot=command==='publish-spot', type=spot?REPORT_TYPES.SpotReport:REPORT_TYPES.ExpiryReport;
-    detail={pricingAuthority:'legacy/indicative only; does not supply new cash vault settlement prices'};
-    method=spot?'publishSpot':'publishExpiry';args=[...type.map(f=>required(r.report,f.name)),r.signature];
+    detail={pricingAuthority:'indicative activation only; does not supply cash vault settlement prices'};
+    method='publishSpot';args=[...REPORT_TYPES.SpotReport.map(f=>required(r.report,f.name)),r.signature];
   } else {
     const actions={'set-platform-fee':['setPlatformFeeBps',[r.rateBps]],'set-platform-treasury':['setPlatformTreasury',[r.recipient]],'set-transfers':['setTransfersEnabled',[r.enabled]],deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'fund-unwind':['fundUnwind',[r.vaultId,r.nonce,r.amount]],'withdraw-unwind-contribution':['withdrawUnwindContribution',[r.vaultId,r.nonce]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
     if(command==='claim-platform-fee') {

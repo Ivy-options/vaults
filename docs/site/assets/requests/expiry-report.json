@@ -1,7 +1,0 @@
-{
-  "rpc": "http://127.0.0.1:8545", "sender": "RELAYER_ADDRESS", "feed": "FEED_ADDRESS", "kind": "expiry",
-  "report": {
-    "underlying": "WETH_ADDRESS", "quote": "USDC_ADDRESS", "expiry": "EXACT_VAULT_EXPIRY_UNIX_SECONDS",
-    "price": "3300000000", "validUntil": "SUBMISSION_DEADLINE_UNIX_SECONDS"
-  }
-}

@@ -65,7 +65,7 @@ describe("Hub settlement authority", function () {
     const c = await deployIvy(await network.create());
     await c.hub.setPlatformFeeBps(200);
     const v = await goLive(c, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash });
-    await c.feed.setSettlementPrice(c.wethAddress, c.usdcAddress, v.bid.expiry, 1);
+    await c.feed.set(c.wethAddress, c.usdcAddress, 2700n * U, v.bid.expiry);
     await at(c, v.bid.expiry);
     await expect(c.hub.expire(v.vaultId)).revertedWithCustomError(c.hub, "ReportUnavailable");
     expect(await c.hub.remainingNotional(v.vaultId)).equal(10n * W);

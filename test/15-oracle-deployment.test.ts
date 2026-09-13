@@ -1,47 +1,47 @@
 import { rejects } from "node:assert/strict";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { Contract, ZeroAddress } from "ethers";
+import { ZeroAddress } from "ethers";
 import { loadArtifacts, REPORT_TYPES, prepareOperation, prepareVault } from "../scripts/operator.mjs";
-import { buildDeploymentPlan, resumeDeployment, verifyBindings, CONTRACTS, json } from "../scripts/deployment.mjs";
+import { buildDeploymentPlan, resumeDeployment, verifyBindings, CONTRACTS } from "../scripts/deployment.mjs";
 import { deployIvy, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
-import { goLive, at } from "./helpers/scenarios.js";
-const expiryArgs = (r: any) => [r.underlying,r.quote,r.expiry,r.price,r.validUntil] as const;
 const spotArgs = (r: any) => [r.underlying,r.quote,r.price,r.observedAt,r.validUntil] as const;
 const connection=await network.create();
 const {ethers,networkHelpers}=connection;
 
-describe("signed expiry reports",function(){
+describe("signed activation spot reports",function(){
   async function fixture(){const c=await deployIvy(connection);const feed=await ethers.deployContract('IvyPriceFeed',[c.admin.address]);return {...c,realFeed:feed};}
-  async function signed(c:any, feed:any, kind:string, value:any, signer=c.admin) {
-    const type=kind==='spot'?'SpotReport':'ExpiryReport';
-    return signer.signTypedData({name:'IvyPriceFeed',version:'1',chainId:(await signer.provider.getNetwork()).chainId,verifyingContract:await feed.getAddress()},{[type]:REPORT_TYPES[type]},value);
+  async function signed(c:any, feed:any, value:any, signer=c.admin) {
+    return signer.signTypedData({name:'IvyPriceFeed',version:'1',chainId:(await signer.provider.getNetwork()).chainId,verifyingContract:await feed.getAddress()},REPORT_TYPES,value);
   }
-  it("pins expiry prices, rejects early reports, and ignores later spot moves",async()=>{
-    const c=await networkHelpers.loadFixture(fixture), f=c.realFeed;
-    const now=BigInt(await networkHelpers.time.latest()), expiry=now+100n;
-    const report={underlying:c.wethAddress,quote:c.usdcAddress,expiry,price:3300n*U,validUntil:expiry+3600n};
-    const sig=await signed(c,f,'expiry',report);
-    await expect(f.publishExpiry(...expiryArgs(report),sig)).revertedWithCustomError(f,'ExpirationNotReached');
-    await networkHelpers.time.increaseTo(expiry);
-    await f.publishExpiry(...expiryArgs(report),sig);
-    await expect(f.publishExpiry(...expiryArgs(report),sig)).revertedWithCustomError(f,'ReportFinalized');
-    const spot={underlying:c.wethAddress,quote:c.usdcAddress,price:5000n*U,observedAt:expiry,validUntil:expiry+3600n};
-    await f.publishSpot(...spotArgs(spot),await signed(c,f,'spot',spot));
-    await networkHelpers.time.increaseTo(expiry+86400n);
-    expect(await f.settlementPrice(c.wethAddress,c.usdcAddress,expiry)).eq(3300n*U);
-    await expect(f.settlementPrice(c.wethAddress,c.usdcAddress,expiry+1n)).revertedWithCustomError(f,'ReportUnavailable');
+  it("prepares signed spot reports for any relayer and stores newer observations",async()=>{
+    const c=await networkHelpers.loadFixture(fixture), f=c.realFeed, artifacts=await loadArtifacts();
+    const now=BigInt(await networkHelpers.time.latest());
+    const report={underlying:c.wethAddress,quote:c.usdcAddress,price:3300n*U,observedAt:now,validUntil:now+3600n};
+    const request={sender:c.bob.address,feed:await f.getAddress(),kind:'spot',report};
+    const typed=await prepareOperation(c.admin.provider,artifacts,'typed-report',request);
+    const signature=await c.admin.signTypedData(typed.domain,typed.types,typed.value);
+    const prepared=await prepareOperation(c.admin.provider,artifacts,'publish-spot',{...request,signature});
+    expect(await f.spot(c.wethAddress,c.usdcAddress)).deep.equal([0n,0n]);
+    await c.bob.sendTransaction({to:prepared.to,data:prepared.data});
+    expect(await f.spot(c.wethAddress,c.usdcAddress)).deep.equal([report.price,now]);
+    await networkHelpers.time.increase(10);
+    const newer={...report,price:3500n*U,observedAt:BigInt(await networkHelpers.time.latest())};
+    await f.publishSpot(...spotArgs(newer),await signed(c,f,newer));
+    expect(await f.spot(c.wethAddress,c.usdcAddress)).deep.equal([newer.price,newer.observedAt]);
+    await rejects(prepareOperation(c.admin.provider,artifacts,'typed-report',{...request,kind:'expiry'}), /Report kind must be spot/);
+    await rejects(prepareOperation(c.admin.provider,artifacts,'publish-expiry',request), /Unknown command publish-expiry/);
   });
   it("rejects bad signatures, wrong feed domains, invalid prices and expired submissions",async()=>{
     const c=await networkHelpers.loadFixture(fixture), f=c.realFeed;
     const now=BigInt(await networkHelpers.time.latest());
-    const r={underlying:c.wethAddress,quote:c.usdcAddress,expiry:now,price:3300n*U,validUntil:now+100n};
-    await expect(f.publishExpiry(...expiryArgs(r),await signed(c,f,'expiry',r,c.bob))).revertedWithCustomError(f,'BadSignature');
+    const r={underlying:c.wethAddress,quote:c.usdcAddress,observedAt:now,price:3300n*U,validUntil:now+100n};
+    await expect(f.publishSpot(...spotArgs(r),await signed(c,f,r,c.bob))).revertedWithCustomError(f,'BadSignature');
     const other=await ethers.deployContract('IvyPriceFeed',[c.admin.address]);
-    await expect(other.publishExpiry(...expiryArgs(r),await signed(c,f,'expiry',r))).revertedWithCustomError(other,'BadSignature');
-    const zero={...r,price:0n};await expect(f.publishExpiry(...expiryArgs(zero),'0x')).revertedWithCustomError(f,'InvalidPrice');
+    await expect(other.publishSpot(...spotArgs(r),await signed(c,f,r))).revertedWithCustomError(other,'BadSignature');
+    const zero={...r,price:0n};await expect(f.publishSpot(...spotArgs(zero),'0x')).revertedWithCustomError(f,'InvalidPrice');
     await networkHelpers.time.increaseTo(now+101n);
-    await expect(f.publishExpiry(...expiryArgs(r),await signed(c,f,'expiry',r))).revertedWithCustomError(f,'BidExpired');
+    await expect(f.publishSpot(...spotArgs(r),await signed(c,f,r))).revertedWithCustomError(f,'BidExpired');
   });
   it("supports contract signers and strictly advancing fresh spot observations",async()=>{
     const c=await networkHelpers.loadFixture(fixture);
@@ -49,10 +49,10 @@ describe("signed expiry reports",function(){
     const f=await ethers.deployContract('IvyPriceFeed',[await wallet.getAddress()]);
     const now=BigInt(await networkHelpers.time.latest());
     const r={underlying:c.wethAddress,quote:c.usdcAddress,price:3000n*U,observedAt:now,validUntil:now+1000n};
-    const sig=await signed(c,f,'spot',r);await f.publishSpot(...spotArgs(r),sig);
+    const sig=await signed(c,f,r);await f.publishSpot(...spotArgs(r),sig);
     expect((await f.spot(c.wethAddress,c.usdcAddress))[0]).eq(3000n*U);
     await expect(f.publishSpot(...spotArgs(r),sig)).revertedWithCustomError(f,'InvalidPrice');
-    const future={...r,observedAt:now+100n};await expect(f.publishSpot(...spotArgs(future),await signed(c,f,'spot',future))).revertedWithCustomError(f,'InvalidPrice');
+    const future={...r,observedAt:now+100n};await expect(f.publishSpot(...spotArgs(future),await signed(c,f,future))).revertedWithCustomError(f,'InvalidPrice');
   });
 });
 

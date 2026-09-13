@@ -71,7 +71,7 @@ A buyer can invalidate its unused nonce with `cancelBid(nonce)` through the ABI.
 
 Use externally prepared report files and verify the target Hub (or indicative feed for signed spot reports) before submission. Prices are raw quote-token units per whole underlying: WETH/USDC at 2,500 USDC per WETH is `2500000000`.
 
-**Indicative activation reports:** `typed-report` with `kind: "spot"` produces domain `IvyPriceFeed`, version `1`, chainId and indicative feed address. Its immutable signer signs; anyone may relay with `publish-spot`. The legacy `kind: "expiry"` / `publish-expiry` signing path remains for the old feed API. It does not supply authoritative prices to new cash vaults.
+**Indicative activation reports:** `typed-report` with `kind: "spot"` produces domain `IvyPriceFeed`, version `1`, chainId and indicative feed address. Its immutable signer signs; anyone may relay with `publish-spot`. Only spot reports are supported; cash settlement uses the Hub publication commands below.
 
 **Authoritative exercise observations:** the publisher uses `publish-settlement-exercise`, with `hub`, `vaultId`, `settlementMethodology` and `report: { price, observedAt, validUntil }`. This directly calls the Hub, without a separate EIP-712 signature. The target must be an existing Live cash vault. Its underlying, selected quote and expiry are derived from Hub state and displayed in the preview. Before expiry, American cash exercise checks the vault's immutable maximum age and the observation's validity deadline. Timestamps must be positive, nonfuture and strictly increasing for that vault. Age and validity bounds are inclusive; a long validity deadline never bypasses age.
 
@@ -164,8 +164,8 @@ All requests include `rpc` and `sender`; hub calls include `hub` and usually `va
 | prepare-vault | terms, pairs, supportedTokens, collateralAmount, collateralPriceUsdE6, minTradeUsdE6, marketQuotes; cash also settlementMethodology |
 | typed-bid | bid: marketMaker, quoteToken, strike, premium, style, settlement, validUntil, nonce; optional executor, recipient |
 | inspect-bid / activate | complete bid, signature, collateralPriceUsdE6, minTradeUsdE6 |
-| typed-report | feed, kind, report; indicative/legacy feed only |
-| publish-spot / publish-expiry | feed, report, signature; indicative/legacy feed only |
+| typed-report | feed, kind: "spot", report; activation feed only |
+| publish-spot | feed, report, signature; activation feed only |
 | publish-settlement-exercise / publish-settlement-expiry | hub, vaultId, settlementMethodology, report containing price/times; authorized publisher sender, no signature |
 | grant-settlement-publisher / revoke-settlement-publisher | hub, account; Hub admin sender |
 | set-cash-settlement-enabled | hub, enabled boolean; enabling also publisher with role; Hub admin sender |

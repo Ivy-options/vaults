@@ -13,7 +13,7 @@ The deployment is immutable. There is no hub proxy, upgrade entrypoint, implemen
 | `IvyShares`                   | ERC-1155 shares and pre-update module notifications                             |
 | `IvyPremiums`                 | Activation entitlements and restricted premium payments                         |
 | `IvyUnwind`                   | One active agreement and current-shareholder consent                            |
-| `IvyPriceFeed`                | Signed indicative activation prices; retained legacy expiry-report API          |
+| `IvyPriceFeed`                | Signed spot prices for optional activation checks                               |
 | `IvyVaultRules` library       | Creation validation and owner-authorized term tightening                        |
 | `IvyOptionSettlement` library | Exercise, cash settlement and residual LP claim implementation                  |
 | `IvyVaultsRegistry`           | Separately deployed release directory with permanent registrations and an admin-selected recommendation |

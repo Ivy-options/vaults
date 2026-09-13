@@ -97,7 +97,7 @@ npm run operator -- expire expiration.json
 <p>A buyer can invalidate its unused nonce with <code>cancelBid(nonce)</code> through the ABI. Cancelled or reopened auctions require a new typed bid for the new auctionId, even if size and terms are unchanged.</p>
 <h2 id="reports-exercise-and-expiration">Reports, exercise and expiration</h2>
 <p>Use externally prepared report files and verify the target Hub (or indicative feed for signed spot reports) before submission. Prices are raw quote-token units per whole underlying: WETH/USDC at 2,500 USDC per WETH is <code>2500000000</code>.</p>
-<p><strong>Indicative activation reports:</strong> <code>typed-report</code> with <code>kind: &quot;spot&quot;</code> produces domain <code>IvyPriceFeed</code>, version <code>1</code>, chainId and indicative feed address. Its immutable signer signs; anyone may relay with <code>publish-spot</code>. The legacy <code>kind: &quot;expiry&quot;</code> / <code>publish-expiry</code> signing path remains for the old feed API. It does not supply authoritative prices to new cash vaults.</p>
+<p><strong>Indicative activation reports:</strong> <code>typed-report</code> with <code>kind: &quot;spot&quot;</code> produces domain <code>IvyPriceFeed</code>, version <code>1</code>, chainId and indicative feed address. Its immutable signer signs; anyone may relay with <code>publish-spot</code>. Only spot reports are supported; cash settlement uses the Hub publication commands below.</p>
 <p><strong>Authoritative exercise observations:</strong> the publisher uses <code>publish-settlement-exercise</code>, with <code>hub</code>, <code>vaultId</code>, <code>settlementMethodology</code> and <code>report: { price, observedAt, validUntil }</code>. This directly calls the Hub, without a separate EIP-712 signature. The target must be an existing Live cash vault. Its underlying, selected quote and expiry are derived from Hub state and displayed in the preview. Before expiry, American cash exercise checks the vault&#39;s immutable maximum age and the observation&#39;s validity deadline. Timestamps must be positive, nonfuture and strictly increasing for that vault. Age and validity bounds are inclusive; a long validity deadline never bypasses age.</p>
 <p><strong>Authoritative expiry reports:</strong> the publisher uses <code>publish-settlement-expiry</code>, with <code>hub</code>, <code>vaultId</code>, <code>settlementMethodology</code> and <code>report: { price, validUntil }</code>. Publish for a Live cash vault at/after its fixed expiry and no later than <code>validUntil</code>. Positive final prices are write-once per vault, with no administrator correction. Even vaults sharing a pair and expiry need separate transactions and can receive different prices. Delayed settlement reads that vault&#39;s finalized price indefinitely. For late publication, submit its approved historical calculation with a current deadline. Verify the derived pair, expiry, units and vault ID before sending.</p>
 <p>Before enabling production cash admissions, approve methodology naming the responsible operator, sources, sampling, weighting, rounding, missing-data/outage rules, evidence retention and freshness configuration. The expiry methodology uses a 30-minute average ending at the vault&#39;s exact expiry; exercise observations need an approved current-price calculation and validity policy. Reference the intended artifact using <code>settlementMethodology</code> in each vault&#39;s preparation and publication requests, retaining vault-specific evidence. A common methodology still requires separate publications. Physical deployment needs no methodology. Contracts and CLI do not verify source accuracy or calculate the average; synthetic examples are local rehearsal only.</p>
@@ -203,11 +203,11 @@ npm run operator -- expire expiration.json
 </tr>
 <tr>
 <td>typed-report</td>
-<td>feed, kind, report; indicative/legacy feed only</td>
+<td>feed, kind: &quot;spot&quot;, report; activation feed only</td>
 </tr>
 <tr>
-<td>publish-spot / publish-expiry</td>
-<td>feed, report, signature; indicative/legacy feed only</td>
+<td>publish-spot</td>
+<td>feed, report, signature; activation feed only</td>
 </tr>
 <tr>
 <td>publish-settlement-exercise / publish-settlement-expiry</td>
