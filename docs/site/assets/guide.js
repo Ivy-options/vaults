@@ -73,12 +73,6 @@
       )
     )
   );
-  const toolbar = make(
-    "div",
-    "guide-tools",
-    '<button type="button" id="motion-toggle" aria-pressed="true">Motion on</button>'
-  );
-  $("#themeToggle").before(toolbar);
   const progress = make("div", "reading-progress", "<span></span>");
   $(".topbar").append(progress);
   $(".rail summary").textContent = "Explore the guide";
@@ -101,24 +95,10 @@
   mobileLayout.addEventListener("change", closeMobileContents);
   closeMobileContents();
 
-  let motionEnabled = !reducedMotion.matches;
   const updateMotion = () => {
-    document.documentElement.classList.toggle(
-      "still-guide",
-      !motionEnabled || reducedMotion.matches
-    );
-    if (!motionEnabled || reducedMotion.matches)
+    document.documentElement.classList.toggle("still-guide", reducedMotion.matches);
+    if (reducedMotion.matches)
       document.getAnimations().forEach((animation) => animation.finish());
-    $("#motion-toggle").textContent =
-      motionEnabled && !reducedMotion.matches ? "Motion on" : "Motion off";
-    $("#motion-toggle").setAttribute(
-      "aria-pressed",
-      String(motionEnabled && !reducedMotion.matches)
-    );
-  };
-  $("#motion-toggle").onclick = () => {
-    motionEnabled = !motionEnabled;
-    updateMotion();
   };
   reducedMotion.addEventListener("change", updateMotion);
   updateMotion();
@@ -152,7 +132,7 @@
   const collateral = $("#visual-collateral");
   collateral.innerHTML = `<div class="stage-top"><span class="stage-label">PHYSICAL DELIVERY · TRY IT</span><div class="segmented" role="group" aria-label="Option type"><button type="button" data-option="call" aria-pressed="true">Covered call</button><button type="button" data-option="put" aria-pressed="false">Cash-secured put</button></div></div>
     <div class="token-key"><span><i class="key-dot eth-dot"></i>Underlying <b>WETH</b></span><span><i class="key-dot usd-dot"></i>Quote <b>USDC</b></span><span>Premium <b>Claimed separately</b></span><span>Strike <b>3,000 USDC / WETH</b></span></div>
-    <div class="transfer-scene"><div class="vault-node"><span class="node-caption">COLLATERAL DEPOSITED</span><span class="coin eth" id="deposit-coin">◇</span><strong id="deposit-amount">10 WETH</strong><span>Held in the vault</span></div><div class="transfer-lanes"><div class="transfer-lane outgoing"><span class="lane-direction">Vault → recipient</span><strong id="outgoing-amount"></strong><span class="lane-track"><i></i></span></div><div class="transfer-lane incoming"><span class="lane-direction">Caller → vault</span><strong id="incoming-amount"></strong><span class="lane-track"><i></i></span></div></div><div class="buyer-node"><span class="node-caption">OPTION BUYER</span><span class="coin buyer-icon">↔</span><strong>Exercise the right</strong><span>Caller pays · recipient receives</span></div></div>
+    <div class="transfer-scene"><div class="vault-node"><span class="node-caption">COLLATERAL DEPOSITED</span><span class="coin eth" id="deposit-coin">◇</span><strong id="deposit-amount">10 WETH</strong><span>Held in the vault</span></div><div class="transfer-lanes"><div class="transfer-lane outgoing"><span class="lane-direction">Vault → recipient</span><strong id="outgoing-amount"></strong><span class="lane-track"><i></i></span></div><div class="transfer-lane incoming"><span class="lane-direction">Caller → vault</span><strong id="incoming-amount"></strong><span class="lane-track"><i></i></span></div></div><div class="buyer-node"><span class="node-caption">RECIPIENT</span><span class="coin buyer-icon">↔</span><strong>Receives delivery</strong><span>Caller pays · recipient receives</span></div></div>
     <div class="exercise-controls"><label for="exercise-amount">Amount exercised <output id="exercise-output" for="exercise-amount">10 WETH · 100%</output></label><input id="exercise-amount" type="range" min="0" max="10" step="1" value="10"><div class="range-ends"><span>None</span><span>Full 10 WETH</span></div><button class="play-transfer" type="button">Replay token flow <span aria-hidden="true">↗</span></button></div>
     <div class="pool-result" role="status"><span>POOL AFTER THIS EXERCISE</span><strong id="pool-amount"></strong><p id="exchange-caption"></p></div>
     <p class="stage-footnote">Illustrative partial exercise, where allowed by the vault. No exercise is an alternative outcome. Remaining collateral stays committed until finalization; premium is claimed separately. Raw-unit rounding is omitted.</p>`;
@@ -161,8 +141,9 @@
   function animateTransfer() {
     animations.forEach((animation) => animation.cancel());
     animations = [];
+    collateral.dispatchEvent(new Event("exchange-replay"));
+    if (collateral.dataset.sceneReady === "true") return;
     if (
-      !motionEnabled ||
       reducedMotion.matches ||
       Number($("#exercise-amount").value) === 0
     )
@@ -186,6 +167,7 @@
     const amount = Number($("#exercise-amount").value);
     const call = option === "call";
     collateral.dataset.option = option;
+    collateral.dataset.amount = amount;
     $("#deposit-amount").textContent = call ? "10 WETH" : "30,000 USDC";
     $("#deposit-coin").className = `coin ${call ? "eth" : "usd"}`;
     $("#deposit-coin").textContent = call ? "◇" : "$";
@@ -212,16 +194,18 @@
         String(button.dataset.option === option)
       )
     );
-    animateTransfer();
+    collateral.dispatchEvent(new Event("exchange-state"));
   }
   $$("[data-option]").forEach(
     (button) =>
       (button.onclick = () => {
         option = button.dataset.option;
         renderExchange();
+        animateTransfer();
       })
   );
   $("#exercise-amount").oninput = renderExchange;
+  $("#exercise-amount").onchange = animateTransfer;
   $(".play-transfer").onclick = animateTransfer;
   renderExchange();
   animations.forEach((animation) => animation.cancel()); // No entrance autoplay.
@@ -270,6 +254,8 @@
       tab.tabIndex = i === index ? 0 : -1;
       phasePanels[i].hidden = i !== index;
     });
+    lifecycle.dataset.phase = String(index);
+    lifecycle.dispatchEvent(new Event("phase-state"));
     if (focus) phaseTabs[index].focus();
     updateProgress();
   }

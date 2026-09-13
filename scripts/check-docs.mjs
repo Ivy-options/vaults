@@ -44,7 +44,7 @@ for (const path of pages) {
       );
   }
 }
-for (const file of ["docs.css", "guide.css", "reference.css"]) {
+for (const file of ["docs.css", "guide.css", "atlas.css", "roman.css", "reference.css"]) {
   const css = readFileSync(resolve(site, "assets", file), "utf8");
   for (const [, url] of css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
     assert.ok(
@@ -55,7 +55,7 @@ for (const file of ["docs.css", "guide.css", "reference.css"]) {
 }
 const ids = pageIds.get(pagePath);
 const js = readFileSync(resolve(site, "assets/docs.js"), "utf8");
-for (const file of ["docs.js", "guide.js", "reference.js"]) {
+for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "atlas.js"]) {
   new Script(readFileSync(resolve(site, "assets", file), "utf8"));
 }
 

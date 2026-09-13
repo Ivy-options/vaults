@@ -158,6 +158,8 @@ export function buildDocs({ check = false } = {}) {
   <link rel="stylesheet" href="assets/docs.css">
   <link rel="stylesheet" href="assets/guide.css">
   <link rel="stylesheet" href="assets/reference.css">
+  <link rel="stylesheet" href="assets/atlas.css">
+  <link rel="stylesheet" href="assets/roman.css">
   <script src="assets/reference.js" defer></script>
 </head>
 <body>

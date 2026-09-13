@@ -63,12 +63,6 @@ p {
 .rail-links {
   margin-top: 24px;
 }
-.guide-tools {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-.guide-tools button,
 .theme {
   border: 1px solid var(--line-strong);
   border-radius: 7px;
@@ -80,7 +74,7 @@ p {
   font: 12px var(--body);
 }
 .theme {
-  margin-left: 0;
+  margin-left: auto;
 }
 .reading-progress {
   position: absolute;
@@ -834,10 +828,6 @@ footer {
   .brand span {
     display: none;
   }
-  .guide-tools {
-    gap: 6px;
-  }
-  .guide-tools button,
   .theme {
     padding: 8px;
     font-size: 10px;
@@ -1126,7 +1116,6 @@ footer {
   }
 }
 @media print {
-  .guide-tools,
   .play-transfer,
   .content {
     margin: 0;
@@ -1884,3 +1873,24 @@ footer {
     grid-column: 1 / -1;
   }
 }
+
+.token-theatre { margin: 22px 0; }
+.token-theatre[hidden] { display: none; }
+.scene-labels { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center; }
+.scene-labels span { display: block; font: 10px var(--mono); color: var(--muted); letter-spacing: .04em; }
+.scene-labels strong { display: block; font-size: 15px; margin-top: 8px; }
+.scene-labels > div:nth-child(2) strong { font-size: 12px; font-weight: 400; color: var(--muted); }
+.scene-canvas { height: 240px; width: 100%; }
+.scene-canvas canvas { display: block; }
+.scene-caption { text-align: center; color: var(--muted); font-size: 12px; margin: 0; }
+[data-scene-ready="true"] .transfer-scene,
+[data-scene-ready="true"] #exchange-caption { display: none; }
+@media (max-width: 760px) {
+  .scene-canvas { height: 140px; }
+  .scene-labels { gap: 8px; }
+  .scene-labels span { font-size: 8px; letter-spacing: 0; }
+  .scene-labels strong { font-size: 12px; }
+  .scene-labels > div:nth-child(2) strong { font-size: 10px; }
+}
+
+#physical-delivery-example > p { grid-column: 1 / -1; }
