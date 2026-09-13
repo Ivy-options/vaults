@@ -109,8 +109,14 @@
       pool = deposit - buyer,
       unit = call ? "WETH" : "USDC";
     $("#cash-price-output").textContent = `${fmt(price, 0)} USDC / WETH`;
+    $("#cash-total-value").textContent = `${fmt(deposit)} ${unit}`;
     $("#cash-buyer-value").textContent = `${fmt(buyer)} ${unit}`;
     $("#cash-pool-value").textContent = `${fmt(pool)} ${unit}`;
+    $("#cash-buyer-percent").textContent = `${fmt(buyer / deposit * 100, 2)}% of collateral`;
+    $("#cash-pool-percent").textContent = `${fmt(pool / deposit * 100, 2)}% of collateral`;
+    $("#cash-outcome-note").textContent = buyer === 0
+      ? `No buyer payout at this price. All ${fmt(deposit)} ${unit} remains for shareholder claims.`
+      : `Both allocations stay in ${unit} until claimed.`;
     $("#cash-buyer-bar").style.width = `${(buyer / deposit) * 100}%`;
     $(".cash-balance-bar").setAttribute(
       "aria-label",

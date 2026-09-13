@@ -1513,7 +1513,18 @@ footer {
   text-align: start;
 }
 .collateral-comparison caption {
-  padding-bottom: 16px;
+  padding: 16px 20px;
+}
+.comparison-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  align-items: baseline;
+}
+.comparison-context strong {
+  margin-inline-start: 6px;
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .phase-rules {

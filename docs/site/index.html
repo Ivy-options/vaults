@@ -202,8 +202,7 @@
               >
                 <table class="collateral-comparison">
                   <caption>
-                    Example: 10 WETH notional at a strike of 3,000 USDC per
-                    WETH.
+                    <span class="comparison-context"><span>Example</span><span>Notional <strong>10 WETH</strong></span><span>Strike <strong>3,000 USDC / WETH</strong></span></span>
                   </caption>
                   <thead>
                     <tr>
@@ -385,7 +384,10 @@
             </div>
 
             <div class="reading-block" id="premium-ownership">
-              <h3>Premium is earned at activation.</h3>
+              <div class="illustrated-heading" data-illustration="premium">
+                <img src="assets/roman-premium-claim.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <h3>Premium is earned at activation.</h3>
+              </div>
               <ol class="premium-sequence">
                 <li>
                   <span class="sequence-number" aria-hidden="true">01</span>
@@ -445,7 +447,10 @@
             </div>
 
             <div class="reading-block reserve-explainer">
-              <h3>What is left for the final claim?</h3>
+              <div class="illustrated-heading" data-illustration="residual">
+                <img src="assets/roman-residual-pool.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <h3>What is left for the final claim?</h3>
+              </div>
               <div
                 class="reserve-equation"
                 aria-label="Vault assets minus reserved amounts equals the residual pool"
@@ -488,12 +493,12 @@
                     <span class="chip lp">LPs</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Withdraw</b> Burn shares for the corresponding
-                        collateral while Open.</span
+                        ><b>Withdraw</b><span>Burn shares for the corresponding
+                        collateral while Open.</span></span
                       ><span
-                        ><b>Deposit</b> Admission must be open. Non-owner
+                        ><b>Deposit</b><span>Admission must be open. Non-owner
                         deposits also require
-                        <code>publicDeposits</code> enabled at creation.</span
+                        <code>publicDeposits</code> enabled at creation.</span></span
                       ></span
                     >
                   </li>
@@ -501,11 +506,11 @@
                     <span class="chip owner">Owner</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Tighten terms</b> While Open; existing LP
-                        protections cannot be relaxed.</span
+                        ><b>Tighten terms</b><span>While Open; existing LP
+                        protections cannot be relaxed.</span></span
                       ><span
-                        ><b>Manage</b> Schedule the auction or transfer vault
-                        ownership.</span
+                        ><b>Manage</b><span>Schedule the auction or transfer vault
+                        ownership.</span></span
                       ></span
                     >
                   </li>
@@ -637,7 +642,10 @@
             transition is one-way.
           </p>
           <div class="reading-block" id="early-exit">
-            <h3>Unwind by unanimous agreement</h3>
+            <div class="illustrated-heading" data-illustration="consent">
+              <img src="assets/roman-unanimous-consent.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+              <h3>Unwind by unanimous agreement</h3>
+            </div>
             <ol class="route-strip" aria-label="Unwind requirements">
               <li>
                 <span class="route-index">01</span>
@@ -1289,7 +1297,10 @@
             </div>
 
             <div class="reading-block">
-              <h3>The signature belongs to one chain and hub.</h3>
+              <div class="illustrated-heading" data-illustration="bid">
+                <img src="assets/roman-bid-signing.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <h3>The signature belongs to one chain and hub.</h3>
+              </div>
               <div class="signature-domain" aria-label="EIP-712 signing domain">
                 <div><span>Domain</span><code>IvyVaultsHub</code></div>
                 <div><span>Version</span><code>2</code></div>
@@ -1544,7 +1555,10 @@
             </div>
 
             <div class="reading-block" id="exercise-windows">
-              <h3>Physical exercise windows</h3>
+              <div class="illustrated-heading" data-illustration="timing">
+                <img src="assets/roman-exercise-window.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <h3>Physical exercise windows</h3>
+              </div>
               <p class="unit-note">
                 <code>exerciseWindow</code> has a launch default of 1 hour.
                 <code>t</code> is the current timestamp.
@@ -1878,7 +1892,7 @@
           </div>
 
           <div class="reading-block" id="cash-outcomes">
-            <h3>The payout stays in collateral</h3>
+            <h3>Collateral after cash expiration</h3>
             <div class="cash-accounting interactive-example">
               <div class="cash-inputs">
                 <label for="cash-kind-demo">Cash vault example</label
@@ -1901,6 +1915,11 @@
                 /><span>10 WETH notional · 3,000 strike</span>
               </div>
               <div class="cash-distribution">
+                <div class="cash-total">
+                  <span>Vault collateral</span>
+                  <strong id="cash-total-value">10 WETH</strong>
+                </div>
+                <p class="cash-split-label">Allocation after <code>expire()</code></p>
                 <div
                   class="cash-balance-bar"
                   role="img"
@@ -1910,19 +1929,24 @@
                 </div>
                 <div class="cash-balance-labels" role="status">
                   <div>
-                    <span>Reserved for buyer</span
+                    <span class="cash-allocation-label"><i class="cash-buyer-key" aria-hidden="true"></i>Buyer reserve</span
                     ><strong id="cash-buyer-value">0.9091 WETH</strong>
+                    <span id="cash-buyer-percent">9.09% of collateral</span>
+                    <p><code>claimPayout()</code><span>Paid to the configured recipient.</span></p>
                   </div>
                   <div>
-                    <span>Residual pool</span
+                    <span class="cash-allocation-label"><i class="cash-pool-key" aria-hidden="true"></i>Shareholder pool</span
                     ><strong id="cash-pool-value">9.0909 WETH</strong>
+                    <span id="cash-pool-percent">90.91% of collateral</span>
+                    <p><code>claim()</code><span>Collected in proportion to shares.</span></p>
                   </div>
                 </div>
-                <p class="display-rounding">
-                  Displayed values are rounded to four decimals.
-                </p>
+                <p id="cash-outcome-note">Both allocations stay in WETH until claimed.</p>
                 <p id="cash-calculation">
                   10 × (3,300 − 3,000) / 3,300 ≈ 0.9091 WETH
+                </p>
+                <p class="display-rounding">
+                  Token amounts rounded to four decimals; percentages to two.
                 </p>
               </div>
             </div>
@@ -2409,13 +2433,7 @@
                 </dd>
               </div>
             </dl>
-            <div class="fig">
-              <span>Calls by phase</span
-              ><span
-                >Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> ·
-                <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span
-              >
-            </div>
+            <div class="fig"><span>Deployment order</span></div>
             <div class="deployment-line" aria-label="Deployment order">
               <span>2 libraries</span><b>→</b><span>Vault implementation</span
               ><b>→</b><span>Hub</span><b>→</b><span>Shares</span><b>→</b
@@ -2447,10 +2465,17 @@
                 </dd>
               </div>
             </dl>
+            <div class="fig">
+              <span>Calls by phase</span
+              ><span
+                >Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> ·
+                <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span
+              >
+            </div>
             <div class="calls">
               <div>
+                <h4 class="who">Open</h4>
                 <dl>
-                  <div class="who">Open</div>
                   <dt>createVault(terms, pairs)</dt>
                   <dd><span class="chip">anyone</span> caller becomes owner</dd>
                   <dt>deposit(vaultId, amount)</dt>
@@ -2466,7 +2491,11 @@
                     <span class="chip owner">owner</span> or
                     <span class="chip">anyone</span> after the schedule
                   </dd>
-                  <div class="who">Auction</div>
+                  </dl>
+              </div>
+              <div>
+                <h4 class="who">Auction</h4>
+                <dl>
                   <dt>activate(vaultId, bid, signature)</dt>
                   <dd><span class="chip bid">bid master</span></dd>
                   <dt>cancelAuction(vaultId)</dt>
@@ -2478,8 +2507,8 @@
                 </dl>
               </div>
               <div>
+                <h4 class="who">Live</h4>
                 <dl>
-                  <div class="who">Live</div>
                   <dt>exercise(vaultId, amount)</dt>
                   <dd>
                     <span class="chip mm">buyer or executor</span> caller
@@ -2500,7 +2529,11 @@
                     <span class="chip">anyone</span> at
                     <code>expirationTimeOf</code>
                   </dd>
-                  <div class="who">Settled</div>
+                  </dl>
+              </div>
+              <div>
+                <h4 class="who">Settled</h4>
+                <dl>
                   <dt>claim(vaultId, shares)</dt>
                   <dd><span class="chip lp">shareholder</span></dd>
                   <dt>claimPayout(vaultId)</dt>
@@ -2508,7 +2541,11 @@
                     <span class="chip mm">buyer or executor</span> cash payout
                     or refund to configured recipient
                   </dd>
-                  <div class="who">Admin</div>
+                  </dl>
+              </div>
+              <div>
+                <h4 class="who">Admin</h4>
+                <dl>
                   <dt>setSettings · setURI</dt>
                   <dd><span class="chip">admin</span></dd>
                   <dt>setAdmissionPause(vaultId, paused)</dt>
@@ -2521,13 +2558,21 @@
                     <span class="chip">admin</span>
                     <a href="#cash-availability">optional cash admissions</a>
                   </dd>
-                  <div class="who">Cash price publication · Live</div>
+                  </dl>
+              </div>
+              <div>
+                <h4 class="who">Cash price publication · Live</h4>
+                <dl>
                   <dt>publishExercisePrice · publishExpiry</dt>
                   <dd>
                     <span class="chip">settlement price publisher</span>
                     <a href="#expiry-price">one vault ID per report</a>
                   </dd>
-                  <div class="who">Views</div>
+                  </dl>
+              </div>
+              <div>
+                <h4 class="who">Views</h4>
+                <dl>
                   <dt>termsOf · stateOf · pairTermsOf</dt>
                   <dd>vault terms, live state, one quote token's terms</dd>
                   <dt>quoteTokensOf · vaultOf · kindOf</dt>

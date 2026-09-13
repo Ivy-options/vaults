@@ -230,31 +230,55 @@
 
   function mountScene(root) {
     const fallback = root.querySelector(".transfer-scene");
+    const settings = document.createElement("div");
+    settings.className = "exercise-settings";
+    settings.append(root.querySelector(".stage-top"));
+    const terms = document.createElement("dl");
+    terms.className = "exercise-terms";
+    terms.innerHTML = "<dt>Strike</dt><dd>3,000 USDC / WETH</dd>";
+    settings.append(terms, root.querySelector(".exercise-controls"));
+    settings.querySelector(".stage-label").textContent = "EXERCISE EXAMPLE";
+    root.querySelector(".token-key").remove();
+    root.prepend(settings);
+
     const host = document.createElement("div");
-    host.className = "token-theatre box-exchange";
-    host.innerHTML = `<div class="box-exchange-flow"><div class="exchange-party"><h4>Caller</h4><strong class="scene-payment"></strong><span>Pays into the vault</span></div><div class="box-connector"><i aria-hidden="true"></i></div>${vaultBox(
-      '<dl class="vault-balances" aria-live="polite" aria-atomic="true"><div><dt><span class="box-token weth-symbol" aria-hidden="true">◇</span> WETH</dt><dd class="held-weth"></dd></div><div><dt><span class="box-token usdc-symbol" aria-hidden="true">$</span> USDC</dt><dd class="held-usdc"></dd></div></dl>',
-      "After exercise"
-    )}<div class="box-connector"><i aria-hidden="true"></i></div><div class="exchange-party"><h4>Recipient</h4><strong class="scene-delivery"></strong><span>Receives from the vault</span></div></div><p class="scene-caption">Caller and recipient can be different addresses.</p>`;
+    host.className = "token-theatre box-exchange exercise-result";
+    host.innerHTML = `<div class="exercise-transfers"><div><span class="transfer-label">Caller <span aria-hidden="true">→</span> Vault</span><strong class="scene-payment"></strong><small>Payment in</small></div><div><span class="transfer-label">Vault <span aria-hidden="true">→</span> Recipient</span><strong class="scene-delivery"></strong><small>Delivery out</small></div></div>${vaultBox(
+      '<table class="exercise-balances"><caption class="sr-only">Vault token balances before and after this illustrative exercise</caption><thead><tr><th scope="col">Token</th><th scope="col">Before</th><th scope="col">After</th></tr></thead><tbody><tr class="balance-weth"><th scope="row"><span class="box-token weth-symbol" aria-hidden="true">◇</span> WETH</th><td><strong class="before-weth"></strong><span class="balance-track" aria-hidden="true"><i class="before-weth-bar"></i></span></td><td><strong class="held-weth"></strong><span class="balance-track" aria-hidden="true"><i class="after-weth-bar"></i></span></td></tr><tr class="balance-usdc"><th scope="row"><span class="box-token usdc-symbol" aria-hidden="true">$</span> USDC</th><td><strong class="before-usdc"></strong><span class="balance-track" aria-hidden="true"><i class="before-usdc-bar"></i></span></td><td><strong class="held-usdc"></strong><span class="balance-track" aria-hidden="true"><i class="after-usdc-bar"></i></span></td></tr></tbody></table>',
+      "Token balances"
+    )}<p class="exercise-summary" role="status"></p><p class="scene-caption">The caller funds the payment; the <a href="#execution-permissions">configured recipient</a> receives delivery.</p>`;
     fallback.before(host);
     function sync() {
       const call = root.dataset.option === "call";
       const amount = Number(root.dataset.amount || 0);
+      const beforeWeth = call ? 10 : 0;
+      const beforeUsdc = call ? 0 : 30000;
+      const afterWeth = call ? 10 - amount : amount;
+      const afterUsdc = call ? amount * 3000 : 30000 - amount * 3000;
       host.querySelector(".scene-payment").textContent =
         root.querySelector("#incoming-amount").textContent;
       host.querySelector(".scene-delivery").textContent =
         root.querySelector("#outgoing-amount").textContent;
-      host.querySelector(".held-weth").textContent = String(
-        call ? 10 - amount : amount
-      );
-      host.querySelector(".held-usdc").textContent = (
-        call ? amount * 3000 : 30000 - amount * 3000
-      ).toLocaleString("en-US");
+      for (const [selector, value] of [
+        [".before-weth", beforeWeth], [".before-usdc", beforeUsdc],
+        [".held-weth", afterWeth], [".held-usdc", afterUsdc],
+      ]) host.querySelector(selector).textContent = value.toLocaleString("en-US");
+      for (const [selector, percent] of [
+        [".before-weth-bar", beforeWeth * 10],
+        [".after-weth-bar", afterWeth * 10],
+        [".before-usdc-bar", beforeUsdc / 300],
+        [".after-usdc-bar", afterUsdc / 300],
+      ]) host.querySelector(selector).style.width = `${percent}%`;
+      host.querySelector(".exercise-summary").textContent = amount === 0
+        ? "No exercise selected. The vault balances stay unchanged."
+        : amount === 10
+          ? "Full exercise. The vault is finalized."
+          : `Partial exercise. ${10 - amount} WETH of option notional remains.`;
       host.classList.toggle("zero-transfer", amount === 0);
     }
     root.addEventListener("exchange-state", sync);
     sync();
-    root.classList.add("box-delivery");
+    root.classList.add("box-delivery", "exercise-lab");
     root.dataset.sceneReady = "true";
   }
 })();
