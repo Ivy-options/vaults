@@ -1364,7 +1364,8 @@ h2 {
 }
 
 /* Keep short labels and structured explanations out of justified prose. */
-.actor-lanes p + p {
+.actor-lanes p + p,
+.actor-explanation .actor-lanes p + p {
   margin-top: 12px;
 }
 .reference-body,
