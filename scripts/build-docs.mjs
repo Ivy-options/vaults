@@ -13,26 +13,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
 const pages = [
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
-  {
-    source: "docs/operations.md",
-    output: "operations.html",
-    title: "Operator runbook",
-  },
-  {
-    source: "docs/settlement-pricing-spec.md",
-    output: "settlement-pricing.html",
-    title: "Cash settlement pricing",
-  },
-  {
-    source: "docs/version-registry.md",
-    output: "releases.html",
-    title: "Releases and integration",
-  },
-  {
-    source: "docs/version-registry-spec.md",
-    output: "registry-specification.html",
-    title: "Release registry specification",
-  },
   { source: "README.md", output: "project-setup.html", title: "Project setup" },
   {
     source: "examples/operator/README.md",
@@ -82,13 +62,7 @@ export function buildDocs({ check = false } = {}) {
     outputs.set(target, readFileSync(resolve(root, source), "utf8"));
   }
   for (const page of pages) {
-    let source = readFileSync(resolve(root, page.source), "utf8");
-    // Internal planning provenance is not part of the reader-facing specification.
-    if (page.source === "docs/settlement-pricing-spec.md")
-      source = source.replace(
-        " This implements [the stakeholder plan](stakeholder-feedback-task-plan.md).",
-        ""
-      );
+    const source = readFileSync(resolve(root, page.source), "utf8");
     const headings = [];
     const usedIds = new Map();
     const renderer = new Renderer();
@@ -112,7 +86,12 @@ export function buildDocs({ check = false } = {}) {
           dirname(page.source),
           decodeURIComponent(path)
         );
-        const mapped = destinations.get(absolute);
+        // Reference pages live in docs/site and are edited there directly.
+        const mapped =
+          destinations.get(absolute) ??
+          (absolute.startsWith(site + "/") && absolute.endsWith(".html")
+            ? relative(site, absolute)
+            : undefined);
         if (!mapped)
           throw new Error(`No site destination for ${page.source}: ${href}`);
         target = mapped + (anchor ? `#${anchor}` : "");
@@ -204,6 +183,6 @@ if (
   console.log(
     `${check ? "Verified" : "Built"} ${
       generated.length
-    } HTML reference pages and their local downloads.`
+    } generated HTML pages and their local downloads.`
   );
 }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext, Script } from "node:vm";
@@ -9,7 +9,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pagePath = resolve(root, "docs/site/index.html");
 const html = readFileSync(pagePath, "utf8");
 const site = dirname(pagePath);
-const pages = [pagePath, ...buildDocs({ check: true })];
+const generated = buildDocs({ check: true });
+// Reference pages are hand-maintained HTML; check every page in the site.
+const pages = [
+  ...new Set([
+    pagePath,
+    ...generated,
+    ...readdirSync(site)
+      .filter((name) => name.endsWith(".html"))
+      .map((name) => resolve(site, name)),
+  ]),
+];
 const pageIds = new Map(
   pages.map((path) => {
     const content = readFileSync(path, "utf8");
@@ -163,5 +173,5 @@ for (const field of ["days", "entryPrice"]) {
 update({ days: "30", entryPrice: "3000", prem: "100" });
 assert.equal(elements.premiumApr.textContent, "40.56%");
 console.log(
-  "Docs checks passed: seven HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, call/put examples, invalid inputs and recovery."
+  `Docs checks passed: ${pages.length} HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, call/put examples, invalid inputs and recovery.`
 );

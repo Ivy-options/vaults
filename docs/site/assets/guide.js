@@ -49,7 +49,7 @@
       )
     );
     // Only interactive examples need a generated stage. Explanations live in HTML.
-    if (["collateral", "lifecycle"].includes(chapter.id)) {
+    if (chapter.id === "lifecycle") {
       const stage = make("div", "visual-stage");
       stage.id = `visual-${chapter.id}`;
       main.append(stage);
@@ -127,91 +127,6 @@
     updateProgress();
   };
   window.addEventListener("hashchange", followAnchor);
-
-  // Collateral: show exact whole-token exchanges for an explicitly selected amount.
-  const collateral = $("#visual-collateral");
-  collateral.innerHTML = `<div class="stage-top"><span class="stage-label">PHYSICAL DELIVERY · TRY IT</span><div class="segmented" role="group" aria-label="Option type"><button type="button" data-option="call" aria-pressed="true">Covered call</button><button type="button" data-option="put" aria-pressed="false">Cash-secured put</button></div></div>
-    <div class="token-key"><span><i class="key-dot eth-dot"></i>Underlying <b>WETH</b></span><span><i class="key-dot usd-dot"></i>Quote <b>USDC</b></span><span>Premium <b>Claimed separately</b></span><span>Strike <b>3,000 USDC / WETH</b></span></div>
-    <div class="transfer-scene"><div class="vault-node"><span class="node-caption">COLLATERAL DEPOSITED</span><span class="coin eth" id="deposit-coin">◇</span><strong id="deposit-amount">10 WETH</strong><span>Held in the vault</span></div><div class="transfer-lanes"><div class="transfer-lane outgoing"><span class="lane-direction">Vault → recipient</span><strong id="outgoing-amount"></strong><span class="lane-track"><i></i></span></div><div class="transfer-lane incoming"><span class="lane-direction">Caller → vault</span><strong id="incoming-amount"></strong><span class="lane-track"><i></i></span></div></div><div class="buyer-node"><span class="node-caption">RECIPIENT</span><span class="coin buyer-icon">↔</span><strong>Receives delivery</strong><span>Caller pays · recipient receives</span></div></div>
-    <div class="exercise-controls"><label for="exercise-amount">Amount exercised <output id="exercise-output" for="exercise-amount">10 WETH · 100%</output></label><input id="exercise-amount" type="range" min="0" max="10" step="1" value="10"><div class="range-ends"><span>None</span><span>Full 10 WETH</span></div><button class="play-transfer" type="button">Replay token flow <span aria-hidden="true">↗</span></button></div>
-    <div class="pool-result" role="status"><span>POOL AFTER THIS EXERCISE</span><strong id="pool-amount"></strong><p id="exchange-caption"></p></div>
-    <p class="stage-footnote">Illustrative partial exercise, where allowed by the vault. No exercise is an alternative outcome. Remaining collateral stays committed until finalization; premium is claimed separately. Raw-unit rounding is omitted.</p>`;
-  let option = "call";
-  let animations = [];
-  function animateTransfer() {
-    animations.forEach((animation) => animation.cancel());
-    animations = [];
-    collateral.dispatchEvent(new Event("exchange-replay"));
-    if (collateral.dataset.sceneReady === "true") return;
-    if (
-      reducedMotion.matches ||
-      Number($("#exercise-amount").value) === 0
-    )
-      return;
-    $$(".lane-track", collateral).forEach((track, i) => {
-      const distance = track.clientWidth - 10;
-      animations.push(
-        $("i", track).animate(
-          [
-            { transform: `translateX(${i ? distance : 0}px)`, opacity: 0 },
-            { opacity: 1, offset: 0.18 },
-            { opacity: 1, offset: 0.8 },
-            { transform: `translateX(${i ? 0 : distance}px)`, opacity: 0 },
-          ],
-          { duration: 1100, easing: "cubic-bezier(.22,.61,.36,1)" }
-        )
-      );
-    });
-  }
-  function renderExchange() {
-    const amount = Number($("#exercise-amount").value);
-    const call = option === "call";
-    collateral.dataset.option = option;
-    collateral.dataset.amount = amount;
-    $("#deposit-amount").textContent = call ? "10 WETH" : "30,000 USDC";
-    $("#deposit-coin").className = `coin ${call ? "eth" : "usd"}`;
-    $("#deposit-coin").textContent = call ? "◇" : "$";
-    $("#outgoing-amount").textContent = call
-      ? `${amount} WETH`
-      : `${number(amount * 3000)} USDC`;
-    $("#incoming-amount").textContent = call
-      ? `${number(amount * 3000)} USDC`
-      : `${amount} WETH`;
-    $("#exercise-output").textContent = `${amount} WETH · ${amount * 10}%`;
-    $("#pool-amount").textContent = call
-      ? `${10 - amount} WETH + ${number(amount * 3000)} USDC`
-      : `${amount} WETH + ${number(30000 - amount * 3000)} USDC`;
-    $("#exchange-caption").textContent =
-      amount === 0
-        ? "No tokens exchanged. The deposited collateral remains in the vault."
-        : call
-        ? "The vault delivers WETH and receives USDC at the agreed strike."
-        : "The vault pays USDC at the agreed strike and receives WETH.";
-    $(".play-transfer").disabled = amount === 0;
-    $$("[data-option]").forEach((button) =>
-      button.setAttribute(
-        "aria-pressed",
-        String(button.dataset.option === option)
-      )
-    );
-    collateral.dispatchEvent(new Event("exchange-state"));
-  }
-  $$("[data-option]").forEach(
-    (button) =>
-      (button.onclick = () => {
-        option = button.dataset.option;
-        renderExchange();
-        animateTransfer();
-      })
-  );
-  $("#exercise-amount").oninput = renderExchange;
-  $("#exercise-amount").onchange = animateTransfer;
-  $(".play-transfer").onclick = animateTransfer;
-  renderExchange();
-  animations.forEach((animation) => animation.cancel()); // No entrance autoplay.
-  // The interactive exchange replaces the static example in the reading flow.
-  $("#physical-delivery-example").replaceChildren(collateral);
-  $("#physical-delivery-example").classList.add("interactive-delivery");
 
   // Move each original phase into its tab so the full rules have one home.
   const lifecycle = $("#visual-lifecycle");

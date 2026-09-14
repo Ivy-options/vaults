@@ -17,9 +17,9 @@
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
   <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol guide"><img src="assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Project setup</span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
-  <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#build-and-verify">Build and verify</a>
-<a href="#manual-operations">Manual operations</a>
-<a href="#documentation">Documentation</a></nav></details></aside>
+  <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#read-the-guide">Read the guide</a>
+<a href="#build-and-verify">Build and verify</a>
+<a href="#edit-the-docs">Edit the docs</a></nav></details></aside>
   <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
 <p><strong>License: Business Source License 1.1 (BUSL-1.1).</strong> Copying, modification,
 redistribution, and non-production use are permitted under the <a href="license.html">license</a>.
@@ -27,85 +27,30 @@ Production use requires a separate commercial license until the change to
 GPL-2.0-or-later on September 14, 2030, or the fourth anniversary of this version&#39;s
 first public distribution under BUSL-1.1, whichever comes first. No Additional Use
 Grant is provided. Third-party material retains its own licenses.</p>
-<p>Single-use covered-call and cash-secured-put vaults with optional pooling and gated ERC-1155 share transfers. An off-chain auction selects a signed buyer bid; activation collects the premium atomically. LPs can claim their net premium immediately, and current shareholders claim the remaining pool after settlement or a unanimous unwind.</p>
-<p>The deployment is immutable. There is no hub proxy, upgrade entrypoint, implementation setter, or module rewiring. This build creates a fresh deployment; it cannot upgrade an older hub.</p>
-<p><code>IvyVaultsRegistry</code> provides a permanent discovery address for multiple immutable releases. Its administrator can add a release and recommend it for new vaults; registered Hub addresses and manifest hashes cannot be replaced or removed. Transactions continue to target the selected Hub directly. Older vaults keep their original Hub, modules and claim paths. See <a href="releases.html">release operations and frontend integration</a>.</p>
-<div class="tablewrap" tabindex="0" role="region" aria-label="Project setup reference table"><table>
-<thead>
-<tr>
-<th>Contract</th>
-<th>Responsibility</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>IvyVaultsHub</code></td>
-<td>Lifecycle, bids, delegation, guarded entrypoints and role-authorized settlement prices</td>
-</tr>
-<tr>
-<td><code>IvyVault</code></td>
-<td>Clone custody, token reserves, separate premium and buyer payment budgets</td>
-</tr>
-<tr>
-<td><code>IvyShares</code></td>
-<td>ERC-1155 shares and pre-update module notifications</td>
-</tr>
-<tr>
-<td><code>IvyPremiums</code></td>
-<td>Activation entitlements and restricted premium payments</td>
-</tr>
-<tr>
-<td><code>IvyUnwind</code></td>
-<td>One active agreement and current-shareholder consent</td>
-</tr>
-<tr>
-<td><code>IvyPriceFeed</code></td>
-<td>Signed spot prices for optional activation checks</td>
-</tr>
-<tr>
-<td><code>IvyVaultRules</code> library</td>
-<td>Creation validation and owner-authorized term tightening</td>
-</tr>
-<tr>
-<td><code>IvyOptionSettlement</code> library</td>
-<td>Exercise, cash settlement and residual LP claim implementation</td>
-</tr>
-<tr>
-<td><code>IvyVaultsRegistry</code></td>
-<td>Separately deployed release directory with permanent registrations and an admin-selected recommendation</td>
-</tr>
-</tbody></table>
-</div>
-<p>The hub links to two separately deployed Solidity libraries. Their addresses are embedded in hub bytecode and cannot be changed. Calls execute against hub storage under its existing authorization and reentrancy guards. The deployment journal verifies the fixed library links along with constructor bindings.</p>
-<p>Approve the <strong>vault address</strong>, never the hub. A share represents one raw unit of credited collateral. Share transfers are disabled by default; the Hub admin can enable them globally. Transfers move the residual pool claim and a proportional portion of the sender’s unclaimed premium. Claimed premium never moves; burning shares preserves unpaid credit.</p>
-<p>The Hub’s global <code>platformFeeBps</code> starts at zero and is managed by <code>PLATFORM_FEE_MANAGER_ROLE</code>. Activation deducts this fee from gross MM premium; LPs immediately claim the net amount. Each vault freezes the current rate as its maximum at creation, rejecting activation above that cap. Fees are reserved separately and anyone can call the vault’s <code>claimPlatformFee()</code> to pay its activation-snapshotted treasury. Treasury defaults to the admin and future recipients are admin-configurable. Fees are not refunded on settlement or unwind. Agreed unwind refunds are separately funded by each current LP in proportion to shares, even after premium has been claimed; unsuccessful contributions and rounding surplus remain recoverable by their funders.</p>
-<p>The three token roles are <strong>asset/underlying, quote and premium</strong>. Collateral is the backing token: underlying for a call, quote for a put. Cash payouts use that collateral too. See <a href="operations.html#token-roles-and-collateral">token roles and worked examples</a>.</p>
-<p>Follow the <a href="operations.html#prepare-and-execute-a-unanimous-unwind">unwind lifecycle and examples</a>, <a href="operations.html#premium-treatment-and-emergency-boundaries">premium treatment on cancellation and pause</a>, and <a href="operations.html#platform-fee-and-share-transfer-administration">fee formula and administration</a>.</p>
+<p>Smart contracts for single-use covered-call and cash-secured-put vaults.</p>
+<h2 id="read-the-guide">Read the guide</h2>
+<p>Start with the <a href="index.html">HTML protocol guide</a> for how vaults work, examples, and the contract reference. For deployment and transaction commands, see the <a href="operations.html">operator runbook</a>.</p>
+<p>Open <code>docs/site/index.html</code> directly in your browser. To serve the docs locally, run this from the repository root:</p>
+<pre><code class="language-sh">python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
+</code></pre>
+<p>Then visit <code>http://localhost:8000</code>. The documentation works offline and needs no build step to read.</p>
 <h2 id="build-and-verify">Build and verify</h2>
-<p>Use Node.js 22.13.0 or newer and the locked dependencies:</p>
+<p>Use Node.js 22.13.0 or newer on an even-numbered release. From the repository root:</p>
 <pre><code class="language-sh">npm ci
 npm run compile
 npm run typecheck
-npm run check:size
 npm test -- --no-compile
 </code></pre>
-<p>Solidity 0.8.34 uses optimizer runs 200 and viaIR. The default compiler target is Osaka; deploy only to a chain supporting the emitted opcodes, including transient storage. Tests enforce the 24,576-byte deployed-code limit without unlimited-size settings. <code>test/17-local-rehearsal.test.ts</code> rehearses physical-only deployment and delivery, explicit cash enablement and settlement, and a pooled unanimous unwind on an ephemeral local EVM using the operator transaction builder.</p>
-<h2 id="manual-operations">Manual operations</h2>
-<p>Read the <a href="operations.html">operator runbook</a> and copy the <a href="operator-examples.html">request examples</a>. Commands simulate and print calldata by default:</p>
-<pre><code class="language-sh">npm run operator -- prepare-vault request.json
-npm run operator -- inspect-bid activation.json
-npm run operator -- expire expiration.json
+<p>Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.</p>
+<p>To run one test file, for example the deployment and settlement rehearsal:</p>
+<pre><code class="language-sh">npm test -- test/17-local-rehearsal.test.ts
 </code></pre>
-<p><code>--send</code> explicitly submits through the configured RPC&#39;s signer. No automated market-data collection, pricing, bidding, or trading UI is included.</p>
-<p>The Hub deploys for physical delivery with no settlement publisher and <code>cashSettlementEnabled</code> false. To enable future cash positions, the admin grants a responsible EOA or helper the publisher role, then explicitly calls <code>setCashSettlementEnabled(true)</code>. Role changes do not toggle the flag. While the flag is false, Cash/Either vault creation and cash bid activation revert; physical vaults remain usable and cannot be converted to cash later. The CLI checks a nominated publisher before preparing enablement; the contract flag setter leaves publication coverage to the admin.</p>
-<p>Each cash vault needs its own price-setting transactions. The Hub stores exercise observations and a write-once final price by <code>vaultId</code>, deriving the selected pair and expiry from the live cash position. Even matching vaults have independent prices. Cash vaults fix <code>maxSettlementPriceAge</code> at creation. Disabling the flag stops new cash positions while publication, exercise, expiration, claims and agreed unwind for existing positions remain available. Revocation prevents that publisher&#39;s future reports without erasing stored prices. Missing reports keep funds locked until an authorized publisher supplies that vault&#39;s price or the parties agree to an unwind. Premium rounding dust stays reserved permanently.</p>
-<p>See the <a href="operations.html">operator runbook</a> and <a href="index.html">public guide</a>.</p>
-<h2 id="documentation">Documentation</h2>
-<p>Open <a href="index.html">the protocol guide</a> directly in a browser, or serve the repository root with <code>python3 -m http.server 8000</code> and visit <code>/docs/site/</code>. The operator runbook, specifications, release guide and request examples have linked HTML pages. The site includes local downloads for request templates and referenced Solidity examples, so <code>docs/site/</code> can also be served on its own.</p>
-<p>The guide uses local fonts and assets in <code>docs/site/assets/</code>. After editing a reference document or request template, run <code>npm run docs:build</code> to regenerate its HTML page or local download. Run <code>npm run docs:check</code> to verify generated pages, HTML-only document links, cross-page anchors, assets and calculator examples.</p>
-<p><code>exercise(vaultId, amount)</code> uses the buyer’s option right and pays the configured recipient. <code>expire(vaultId)</code> permissionlessly processes expiration and unlocks residual assets; cash expiration reserves the remaining payout for <code>claimPayout</code>. Cash exercise at/after expiry, including European exercise, uses the finalized expiry price. American cash early exercise uses a fresh, unexpired observation stored in the Hub. Indicative prices never authorize cash payouts. Physical exercise exchanges assets at strike within its exercise window.</p>
-<p>Every vault fixes <code>allowPartialExercise</code> at creation, before deposits. True permits any valid positive amount up to remaining notional; false requires all remaining notional. The term cannot be tightened or changed later. Operator creation requests must specify it explicitly. Full exercise finalizes automatically; partial exercise leaves the remainder open.</p>
-<p>See the <a href="settlement-pricing.html">accepted pricing specification</a> for publisher governance, observation validity, finality and production methodology requirements. Per-vault publication/read APIs and storage require a fresh immutable deployment. Existing vaults retain their original behavior; the constructor still takes no settlement publisher.</p>
-<p>An EOA with <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code> can publish directly to the Hub. No standalone settlement-price contract is deployed or configured. An optional helper may hold the same role and submit reports; the Hub never reads prices back from that helper.</p>
+<h2 id="edit-the-docs">Edit the docs</h2>
+<p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README; <code>operator-examples.html</code> is generated from <code>examples/operator/README.md</code>. The license page is generated from <code>LICENSE.md</code>.</p>
+<p>After changing docs or request templates, rebuild and check:</p>
+<pre><code class="language-sh">npm run docs:build
+npm run docs:check
+</code></pre>
 </article></main>
   <footer><a href="index.html">Ivy Vaults · Protocol guide</a> · <a href="license.html">License · BUSL-1.1</a></footer>
 </body>
