@@ -385,7 +385,7 @@
 
             <div class="reading-block" id="premium-ownership">
               <div class="illustrated-heading" data-illustration="premium">
-                <img src="assets/roman-premium-claim.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <img src="assets/roman-premium-claim.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
                 <h3>Premium is earned at activation.</h3>
               </div>
               <ol class="premium-sequence">
@@ -448,7 +448,7 @@
 
             <div class="reading-block reserve-explainer">
               <div class="illustrated-heading" data-illustration="residual">
-                <img src="assets/roman-residual-pool.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <img src="assets/roman-residual-pool.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
                 <h3>What is left for the final claim?</h3>
               </div>
               <div
@@ -638,12 +638,13 @@
             available. Deadlines never move.
           </div>
           <p class="phase-return">
-            Cancelling an auction returns the vault to Open. Every other
-            transition is one-way.
+            Cancelling an auction returns the vault to Open and clears any
+            scheduled start time, so the owner must schedule again or open
+            manually. Every other transition is one-way.
           </p>
           <div class="reading-block" id="early-exit">
             <div class="illustrated-heading" data-illustration="consent">
-              <img src="assets/roman-unanimous-consent.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+              <img src="assets/roman-unanimous-consent.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
               <h3>Unwind by unanimous agreement</h3>
             </div>
             <ol class="route-strip" aria-label="Unwind requirements">
@@ -748,9 +749,10 @@
                 <dt>New agreement</dt>
                 <dd>
                   A replacement proposal or further exercise requires fresh
-                  agreement. After expiry or replacement, propose a new future
-                  deadline and nonce while Live; old signatures and approvals
-                  cannot execute it.
+                  agreement. After expiry or replacement, propose again while
+                  Live with a new future deadline; the contract assigns the
+                  next nonce, and old signatures and approvals cannot execute
+                  it.
                 </dd>
               </div>
               <div>
@@ -957,8 +959,8 @@
               <span class="route-index">03</span>
               <h4>Treasury claim</h4>
               <p>
-                Anyone can trigger <code>claimPlatformFee()</code> once, paying
-                the recorded treasury.
+                Anyone can call <code>claimPlatformFee()</code> on the vault
+                clone once, paying the recorded treasury.
               </p>
             </li>
           </ol>
@@ -1298,7 +1300,7 @@
 
             <div class="reading-block">
               <div class="illustrated-heading" data-illustration="bid">
-                <img src="assets/roman-bid-signing.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <img src="assets/roman-bid-signing.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
                 <h3>The signature belongs to one chain and hub.</h3>
               </div>
               <div class="signature-domain" aria-label="EIP-712 signing domain">
@@ -1556,7 +1558,7 @@
 
             <div class="reading-block" id="exercise-windows">
               <div class="illustrated-heading" data-illustration="timing">
-                <img src="assets/roman-exercise-window.png" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+                <img src="assets/roman-exercise-window.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
                 <h3>Physical exercise windows</h3>
               </div>
               <p class="unit-note">
@@ -1745,7 +1747,9 @@
                 <ul>
                   <li>American cash exercise only.</li>
                   <li>
-                    Positive price; within maximum age and validity deadline.
+                    Positive price; validity deadline not yet passed. The
+                    vault's maximum age is checked when the buyer exercises,
+                    not at publication.
                   </li>
                   <li>
                     Each new observation timestamp must be strictly later.
@@ -2096,8 +2100,9 @@
               <span class="mono">strikeLimit</span
               ><span
                 >Per quote token. Calls:
-                <span class="mono">strike ≥ limit</span>. Puts:
-                <span class="mono">strike ≤ limit</span>.</span
+                <span class="mono">strike ≥ limit</span>, and 0 means no
+                limit. Puts: <span class="mono">strike ≤ limit</span>, and
+                the limit must be nonzero.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">calls raise · puts lower</span></span
@@ -2469,7 +2474,9 @@
               <span>Calls by phase</span
               ><span
                 >Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> ·
-                <b>BID_MASTER</b> · <b>MARKET_MAKER</b></span
+                <b>BID_MASTER</b> · <b>MARKET_MAKER</b> ·
+                <b>PLATFORM_FEE_MANAGER</b> ·
+                <b>SETTLEMENT_PRICE_PUBLISHER</b></span
               >
             </div>
             <div class="calls">
@@ -2504,6 +2511,11 @@
                     <span class="chip owner">owner</span> after timeout, at
                     expiry, or while admission is paused
                   </dd>
+                  <dt>cancelBid(nonce)</dt>
+                  <dd>
+                    <span class="chip mm">buyer</span> burns an unused bid
+                    nonce, any phase
+                  </dd>
                 </dl>
               </div>
               <div>
@@ -2514,10 +2526,25 @@
                     <span class="chip mm">buyer or executor</span> caller
                     supplies physical funding
                   </dd>
-                  <dt>proposeUnwind · approveUnwind · executeUnwind</dt>
+                  <dt>setExecution(vaultId, executor, recipient)</dt>
                   <dd>
-                    owner/buyer proposal, all current shares approve, buyer
-                    signs, each LP funds proportional refund
+                    <span class="chip mm">buyer</span> updates the executor and
+                    recipient, any phase
+                  </dd>
+                  <dt>
+                    proposeUnwind · approveUnwind · revokeUnwind · fundUnwind ·
+                    withdrawUnwindContribution · executeUnwind
+                  </dt>
+                  <dd>
+                    owner/buyer proposal; every current holder approves and
+                    funds a proportional refund, and may revoke or withdraw
+                    before execution; anyone executes with the buyer's
+                    signature
+                  </dd>
+                  <dt>vault.claimPlatformFee()</dt>
+                  <dd>
+                    <span class="chip">anyone</span> pays the recorded treasury
+                    once, from activation onward
                   </dd>
                   <dt>claimPremium(vaultId)</dt>
                   <dd>
@@ -2541,13 +2568,27 @@
                     <span class="chip mm">buyer or executor</span> cash payout
                     or refund to configured recipient
                   </dd>
+                  <dt>withdrawUnwindContribution(vaultId, nonce)</dt>
+                  <dd>
+                    <span class="chip lp">funder</span> recovers excess refund
+                    contributions after an executed unwind
+                  </dd>
                   </dl>
               </div>
               <div>
                 <h4 class="who">Admin</h4>
                 <dl>
-                  <dt>setSettings · setURI</dt>
-                  <dd><span class="chip">admin</span></dd>
+                  <dt>setSettings · setURI · setTransfersEnabled</dt>
+                  <dd>
+                    <span class="chip">admin</span> future timing defaults,
+                    share metadata, share transfers
+                  </dd>
+                  <dt>setPlatformFeeBps · setPlatformTreasury</dt>
+                  <dd>
+                    <span class="chip">fee manager</span> global rate up to
+                    10,000 bps; <span class="chip">admin</span> treasury for
+                    future activations
+                  </dd>
                   <dt>setAdmissionPause(vaultId, paused)</dt>
                   <dd>
                     <span class="chip">guardian</span> zero ID pauses global
@@ -2579,6 +2620,11 @@
                   <dd>listed quote tokens, clone address, call or put</dd>
                   <dt>totalShares · remainingNotional</dt>
                   <dd>shares outstanding, notional still exercisable</dd>
+                  <dt>expirationTimeOf · usedBidNonces · platformFees</dt>
+                  <dd>
+                    first expire time, consumed bid nonces, recorded fee per
+                    vault
+                  </dd>
                   <dt>
                     cashSettlementEnabled · exercisePrice · settlementPrice
                   </dt>
@@ -2621,7 +2667,8 @@
                         VaultTermsTightened · PairTermsTightened ·
                         AuctionScheduled · AuctionOpened · AuctionCancelled ·
                         Activated · Exercised · Settled · Claimed ·
-                        PayoutClaimed · BidCancelled ·
+                        PayoutClaimed · BidCancelled · ExecutionUpdated ·
+                        Unwound · ExercisePricePublished · ExpiryPublished ·
                         VaultOwnershipTransferred</span
                       >
                     </td>

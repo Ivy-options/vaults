@@ -17,7 +17,7 @@
       "1394 76 533 580", // Bid master announcing the auction.
     ];
     const [x, y, width, height] = crops[index].split(" ");
-    const artwork = index < 2 ? "operator-portraits.png" : "operator-portraits-revised.png";
+    const artwork = "operator-portraits.webp"; // one sheet, drawn into the original 1942×809 box
     return `<svg class="roman-operator" viewBox="${crops[index]}" aria-hidden="true" focusable="false"><defs><clipPath id="operator-crop-${index}"><rect x="${x}" y="${y}" width="${width}" height="${height}" /></clipPath></defs><image href="assets/${artwork}" width="1942" height="809" clip-path="url(#operator-crop-${index})" /></svg>`;
   }
 
