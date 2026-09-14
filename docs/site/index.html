@@ -86,28 +86,37 @@
                 <span class="inscription">OWNER</span>
                 <h3>Sets the terms</h3>
                 <p>
-                  Creates the vault. Funds it alone or permits other depositors.
+                  The owner creates the vault, chooses its tokens and sets the
+                  trading terms. The owner funds it alone or allows other depositors.
+                </p>
+                <p>
+                  For a call, the owner can allow bids in several currencies.
+                  For a put, bids must use the deposited token as their strike
+                  currency. The owner makes these <a href="#vault-token-choices">token choices</a>
+                  when creating the vault.
                 </p>
               </div>
               <div>
                 <span class="inscription">LIQUIDITY PROVIDER</span>
                 <h3>Supplies collateral</h3>
                 <p>
-                  Receives shares. The current shareholder may differ from the
-                  original depositor.
+                  The LP deposits collateral and receives shares. A later
+                  holder can acquire those shares from the original depositor
+                  when transfers are enabled.
                 </p>
               </div>
               <div>
                 <span class="inscription">BUYER</span>
                 <h3>Signs the bid</h3>
-                <p>Needs <code>MARKET_MAKER_ROLE</code> at activation.</p>
+                <p>The buyer signs a bid within the owner's allowed terms and
+                  must hold <code>MARKET_MAKER_ROLE</code> at activation.</p>
               </div>
               <div>
                 <span class="inscription">BID MASTER</span>
                 <h3>Selects & submits</h3>
                 <p>
-                  Runs the auction off-chain and submits the selected signed
-                  bid.
+                  The bid master runs the auction off-chain, selects a buyer's
+                  signed bid and submits it to the Hub for activation.
                 </p>
               </div>
             </div>
@@ -176,102 +185,26 @@
                 <span class="role-symbol" aria-hidden="true">◇</span>
                 <h3>Underlying</h3>
                 <strong>WETH</strong>
-                <p>Fixed when the vault is created.</p>
+                <p>The owner fixes this asset at creation.</p>
               </div>
               <div>
                 <span class="role-symbol" aria-hidden="true">$</span>
                 <h3>Quote</h3>
                 <strong>USDC</strong>
-                <p>Bids must use a listed quote/premium pair.</p>
+                <p>The buyer prices the strike in this currency.</p>
               </div>
               <div>
                 <span class="role-symbol" aria-hidden="true">＋</span>
                 <h3>Premium</h3>
-                <strong>Fixed per pair</strong>
-                <p>Can use underlying, quote or a third token.</p>
+                <strong>Owner-selected token</strong>
+                <p>The owner can choose underlying, quote or a third token.</p>
               </div>
             </div>
 
-            <div class="reading-block">
-              <h3>What does the vault hold?</h3>
-              <div
-                class="tablewrap"
-                tabindex="0"
-                role="region"
-                aria-label="Covered call and cash-secured put comparison"
-              >
-                <table class="collateral-comparison">
-                  <caption>
-                    <span class="comparison-context"><span>Example</span><span>Notional <strong>10 WETH</strong></span><span>Strike <strong>3,000 USDC / WETH</strong></span></span>
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">The trade</th>
-                      <th scope="col">Covered call</th>
-                      <th scope="col">Cash-secured put</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <th scope="row">Deposit</th>
-                      <td>
-                        <strong>10 WETH</strong
-                        ><span>Underlying backs the call.</span>
-                      </td>
-                      <td>
-                        <strong>30,000 USDC</strong
-                        ><span>Quote tokens fund the put.</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <th scope="row">Notional</th>
-                      <td>
-                        <strong>10 WETH</strong
-                        ><span>Equals the underlying deposited.</span>
-                      </td>
-                      <td>
-                        <strong>10 WETH</strong
-                        ><span>30,000 USDC ÷ 3,000 USDC per WETH.</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <th scope="row">Token pairs</th>
-                      <td>
-                        May list multiple quote/premium pairs. The winning bid
-                        selects one.
-                      </td>
-                      <td>
-                        One quote/premium pair. Collateral is the quote token.
-                      </td>
-                    </tr>
-                    <tr>
-                      <th scope="row">Fixed terms</th>
-                      <td>
-                        Each listed pair fixes its premium token. Bids quote
-                        strike in that pair’s quote token.
-                      </td>
-                      <td>
-                        The underlying the buyer can deliver is fixed when the
-                        vault is created.
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="notional-equation">
-                <span>Put notional · raw token units</span
-                ><code>collateral × underlyingUnit / strike</code>
-                <p>
-                  <code>underlyingUnit = 10^underlyingDecimals</code>, the
-                  number of smallest units in one whole underlying token.
-                </p>
-              </div>
-              <p>
-                These deposits back the seller’s obligation. Earning a premium
-                does not guarantee that LPs get the same assets or market value
-                back.
-              </p>
-            </div>
+            <p class="example-context">
+              LPs back the seller's obligation. Premium does not guarantee that
+              they recover the deposited assets or their market value.
+            </p>
 
             <div class="reading-block">
               <h3>What moves when the buyer exercises?</h3>
@@ -291,6 +224,7 @@
                   </p>
                 </div>
                 <p>
+                  These examples use a strike of 3,000 USDC per WETH.
                   With <code>allowPartialExercise = true</code>, exercising half
                   leaves <strong>5 WETH + 15,000 USDC</strong> in either pool.
                   If the rest expires unused, those balances remain for LPs to
@@ -2191,9 +2125,13 @@
                 ><span class="chip lp">immutable</span></span
               >
             </div>
-            <div class="row">
+            <div class="row" id="vault-token-choices">
               <span class="mono">pairs</span
-              ><span>Accepted quote tokens, each with its premium token.</span
+              ><span>The owner sets allowed strike currencies and a premium
+                token for each at creation. Calls may have several; puts have
+                one, with the strike priced in the deposited token. The buyer
+                chooses an enabled entry. While Open, the owner can disable
+                entries but cannot add them or change their tokens.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">disable only</span></span
@@ -2212,7 +2150,8 @@
             </div>
             <div class="row">
               <span class="mono">publicDeposits · underlying · collateral</span
-              ><span>Who may deposit, and what the vault is.</span
+              ><span>The owner fixes the underlying and collateral tokens and decides
+                whether other users may deposit.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip">immutable</span></span
