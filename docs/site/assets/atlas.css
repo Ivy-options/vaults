@@ -518,29 +518,6 @@ h4 {
   font-family: var(--atlas-serif);
   font-size: 24px;
 }
-.cash-switches {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  border-block: 1px solid var(--line-strong);
-  padding: 28px 0;
-}
-.cash-switches label {
-  display: grid;
-  grid-template-columns: 24px 1fr;
-  gap: 10px;
-  font-size: 16px;
-}
-.cash-switches label span {
-  grid-column: 2;
-  font-size: 12px;
-  color: var(--muted);
-}
-.cash-switches .example-status {
-  grid-column: 1 / -1;
-  min-height: 0;
-  margin: 0;
-}
 .price-boundary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr);
@@ -1010,9 +987,6 @@ h4 {
   .release-branches {
     grid-template-columns: 1fr;
     gap: 24px;
-  }
-  .cash-switches {
-    grid-template-columns: 1fr;
   }
   .price-boundary {
     grid-template-columns: 1fr;

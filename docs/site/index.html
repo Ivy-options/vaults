@@ -1186,26 +1186,29 @@
           </p>
 
           <div class="reading-block" id="cash-availability">
-            <h3>Two independent switches</h3>
-            <div class="cash-switches interactive-example">
-              <label
-                ><input id="cash-flag-demo" type="checkbox" disabled />Cash
-                admissions enabled<span
-                  >Controls new Cash/Either creation and cash activation.</span
-                ></label
-              ><label
-                ><input
-                  id="cash-publisher-demo"
-                  type="checkbox"
-                  disabled
-                />Publisher role granted<span
-                  >Controls who can publish authoritative prices.</span
-                ></label
-              >
-              <div id="cash-switch-status" class="example-status" role="status">
-                Physical launch · cash admissions disabled · no publisher
+            <h3>Two separate admin controls</h3>
+            <p>
+              At launch, cash admissions are disabled and no price publisher is
+              authorized.
+            </p>
+            <dl class="rule-ledger">
+              <div>
+                <dt>Allow new cash positions</dt>
+                <dd>
+                  Enabling cash admissions allows new Cash/Either vaults and
+                  cash activation. Disabling admissions blocks both; existing
+                  positions keep their obligations.
+                </dd>
               </div>
-            </div>
+              <div>
+                <dt>Authorize a price publisher</dt>
+                <dd>
+                  Granting the publisher role lets that address publish
+                  settlement prices. Revoking it stops future reports from that
+                  address; prices already published remain stored.
+                </dd>
+              </div>
+            </dl>
             <ol class="route-strip" aria-label="Cash enablement">
               <li>
                 <span class="route-index">01</span>

@@ -82,21 +82,6 @@
   }
   $("#fee-rate").addEventListener("input", fees);
   fees();
-  function cashControls() {
-    const flag = $("#cash-flag-demo").checked,
-      publisher = $("#cash-publisher-demo").checked;
-    $("#cash-switch-status").textContent = `${
-      flag ? "Cash admissions enabled" : "Cash admissions disabled"
-    } · ${publisher ? "Publisher authorized" : "No authorized publisher"}${
-      flag && !publisher
-        ? " · the flag alone does not provide settlement reports"
-        : ""
-    }. Existing positions keep their obligations.`;
-  }
-  ["#cash-flag-demo", "#cash-publisher-demo"].forEach((id) =>
-    $(id).addEventListener("change", cashControls)
-  );
-  cashControls();
   const fmt = (n, d = 4) =>
     n.toLocaleString("en-US", { maximumFractionDigits: d });
   function cashAmounts() {

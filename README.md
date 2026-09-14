@@ -1,12 +1,5 @@
 # Ivy Vaults
 
-**License: Business Source License 1.1 (BUSL-1.1).** Copying, modification,
-redistribution, and non-production use are permitted under the [license](LICENSE.md).
-Production use requires a separate commercial license until the change to
-GPL-2.0-or-later on September 14, 2030, or the fourth anniversary of this version's
-first public distribution under BUSL-1.1, whichever comes first. No Additional Use
-Grant is provided. Third-party material retains its own licenses.
-
 Smart contracts for single-use covered-call and cash-secured-put vaults.
 
 ## Read the guide
@@ -50,3 +43,12 @@ After changing docs or request templates, rebuild and check:
 npm run docs:build
 npm run docs:check
 ```
+
+## License
+
+**Business Source License 1.1 (BUSL-1.1).** Copying, modification,
+redistribution, and non-production use are permitted under the [license](LICENSE.md).
+Production use requires a separate commercial license until the change to
+GPL-2.0-or-later on September 14, 2030, or the fourth anniversary of this version's
+first public distribution under BUSL-1.1, whichever comes first. No Additional Use
+Grant is provided. Third-party material retains its own licenses.
