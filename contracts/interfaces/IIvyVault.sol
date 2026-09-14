@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 interface IIvyVault {
     function initialize(address hub, uint256 vaultId, address collateral, address premiums) external;

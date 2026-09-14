@@ -1,5 +1,12 @@
 # Ivy Vaults
 
+**License: Business Source License 1.1 (BUSL-1.1).** Copying, modification,
+redistribution, and non-production use are permitted under the [license](LICENSE.md).
+Production use requires a separate commercial license until the change to
+GPL-2.0-or-later on September 14, 2030, or the fourth anniversary of this version's
+first public distribution under BUSL-1.1, whichever comes first. No Additional Use
+Grant is provided. Third-party material retains its own licenses.
+
 Single-use covered-call and cash-secured-put vaults with optional pooling and gated ERC-1155 share transfers. An off-chain auction selects a signed buyer bid; activation collects the premium atomically. LPs can claim their net premium immediately, and current shareholders claim the remaining pool after settlement or a unanimous unwind.
 
 The deployment is immutable. There is no hub proxy, upgrade entrypoint, implementation setter, or module rewiring. This build creates a fresh deployment; it cannot upgrade an older hub.

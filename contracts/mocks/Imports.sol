@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
 // Pulls third-party contracts into the compilation so their artifacts exist for tests and Ignition.

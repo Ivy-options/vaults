@@ -12,6 +12,7 @@ import { Marked, Renderer } from "marked";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
 const pages = [
+  { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
   {
     source: "docs/operations.md",
     output: "operations.html",
@@ -173,7 +174,7 @@ export function buildDocs({ check = false } = {}) {
       : ""
   }</aside>
   <main id="content" class="content doc-page" tabindex="-1"><article>${body}</article></main>
-  <footer><a href="index.html">Ivy Vaults · Protocol guide</a></footer>
+  <footer><a href="index.html">Ivy Vaults · Protocol guide</a> · <a href="license.html">License · BUSL-1.1</a></footer>
 </body>
 </html>
 `

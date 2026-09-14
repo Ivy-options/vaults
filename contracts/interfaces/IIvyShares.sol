@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
 /// @notice The hub-owned ERC-1155 share token. Token id == vault id. 1 share == 1 smallest unit of collateral.

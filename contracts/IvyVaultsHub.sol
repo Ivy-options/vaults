@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 import {IvyVaultsSettlement} from "./hub/IvyVaultsSettlement.sol";
 import {IvyVaultsHubStorage} from "./hub/IvyVaultsHubStorage.sol";
