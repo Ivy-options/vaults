@@ -33,6 +33,26 @@ To run one test file, for example the deployment and settlement rehearsal:
 npm test -- test/17-local-rehearsal.test.ts
 ```
 
+## Solidity style
+
+The contracts follow the Solidity style guide (`https://docs.soliditylang.org/en/latest/style-guide.html`).
+
+- Use four spaces, a 120-character line target, and braces for control-flow bodies.
+- Keep imports sorted and separate declarations with blank lines.
+- Order contract members: using directives, enums, structs, constants, immutables, storage, events, errors, modifiers, then functions.
+- Sort events and errors alphabetically within each contract or interface.
+- Order functions: constructor, receive/fallback, external, public, internal, private; put view and pure functions last within each visibility group.
+- Preserve storage-variable order, struct-field order, enum values, inheritance order, and modifier execution order during style changes.
+
+Install Foundry (`https://getfoundry.sh/introduction/installation/`) to use the formatter (validated with Forge 1.7.1). Hardhat remains the compiler and test runner.
+
+```sh
+npm run format:solidity
+npm run format:solidity:check
+```
+
+Formatting is configured in `foundry.toml`. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run `npm run docs:build` to refresh the guide's source copies.
+
 ## Edit the docs
 
 Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README; `operator-examples.html` is generated from `examples/operator/README.md`. The license page is generated from `LICENSE.md`.

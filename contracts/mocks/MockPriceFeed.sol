@@ -4,7 +4,10 @@ pragma solidity ^0.8.34;
 import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
 
 contract MockPriceFeed is IIvyPriceFeed {
-    struct Quote { uint256 price; uint256 updatedAt; }
+    struct Quote {
+        uint256 price;
+        uint256 updatedAt;
+    }
 
     mapping(address => mapping(address => Quote)) public quotes;
     bool public shouldRevert;

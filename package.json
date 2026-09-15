@@ -13,7 +13,9 @@
     "operator": "node scripts/operator.mjs",
     "postcompile": "node scripts/check-size.mjs",
     "docs:check": "node scripts/check-docs.mjs",
-    "docs:build": "node scripts/build-docs.mjs"
+    "docs:build": "node scripts/build-docs.mjs",
+    "format:solidity": "forge fmt contracts",
+    "format:solidity:check": "forge fmt --check contracts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.15",
