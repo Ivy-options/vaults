@@ -199,11 +199,10 @@
             <p class="chapter-eyebrow">Section 02</p>
             <h2>Vault lifecycle</h2>
             <p class="section-intro">
-              A vault moves through four phases. LPs fund it while Open, the bid master
-              selects an offer during Auction, and the buyer can exercise during its
-              agreed window while it is Live. Settled is the final phase, when
-              shareholders claim what remains. The phase details below explain who can act
-              and how each phase ends.
+              A vault moves from Open to Auction, then Live and Settled.
+              Cancelling an auction is the only way to return to an earlier
+              phase. Once a bid activates, the vault can only move forward
+              to Settled.
             </p>
             <p>Every vault has a fixed expiry date and time set at creation.
               The exercise window is the period when the buyer may use its
@@ -221,7 +220,7 @@
                   <div class="idx">PHASE 0</div>
                   <div class="name">Open</div>
                 </div>
-                <p class="phase-intro">The vault is collecting collateral, and no option has been sold yet. LPs can add funds or take them back while the owner prepares the auction. The buyer has not paid a premium at this stage.</p>
+                <p class="phase-intro">No option has been sold yet. This is the stage for funding the vault and preparing the terms offered to buyers.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip lp">LPs</span
@@ -249,24 +248,23 @@
                         it can raise the minimum premium a buyer must offer, but
                         cannot lower it after LPs have committed their funds.</span></span
                       ><span
-                        ><b>Prepare the auction.</b><span>The owner can set a time
-                        from which anyone may open the auction, or open it
-                        manually. It can also hand vault ownership to another
+                        ><b>Manage ownership.</b><span>The owner can hand
+                        management of the vault to another
                         address.</span></span
                       ></span
                     >
                   </li>
                 </ul>
                 <div class="exit">
-                  <p><b>Moving to Auction.</b> The owner calls
-                  <code>openAuction</code>, or anyone can call it once a nonzero
-                  scheduled start time, <code>auctionStartsAt</code>, is
-                  reached. A scheduled time does not submit the transaction automatically.</p>
-                  <p>Deposits and auction opening must not be paused. The vault
+                  <p><b>Moving to Auction.</b> The owner can open the auction
+                  manually with <code>openAuction</code> or set a scheduled
+                  start time, <code>auctionStartsAt</code>. Once that nonzero
+                  time is reached, anyone can submit the opening transaction.
+                  A schedule does not submit it automatically.</p>
+                  <p>Auction opening must not be paused. The vault
                   needs a nonzero collateral balance that meets the configured
                   minimum, <code>minCollateral</code>, and expiry must still
-                  be in the future. Once the auction opens, LPs can no longer
-                  deposit or withdraw.</p>
+                  be in the future.</p>
                 </div>
               </div>
             </div>
@@ -276,14 +274,13 @@
                   <div class="idx">PHASE 1</div>
                   <div class="name">Auction</div>
                 </div>
-                <p class="phase-intro">The vault is now offering an option backed by the committed collateral. Buyers submit offers off-chain, and the bid master selects one to submit on-chain. The option becomes Live only when that bid is accepted and its premium is collected.</p>
+                <p class="phase-intro">The auction is open, and the trade terms are locked. The owner cannot change them while buyers are bidding.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip lp">LPs</span
                     ><span
                       >The committed collateral stays fixed during the auction,
-                      so LPs cannot deposit or withdraw and the owner cannot
-                      change the terms. If the admin enables transfers, shares
+                      so LPs cannot deposit or withdraw. If the admin enables transfers, shares
                       remain transferable even though collateral cannot leave
                       through a withdrawal.</span
                     >
@@ -291,8 +288,8 @@
                   <li>
                     <span class="chip bid">Bid master</span
                     ><span
-                      >Select a buyer's signed offer and submit it through the
-                      <a href="#makers">activation flow</a>. The offer must fit
+                      >Compare offers off-chain and select a buyer's
+                      <a href="#makers">signed bid</a>. The offer must fit
                       the vault's terms, and the buyer must have enough funds
                       and token allowance to pay the premium.</span
                     >
@@ -332,7 +329,7 @@
                   <div class="idx">PHASE 2</div>
                   <div class="name">Live</div>
                 </div>
-                <p class="phase-intro">The option has been sold. The buyer has paid for the right to exercise under the agreed terms, and the vault must keep enough assets to meet that obligation. LPs can collect their earned premium now, but must wait for settlement to claim the remaining collateral and proceeds.</p>
+                <p class="phase-intro">The option has been sold. Collateral is now committed to the buyer's remaining rights, so LPs must wait for settlement to claim the remaining collateral and proceeds.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip mm">Market maker</span
@@ -342,12 +339,8 @@
                       exercise window. The amount is the quantity of the
                       underlying token, such as WETH, that is
                       covered by that exercise. It can be part or all of the
-                      remaining option size, called notional, depending on the
-                      vault's rules on exercising in smaller portions.
-                      American options allow exercise before expiry; European
-                      options require the buyer to wait until expiry.
-                      Physical settlement exchanges tokens, while cash
-                      settlement pays the calculated payoff from collateral.</span
+                      remaining option size, depending on whether the vault's
+                      terms permit exercising in smaller portions.</span
                     >
                   </li>
                   <li>
@@ -355,8 +348,7 @@
                     ><span
                       ><a href="#platform-fees">Premium claims</a> are
                       available immediately. Shares can be transferred when
-                      enabled, and holders can consent to an
-                      <a href="#early-exit">early exit by agreement</a>.</span
+                      enabled by the admin.</span
                     >
                   </li>
                 </ul>
@@ -378,7 +370,7 @@
                   <div class="idx">PHASE 3</div>
                   <div class="name">Settled</div>
                 </div>
-                <p class="phase-intro">The option is over, and no further exercise is possible. The vault now pays out what each party is owed. The assets available to shareholders depend on how the option ended, so they may differ from the tokens originally deposited.</p>
+                <p class="phase-intro">The option is over, and no further exercise is possible. Final claims may contain a different mix of tokens from the original deposit, depending on how the option ended.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip lp">Shareholders</span
@@ -410,7 +402,8 @@
                   </li>
                 </ul>
                 <div class="exit">
-                  <b>Final phase.</b> There is no transition back to Open.
+                  <b>Claims require transactions.</b> Reaching Settled does
+                  not automatically distribute the remaining assets.
                 </div>
               </div>
             </div>
@@ -424,12 +417,6 @@
             exercise, expiration, claims or agreed unwinds that otherwise meet
             their normal rules. A pause does not extend any deadline.
           </div>
-          <p class="phase-return">
-            Cancelling an auction is the only way to return to an earlier
-            phase. Once a bid activates and the vault becomes Live, ending
-            the option requires full exercise, expiration or agreement between
-            the buyer and every current shareholder.
-          </p>
         </div>
       </section>
 

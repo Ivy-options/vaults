@@ -146,27 +146,27 @@
     const states = [
       [
         "Deposited collateral",
-        "LP deposits are held here to back the future option. LPs can still withdraw while the vault is Open.",
+        "The vault's current balance of the chosen collateral token.",
         "Premium & fees",
-        "No premium has been collected. Premium and fees are earned only if a bid activates.",
+        "Empty: no buyer payment has been collected.",
       ],
       [
         "Committed collateral",
-        "The collateral backing the auction is fixed. LP deposits and withdrawals are closed while buyers bid.",
+        "The collateral balance committed to this auction.",
         "Premium & fees",
-        "Buyers are making offers, but the premium is collected only when the winning bid activates.",
+        "Empty: no buyer payment has been collected.",
       ],
       [
         "Backing & proceeds",
-        "The vault holds the assets backing the remaining option. Physical exercise exchanges some of those assets for the caller's payment; cash exercise pays from collateral.",
+        "Remaining backing assets, plus any tokens received from physical exercise.",
         "Premium & fee reserves",
-        "The LP premium and platform fee were earned at activation. Any amounts not yet claimed stay reserved here.",
+        "Premium owed to LPs and fees owed to the treasury that have not yet been paid.",
       ],
       [
         "Shareholder pool",
-        "The assets left after setting aside unpaid obligations are available to shareholders in proportion to their remaining shares.",
+        "Remaining collateral and exercise proceeds after unpaid obligations are set aside.",
         "Premium & fee reserves",
-        "Any earned premium and platform fees still awaiting a claim remain separate from the shareholder pool.",
+        "Premium owed to LPs and fees owed to the treasury that have not yet been paid.",
       ],
     ];
     const choice = host.querySelector("select");
@@ -190,8 +190,8 @@
         .classList.toggle("with-buyer-reserve", outcome !== "physical");
       reserve.querySelector("p").textContent =
         outcome === "cash"
-          ? "Cash expiration sets aside any positive payoff still owed to the buyer. It stays here until the buyer or executor claims it for the recipient."
-          : "A negotiated refund is funded separately by current LPs. After the unwind executes, it stays here until claimed for the buyer's recipient.";
+          ? "Any cash-expiry payoff still owed to the buyer."
+          : "The refund contributed separately by LPs and set aside for the buyer.";
     }
     choice.addEventListener("change", sync);
     root.addEventListener("phase-state", sync);
