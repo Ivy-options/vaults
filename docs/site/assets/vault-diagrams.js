@@ -141,32 +141,32 @@
   function mountLifecycle(root) {
     const host = document.createElement("div");
     host.className = "lifecycle-map";
-    host.innerHTML = `<div class="custody-heading"><span class="inscription">ACCOUNTING WITHIN THE VAULT</span><label class="settled-example" hidden>Settlement illustration<select aria-label="Settlement illustration"><option value="physical">Physical exercise / expiry</option><option value="cash">Cash expiry</option><option value="unwind">Unwind with a refund</option></select></label></div><div class="custody-compartments"><div class="custody-backing"><span class="compartment-index" aria-hidden="true">I</span><h4></h4><p></p></div><div class="custody-premium"><span class="compartment-index" aria-hidden="true">II</span><h4></h4><p></p></div><div class="custody-buyer" hidden><span class="compartment-index" aria-hidden="true">III</span><h4>Buyer payout reserve</h4><p></p></div></div><p class="custody-note">Separate accounting budgets within the same vault.</p>`;
+    host.innerHTML = `<div class="custody-heading"><span class="inscription">WHAT THE VAULT HOLDS IN THIS PHASE</span><label class="settled-example" hidden>Settlement illustration<select aria-label="Settlement illustration"><option value="physical">Physical exercise / expiry</option><option value="cash">Cash expiry</option><option value="unwind">Unwind with a refund</option></select></label></div><div class="custody-compartments"><div class="custody-backing"><span class="compartment-index" aria-hidden="true">I</span><h4></h4><p></p></div><div class="custody-premium"><span class="compartment-index" aria-hidden="true">II</span><h4></h4><p></p></div><div class="custody-buyer" hidden><span class="compartment-index" aria-hidden="true">III</span><h4>Buyer payout reserve</h4><p></p></div></div><p class="custody-note">These boxes show how one vault accounts for its assets. They are not separate wallets. Amounts owed as premium, fees or buyer payouts are set aside so they cannot also be claimed as shareholder collateral.</p>`;
     root.querySelector(".phase-buttons").after(host);
     const states = [
       [
         "Deposited collateral",
-        "Backing assets",
+        "LP deposits are held here to back the future option. LPs can still withdraw while the vault is Open.",
         "Premium & fees",
-        "Not yet earned",
+        "No premium has been collected. Premium and fees are earned only if a bid activates.",
       ],
       [
         "Committed collateral",
-        "Fixed auction balance",
+        "The collateral backing the auction is fixed. LP deposits and withdrawals are closed while buyers bid.",
         "Premium & fees",
-        "Not yet earned",
+        "Buyers are making offers, but the premium is collected only when the winning bid activates.",
       ],
       [
         "Backing & proceeds",
-        "Changes with exercise",
+        "The vault holds the assets backing the remaining option. Physical exercise exchanges some of those assets for the caller's payment; cash exercise pays from collateral.",
         "Premium & fee reserves",
-        "Unpaid earned allocations",
+        "The LP premium and platform fee were earned at activation. Any amounts not yet claimed stay reserved here.",
       ],
       [
         "Shareholder pool",
-        "Unreserved assets",
+        "The assets left after setting aside unpaid obligations are available to shareholders in proportion to their remaining shares.",
         "Premium & fee reserves",
-        "Unpaid earned allocations",
+        "Any earned premium and platform fees still awaiting a claim remain separate from the shareholder pool.",
       ],
     ];
     const choice = host.querySelector("select");
@@ -190,8 +190,8 @@
         .classList.toggle("with-buyer-reserve", outcome !== "physical");
       reserve.querySelector("p").textContent =
         outcome === "cash"
-          ? "Cash payout · only if positive and unpaid"
-          : "Funded unwind refund · only while unpaid";
+          ? "Cash expiration sets aside any positive payoff still owed to the buyer. It stays here until the buyer or executor claims it for the recipient."
+          : "A negotiated refund is funded separately by current LPs. After the unwind executes, it stays here until claimed for the buyer's recipient.";
     }
     choice.addEventListener("change", sync);
     root.addEventListener("phase-state", sync);

@@ -103,6 +103,9 @@
                 <h3>Supplies collateral</h3>
                 <p>
                   The LP deposits collateral and receives shares in one vault.
+                  Collateral is the asset set aside to meet the option's payment
+                  obligations. Shares record the LP's stake in that vault and
+                  determine its share of the premium and remaining assets.
                 </p>
               </div>
               <div>
@@ -144,12 +147,12 @@
           </div>
           <div class="reading-block execution-settings reading-flow" id="execution-permissions">
             <h3>Executor and recipient</h3>
-            <p>The buyer can submit transactions and receive the assets in the same wallet. Separate addresses are optional.</p>
+            <p>The buyer can use one wallet for the whole trade: that wallet submits transactions and receives the assets. If the buyer wants another address to handle either job, it can choose an executor, a recipient, or both.</p>
             <dl>
               <dt>Executor</dt>
-              <dd>Delegate exercise and payout claims to an operator or bot.</dd>
+              <dd>An address allowed to submit exercise and payout-claim transactions for the buyer, such as an operator or bot. For physical exercise, the executor must supply and approve the tokens needed to pay the vault.</dd>
               <dt>Recipient</dt>
-              <dd>Send the assets directly to a treasury, multisig or integration contract.</dd>
+              <dd>The address that receives the buyer's assets. For example, an operator can submit the transaction while the vault sends the assets directly to the buyer's treasury or multisig.</dd>
             </dl>
             <p class="execution-control">Only the buyer can update the executor and recipient. An executor cannot change where assets are sent.</p>
             <figure class="receipt-flow" aria-label="Direct receipt and a possible future swap route">
@@ -194,17 +197,22 @@
                   <div class="idx">PHASE 0</div>
                   <div class="name">Open</div>
                 </div>
+                <p class="phase-intro">The vault is collecting collateral, and no option has been sold yet. LPs can add funds or take them back while the owner prepares the auction. The buyer has not paid a premium at this stage.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip lp">LPs</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Withdraw.</b><span>Burn shares for the corresponding
-                        collateral while Open.</span></span
+                        ><b>Take funds back.</b><span>An LP can return some or all
+                        of its shares to withdraw the corresponding collateral.
+                        The contract destroys those shares, called burning,
+                        because they no longer represent a stake in the vault.
+                        This withdrawal route is available only while Open.</span></span
                       ><span
-                        ><b>Deposit.</b><span>Admission must be open. Non-owner
-                        deposits also require
-                        <code>publicDeposits</code> enabled at creation.</span></span
+                        ><b>Add funds.</b><span>A deposit adds collateral and gives
+                        the depositor shares. Deposits must not be paused. Anyone
+                        other than the owner can deposit only if the vault was
+                        created with <code>publicDeposits</code> enabled.</span></span
                       ></span
                     >
                   </li>
@@ -212,22 +220,29 @@
                     <span class="chip owner">Owner</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Tighten terms.</b><span>While Open; existing LP
-                        protections cannot be relaxed.</span></span
+                        ><b>Keep or strengthen LP protections.</b><span>The owner
+                        can tighten the permitted terms while Open. For example,
+                        it can raise the minimum premium a buyer must offer, but
+                        cannot lower it after LPs have committed their funds.</span></span
                       ><span
-                        ><b>Manage.</b><span>Schedule the auction or transfer vault
-                        ownership.</span></span
+                        ><b>Prepare the auction.</b><span>The owner can set a time
+                        from which anyone may open the auction, or open it
+                        manually. It can also hand vault ownership to another
+                        address.</span></span
                       ></span
                     >
                   </li>
                 </ul>
                 <div class="exit">
-                  <b>Opening the auction.</b> The owner calls
+                  <p><b>Moving to Auction.</b> The owner calls
                   <code>openAuction</code>, or anyone can call it once a nonzero
                   scheduled start time, <code>auctionStartsAt</code>, is
-                  reached. The vault must hold at least the configured minimum
-                  collateral, <code>minCollateral</code>, and expiry must still
-                  be in the future.
+                  reached. A scheduled time does not submit the transaction automatically.</p>
+                  <p>Deposits and auction opening must not be paused. The vault
+                  needs a nonzero collateral balance that meets the configured
+                  minimum, <code>minCollateral</code>, and expiry must still
+                  be in the future. Once the auction opens, LPs can no longer
+                  deposit or withdraw.</p>
                 </div>
               </div>
             </div>
@@ -237,6 +252,7 @@
                   <div class="idx">PHASE 1</div>
                   <div class="name">Auction</div>
                 </div>
+                <p class="phase-intro">The vault is now offering an option backed by the committed collateral. Buyers submit offers off-chain, and the bid master selects one to submit on-chain. The option becomes Live only when that bid is accepted and its premium is collected.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip lp">LPs</span
@@ -251,17 +267,23 @@
                   <li>
                     <span class="chip bid">Bid master</span
                     ><span
-                      >Submit the winning bid through the
-                      <a href="#makers">activation flow</a>.</span
+                      >Select a buyer's signed offer and submit it through the
+                      <a href="#makers">activation flow</a>. The offer must fit
+                      the vault's terms, and the buyer must have enough funds
+                      and token allowance to pay the premium.</span
                     >
                   </li>
                 </ul>
                 <div class="exit">
-                  <b>Exit</b> <code>activate(vaultId, bid, signature)</code>.
-                  Cancel back to Open: bid master any time, owner after its
-                  timeout recorded when the vault was created, which is 3 days
-                  by default, or immediately when admission is paused or expiry
-                  has passed.
+                  <p><b>Moving to Live.</b> The bid master calls
+                  <code>activate(vaultId, bid, signature)</code>. If the checks
+                  pass, the buyer pays the premium and the option begins.</p>
+                  <p><b>Returning to Open.</b> The bid master can cancel the
+                  auction at any time. The owner can cancel once the auction
+                  has been open for its timeout duration. That duration is saved
+                  at vault creation and is 3 days by default.
+                  The owner can also cancel immediately if admission is paused
+                  or expiry has been reached.</p>
                 </div>
               </div>
             </div>
@@ -271,14 +293,18 @@
                   <div class="idx">PHASE 2</div>
                   <div class="name">Live</div>
                 </div>
+                <p class="phase-intro">The option has been sold. The buyer has paid for the right to exercise under the agreed terms, and the vault must keep enough assets to meet that obligation. LPs can collect their earned premium now, but must wait for settlement to claim the remaining collateral and proceeds.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip mm">Market maker</span
                     ><span
-                      ><code>exercise(vaultId, amount)</code> inside its window,
-                      for part or all of the remaining notional, subject to its
-                      fixed partial-exercise policy, exercise style and
-                      settlement type.</span
+                      >The buyer or its executor calls
+                      <code>exercise(vaultId, amount)</code> during the allowed
+                      exercise window. The amount is the quantity of underlying
+                      covered by that exercise. It can be part or all of the
+                      remaining option size, called notional, depending on the
+                      vault's fixed partial-exercise policy. The exercise style
+                      and settlement type determine when and how payment happens.</span
                     >
                   </li>
                   <li>
@@ -292,10 +318,14 @@
                   </li>
                 </ul>
                 <div class="exit">
-                  <b>Exit</b> <code>expire(vaultId)</code> by anyone at the
-                  expiration time; also finalized automatically on full
-                  exercise, or through a
-                  <a href="#early-exit">buyer-signed unanimous unwind</a>.
+                  <p><b>Moving to Settled.</b> Full exercise settles the vault in
+                  the exercise transaction. Otherwise, anyone can call
+                  <code>expire(vaultId)</code> once expiration is allowed.
+                  Physical options must first finish their exercise window;
+                  cash options require their final expiry price.</p>
+                  <p>The parties can also end the option through an
+                  <a href="#early-exit">unwind signed by the buyer and approved
+                  by every current shareholder</a>.</p>
                 </div>
               </div>
             </div>
@@ -305,24 +335,32 @@
                   <div class="idx">PHASE 3</div>
                   <div class="name">Settled</div>
                 </div>
+                <p class="phase-intro">The option is over, and no further exercise is possible. The vault now pays out what each party is owed. The assets available to shareholders depend on how the option ended, so they may differ from the tokens originally deposited.</p>
                 <ul class="facts">
                   <li>
                     <span class="chip lp">Shareholders</span
                     ><span
-                      ><code>claim(vaultId, shares)</code> burns shares for a
-                      pro-rata slice of unreserved collateral and proceeds.
-                      Premium and buyer reserves are excluded.</span
+                      >Call <code>claim(vaultId, shares)</code> to exchange shares
+                      for a proportional part of the remaining collateral and
+                      exercise proceeds. For example, a holder of 10% of the
+                      remaining shares can claim 10% of that available pool,
+                      subject to token rounding. The shares are burned when
+                      claimed. Reserved premium, platform fees and buyer payouts
+                      are excluded from this pool.</span
                     >
                   </li>
                   <li>
                     <span class="chip mm">Market maker</span
                     ><span
-                      ><code>claimPayout(vaultId)</code> collects a reserved
-                      buyer payout for the configured recipient: a separately
-                      funded unwind refund, or an owed
+                      >The buyer or its executor calls
+                      <code>claimPayout(vaultId)</code> if a payout is waiting in
+                      the buyer reserve. This can be a separately funded unwind
+                      refund or an owed
                       <a href="#cash-exercise-windows">cash-expiry payout</a>
-                      for a cash-settled vault. Physical exercise pays the
-                      recipient in the exercise transaction.</span
+                      for a cash-settled vault. The claim sends those assets to
+                      the configured recipient. Physical exercise already pays
+                      the recipient in the exercise transaction, so it creates
+                      no later buyer payout to claim.</span
                     >
                   </li>
                 </ul>
@@ -333,11 +371,12 @@
             </div>
           </div>
           <div class="callout" id="admission-pause">
-            <b>Admission pause.</b> The guardian is authorized to pause
-            admission globally or per vault. Pauses block new creation where
-            applicable, deposits, auction opening and activation. Withdrawals,
-            transfers, exercise, expiration, claims and agreed unwinds remain
-            available. Deadlines never move.
+            <b>What a pause means.</b> The guardian can stop new commitments
+            across the protocol or for one vault. This is called an admission
+            pause. It blocks new creation where applicable, deposits, auction
+            opening and activation. It does not stop withdrawals, transfers,
+            exercise, expiration, claims or agreed unwinds that otherwise meet
+            their normal rules. A pause does not extend any deadline.
           </div>
           <p class="phase-return">
             Cancelling an auction returns the vault to Open and clears any
@@ -354,10 +393,12 @@
             <p class="chapter-eyebrow">Section 03</p>
             <h2>Premium and fees</h2>
             <p class="section-intro">
-              The premium is the buyer's payment for the option. When the winning bid
-              activates, the platform takes its fee and whoever holds shares earns the
-              rest, claimable immediately. The example below splits a 1,000 USDC premium
-              between LPs and the treasury at the selected fee rate.
+              The premium is what the buyer pays to obtain the option. Imagine
+              a buyer pays 1,000 USDC and the platform fee is 2%. The vault sets
+              aside 20 USDC for the treasury, and the shareholders at activation
+              earn the remaining 980 USDC. They can claim it immediately,
+              without waiting to see whether the buyer exercises. Move the fee
+              slider below to see how the split changes.
             </p>
           </header>
           <div class="fee-laboratory interactive-example">
@@ -412,17 +453,22 @@
               <dt>Calculation</dt>
               <dd>
                 <code>floor(grossPremium × feeBps / 10,000)</code> in premium
-                tokens. Fractional fee units stay in the net LP allocation.
-                <code>minPremium</code> is gross.
+                tokens. The fee rounds down to a whole raw token unit, leaving
+                the rounding remainder for LPs. The owner's
+                <code>minPremium</code> limit is the gross premium per whole
+                underlying token, before the platform fee is deducted. The
+                total payment scales that per-token premium by the option's notional.
               </dd>
             </div>
             <div>
               <dt>Rate authority</dt>
               <dd>
-                Starts at zero. <code>PLATFORM_FEE_MANAGER_ROLE</code> can set
-                up to 10,000 bps for newly created vaults. Existing vault rates
-                never change. The deployment admin initially holds and administers
-                the role.
+                The global fee rate starts at zero. An address with
+                <code>PLATFORM_FEE_MANAGER_ROLE</code> can set it as high as
+                10,000 basis points, or 100%, for newly created vaults.
+                Existing vaults keep their fixed rates. One basis point is
+                0.01%, so 200 bps means 2%. The deployment admin initially
+                holds and administers this role.
               </dd>
             </div>
             <div>
@@ -436,9 +482,10 @@
             <div>
               <dt id="premium-treatment">Earned payments</dt>
               <dd>
-                Premium and fees remain earned through exercise, expiry, pause
-                or unwind. Fees, LP premium and buyer obligations have separate
-                budgets even when token addresses overlap.
+                Once activation succeeds, exercise, expiry, a pause or an unwind
+                does not take back the premium and fees already earned.
+                The vault tracks fees, LP premium and buyer obligations
+                separately, even if they are all owed in the same token.
                 <a href="#early-exit">Unwind refunds</a> are funded separately.
               </dd>
             </div>
@@ -465,6 +512,12 @@
               calculator includes earned premium in LP totals.
             </p>
           </header>
+          <p class="prose">For example, suppose LPs deposit 10 WETH for a call
+            with a strike of 3,000 USDC per WETH. If the buyer exercises the
+            whole option, it pays 30,000 USDC and receives the 10 WETH. The LPs
+            then claim the USDC left in the vault, alongside their separately
+            earned premium. If the option expires without exercise, their WETH
+            remains available to claim instead.</p>
           <div
             class="tablewrap"
             tabindex="0"
@@ -606,7 +659,12 @@
             </div>
           </div>
           <div class="reading-block reading-flow">
-            <h3>Read the accounting, including its limits</h3>
+            <h3>How to read the calculator</h3>
+            <p>The premium yield compares the option income with the value of
+              the deposit when the funds were committed. The annualized rate
+              stretches that same yield over a year for comparison. It does
+              not predict what future trades will earn or include changes in
+              the value of the deposited assets.</p>
             <div class="formula-pair">
               <div>
                 <span>Period premium yield</span
@@ -621,9 +679,10 @@
               <div>
                 <dt>Initial value</dt>
                 <dd>
-                  Call: deposited WETH × the entered current WETH price. Put:
-                  deposited USDC. Include all committed days, including the wait
-                  before activation.
+                  For a call, multiply the deposited WETH by the current WETH
+                  price you entered. For a put, use the deposited USDC amount.
+                  Count every day the funds are committed, including the wait
+                  before activation, when entering the duration.
                 </dd>
               </div>
               <div>
@@ -644,8 +703,10 @@
               <div>
                 <dt>Price input</dt>
                 <dd>
-                  Market price values tokens and call capital for yield/APR.
-                  Physical settlement needs no settlement-price report.
+                  The calculator uses market prices to express token values
+                  and estimate yield and APR. The physical trade itself
+                  exchanges tokens at the agreed strike and needs no
+                  settlement-price report.
                 </dd>
               </div>
               <div>
@@ -686,7 +747,9 @@
               <li>
                 <span class="sequence-number">01 · BUYER</span>
                 <h3>Sign the bid</h3>
-                <p>Sign the trade's terms for this auction using EIP-712.</p>
+                <p>The buyer signs an offer specifying the price, premium and
+                  option rules for this auction. EIP-712 is the structured
+                  signing format that binds those fields into one message.</p>
                 <code>MARKET_MAKER_ROLE</code
                 ><span class="process-note"
                   >The buyer needs this role for activation.</span
@@ -695,10 +758,13 @@
               <li>
                 <span class="sequence-number">02 · BUYER</span>
                 <h3>Approve the vault</h3>
-                <p>Approve the individual vault for the full premium:
+                <p>The buyer gives the individual vault permission to collect
+                  the full premium from its wallet. That amount is
                   <code>floor(premium × notional / underlyingUnit)</code>.</p>
                 <span class="process-note"
-                  >This allowance funds activation only.</span
+                  >Approval grants permission to spend; activation is the
+                  transaction that collects the premium. Exercise has its own
+                  payment requirements.</span
                 >
               </li>
               <li>
@@ -719,14 +785,16 @@
                 <span class="check-symbol" aria-hidden="true">✓</span>
                 <div>
                   <h4>Signature, terms and funding pass</h4>
-                  <p>The option becomes Live.</p>
+                  <p>The premium is collected and the option becomes Live.
+                    The buyer can then exercise when its terms allow.</p>
                 </div>
               </div>
               <div>
                 <span class="check-symbol" aria-hidden="true">×</span>
                 <div>
                   <h4>Any of those checks fail</h4>
-                  <p>Activation reverts.</p>
+                  <p>The whole activation transaction is rejected. The vault
+                    stays in Auction and no premium is collected by that attempt.</p>
                 </div>
               </div>
             </div>
@@ -837,11 +905,13 @@
                     </div>
                     <div>
                       <dt><code>executor</code><small>address</small></dt>
-                      <dd>The appointed caller.</dd>
+                      <dd>The address allowed to exercise or claim a buyer
+                        payout on the buyer's behalf.</dd>
                     </div>
                     <div>
                       <dt><code>recipient</code><small>address</small></dt>
-                      <dd>The configured payment recipient.</dd>
+                      <dd>The address that receives the buyer's exercise
+                        assets or reserved payout.</dd>
                     </div>
                   </dl>
                 </div>
@@ -865,7 +935,12 @@
 
             <div class="reading-block reading-flow" id="exercise-and-expiration">
               <h3>Exercise and expiration</h3>
-            <p class="prose">Physical exercise exchanges the option assets at the strike. Expiration closes any unused rights once their exercise window has ended. These are separate transactions with different callers and payment requirements.</p>
+            <p class="prose">When the buyer exercises a physical option, it uses
+              the right it bought: the caller pays one asset and the vault
+              delivers the other at the agreed strike. If the buyer leaves some
+              or all of that right unused, anyone can close it after the exercise
+              window ends by submitting an expiration transaction. The two paths
+              have different callers and payment requirements.</p>
               <div class="option-endings">
                 <div>
                   <span class="sequence-number">EXERCISE</span>
@@ -1032,11 +1107,13 @@
             <p class="chapter-eyebrow">Section 06</p>
             <h2>Optional cash settlement</h2>
             <p class="section-intro">
-              Cash settlement pays the option's intrinsic value, the exercise payoff
-              calculated from the strike and reported market price, instead of exchanging
-              the two assets. Payment comes from the vault's collateral, so a call may pay
-              WETH rather than a stablecoin. This feature is implemented but disabled by
-              default and requires an authorized price publisher.
+              With cash settlement, the buyer receives the value of the option's
+              payoff without exchanging the full underlying and quote amounts.
+              That payoff, called intrinsic value, is calculated from the strike
+              and a reported market price. Payment comes from the vault's
+              collateral: a WETH-backed call pays WETH, even though the method
+              is called cash settlement. This feature is implemented but
+              disabled by default and requires an authorized price publisher.
             </p>
           </header>
 
@@ -1114,7 +1191,7 @@
           </div>
 
           <div class="reading-block reading-flow" id="expiry-price">
-            <h3>A hard boundary at expiry</h3>
+            <h3>Which price does the vault use?</h3>
             <p class="prose">Cash settlement needs a price for this specific vault. Before expiry, an American option uses a recent exercise observation. At expiry, settlement switches to one final price for the original expiry time, even if the transaction happens much later.</p>
             <div class="price-boundary">
               <div>
@@ -1212,7 +1289,9 @@
                 </p>
                 <strong>Zero payout → revert</strong>
                 <p>
-                  Partial policy applies. Full exercise finalizes the vault.
+                  The vault's partial-exercise policy determines whether the
+                  buyer can exercise some of the remaining option or must
+                  exercise all of it. Full exercise settles the vault.
                 </p>
               </div>
               <div>
@@ -1225,8 +1304,9 @@
                 </p>
                 <strong>Zero payout → may finalize</strong>
                 <p>
-                  Remaining notional is finalized. Unreserved assets go to
-                  shareholder claims; premium stays separate.
+                  Expiration closes the remaining option and sets aside any
+                  amount owed to the buyer. Shareholders can claim the assets
+                  left after that reservation. Earned premium stays separate.
                 </p>
               </div>
             </div>
@@ -1427,11 +1507,13 @@
             <p class="chapter-eyebrow">Section 07</p>
             <h2>Vault terms</h2>
             <p class="section-intro">
-              The owner sets the vault's permitted trade before LPs deposit, including
-              tokens, price limits, expiry and exercise rules. These terms constrain the
-              bids that can activate. While the vault is Open, the owner can tighten
-              certain limits but cannot relax LP protections or change immutable fields.
-              The table gives the exact rules for each field.
+              Before LPs deposit, the owner defines which trades the vault may
+              accept. For example, a call vault can require a minimum strike and
+              a minimum premium. A buyer's offer must satisfy both limits to
+              activate. The owner also chooses the tokens, expiry and exercise
+              rules. While the vault is Open, some limits can become stricter;
+              LP protections cannot be relaxed, and fields marked immutable
+              cannot change. The table below gives the rule for each term.
             </p>
           </header>
           <div class="terms">
@@ -1453,7 +1535,9 @@
             </div>
             <div class="row">
               <span class="mono">minPremium</span
-              ><span>Per quote token, per one whole underlying.</span
+              ><span>The minimum gross premium per whole underlying token,
+                configured separately for each accepted quote-token pair.
+                The buyer's offer must meet or exceed it.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">raise only</span></span
@@ -1461,7 +1545,9 @@
             </div>
             <div class="row">
               <span class="mono">minCollateral</span
-              ><span>Shares required before the auction can open.</span
+              ><span>The minimum total share supply required to open the
+                auction. While Open, those shares correspond to the deposited
+                collateral.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">raise only</span></span
@@ -1665,17 +1751,20 @@
             <div>
               <dt>Recommendation limits</dt>
               <dd>
-                No migration, pause or code change for older positions. Direct
-                access to the old Hub remains. Registration does not prove an
-                audit.
+                Recommending a new release does not move, pause or change the
+                code of an older position. Its users continue through the old
+                Hub. A release appearing in the registry does not establish
+                that it has been audited.
               </dd>
             </div>
             <div>
               <dt>Immutable deployment</dt>
               <dd>
-                Code and bindings are fixed. Defects cannot be patched in place.
-                Original settlement and unwind rules, admission pauses, transfer
-                controls and optional cash-price publication continue to apply.
+                An existing vault keeps the code and Hub it was created with,
+                so a defect cannot be fixed by replacing that code in place.
+                Its original settlement and unwind rules still apply, along
+                with its existing admission-pause controls, share-transfer
+                controls and any cash-price publication requirements.
               </dd>
             </div>
           </dl>
@@ -1770,16 +1859,19 @@
             </div>
             <dl class="rule-ledger">
               <div>
-                <dt>Snapshot</dt>
+                <dt>What the proposal records</dt>
                 <dd>
-                  Exercised notional, share supply, refund, nonce and a future
-                  deadline.
+                  The proposal records how much of the option has already been
+                  exercised, the total share supply and the agreed refund. It
+                  also has a nonce identifying this agreement and a future
+                  deadline by which it must execute.
                 </dd>
               </div>
               <div>
                 <dt>Consent changes</dt>
                 <dd>
-                  Holders may revoke. A nonzero transfer to another holder
+                  A shareholder can withdraw its approval. A nonzero share
+                  transfer to another holder
                   invalidates both sender and recipient approvals. They approve
                   again at their new balances.
                 </dd>
@@ -1804,10 +1896,11 @@
                 </dd>
               </div>
               <div>
-                <dt>Preserved</dt>
+                <dt>While the proposal is pending</dt>
                 <dd>
-                  Completed exercises remain intact. A proposal suspends
-                  neither exercise nor expiration.
+                  Proposing an unwind does not pause exercise or expiration.
+                  The usual option rules keep applying until the agreement
+                  executes, and any exercises already completed are not reversed.
                 </dd>
               </div>
             </dl>

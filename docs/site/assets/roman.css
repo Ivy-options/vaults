@@ -982,7 +982,7 @@ h2 {
 }
 
 .receipt-flow {
-  max-width: 850px;
+  width: 100%;
   margin: 26px 0 0;
 }
 .receipt-lane {
@@ -1603,6 +1603,25 @@ h2 {
 }
 .protocol-guide :is(.phase-rules .facts li, .phase-rules .exit) {
   font-size: var(--text-body);
+  line-height: 1.7;
+}
+.protocol-guide .phase-intro {
+  margin-block: 12px 24px;
+  font-size: var(--text-body);
+  line-height: 1.7;
+}
+.protocol-guide .phase-rules .exit p + p {
+  margin-block-start: 16px;
+}
+.protocol-guide .phase-actions > span {
+  display: block;
+}
+.protocol-guide .phase-actions b {
+  display: block;
+  margin-block-end: 4px;
+}
+.protocol-guide .custody-compartments p {
+  font-size: var(--text-label);
   line-height: 1.7;
 }
 .protocol-guide :is(.stage-label, .inscription, .kicker, .chip, .release-badge, .term-rule-label, .cash-allocation-label, .display-rounding, .small, .fig, .figcap, .stage-footnote, .scene-caption, .rail summary, .rail-links a, .rail nav a, .theme, label, legend, small, footer a) {

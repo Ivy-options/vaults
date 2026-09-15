@@ -113,7 +113,11 @@
     panel.setAttribute("role", "tabpanel");
     panel.setAttribute("aria-labelledby", `phase-tab-${i}`);
     panel.tabIndex = 0;
-    $(".phase-rules", panel).append($(".facts", card), $(".exit", card));
+    $(".phase-rules", panel).append(
+      $(".phase-intro", card),
+      $(".facts", card),
+      $(".exit", card)
+    );
     lifecycle.append(panel);
     return panel;
   });
