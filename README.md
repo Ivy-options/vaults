@@ -4,7 +4,7 @@ Smart contracts for single-use covered-call and cash-secured-put vaults.
 
 ## Read the guide
 
-Start with the [HTML protocol guide](docs/site/index.html) for how vaults work, examples, and the contract reference. For deployment and transaction commands, see the [operator runbook](docs/site/operations.html).
+Start with the [HTML protocol guide](docs/site/index.html) for how vaults work and interactive examples. For deployment and transaction commands, see the [operator runbook](docs/site/operations.html).
 
 Open `docs/site/index.html` directly in your browser. To serve the docs locally, run this from the repository root:
 
