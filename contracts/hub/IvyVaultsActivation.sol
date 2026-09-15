@@ -50,7 +50,7 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         s.totalNotional = totalNotional;
         s.phase = Phase.Live;
 
-        uint16 feeRate = platformFeeBps;
+        uint16 feeRate = vaultPlatformFeeBps[vaultId];
         address treasury = platformTreasury;
         uint256 fee = Math.mulDiv(totalPremium, feeRate, 10_000);
         platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);

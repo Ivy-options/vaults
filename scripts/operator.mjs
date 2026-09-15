@@ -94,7 +94,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
     if(valueUsdE6<minimum) throw new Error('Below launch USD minimum at activation');
     const notional=s.isCall?amount:amount*s.underlyingUnit/BigInt(r.bid.strike);
     const totalPremium=BigInt(r.bid.premium)*notional/s.underlyingUnit;
-    const platformFeeBps=await hub.platformFeeBps();
+    const platformFeeBps=await hub.vaultPlatformFeeBps(r.vaultId);
     const platformFee=totalPremium*platformFeeBps/10000n;
     detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
   } else if(command==='publish-settlement-exercise'||command==='publish-settlement-expiry') {

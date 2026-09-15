@@ -366,7 +366,7 @@
               ><strong class="large-amount">1,000 <small>USDC</small></strong
               ><span>Gross premium</span
               ><label for="fee-rate"
-                >Global fee at activation
+                >Vault fee fixed at creation
                 <output id="fee-rate-output">200 bps · 2%</output></label
               ><input
                 id="fee-rate"
@@ -401,9 +401,10 @@
               </div>
             </div>
           </div>
-          <p class="prose">Activation uses the current global fee rate and records
-            the applied rate and treasury for that trade. Later changes affect
-            future activations. Anyone can then call
+          <p class="prose">Each vault fixes its fee rate at creation using the
+            current global rate. Later rate increases or decreases affect only new
+            vaults, including when an existing vault has a zero fee. Activation
+            uses that fixed rate and records the current treasury. Anyone can then call
             <code>claimPlatformFee()</code> on the vault clone once to pay that
             recorded treasury.</p>
           <dl class="rule-ledger">
@@ -419,8 +420,9 @@
               <dt>Rate authority</dt>
               <dd>
                 Starts at zero. <code>PLATFORM_FEE_MANAGER_ROLE</code> can set
-                up to 10,000 bps. The deployment admin initially holds and
-                administers the role.
+                up to 10,000 bps for newly created vaults. Existing vault rates
+                never change. The deployment admin initially holds and administers
+                the role.
               </dd>
             </div>
             <div>
