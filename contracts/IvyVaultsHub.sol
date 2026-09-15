@@ -44,6 +44,7 @@ contract IvyVaultsHub is
     IvyUnwind public immutable unwind;
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
     bytes32 public constant PLATFORM_FEE_MANAGER_ROLE = keccak256("PLATFORM_FEE_MANAGER_ROLE");
+    /// @notice Default premium fee rate for subsequently created vaults.
     uint16 public platformFeeBps;
     address public platformTreasury;
     struct PlatformFee { uint16 rateBps; address recipient; uint256 amount; }
@@ -66,6 +67,8 @@ contract IvyVaultsHub is
     mapping(uint256 vaultId => address[]) internal _quoteTokens;
     mapping(address marketMaker => mapping(uint256 nonce => bool)) public usedBidNonces;
     IIvyShares public immutable shareToken;
+    /// @notice Premium fee rate fixed at vault creation, including a zero rate.
+    mapping(uint256 vaultId => uint16) public vaultPlatformFeeBps;
 
     constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
         EIP712("IvyVaultsHub", "2")
@@ -141,6 +144,7 @@ contract IvyVaultsHub is
         IIvyVault(vault).initialize(address(this), vaultId, terms.collateral, address(premiums));
 
         _terms[vaultId] = terms;
+        vaultPlatformFeeBps[vaultId] = platformFeeBps;
         VaultState storage s = _state[vaultId];
         s.vault = vault;
         s.owner = msg.sender;
@@ -311,7 +315,7 @@ contract IvyVaultsHub is
         s.totalNotional = totalNotional;
         s.phase = Phase.Live;
 
-        uint16 feeRate = platformFeeBps;
+        uint16 feeRate = vaultPlatformFeeBps[vaultId];
         address treasury = platformTreasury;
         uint256 fee = Math.mulDiv(totalPremium, feeRate, 10_000);
         platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);

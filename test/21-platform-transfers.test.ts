@@ -1,10 +1,10 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { ZeroAddress } from "ethers";
-import { deployIvy, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
+import { deployIvy, callTerms, callPairs, createVaultAs, fund, Phase, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
 import { signBid } from "./helpers/bids.js";
 import { UNWIND_TYPES, loadArtifacts, prepareOperation } from "../scripts/operator.mjs";
-import { goLive, openVault, makeBid, at } from "./helpers/scenarios.js";
+import { goLive, openVault, activate, makeBid, at } from "./helpers/scenarios.js";
 const connection = await network.create();
 const { networkHelpers } = connection;
 
@@ -49,21 +49,23 @@ describe("platform fees and transferable unpaid premium", function () {
     await expect(c.hub.setPlatformFeeBps(10001)).revertedWithCustomError(c.hub,"InvalidPlatformFee");
     await expect(c.hub.setPlatformTreasury(ZeroAddress)).revertedWithCustomError(c.hub,"ZeroAddress");
   });
-  for (const [creationRate, activationRate] of [[0,200],[200,500],[500,100],[500,0]]) {
-    it(`uses the activation rate after a change from ${creationRate} to ${activationRate} bps`, async function () {
+  for (const [creationRate, activationRate, feeUnits] of [[0,200,0],[200,500,20],[500,100,50],[500,0,50],[10000,0,1000],[0,10000,0]]) {
+    it(`keeps the creation rate after the global rate changes from ${creationRate} to ${activationRate} bps`, async function () {
       const c = await networkHelpers.loadFixture(fixture);
       await c.hub.setPlatformFeeBps(creationRate);
       const v = await openVault(c);
+      expect(await c.hub.vaultPlatformFeeBps(v.vaultId)).eq(creationRate);
       const bid = await makeBid(c,v.vaultId);
       const signature = await signBid(c.marketMaker,c.hubAddress,bid);
-      const gross = 1000n*U, fee = gross*BigInt(activationRate)/10000n;
+      const gross = 1000n*U, fee = BigInt(feeUnits)*U;
       await c.usdc.mint(c.marketMaker.address,gross);
       await c.usdc.connect(c.marketMaker).approve(v.vaultAddress,gross);
       await c.hub.setPlatformFeeBps(activationRate);
       await expect(c.hub.connect(c.bidMaster).activate(v.vaultId,bid,signature))
         .changeTokenBalances(connection.ethers,c.usdc,[c.marketMaker,v.vault],[-gross,gross]);
       const allocated = await c.hub.platformFees(v.vaultId);
-      expect(allocated.rateBps).eq(activationRate);
+      expect(allocated.rateBps).eq(creationRate);
+      expect(await c.hub.vaultPlatformFeeBps(v.vaultId)).eq(creationRate);
       expect(allocated.amount).eq(fee);
       expect(await v.vault.platformFeeRemaining()).eq(fee);
       expect(await v.vault.premiumRemaining()).eq(gross-fee);
@@ -71,23 +73,64 @@ describe("platform fees and transferable unpaid premium", function () {
       expect(await v.vault.reserved(c.usdcAddress)).eq(gross);
     });
   }
-  it("preflights and submits a signed bid using the latest fee rate", async function () {
+  it("fixes the rate before deposits and applies new defaults only to new vaults", async function () {
     const c = await networkHelpers.loadFixture(fixture);
+    await c.hub.setPlatformFeeBps(200);
+    const original = await createVaultAs(c,c.alice,callTerms(c),callPairs(c));
+    expect(await c.hub.vaultPlatformFeeBps(original.vaultId)).eq(200);
+    await c.hub.setPlatformFeeBps(500);
+    const higher = await goLive(c);
+    expect(await c.hub.vaultPlatformFeeBps(higher.vaultId)).eq(500);
+    expect(await higher.vault.platformFeeRemaining()).eq(50n*U);
+    await c.hub.setPlatformFeeBps(0);
+    const free = await goLive(c);
+    expect(await c.hub.vaultPlatformFeeBps(free.vaultId)).eq(0);
+    expect(await free.vault.platformFeeRemaining()).eq(0);
+    await fund(c,c.weth,c.alice,original.vaultAddress,10n*W);
+    await c.hub.connect(c.alice).deposit(original.vaultId,10n*W);
+    await c.hub.connect(c.alice).openAuction(original.vaultId);
+    await activate(c,original.vaultId,original.vaultAddress);
+    expect((await c.hub.platformFees(original.vaultId)).rateBps).eq(200);
+    expect(await original.vault.platformFeeRemaining()).eq(20n*U);
+    expect(await c.premiums.claimable(original.vaultId,c.alice.address)).eq(980n*U);
+  });
+  it("retains the creation rate through a cancelled and reopened auction", async function () {
+    const c = await networkHelpers.loadFixture(fixture);
+    await c.hub.setPlatformFeeBps(200);
+    const v = await openVault(c);
+    await c.hub.connect(c.bidMaster).cancelAuction(v.vaultId);
+    await c.hub.setPlatformFeeBps(500);
+    await c.hub.connect(c.alice).openAuction(v.vaultId);
+    expect((await c.hub.stateOf(v.vaultId)).auctionId).eq(2);
+    expect(await c.hub.vaultPlatformFeeBps(v.vaultId)).eq(200);
+    await activate(c,v.vaultId,v.vaultAddress);
+    expect(await v.vault.platformFeeRemaining()).eq(20n*U);
+    expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(980n*U);
+  });
+  it("preflights and submits the fixed vault fee despite later global rate changes", async function () {
+    const c = await networkHelpers.loadFixture(fixture);
+    await c.hub.setPlatformFeeBps(200);
     const v = await openVault(c);
     const bid = await makeBid(c,v.vaultId);
     const signature = await signBid(c.marketMaker,c.hubAddress,bid);
     await c.usdc.mint(c.marketMaker.address,1000n*U);
     await c.usdc.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
     await c.hub.setPlatformFeeBps(500);
+    await c.hub.setPlatformTreasury(c.carol.address);
     const prepared = await prepareOperation(c.admin.provider,await loadArtifacts(),"inspect-bid",{
       sender:c.bidMaster.address,hub:c.hubAddress,vaultId:v.vaultId,bid,signature,
       minTradeUsdE6:10000n*U,collateralPriceUsdE6:3000n*U,
     });
-    expect(prepared.detail.platformFeeBps).eq(500n);
-    expect(prepared.detail.platformFee).eq(50n*U);
-    expect(prepared.detail.lpPremium).eq(950n*U);
+    expect(prepared.detail.platformFeeBps).eq(200n);
+    expect(prepared.detail.platformFee).eq(20n*U);
+    expect(prepared.detail.lpPremium).eq(980n*U);
     expect(await v.vault.premiumCollected()).eq(false);
+    await c.hub.setPlatformFeeBps(0);
+    await c.hub.setPlatformTreasury(c.bob.address);
     await c.bidMaster.sendTransaction({to:prepared.to,data:prepared.data});
+    const allocated = await c.hub.platformFees(v.vaultId);
+    expect(allocated.rateBps).eq(200);
+    expect(allocated.recipient).eq(c.bob.address);
     expect(await v.vault.platformFeeRemaining()).eq(prepared.detail.platformFee);
     expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(prepared.detail.lpPremium);
   });
@@ -131,12 +174,16 @@ describe("platform fees and transferable unpaid premium", function () {
     const signature = await signBid(c.marketMaker,c.hubAddress,bid);
     await c.usdc.mint(c.marketMaker.address,1000n*U);
     await c.usdc.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
+    await c.hub.setPlatformFeeBps(500);
     await c.usdc.setFeeBps(100);
     await expect(c.hub.connect(c.bidMaster).activate(v.vaultId,bid,signature)).revertedWithCustomError(v.vault,"ShortReceived");
     expect(await c.hub.usedBidNonces(c.marketMaker.address,bid.nonce)).eq(false);
     expect(await v.vault.premiumCollected()).eq(false);
     expect((await c.hub.platformFees(v.vaultId)).amount).eq(0);
     expect((await c.premiums.pools(v.vaultId)).supply).eq(0);
+    expect((await c.hub.stateOf(v.vaultId)).phase).eq(Phase.Auction);
+    expect(await c.hub.vaultPlatformFeeBps(v.vaultId)).eq(200);
+    await c.hub.setPlatformFeeBps(0);
     await c.usdc.setFeeBps(0);
     await c.hub.connect(c.bidMaster).activate(v.vaultId,bid,signature);
     expect(await v.vault.platformFeeRemaining()).eq(20n*U);
