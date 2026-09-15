@@ -68,9 +68,22 @@
           </p>
           <p class="prose">
             An Ivy vault is a smart contract for a single option trade. The
-            depositors' final claim depends on the option's terms and whether
-            the buyer exercises. Selling another option requires a new vault.
+            buyer pays an upfront price, called the premium, for the right to
+            trade an agreed asset at an agreed price, called the strike.
+            Using that right is called exercising the option. The depositors
+            provide the assets that back the trade, so what they receive at
+            the end depends on whether the buyer exercises. Selling another
+            option requires a new vault.
           </p>
+          <p class="prose">For example, an option on WETH might have a strike of
+            3,000 USDC per WETH. WETH is the underlying token, the asset the
+            option is written on. USDC is the quote token, the currency used
+            to express its price. A call gives the buyer the right to buy WETH
+            at the strike; a put gives it the right to sell WETH at the strike.</p>
+          <p class="prose">With physical settlement, exercising exchanges those
+            tokens. With cash settlement, the buyer receives the calculated
+            payoff from the assets deposited in the vault instead. The guide follows the
+            physical trade first, then explains the optional cash method.</p>
         </div>
       </div>
 
@@ -81,9 +94,13 @@
             <h2>The people around a vault</h2>
             <p class="section-intro">
               An option trade has a seller and a buyer. In Ivy, liquidity providers, or
-              LPs, supply the seller's backing assets, and a market maker buys the
-              option. The owner manages the vault, and the bid master selects the
-              market maker's offer. The roles below show who makes each decision and which contract holds the money.
+              LPs, supply the seller's backing assets, called collateral, and
+              receive shares that record their stake in the vault. A market
+              maker buys the option. The owner manages the vault, and the bid master selects the
+              market maker's offer. The protocol administrator manages global
+              settings and permissions, a different role from owning an
+              individual vault. The roles below show who makes each decision
+              and which contract holds the money.
             </p>
           </header>
           <div class="actor-map" aria-label="Protocol roles and instructions">
@@ -188,6 +205,13 @@
               shareholders claim what remains. The phase details below explain who can act
               and how each phase ends.
             </p>
+            <p>Every vault has a fixed expiry date and time set at creation.
+              The exercise window is the period when the buyer may use its
+              option. Its boundaries depend on the agreed rules, so expiry
+              does not always mean exercise must stop immediately. The
+              <a href="#exercise-windows">physical timing rules</a> and
+              <a href="#cash-exercise-windows">cash timing rules</a> below
+              give the exact boundaries.</p>
           </header>
           <div class="fig"><span>Who can act in each phase</span></div>
           <div class="timeline">
@@ -278,12 +302,27 @@
                   <p><b>Moving to Live.</b> The bid master calls
                   <code>activate(vaultId, bid, signature)</code>. If the checks
                   pass, the buyer pays the premium and the option begins.</p>
-                  <p><b>Returning to Open.</b> The bid master can cancel the
-                  auction at any time. The owner can cancel once the auction
-                  has been open for its timeout duration. That duration is saved
-                  at vault creation and is 3 days by default.
-                  The owner can also cancel immediately if admission is paused
-                  or expiry has been reached.</p>
+                  <p><b>When can the auction be cancelled?</b> The bid master
+                  can cancel at any time. By default, the owner has to wait
+                  until the auction has been open for three days. This waiting
+                  period is called the auction timeout. The protocol admin can
+                  choose a different waiting period for new vaults; each vault
+                  copies the current setting at creation and keeps it. The clock
+                  starts when the auction opens, not when the vault is created.</p>
+                  <p>The owner can skip that wait if new deposits and auctions
+                  have been paused for this vault or across the protocol, or
+                  if the option's fixed expiry time has been reached.</p>
+                  <p><b>What happens after cancellation?</b> The vault returns
+                  to Open. Collateral stays in the vault until LPs choose to
+                  withdraw it; cancellation does not send funds back
+                  automatically. Deposits are possible again if they are not
+                  paused and the vault's deposit rules allow them.</p>
+                  <p>The scheduled auction start is cleared. Before expiry,
+                  the owner can schedule another auction or open one manually.
+                  If expiry has already passed, no new auction can open, but
+                  LPs can still withdraw. No premium or platform fee was
+                  collected during the cancelled auction, so neither needs
+                  to be refunded.</p>
                 </div>
               </div>
             </div>
@@ -300,11 +339,15 @@
                     ><span
                       >The buyer or its executor calls
                       <code>exercise(vaultId, amount)</code> during the allowed
-                      exercise window. The amount is the quantity of underlying
+                      exercise window. The amount is the quantity of the
+                      underlying token, such as WETH, that is
                       covered by that exercise. It can be part or all of the
                       remaining option size, called notional, depending on the
-                      vault's fixed partial-exercise policy. The exercise style
-                      and settlement type determine when and how payment happens.</span
+                      vault's rules on exercising in smaller portions.
+                      American options allow exercise before expiry; European
+                      options require the buyer to wait until expiry.
+                      Physical settlement exchanges tokens, while cash
+                      settlement pays the calculated payoff from collateral.</span
                     >
                   </li>
                   <li>
@@ -346,7 +389,9 @@
                       remaining shares can claim 10% of that available pool,
                       subject to token rounding. The shares are burned when
                       claimed. Reserved premium, platform fees and buyer payouts
-                      are excluded from this pool.</span
+                      are excluded from this pool. A reserve is an amount set
+                      aside for a specific payment, so it is not available for
+                      this shareholder claim.</span
                     >
                   </li>
                   <li>
@@ -371,7 +416,8 @@
             </div>
           </div>
           <div class="callout" id="admission-pause">
-            <b>What a pause means.</b> The guardian can stop new commitments
+            <b>What a pause means.</b> The guardian, an address with permission
+            to pause new activity, can stop new commitments
             across the protocol or for one vault. This is called an admission
             pause. It blocks new creation where applicable, deposits, auction
             opening and activation. It does not stop withdrawals, transfers,
@@ -379,10 +425,10 @@
             their normal rules. A pause does not extend any deadline.
           </div>
           <p class="phase-return">
-            Cancelling an auction returns the vault to Open and clears any
-            scheduled start time, so the owner must schedule again or open
-            manually. No premium or fee has been collected, so there is
-            nothing to refund. Every other transition is one-way.
+            Cancelling an auction is the only way to return to an earlier
+            phase. Once a bid activates and the vault becomes Live, ending
+            the option requires full exercise, expiration or agreement between
+            the buyer and every current shareholder.
           </p>
         </div>
       </section>
@@ -398,14 +444,16 @@
               aside 20 USDC for the treasury, and the shareholders at activation
               earn the remaining 980 USDC. They can claim it immediately,
               without waiting to see whether the buyer exercises. Move the fee
-              slider below to see how the split changes.
+              slider below to see how the split changes. The treasury is the
+              address that receives the platform fee. Rates are also shown in
+              basis points, abbreviated bps: 100 bps is 1%, so 200 bps is 2%.
             </p>
           </header>
           <div class="fee-laboratory interactive-example">
             <div class="fee-controls">
               <span class="inscription">ILLUSTRATIVE ACTIVATION</span
               ><strong class="large-amount">1,000 <small>USDC</small></strong
-              ><span>Gross premium</span
+              ><span>Gross premium, before fees</span
               ><label for="fee-rate"
                 >Vault fee fixed at creation
                 <output id="fee-rate-output">200 bps · 2%</output></label
@@ -446,8 +494,19 @@
             current global rate. Later rate increases or decreases affect only new
             vaults, including when an existing vault has a zero fee. Activation
             uses that fixed rate and records the current treasury. Anyone can then call
-            <code>claimPlatformFee()</code> on the vault clone once to pay that
+            <code>claimPlatformFee()</code> on the individual vault contract once to pay that
             recorded treasury.</p>
+          <p class="prose">Contracts count tokens in their smallest units,
+            called raw units. For a token with six decimal places, 1 USDC is
+            stored as 1,000,000 raw units. A calculation that lands between two
+            raw units must round to one of them. In the formulas below,
+            <code>floor</code> means round down and <code>ceil</code> means round up.</p>
+          <p class="prose">LPs collect unpaid premium by calling
+            <code>claimPremium(vaultId)</code>. Transferring shares also transfers
+            a proportional amount of the sender's unpaid premium to the new
+            holder. Premium already collected is not paid again. If an LP burns
+            shares to claim settlement assets, any unpaid premium remains
+            available for that LP to claim separately.</p>
           <dl class="rule-ledger">
             <div>
               <dt>Calculation</dt>
@@ -457,7 +516,9 @@
                 the rounding remainder for LPs. The owner's
                 <code>minPremium</code> limit is the gross premium per whole
                 underlying token, before the platform fee is deducted. The
-                total payment scales that per-token premium by the option's notional.
+                total payment scales that per-token premium by the option's
+                size, called its notional. For example, 100 USDC per WETH
+                over a 10 WETH option produces a 1,000 USDC gross premium.
               </dd>
             </div>
             <div>
@@ -467,15 +528,16 @@
                 <code>PLATFORM_FEE_MANAGER_ROLE</code> can set it as high as
                 10,000 basis points, or 100%, for newly created vaults.
                 Existing vaults keep their fixed rates. One basis point is
-                0.01%, so 200 bps means 2%. The deployment admin initially
-                holds and administers this role.
+                0.01%, so 200 bps means 2%. The deployment admin, the address
+                chosen to administer the protocol when it is deployed,
+                initially holds this permission and controls who else receives it.
               </dd>
             </div>
             <div>
               <dt>Treasury authority</dt>
               <dd>
                 The deployment admin is the initial recipient.
-                <code>DEFAULT_ADMIN_ROLE</code> can change the recipient for
+                An address with <code>DEFAULT_ADMIN_ROLE</code> can change the recipient for
                 future activations; later changes never rewrite recorded fees.
               </dd>
             </div>
@@ -652,7 +714,7 @@
                   ><span
                     >Premium yield for this period
                     <b id="premiumYield">–</b></span
-                  ><span>Estimated premium APR <b id="premiumApr">–</b></span
+                  ><span>Estimated annual premium rate (APR) <b id="premiumApr">–</b></span
                   ><span id="calcNote"></span>
                 </div>
               </div>
@@ -696,8 +758,11 @@
                 <dt>Exercise assumption</dt>
                 <dd>
                   The table compares full exercise with no exercise. The chart
-                  assumes full exercise when in the money and none otherwise;
-                  the buyer still chooses whether to exercise.
+                  assumes full exercise when the strike gives the buyer a
+                  better price than the market: above the strike for a call,
+                  or below it for a put. This is called being in the money.
+                  Otherwise it assumes no exercise. The buyer still chooses
+                  whether to exercise.
                 </dd>
               </div>
               <div>
@@ -712,8 +777,10 @@
               <div>
                 <dt>Rounding</dt>
                 <dd>
-                  Decimal estimates omit raw-unit rounding. Call consideration
-                  rounds up; put payments round down.
+                  The calculator shows decimal estimates. The contract instead
+                  rounds the quote-token payment to the smallest token unit:
+                  up when the caller pays for a call, down when the recipient
+                  is paid for a put.
                 </dd>
               </div>
               <div>
@@ -778,7 +845,9 @@
             </ol>
             <p class="unit-note">
               <code>underlyingUnit = 10 ** underlyingDecimals</code> is the
-              number of raw units in one whole underlying token.
+              number of raw units in one whole underlying token. Here
+              <code>**</code> means exponentiation: a token with 18 decimal
+              places has <code>10 ** 18</code> raw units per whole token.
             </p>
             <div class="activation-checks" aria-label="Activation outcomes">
               <div>
@@ -820,6 +889,10 @@
 
               <h3>What the buyer signs</h3>
             <p class="prose">The signature covers the auction, payment terms, exercise rules and execution addresses together. These fields let the Hub check that the submitted bid is exactly the offer the buyer authorized.</p>
+              <p>The small type labels describe the contract's expected input:
+                <code>uint</code> values are non-negative whole numbers,
+                <code>address</code> identifies a wallet or contract, and
+                <code>bytes32</code> holds a fixed 32-byte value such as a hash.</p>
               <div class="bid-field-groups">
                 <div>
                   <h4>The auction and buyer</h4>
@@ -830,7 +903,8 @@
                     </div>
                     <div>
                       <dt><code>auctionId</code><small>uint256</small></dt>
-                      <dd>The particular auction.</dd>
+                      <dd>Identifies this auction round. Cancelling and
+                        opening another auction produces a new ID.</dd>
                     </div>
                     <div>
                       <dt>
@@ -854,7 +928,8 @@
                     <div>
                       <dt><code>pairHash</code><small>bytes32</small></dt>
                       <dd>
-                        Identifies the exact accepted token-pair configuration.
+                        A hash, or fingerprint, of the accepted token-pair
+                        settings. It binds the bid to that exact configuration.
                       </dd>
                     </div>
                     <div>
@@ -873,7 +948,8 @@
                     <div>
                       <dt><code>style</code><small>uint8</small></dt>
                       <dd>
-                        <code>0</code> European · <code>1</code> American.
+                        <code>0</code> European: exercise starts at expiry.
+                        <code>1</code> American: exercise may start before expiry.
                       </dd>
                     </div>
                     <div>
@@ -886,11 +962,13 @@
                     </div>
                     <div>
                       <dt><code>expiry</code><small>uint64</small></dt>
-                      <dd>Option expiry, in Unix seconds.</dd>
+                      <dd>The option's fixed expiry time, expressed as seconds
+                        since 1 January 1970 UTC, the Unix timestamp format.</dd>
                     </div>
                     <div>
                       <dt><code>validUntil</code><small>uint64</small></dt>
-                      <dd>The signature's deadline.</dd>
+                      <dd>The latest timestamp at which this signed bid may
+                        activate. This is separate from the option's expiry.</dd>
                     </div>
                   </dl>
                 </div>
@@ -900,7 +978,9 @@
                     <div>
                       <dt><code>nonce</code><small>uint256</small></dt>
                       <dd>
-                        A buyer-chosen identifier, consumed at activation and never reused.
+                        A number the buyer chooses to identify the bid. Once
+                        that buyer's nonce is used at activation or cancelled,
+                        no bid using the same nonce can activate again.
                       </dd>
                     </div>
                     <div>
@@ -920,8 +1000,9 @@
                 <div>
                   <dt>Unused bid cancelled</dt>
                   <dd>
-                    The buyer invalidates its nonce with
-                    <code>cancelBid(nonce)</code>.
+                    The buyer calls <code>cancelBid(nonce)</code> to prevent
+                    any unused bid carrying that nonce from activating. This
+                    does not cancel the vault's auction or an option already sold.
                   </dd>
                 </div>
                 <div>
@@ -978,10 +1059,11 @@
                     >
                   </div>
                   <p>
-                    The immutable
+                    The
                     <a href="#partial-exercise">partial-exercise policy</a>
-                    determines whether partial amounts are allowed or all
-                    remaining notional must be exercised.
+                    is fixed when the vault is created. It determines whether
+                    the buyer may exercise smaller portions or must exercise
+                    the whole remaining option in one transaction.
                   </p>
                 </div>
                 <div>
@@ -1030,9 +1112,15 @@
               <p class="unit-note">
                 American options may be exercised before expiry; European
                 options must wait until expiry. Both physical styles remain
-                exercisable during the grace window after expiry, then anyone
-                may expire them. <code>exerciseWindow</code> defaults to 1 hour,
-                and <code>t</code> below is the current timestamp.
+                exercisable for an additional period after expiry, called the
+                grace window. This lasts 1 hour by default and is configured
+                as <code>exerciseWindow</code>. The protocol admin chooses the
+                setting for new vaults; each vault copies it at creation and
+                keeps that duration. For example, with a one-hour
+                window and an expiry of 12:00 UTC, exercise remains possible
+                until just before 13:00 UTC. At 13:00 UTC it stops, and anyone
+                can submit expiration. In the rules below, <code>t</code> is
+                the current timestamp.
               </p>
               <div
                 class="window-schedule"
@@ -1093,8 +1181,9 @@
                 </div>
               </dl>
               <p class="unit-note">
-                <code>K</code> is the strike. Call consideration rounds up; put
-                payments round down.
+                <code>K</code> is the strike. For a call, the caller's
+                quote-token payment rounds up to the smallest token unit.
+                For a put, the quote tokens paid to the recipient round down.
               </p>
             </div>
           </div>
@@ -1120,16 +1209,21 @@
           <div class="reading-block reading-flow" id="cash-availability">
             <h3>Two separate admin controls</h3>
             <p>
-              At launch, cash admissions are disabled and no price publisher is
-              authorized.
+              At launch, the protocol does not allow new cash-settled positions
+              and has no authorized price publisher. The admin must separately
+              enable new cash positions and give an address permission to
+              submit their prices. Enabling one does not enable the other.
             </p>
             <dl class="rule-ledger">
               <div>
                 <dt>Allow new cash positions</dt>
                 <dd>
-                  Enabling cash admissions allows new Cash/Either vaults and
-                  cash activation. Disabling admissions blocks both; existing
-                  positions keep their obligations.
+                  Enabling cash admissions allows new vaults configured for
+                  Cash, meaning cash settlement only, or Either, meaning the
+                  buyer's bid may choose physical or cash settlement. It also
+                  allows cash bids to activate. Disabling admissions blocks
+                  those new commitments; existing Live positions still have
+                  to meet their payment obligations.
                 </dd>
               </div>
               <div>
@@ -1142,27 +1236,33 @@
               </div>
             </dl>
             <p class="prose">Before enabling cash positions, agree on the price
-              methodology, evidence and operator. The publisher can be an EOA,
-              multisig or authenticated helper. The admin grants it
+              methodology, evidence and operator. The publisher can be a regular
+              wallet controlled by a private key, a multisig wallet requiring
+              several signers, or a helper contract authorized to submit reports.
+              The admin grants it
               <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code>, then calls
               <code>setCashSettlementEnabled(true)</code>. Cash/Either vaults
-              must set a positive <code>maxSettlementPriceAge</code>.</p>
+              must set a positive <code>maxSettlementPriceAge</code>, the maximum
+              age in seconds of a price used for exercise before expiry.</p>
             <dl class="rule-ledger">
               <div>
                 <dt>Publication route</dt>
                 <dd>
-                  EOAs submit directly; helpers use the same APIs. No settlement
-                  feed is required, and the Hub does not read prices back from a
-                  helper.
+                  A regular wallet submits a price transaction directly. A
+                  helper contract calls the same publication methods. In both
+                  cases, the report is written into the Hub; the Hub does not
+                  fetch the settlement price from a separate feed or helper.
                 </dd>
               </div>
               <div>
                 <dt>Independence</dt>
                 <dd>
-                  Granting or revoking a role never toggles the feature. The
-                  on-chain flag setter does not check publisher coverage. The
-                  operator command preflights a nominated publisher; the admin
-                  remains responsible for publication.
+                  Giving or removing publication permission does not enable or
+                  disable cash positions. Likewise, the contract lets the admin
+                  enable cash without checking that someone is ready to publish.
+                  The operator command checks a nominated publisher before
+                  submitting that change, but the admin remains responsible
+                  for arranging ongoing price publication.
                 </dd>
               </div>
               <div>
@@ -1192,7 +1292,12 @@
 
           <div class="reading-block reading-flow" id="expiry-price">
             <h3>Which price does the vault use?</h3>
-            <p class="prose">Cash settlement needs a price for this specific vault. Before expiry, an American option uses a recent exercise observation. At expiry, settlement switches to one final price for the original expiry time, even if the transaction happens much later.</p>
+            <p class="prose">Cash settlement needs a price report for this
+              specific vault. Before expiry, an American option uses a recent
+              reported market price, called an exercise observation. That
+              report records both the price and when it was observed. At
+              expiry, settlement switches to one final price for the option's
+              original expiry time, even if the transaction happens much later.</p>
             <div class="price-boundary">
               <div>
                 <span class="inscription">BEFORE EXPIRY</span>
@@ -1204,12 +1309,15 @@
                 <ul>
                   <li>American cash exercise only.</li>
                   <li>
-                    Positive price; validity deadline not yet passed. The
-                    vault's maximum age is checked when the buyer exercises,
-                    not at publication.
+                    The price must be positive and its validity deadline,
+                    <code>validUntil</code>, must not have passed. When the buyer
+                    exercises, the contract also checks how long ago the price
+                    was observed against <code>maxSettlementPriceAge</code>.
+                    That age check happens at exercise, not publication.
                   </li>
                   <li>
-                    Each new observation timestamp must be strictly later.
+                    A replacement report must have a later observation time
+                    than the previous report for that vault.
                   </li>
                 </ul>
               </div>
@@ -1221,11 +1329,13 @@
                 <h4>Write-once final price</h4>
                 <code>publishExpiry(vaultId, price, validUntil)</code>
                 <ul>
-                  <li>Publish at or after fixed expiry.</li>
+                  <li>Publish at or after the option's fixed expiry, before
+                    the publication request's validity deadline has passed.</li>
                   <li>
                     Even a fresh exercise observation is no longer enough.
                   </li>
-                  <li>Once finalized, usable indefinitely.</li>
+                  <li>Once published, this final price can be used indefinitely.
+                    The publication deadline does not make it expire.</li>
                 </ul>
               </div>
             </div>
@@ -1242,17 +1352,20 @@
               <div>
                 <dt>Publisher scope</dt>
                 <dd>
-                  Any role holder may publish for any eligible cash vault. There
-                  is no per-vault assignment or built-in quorum.
+                  Any authorized publisher may submit prices for any eligible
+                  cash vault. Publishers are not assigned to individual vaults,
+                  and the Hub does not require several publishers to agree
+                  before accepting a price.
                 </dd>
               </div>
               <div>
                 <dt>Units & authority</dt>
                 <dd>
-                  Quote-token units per whole underlying. The indicative
-                  <code>priceFeed</code> only constrains activation. No
-                  indicative-price or other-vault fallback can authorize cash
-                  payment.
+                  Prices use raw quote-token units per whole underlying token.
+                  The optional <code>priceFeed</code> is a separate source used
+                  to check whether a bid's strike is acceptable at activation.
+                  Its price cannot replace a missing cash-settlement report,
+                  and neither can another vault's report.
                 </dd>
               </div>
               <div>
@@ -1287,7 +1400,7 @@
                   <code>exercise(vaultId, amount)</code>. Intrinsic value is
                   paid immediately.
                 </p>
-                <strong>Zero payout → revert</strong>
+                <strong>If the calculated payout is zero, exercise is rejected.</strong>
                 <p>
                   The vault's partial-exercise policy determines whether the
                   buyer can exercise some of the remaining option or must
@@ -1302,7 +1415,7 @@
                   buyer or executor later uses
                   <code>claimPayout(vaultId)</code>.
                 </p>
-                <strong>Zero payout → may finalize</strong>
+                <strong>Expiration can settle the vault even when the buyer is owed nothing.</strong>
                 <p>
                   Expiration closes the remaining option and sets aside any
                   amount owed to the buyer. Shareholders can claim the assets
@@ -1436,7 +1549,9 @@
                 <dt>Example inputs</dt>
                 <dd>
                   <code>N</code> = remaining notional; <code>K</code> = strike;
-                  <code>S</code> = applicable reported price. No earlier
+                  <code>S</code> = applicable reported price. In these formulas,
+                  <code>max(x, 0)</code> uses zero whenever the calculated
+                  difference is negative, so a payoff cannot be negative. No earlier
                   exercise, zero fees and separately earned premium excluded.
                   Buyer payouts round down on-chain.
                 </dd>
@@ -1586,7 +1701,12 @@
             <div class="row">
               <span class="mono">priceFeed · maxInTheMoneyBps</span
               ><span
-                >Optional. Calls:
+                >The owner can optionally limit how far a bid's strike may
+                differ in the buyer's favor from the current market price.
+                Here <span class="mono">spot</span> is that price from
+                <span class="mono">priceFeed</span>, and
+                <span class="mono">bps</span> is the permitted difference
+                in basis points. Calls:
                 <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts:
                 <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both
                 this and <span class="mono">strikeLimit</span> must pass.</span
@@ -1598,9 +1718,10 @@
             <div class="row">
               <span class="mono">maxPriceAge</span
               ><span
-                >Activation rejects old indicative spot prices. This field does
-                not impose a price requirement on physical exercise or
-                expiration.</span
+                >When the optional activation price feed is configured, this
+                is the oldest observation it may use, measured in seconds.
+                An older report rejects activation. It does not impose a
+                price requirement on physical exercise or expiration.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip lp">lower only, never 0</span></span
@@ -1655,8 +1776,9 @@
             <div class="row">
               <span class="mono">auctionStartsAt</span
               ><span
-                >Time from which anyone may open the auction. 0 = manual
-                only.</span
+                >The scheduled time from which anyone may submit the
+                transaction that opens the auction. Zero means there is no
+                public opening schedule: only the owner may open it.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip owner">any value while Open</span></span
@@ -1788,7 +1910,9 @@
             </p>
           </header>
             <ol class="procedure-steps" aria-label="Unwind requirements">
-              <li>The owner or buyer proposes an unwind using a snapshot of the Live position.</li>
+              <li>The owner or buyer proposes an unwind, recording how much of
+                the Live option has been exercised, the current share supply,
+                the refund amount and a deadline for executing the agreement.</li>
               <li>The buyer signs, and every current shareholder approves.</li>
               <li>Current LPs separately fund any negotiated refund.</li>
               <li>Anyone can execute once the agreement is valid, while the vault
@@ -1852,8 +1976,9 @@
                   >
                 </div>
                 <p id="refund-note">
-                  Six-decimal USDC: <code>100000000</code> raw units. The
-                  executing caller supplies no refund tokens.
+                  A 100 USDC refund is <code>100000000</code> raw units when USDC
+                  has six decimal places. The LPs fund it before execution;
+                  the caller who executes the agreement does not supply it.
                 </p>
               </div>
             </div>
@@ -1880,8 +2005,10 @@
                 <dt>New agreement</dt>
                 <dd>
                   A replacement proposal or further exercise requires fresh
-                  agreement. After expiry or replacement, propose again while
-                  Live with a new future deadline; the contract assigns the
+                  agreement. If the proposal's deadline passes or the proposal
+                  is replaced, propose again while the vault is Live with a
+                  new future deadline. This is the proposal's deadline, separate
+                  from the option's expiry. The contract assigns the
                   next nonce, and old signatures and approvals cannot execute
                   it.
                 </dd>
@@ -1889,7 +2016,7 @@
               <div>
                 <dt>Funding</dt>
                 <dd>
-                  Each current LP approves the vault clone and funds a
+                  Each current LP approves the individual vault contract and funds a
                   proportional contribution in the premium token, rounded up to
                   a raw unit. Zero refund needs the same consent but no refund
                   funding.
@@ -1908,14 +2035,21 @@
             <dl class="rule-ledger">
               <div>
                 <dt>Before execution</dt>
-                <dd>A funder can recover the deposit, including after revocation,
-                  proposal expiry or replacement. Withdrawing also revokes current consent.</dd>
+                <dd>A funder can take back its refund contribution before the
+                  unwind executes, including after withdrawing approval, after
+                  the proposal's deadline or after replacement. Taking back a
+                  contribution to the current proposal also withdraws that
+                  funder's approval. Recovering funds from a replaced proposal
+                  does not affect approval of its replacement.</dd>
               </div>
               <div>
                 <dt>After execution</dt>
-                <dd>Only excess contributions and allocated ceiling surplus can
-                  be recovered. The last surplus participant receives rounding
-                  dust; the buyer receives exactly the agreed refund.</dd>
+                <dd>The buyer receives exactly the agreed refund. A funder can
+                  recover any contribution above its required amount, plus its
+                  allocated share of extra units left because each LP's required
+                  contribution was rounded up. Any smallest-token units left
+                  when dividing that surplus go to the last participant to
+                  recover a share of it.</dd>
               </div>
               <div>
                 <dt>Original funder</dt>

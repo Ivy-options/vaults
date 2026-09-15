@@ -1601,7 +1601,7 @@ h2 {
   font-size: var(--text-label);
   line-height: 1.65;
 }
-.protocol-guide :is(.phase-rules .facts li, .phase-rules .exit) {
+.protocol-guide :is(.phase-rules .facts li, .phase-rules .exit, .phase-rules .exit p, .callout, .phase-return) {
   font-size: var(--text-body);
   line-height: 1.7;
 }
