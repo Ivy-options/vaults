@@ -19,13 +19,12 @@
   <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol guide"><img src="assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Project setup</span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
   <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#read-the-guide">Read the guide</a>
 <a href="#build-and-verify">Build and verify</a>
-<a href="#contract-source-map">Contract source map</a>
 <a href="#edit-the-docs">Edit the docs</a>
 <a href="#license">License</a></nav></details></aside>
   <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
 <p>Smart contracts for single-use covered-call and cash-secured-put vaults.</p>
 <h2 id="read-the-guide">Read the guide</h2>
-<p>Start with the <a href="index.html">HTML protocol guide</a> for how vaults work, examples, and the contract reference. For deployment and transaction commands, see the <a href="operations.html">operator runbook</a>.</p>
+<p>Start with the <a href="index.html">HTML protocol guide</a> for how vaults work and interactive examples. For deployment and transaction commands, see the <a href="operations.html">operator runbook</a>.</p>
 <p>Open <code>docs/site/index.html</code> directly in your browser. To serve the docs locally, run this from the repository root:</p>
 <pre><code class="language-sh">python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
 </code></pre>
@@ -41,21 +40,6 @@ npm test -- --no-compile
 <p>To run one test file, for example the deployment and settlement rehearsal:</p>
 <pre><code class="language-sh">npm test -- test/17-local-rehearsal.test.ts
 </code></pre>
-<h2 id="contract-source-map">Contract source map</h2>
-<p><code>contracts/IvyVaultsHub.sol</code> contains the Hub&#39;s state, administration, creation,
-auction, activation, settlement and claims in one file. Read the entrypoint there
-alongside its permissions and phase checks; there is no protocol inheritance chain
-to follow. The Hub retains OpenZeppelin access control, typed-data signing and
-reentrancy protection.</p>
-<p>Accounting responsibilities stay separate: <code>IvyVault</code> holds each vault&#39;s tokens
-and reserves, <code>IvyShares</code> records ownership, <code>IvyPremiums</code> tracks premium credits,
-and <code>IvyUnwind</code> tracks consent and refund contributions. Share changes update
-premium rights and invalidate affected unwind consent before balances change.
-Fixed linked libraries execute with the Hub&#39;s storage and authority. Separate
-custody addresses segregate balances but still share the same Hub implementation.</p>
-<p>Preserve these rules when editing: reserved payments cannot fund residual claims,
-premium cannot be paid twice, and unwind requires current consent and sufficient
-funding. Existing callback and conservation tests exercise these interactions.</p>
 <h2 id="edit-the-docs">Edit the docs</h2>
 <p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README; <code>operator-examples.html</code> is generated from <code>examples/operator/README.md</code>. The license page is generated from <code>LICENSE.md</code>.</p>
 <p>After changing docs or request templates, rebuild and check:</p>
