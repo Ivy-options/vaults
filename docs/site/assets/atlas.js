@@ -28,7 +28,7 @@
     $("#refund-b").textContent = `${total * 0.4} USDC`;
     $("#refund-total").textContent = `${total} USDC`;
     $("#refund-note").textContent = total
-      ? "Six-decimal USDC: 100000000 raw units. The executing caller supplies no refund tokens."
+      ? "A 100 USDC refund is 100000000 raw units when USDC has six decimal places. The LPs fund it before execution; the caller who executes the agreement does not supply it."
       : "Zero refund needs no funding. Buyer signature and all current-shareholder approvals are still required.";
   }
   ["#consent-a", "#consent-b", "#consent-buyer", "#unwind-refund"].forEach(
