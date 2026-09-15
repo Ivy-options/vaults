@@ -14,65 +14,25 @@
     value.toLocaleString("en-US", { maximumFractionDigits: 2 });
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const chapters = [$("#overview"), ...$$("main > section")];
-  const diagram = (items, label) =>
-    `<div class="concept-flow" role="group" aria-label="${label}">${items
-      .map(
-        (item, i) =>
-          `<div class="concept-node"><span class="node-index">0${
-            i + 1
-          }</span><strong>${item[0]}</strong><span>${item[1]}</span></div>${
-            i < items.length - 1
-              ? '<span class="flow-arrow" aria-hidden="true">→</span>'
-              : ""
-          }`
-      )
-      .join("")}</div>`;
   chapters.forEach((chapter, i) => {
     chapter.classList.add("guide-chapter");
     chapter.dataset.chapter = i;
     if (!i) return;
     const main = $(".main", chapter) || $(".devgrid", chapter) || chapter;
-    const heading = $("h2", chapter);
-    const body = make("div", "reference-body");
-    // Keep existing elements, IDs and calculator event listeners intact.
-    if (heading.parentElement !== main) heading.parentElement.before(heading);
+    const heading = $(".chapter-heading", main);
+    const body = make("div", "reference-body reading-flow");
+    // Keep the chapter introduction ahead of controls in both HTML and JS layouts.
     [...main.childNodes].forEach((node) => {
       if (node !== heading) body.append(node);
     });
-    main.prepend(
-      make(
-        "div",
-        "chapter-eyebrow",
-        `CHAPTER ${String(i).padStart(2, "0")} <span>/ ${String(
-          chapters.length - 1
-        ).padStart(2, "0")}</span>`
-      )
-    );
-    // Only interactive examples need a generated stage. Explanations live in HTML.
     if (chapter.id === "lifecycle") {
       const stage = make("div", "visual-stage");
-      stage.id = `visual-${chapter.id}`;
+      stage.id = "visual-lifecycle";
       main.append(stage);
     }
     main.append(body);
   });
 
-  // Replace the overview sentence with the same sequence as a diagram.
-  const overview = $("#overview > div");
-  $(".lede", overview).replaceWith(
-    make(
-      "div",
-      "overview-journey",
-      diagram(
-        [
-          ["Deposit", "Back one option with assets."],
-          ["Earn premium", "The buyer pays at activation."],
-          ["Claim", "Collect your share of what remains."],
-        ],
-        "Vault overview"
-      )
-    )
-  );
   const progress = make("div", "reading-progress", "<span></span>");
   $(".topbar").append(progress);
   $(".rail summary").textContent = "Explore the guide";
@@ -147,7 +107,7 @@
     const panel = make(
       "div",
       "phase-detail",
-      `<span class="phase-watermark" aria-hidden="true">0${i}</span><div class="phase-rules"><h3>${phaseNames[i]}</h3></div>`
+      `<div class="phase-rules"><h3>${phaseNames[i]}</h3></div>`
     );
     panel.id = `phase-panel-${i}`;
     panel.setAttribute("role", "tabpanel");
@@ -157,8 +117,6 @@
     lifecycle.append(panel);
     return panel;
   });
-  const lifecycleIntro = $("#lifecycle .reference-body > .prose");
-  if (lifecycleIntro) lifecycle.before(lifecycleIntro);
   if (timeline.previousElementSibling?.classList.contains("fig"))
     timeline.previousElementSibling.remove();
   timeline.remove();

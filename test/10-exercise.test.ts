@@ -79,11 +79,11 @@ describe("exercise", function () {
 
     it("fails if the quote does not arrive in full", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
-      const { vaultId, vaultAddress } = await goLive(ctx);
+      const { vaultId, vaultAddress, vault } = await goLive(ctx);
       await fund(ctx, ctx.usdc, ctx.marketMaker, vaultAddress, 12_000n * USDC_UNIT);
       await ctx.usdc.setFeeBps(100n);
       await expect(ctx.hub.connect(ctx.marketMaker).exercise(vaultId, 4n * WETH_UNIT))
-        .to.be.revertedWithCustomError(await ctx.ethers.getContractAt("IvyVault", vaultAddress), "ShortReceived").withArgs(12_000n * USDC_UNIT, 11_880n * USDC_UNIT);
+        .to.be.revertedWithCustomError(vault, "ShortReceived").withArgs(12_000n * USDC_UNIT, 11_880n * USDC_UNIT);
     });
   });
 

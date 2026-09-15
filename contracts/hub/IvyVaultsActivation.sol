@@ -51,7 +51,6 @@ abstract contract IvyVaultsActivation is IvyVaultsLifecycle {
         s.phase = Phase.Live;
 
         uint16 feeRate = platformFeeBps;
-        if (feeRate > maxPlatformFeeBps[vaultId]) revert PlatformFeeAboveCap();
         address treasury = platformTreasury;
         uint256 fee = Math.mulDiv(totalPremium, feeRate, 10_000);
         platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);

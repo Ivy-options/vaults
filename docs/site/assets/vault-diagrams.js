@@ -42,7 +42,7 @@
     host.innerHTML = `<div class="custody-composition multi-vault"><div class="hub-box"><h3>Ivy Vaults Hub</h3><p>Shared entry point</p><span>Validates and coordinates · No token custody</span></div><div class="box-connector hub-entry-link"><span>Calls</span><i aria-hidden="true"></i></div><div class="vault-collection">${vaults}</div></div><div class="plate-select" aria-label="Highlight an instruction route">${[
       "Owner",
       "LP",
-      "Buyer",
+      "Market maker",
       "Bid master",
     ]
       .map(
@@ -75,9 +75,9 @@
         ["Vault.pull", "(token, from, amount)"],
       ],
       [
-        ["Buyer", "Signs the bid"],
+        ["Market maker", "Offers premium and terms"],
         ["Bid master", "Selects off-chain"],
-        ["Hub", "Receives the selected bid"],
+        ["Hub", "Collects premium and activates"],
       ],
       [
         ["Bid master", "Submits the signed bid"],

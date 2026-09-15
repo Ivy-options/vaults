@@ -30,7 +30,6 @@ abstract contract IvyVaultsLifecycle is IvyVaultsHubStorage, IIvyVaultsHub {
         IIvyVault(vault).initialize(address(this), vaultId, terms.collateral, address(premiums));
 
         _terms[vaultId] = terms;
-        maxPlatformFeeBps[vaultId] = platformFeeBps;
         VaultState storage s = _state[vaultId];
         s.vault = vault;
         s.owner = msg.sender;

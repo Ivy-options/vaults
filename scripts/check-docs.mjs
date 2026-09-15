@@ -80,6 +80,7 @@ const elements = Object.fromEntries(
       innerHTML: "",
       hidden: false,
       addEventListener() {},
+      setAttribute() {},
     },
   ])
 );
@@ -150,12 +151,15 @@ assert.deepEqual(resultRows(), [
 for (const invalid of ["", "0", "-1", "NaN"]) {
   update({ strike: invalid });
   assert.equal(elements.calcError.hidden, false);
+  assert.equal(elements.strike.ariaInvalid, "true");
+  assert.equal(elements.calcError.textContent, "Enter a strike price greater than zero.");
   assert.equal(elements.rows.innerHTML, "");
   assert.equal(elements.calcChart.innerHTML, "");
   assert.equal(elements.notional.textContent, "Unavailable");
 }
 update({ strike: "3000", prem: "0" });
 assert.equal(elements.calcError.hidden, true);
+assert.equal(elements.strike.ariaInvalid, "false");
 assert.equal(elements.premTotal.textContent, "0 USDC");
 assert.deepEqual(resultRows(), [
   ["Expired without exercise", "0", "30,000", "pays premium only"],

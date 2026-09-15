@@ -83,7 +83,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
       detail={hub:verified.hub,manifestHash:verified.manifestHash,releaseId:r.releaseId};
     } else { method='setRecommendedVersion';args=[required(r,'releaseId')];detail={hub:await target.hubOf(r.releaseId),releaseId:r.releaseId}; }
   } else if(command==='prepare-vault') {
-    detail=await prepareVault(provider,r); detail.maxPlatformFeeBps=await hub.platformFeeBps(); method='createVault';args=[detail.terms,detail.pairs];
+    detail=await prepareVault(provider,r); method='createVault';args=[detail.terms,detail.pairs];
   } else if(command==='inspect-bid'||command==='activate') {
     method='activate';args=[r.vaultId,r.bid,r.signature];
     const s=await hub.stateOf(r.vaultId), t=await hub.termsOf(r.vaultId);
@@ -94,9 +94,9 @@ export async function prepareOperation(provider, artifacts, command, r) {
     if(valueUsdE6<minimum) throw new Error('Below launch USD minimum at activation');
     const notional=s.isCall?amount:amount*s.underlyingUnit/BigInt(r.bid.strike);
     const totalPremium=BigInt(r.bid.premium)*notional/s.underlyingUnit;
-    const platformFeeBps=await hub.platformFeeBps(), maxPlatformFeeBps=await hub.maxPlatformFeeBps(r.vaultId);
+    const platformFeeBps=await hub.platformFeeBps();
     const platformFee=totalPremium*platformFeeBps/10000n;
-    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,maxPlatformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
+    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
   } else if(command==='publish-settlement-exercise'||command==='publish-settlement-expiry') {
     required(r,'hub'); target=hub;
     const vaultId=required(r,'vaultId');

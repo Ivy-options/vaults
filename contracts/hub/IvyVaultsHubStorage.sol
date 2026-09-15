@@ -33,14 +33,12 @@ abstract contract IvyVaultsHubStorage is
     bytes32 public constant PLATFORM_FEE_MANAGER_ROLE = keccak256("PLATFORM_FEE_MANAGER_ROLE");
     uint16 public platformFeeBps;
     address public platformTreasury;
-    mapping(uint256 => uint16) public maxPlatformFeeBps;
     struct PlatformFee { uint16 rateBps; address recipient; uint256 amount; }
     mapping(uint256 => PlatformFee) public platformFees;
     event PlatformFeeBpsUpdated(uint16 oldRate, uint16 newRate);
     event PlatformTreasuryUpdated(address oldTreasury, address newTreasury);
     event PlatformFeeAllocated(uint256 indexed vaultId, address indexed recipient, uint16 rateBps, uint256 amount);
     error InvalidPlatformFee();
-    error PlatformFeeAboveCap();
     bool public paused;
     bool public transfersEnabled;
     event TransfersEnabledUpdated(bool enabled);

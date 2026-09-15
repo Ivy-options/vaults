@@ -37,12 +37,13 @@
   // in the money and no exercise otherwise. Market price only values the tokens.
   // call: D*min(S,K) + P (hold = D*S).  put: N*min(S,K) + P (hold = C).
   function drawPayoff(svg, o) {
-    var W = 420,
+    var W = Math.max(260, svg.clientWidth || 420),
       H = 250,
       L = 52,
-      R = 16,
+      R = 28,
       T = 18,
       B = 34;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var K = o.K,
       P = o.P;
     var xs = [K * 0.5, K * 1.5];
@@ -144,7 +145,7 @@
       (L + 6) +
       '" y="' +
       (Math.max(yb0, yb1) + 12).toFixed(1) +
-      '" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' +
+      '" font-family="JetBrains Mono, monospace" font-size="12" fill="' +
       accent +
       '">P = ' +
       fmt(P, 0) +
@@ -156,7 +157,7 @@
         X(S).toFixed(1) +
         '" y="' +
         (H - 12) +
-        '" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' +
+        '" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="' +
         faint +
         '">' +
         (S === K ? "K " : "") +
@@ -169,7 +170,7 @@
         (L - 8) +
         '" y="' +
         (Y(v) + 3).toFixed(1) +
-        '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10.5" fill="' +
+        '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="12" fill="' +
         faint +
         '">' +
         (v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, 0)) +
@@ -180,7 +181,7 @@
       (W - R) +
       '" y="' +
       (T - 6) +
-      '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="' +
+      '" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="12" fill="' +
       faint +
       '" letter-spacing="1">SPOT →</text>';
     svg.innerHTML = h;
@@ -212,10 +213,21 @@
       o.p >= 0 &&
       o.days > 0 &&
       initialValue > 0;
+    var fieldErrors = [
+      ["dep", Number.isFinite(o.D) && o.D > 0, "Enter a deposit greater than zero."],
+      ["strike", Number.isFinite(o.K) && o.K > 0, "Enter a strike price greater than zero."],
+      ["prem", Number.isFinite(o.p) && o.p >= 0, "Enter a premium of zero or more."],
+      ["days", Number.isFinite(o.days) && o.days > 0, "Enter more than zero days committed."],
+      ["entryPrice", o.kind !== "call" || (Number.isFinite(o.entryPrice) && o.entryPrice > 0), "Enter a WETH price greater than zero."],
+    ];
+    fieldErrors.forEach(function (field) {
+      $(field[0]).ariaInvalid = String(!field[1]);
+    });
+    var invalidField = fieldErrors.find(function (field) { return !field[1]; });
     $("calcError").hidden = valid;
     $("calcError").textContent = valid
       ? ""
-      : "Enter positive deposit, strike and days committed, a positive value for today’s WETH price for calls, and a non-negative premium. Values must stay within the calculator’s numeric range.";
+      : invalidField ? invalidField[2] : "These values exceed the calculator's numeric range. Use smaller amounts.";
     if (!valid) {
       $("rows").innerHTML = "";
       $("calcChart").innerHTML = "";
@@ -280,6 +292,7 @@
   function redrawAll() {
     render();
   }
+  window.addEventListener("resize", redrawAll);
   ["kind", "dep", "strike", "prem", "days", "entryPrice"].forEach(function (id) {
     $(id).addEventListener("input", render);
   });

@@ -2,29 +2,6 @@
 (() => {
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
-  const roman = [
-    "I",
-    "II",
-    "III",
-    "IV",
-    "V",
-    "VI",
-    "VII",
-    "VIII",
-    "IX",
-    "X",
-    "XI",
-  ];
-  $$(".chapter-eyebrow").forEach(
-    (e, i) =>
-      (e.innerHTML = `LIBER ${roman[i]} <span>/ ${
-        roman[$$(".chapter-eyebrow").length - 1]
-      }</span>`)
-  );
-  $$(".nav-number").forEach((e) => {
-    const n = Number(e.textContent);
-    if (Number.isFinite(n)) e.textContent = n ? roman[n - 1] : "·";
-  });
   $$(".interactive-example input, .interactive-example select").forEach(
     (e) => (e.disabled = false)
   );
@@ -60,25 +37,16 @@
   consent();
   function fees() {
     const bps = Number($("#fee-rate").value),
-      blocked = bps > 200,
       fee = (1000 * bps) / 10000;
-    $("#fee-rate-output").textContent = `${bps} bps · ${bps / 100}%`;
-    $(".fee-laboratory").classList.toggle("is-blocked", blocked);
-    $("#fee-net").textContent = blocked
-      ? "Not allocated"
-      : `${1000 - fee} USDC`;
-    $("#fee-treasury").textContent = blocked ? "Not allocated" : `${fee} USDC`;
-    $("#fee-example-bar > span").style.width = `${blocked ? 0 : 100 - bps / 100}%`;
-    $("#fee-example-bar > i").style.width = `${blocked ? 0 : bps / 100}%`;
+    $("#fee-rate-output").textContent = `${bps.toLocaleString("en-US")} bps · ${bps / 100}%`;
+    $("#fee-net").textContent = `${1000 - fee} USDC`;
+    $("#fee-treasury").textContent = `${fee} USDC`;
+    $("#fee-example-bar > span").style.width = `${100 - bps / 100}%`;
+    $("#fee-example-bar > i").style.width = `${bps / 100}%`;
     $("#fee-example-bar").setAttribute(
       "aria-label",
-      blocked
-        ? "Activation rejected; no premium allocation"
-        : `${1000 - fee} USDC to LPs; ${fee} USDC to treasury`
+      `${1000 - fee} USDC to LPs; ${fee} USDC to treasury`
     );
-    $("#fee-status").textContent = blocked
-      ? "Activation rejected: current fee exceeds the 200 bps creation-time cap."
-      : "Rate is within the cap. Activation may proceed if all other checks pass.";
   }
   $("#fee-rate").addEventListener("input", fees);
   fees();

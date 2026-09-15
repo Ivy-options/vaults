@@ -4,7 +4,7 @@ import {IvyVaultsSettlement} from "./hub/IvyVaultsSettlement.sol";
 import {IvyVaultsHubStorage} from "./hub/IvyVaultsHubStorage.sol";
 import "./types/IvyTypes.sol";
 
-/// @notice Immutable factory and rule engine. Defaults only affect newly created vaults.
+/// @notice Immutable factory and rule engine for individual option vaults.
 contract IvyVaultsHub is IvyVaultsSettlement {
     constructor(address admin, address implementation, address shares_, address premiums_, address unwind_, uint64 window_, uint64 timeout_)
         IvyVaultsHubStorage(admin, implementation, shares_, premiums_, unwind_, window_, timeout_) {}

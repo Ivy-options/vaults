@@ -24,7 +24,7 @@
     <script src="assets/vault-diagrams.js" defer></script>
     <script src="assets/atlas.js" defer></script>
   </head>
-  <body>
+  <body class="protocol-guide">
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="topbar">
       <a class="brand" href="#overview" aria-label="Ivy Vaults overview"
@@ -47,7 +47,6 @@
           <a href="#overview">Overview</a>
           <a href="#participants">People and permissions</a>
           <a href="#lifecycle">Vault lifecycle</a>
-          <a href="#early-exit">Unwind by agreement</a>
           <a href="#platform-fees">Premium and fees</a>
           <a href="#outcomes">What each side receives</a>
           <a href="#makers">Bidding and exercise</a>
@@ -55,6 +54,7 @@
           <a href="#terms">Vault terms</a>
           <a href="#versions">Versions and existing vaults</a>
           <a href="#developers">Contracts and entrypoints</a>
+          <a href="#early-exit">Unwind by agreement</a>
         </nav>
       </details>
     </aside>
@@ -76,8 +76,17 @@
       </div>
 
       <section id="participants">
-        <div class="main">
-          <h2>The people around a vault</h2>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 01</p>
+            <h2>The people around a vault</h2>
+            <p class="section-intro">
+              An option trade has a seller and a buyer. In Ivy, liquidity providers, or
+              LPs, supply the seller's backing assets, and a market maker buys the
+              option. The owner manages the vault, and the bid master selects the
+              market maker's offer. The roles below show who makes each decision and which contract holds the money.
+            </p>
+          </header>
           <div class="actor-map" aria-label="Protocol roles and instructions">
             <div class="actor-lanes">
               <div>
@@ -86,7 +95,8 @@
                 <p>
                   The owner creates the vault and sets its
                   <a href="#vault-token-choices">tokens</a> and trading terms.
-                  The owner funds it alone or allows other depositors.
+                  The owner may also be an LP and can fund the vault alone,
+                  accept deposits from other LPs, or do both.
                 </p>
               </div>
               <div>
@@ -97,11 +107,13 @@
                 </p>
               </div>
               <div>
-                <span class="inscription">BUYER</span>
-                <h3>Signs the bid</h3>
-                <p>The buyer offers a premium for the right to exercise an
-                  option, using a <a href="#makers">signed bid</a> within the
-                  owner's allowed terms.</p>
+                <span class="inscription">MARKET MAKER</span>
+                <h3>Buys and manages the option</h3>
+                <p>The market maker is the option buyer and manages the position
+                  through settlement. It proposes the premium and option terms in a
+                  <a href="#makers">signed bid</a> within the owner's limits. At
+                  activation, it pays the premium and holds the right to exercise
+                  under the agreed terms.</p>
               </div>
               <div>
                 <span class="inscription">BID MASTER</span>
@@ -131,7 +143,7 @@
               </div>
             </div>
           </div>
-          <div class="reading-block execution-settings" id="execution-permissions">
+          <div class="reading-block execution-settings reading-flow" id="execution-permissions">
             <h3>Executor and recipient</h3>
             <p>The buyer can submit transactions and receive the assets in the same wallet. Separate addresses are optional.</p>
             <dl>
@@ -163,8 +175,18 @@
       </section>
 
       <section id="lifecycle">
-        <div class="main">
-          <h2>Vault lifecycle</h2>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 02</p>
+            <h2>Vault lifecycle</h2>
+            <p class="section-intro">
+              A vault moves through four phases. LPs fund it while Open, the bid master
+              selects an offer during Auction, and the buyer can exercise during its
+              agreed window while it is Live. Settled is the final phase, when
+              shareholders claim what remains. The phase details below explain who can act
+              and how each phase ends.
+            </p>
+          </header>
           <div class="fig"><span>Who can act in each phase</span></div>
           <div class="timeline">
             <div class="step">
@@ -178,10 +200,10 @@
                     <span class="chip lp">LPs</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Withdraw</b><span>Burn shares for the corresponding
+                        ><b>Withdraw.</b><span>Burn shares for the corresponding
                         collateral while Open.</span></span
                       ><span
-                        ><b>Deposit</b><span>Admission must be open. Non-owner
+                        ><b>Deposit.</b><span>Admission must be open. Non-owner
                         deposits also require
                         <code>publicDeposits</code> enabled at creation.</span></span
                       ></span
@@ -191,10 +213,10 @@
                     <span class="chip owner">Owner</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Tighten terms</b><span>While Open; existing LP
+                        ><b>Tighten terms.</b><span>While Open; existing LP
                         protections cannot be relaxed.</span></span
                       ><span
-                        ><b>Manage</b><span>Schedule the auction or transfer vault
+                        ><b>Manage.</b><span>Schedule the auction or transfer vault
                         ownership.</span></span
                       ></span
                     >
@@ -324,170 +346,21 @@
             manually. No premium or fee has been collected, so there is
             nothing to refund. Every other transition is one-way.
           </p>
-          <div class="reading-block" id="early-exit">
-            <div class="illustrated-heading" data-illustration="consent">
-              <img src="assets/roman-unanimous-consent.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
-              <h3>Unwind by unanimous agreement</h3>
-            </div>
-            <ol class="route-strip" aria-label="Unwind requirements">
-              <li>
-                <span class="route-index">01</span>
-                <h4>Propose</h4>
-                <p>Owner or buyer records a Live-position snapshot.</p>
-              </li>
-              <li>
-                <span class="route-index">02</span>
-                <h4>Consent</h4>
-                <p>Buyer signs. Every current shareholder approves.</p>
-              </li>
-              <li>
-                <span class="route-index">03</span>
-                <h4>Fund</h4>
-                <p>Current LPs separately fund any negotiated refund.</p>
-              </li>
-              <li>
-                <span class="route-index">04</span>
-                <h4>Execute</h4>
-                <p>Finalize while Live, no later than the proposal deadline.</p>
-              </li>
-            </ol>
-            <div
-              class="consent-example interactive-example"
-              aria-label="Illustrative unwind consent and refund"
-            >
-              <div>
-                <span class="inscription"
-                  >CONSENT EXAMPLE · 60 / 40 OWNERSHIP</span
-                >
-                <div class="consent-controls">
-                  <label
-                    ><input
-                      id="consent-buyer"
-                      type="checkbox"
-                      checked
-                      disabled
-                    />Buyer signature</label
-                  ><label
-                    ><input id="consent-a" type="checkbox" checked disabled />LP
-                    A · 60%</label
-                  ><label
-                    ><input id="consent-b" type="checkbox" checked disabled />LP
-                    B · 40%</label
-                  >
-                </div>
-                <div
-                  class="ownership-bar"
-                  role="img"
-                  aria-label="All current shares approve"
-                >
-                  <span class="ownership-a">60%</span
-                  ><span class="ownership-b">40%</span>
-                </div>
-                <p class="example-status" id="consent-status" role="status">
-                  Buyer signed · 100% of current shares approve
-                </p>
-              </div>
-              <div>
-                <label class="field-label" for="unwind-refund"
-                  >Agreed refund example</label
-                ><select id="unwind-refund" disabled>
-                  <option value="100">100 USDC</option>
-                  <option value="0">Zero refund</option>
-                </select>
-                <div class="refund-equation">
-                  <span>LP A<strong id="refund-a">60 USDC</strong></span
-                  ><span aria-hidden="true">+</span
-                  ><span>LP B<strong id="refund-b">40 USDC</strong></span
-                  ><span aria-hidden="true">→</span
-                  ><span
-                    >Buyer reserve<strong id="refund-total"
-                      >100 USDC</strong
-                    ></span
-                  >
-                </div>
-                <p id="refund-note">
-                  Six-decimal USDC: <code>100000000</code> raw units. The
-                  executing caller supplies no refund tokens.
-                </p>
-              </div>
-            </div>
-            <dl class="rule-ledger">
-              <div>
-                <dt>Snapshot</dt>
-                <dd>
-                  Exercised notional, share supply, refund, nonce and a future
-                  deadline.
-                </dd>
-              </div>
-              <div>
-                <dt>Consent changes</dt>
-                <dd>
-                  Holders may revoke. A nonzero transfer to another holder
-                  invalidates both sender and recipient approvals. They approve
-                  again at their new balances.
-                </dd>
-              </div>
-              <div>
-                <dt>New agreement</dt>
-                <dd>
-                  A replacement proposal or further exercise requires fresh
-                  agreement. After expiry or replacement, propose again while
-                  Live with a new future deadline; the contract assigns the
-                  next nonce, and old signatures and approvals cannot execute
-                  it.
-                </dd>
-              </div>
-              <div>
-                <dt>Funding</dt>
-                <dd>
-                  Each current LP approves the vault clone and funds a
-                  proportional contribution in the premium token, rounded up to
-                  a raw unit. Zero refund needs the same consent but no refund
-                  funding.
-                </dd>
-              </div>
-              <div>
-                <dt>Preserved</dt>
-                <dd>
-                  Completed exercises remain intact. A proposal suspends
-                  neither exercise nor expiration.
-                </dd>
-              </div>
-            </dl>
-            <h4 id="unwind-recovery">Recover refund contributions</h4>
-            <dl class="rule-ledger">
-              <div>
-                <dt>Before execution</dt>
-                <dd>A funder can recover the deposit, including after revocation,
-                  proposal expiry or replacement. Withdrawing also revokes current consent.</dd>
-              </div>
-              <div>
-                <dt>After execution</dt>
-                <dd>Only excess contributions and allocated ceiling surplus can
-                  be recovered. The last surplus participant receives rounding
-                  dust; the buyer receives exactly the agreed refund.</dd>
-              </div>
-              <div>
-                <dt>Original funder</dt>
-                <dd>Recovery stays attached to the funder after share transfers
-                  or burns. Already-claimed premium does not excuse a current
-                  LP from funding its contribution.</dd>
-              </div>
-            </dl>
-            <p class="reference-link">
-              <a href="operations.html#prepare-and-execute-a-unanimous-unwind"
-                >Unwind procedure and commands ↗</a
-              >
-            </p>
-          </div>
         </div>
       </section>
 
       <section id="platform-fees">
-        <div class="main">
-          <h2>Premium split</h2>
-          <p class="prose">Whoever holds shares at activation earns the buyer's
-            premium after the platform fee and can claim it immediately.</p>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 03</p>
+            <h2>Premium and fees</h2>
+            <p class="section-intro">
+              The premium is the buyer's payment for the option. When the winning bid
+              activates, the platform takes its fee and whoever holds shares earns the
+              rest, claimable immediately. The example below splits a 1,000 USDC premium
+              between LPs and the treasury at the selected fee rate.
+            </p>
+          </header>
           <div class="fee-laboratory interactive-example">
             <div class="fee-controls">
               <span class="inscription">ILLUSTRATIVE ACTIVATION</span
@@ -500,15 +373,14 @@
                 id="fee-rate"
                 type="range"
                 min="0"
-                max="500"
+                max="10000"
                 step="10"
                 value="200"
                 disabled
               />
               <div class="range-ends">
-                <span>0 bps</span><span>500 bps</span>
+                <span>0 bps</span><span>10,000 bps</span>
               </div>
-              <span class="cap-mark">Creation-time cap · 200 bps</span>
             </div>
             <div class="fee-distribution">
               <div
@@ -519,7 +391,7 @@
               >
                 <span></span><i></i>
               </div>
-              <div class="fee-labels">
+              <div class="fee-labels" role="status" aria-atomic="true">
                 <div>
                   <span>LP premium</span><strong id="fee-net">980 USDC</strong>
                 </div>
@@ -528,37 +400,13 @@
                   ><strong id="fee-treasury">20 USDC</strong>
                 </div>
               </div>
-              <p id="fee-status" class="example-status" role="status">
-                Rate is within the cap. Activation may proceed if all other
-                checks pass.
-              </p>
             </div>
           </div>
-          <ol class="route-strip" aria-label="Fee snapshots">
-            <li>
-              <span class="route-index">01</span>
-              <h4>Vault creation</h4>
-              <p>
-                Captures the current global fee rate as this vault's maximum.
-              </p>
-            </li>
-            <li>
-              <span class="route-index">02</span>
-              <h4>Activation</h4>
-              <p>
-                Checks the latest rate against that cap; records the applied
-                rate and treasury.
-              </p>
-            </li>
-            <li>
-              <span class="route-index">03</span>
-              <h4>Treasury claim</h4>
-              <p>
-                Anyone can call <code>claimPlatformFee()</code> on the vault
-                clone once, paying the recorded treasury.
-              </p>
-            </li>
-          </ol>
+          <p class="prose">Activation uses the current global fee rate and records
+            the applied rate and treasury for that trade. Later changes affect
+            future activations. Anyone can then call
+            <code>claimPlatformFee()</code> on the vault clone once to pay that
+            recorded treasury.</p>
           <dl class="rule-ledger">
             <div>
               <dt>Calculation</dt>
@@ -574,12 +422,6 @@
                 Starts at zero. <code>PLATFORM_FEE_MANAGER_ROLE</code> can set
                 up to 10,000 bps. The deployment admin initially holds and
                 administers the role.
-              </dd>
-            </div>
-            <div>
-              <dt>Above the cap</dt>
-              <dd>
-                Activation reverts. Lower the global rate or create a new vault.
               </dd>
             </div>
             <div>
@@ -610,12 +452,18 @@
       </section>
 
       <section id="outcomes">
-        <div class="main">
-          <h2>What each side receives</h2>
-          <p class="prose">
-            The table shows the whole vault's pool after physical settlement.
-            Each shareholder claims their proportion of these unreserved assets.
-          </p>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 04</p>
+            <h2>What each side receives</h2>
+            <p class="section-intro">
+              An LP's result depends on both the premium and the assets left after the
+              option ends. With physical exercise, the buyer exchanges tokens with the
+              vault at the agreed strike, so LPs may receive a different mix of tokens
+              from their deposit. The table shows the pool before individual claims; the
+              calculator includes earned premium in LP totals.
+            </p>
+          </header>
           <div
             class="tablewrap"
             tabindex="0"
@@ -671,19 +519,21 @@
               </label>
               <label
                 ><span id="depLabel">Deposit (WETH)</span
-                ><input id="dep" type="number" step="any" value="10"
+                ><input id="dep" type="number" step="any" value="10" aria-describedby="calcError"
               /></label>
               <label id="entryPriceField"
-                >Today's WETH Price (USDC)<input
+                >Today's WETH price (USDC)<input
                   id="entryPrice"
+                  aria-describedby="calcError"
                   type="number"
                   min="0.01"
                   step="any"
                   value="3000"
               /></label>
               <label
-                >Strike Price (USDC / WETH)<input
+                >Strike price (USDC / WETH)<input
                   id="strike"
+                  aria-describedby="calcError"
                   type="number"
                   step="any"
                   value="3000"
@@ -691,6 +541,7 @@
               <label
                 >Premium (USDC / WETH)<input
                   id="prem"
+                  aria-describedby="calcError"
                   type="number"
                   step="any"
                   value="100"
@@ -698,6 +549,7 @@
               <label
                 >Capital committed (days)<input
                   id="days"
+                  aria-describedby="calcError"
                   type="number"
                   min="0.01"
                   step="any"
@@ -752,7 +604,7 @@
               </div>
             </div>
           </div>
-          <div class="reading-block">
+          <div class="reading-block reading-flow">
             <h3>Read the accounting, including its limits</h3>
             <div class="formula-pair">
               <div>
@@ -817,9 +669,18 @@
       </section>
 
       <section id="makers">
-        <div class="main">
-          <h2>Bidding and exercise</h2>
-          <div class="bid-guide">
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 05</p>
+            <h2>Bidding and exercise</h2>
+            <p class="section-intro">
+              The auction happens off-chain. A buyer signs an offer, then the bid master
+              submits it to activate the option and collect the premium. Signing alone
+              does not open a position. Once activation succeeds, the buyer or its
+              executor can exercise under the agreed terms.
+            </p>
+          </header>
+          <div class="bid-guide reading-flow">
             <ol class="bid-process" aria-label="From signed bid to activation">
               <li>
                 <span class="sequence-number">01 · BUYER</span>
@@ -869,7 +730,7 @@
               </div>
             </div>
 
-            <div class="reading-block">
+            <div class="reading-block reading-flow">
               <div class="illustrated-heading" data-illustration="bid">
                 <img src="assets/roman-bid-signing.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
                 <h3>The signature belongs to one chain and hub.</h3>
@@ -889,6 +750,7 @@
               </p>
 
               <h3>What the buyer signs</h3>
+            <p class="prose">The signature covers the auction, payment terms, exercise rules and execution addresses together. These fields let the Hub check that the submitted bid is exactly the offer the buyer authorized.</p>
               <div class="bid-field-groups">
                 <div>
                   <h4>The auction and buyer</h4>
@@ -1000,8 +862,9 @@
               </dl>
             </div>
 
-            <div class="reading-block" id="exercise-and-expiration">
+            <div class="reading-block reading-flow" id="exercise-and-expiration">
               <h3>Exercise and expiration</h3>
+            <p class="prose">Physical exercise exchanges the option assets at the strike. Expiration closes any unused rights once their exercise window has ended. These are separate transactions with different callers and payment requirements.</p>
               <div class="option-endings">
                 <div>
                   <span class="sequence-number">EXERCISE</span>
@@ -1077,35 +940,23 @@
                   </p>
                 </div>
               </div>
-              <div
-                class="expiration-route"
-                aria-label="Time alone does not settle the vault"
-              >
-                <div>
-                  <span>Deadline reached</span
-                  ><strong>Expiration is allowed</strong>
-                </div>
-                <span class="reading-arrow" aria-hidden="true">→</span>
-                <div>
-                  <span>Someone calls expire</span
-                  ><strong>On-chain transaction</strong>
-                </div>
-                <span class="reading-arrow" aria-hidden="true">→</span>
-                <div>
-                  <span>Vault becomes Settled</span
-                  ><strong>Residual claims open</strong>
-                </div>
-              </div>
+              <p class="prose">Reaching the deadline makes expiration possible,
+                but it does not settle the vault automatically. Someone must
+                submit <code>expire(vaultId)</code> before shareholders can claim
+                the remaining assets.</p>
             </div>
 
-            <div class="reading-block" id="exercise-windows">
+            <div class="reading-block reading-flow" id="exercise-windows">
               <div class="illustrated-heading" data-illustration="timing">
                 <img src="assets/roman-exercise-window.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
                 <h3>Physical exercise windows</h3>
               </div>
               <p class="unit-note">
-                <code>exerciseWindow</code> has a launch default of 1 hour.
-                <code>t</code> is the current timestamp.
+                American options may be exercised before expiry; European
+                options must wait until expiry. Both physical styles remain
+                exercisable during the grace window after expiry, then anyone
+                may expire them. <code>exerciseWindow</code> defaults to 1 hour,
+                and <code>t</code> below is the current timestamp.
               </p>
               <div
                 class="window-schedule"
@@ -1175,17 +1026,20 @@
       </section>
 
       <section id="cash-settlement">
-        <div class="main">
-          <h2>Optional cash settlement</h2>
-          <p class="prose">
-            Cash payouts use the vault's collateral token and the Hub's stored
-            settlement prices. The feature is implemented but
-            <strong>disabled by default</strong>; the rules below apply after
-            the administrator enables it. Physical delivery needs no settlement
-            publisher.
-          </p>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 06</p>
+            <h2>Optional cash settlement</h2>
+            <p class="section-intro">
+              Cash settlement pays the option's intrinsic value, the exercise payoff
+              calculated from the strike and reported market price, instead of exchanging
+              the two assets. Payment comes from the vault's collateral, so a call may pay
+              WETH rather than a stablecoin. This feature is implemented but disabled by
+              default and requires an authorized price publisher.
+            </p>
+          </header>
 
-          <div class="reading-block" id="cash-availability">
+          <div class="reading-block reading-flow" id="cash-availability">
             <h3>Two separate admin controls</h3>
             <p>
               At launch, cash admissions are disabled and no price publisher is
@@ -1209,33 +1063,12 @@
                 </dd>
               </div>
             </dl>
-            <ol class="route-strip" aria-label="Cash enablement">
-              <li>
-                <span class="route-index">01</span>
-                <h4>Arrange publication</h4>
-                <p>
-                  Agree methodology, evidence and operator. Choose an EOA,
-                  multisig or authenticated helper.
-                </p>
-              </li>
-              <li>
-                <span class="route-index">02</span>
-                <h4>Grant the role</h4>
-                <p>
-                  Admin grants <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code> on
-                  the Hub.
-                </p>
-              </li>
-              <li>
-                <span class="route-index">03</span>
-                <h4>Enable admissions</h4>
-                <p>
-                  Admin calls <code>setCashSettlementEnabled(true)</code>.
-                  Cash/Either vaults require positive
-                  <code>maxSettlementPriceAge</code>.
-                </p>
-              </li>
-            </ol>
+            <p class="prose">Before enabling cash positions, agree on the price
+              methodology, evidence and operator. The publisher can be an EOA,
+              multisig or authenticated helper. The admin grants it
+              <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code>, then calls
+              <code>setCashSettlementEnabled(true)</code>. Cash/Either vaults
+              must set a positive <code>maxSettlementPriceAge</code>.</p>
             <dl class="rule-ledger">
               <div>
                 <dt>Publication route</dt>
@@ -1279,8 +1112,9 @@
             </p>
           </div>
 
-          <div class="reading-block" id="expiry-price">
+          <div class="reading-block reading-flow" id="expiry-price">
             <h3>A hard boundary at expiry</h3>
+            <p class="prose">Cash settlement needs a price for this specific vault. Before expiry, an American option uses a recent exercise observation. At expiry, settlement switches to one final price for the original expiry time, even if the transaction happens much later.</p>
             <div class="price-boundary">
               <div>
                 <span class="inscription">BEFORE EXPIRY</span>
@@ -1363,8 +1197,9 @@
             </dl>
           </div>
 
-          <div class="deal-block">
+          <div class="deal-block reading-flow">
             <h3>Cash exercise, expiration and claims</h3>
+            <p class="prose">Exercising sends the buyer's payoff immediately. Expiration instead sets aside the remaining payoff in a buyer reserve for a later claim. Both paths use the reported price, and the distinction determines when tokens leave the vault.</p>
             <div class="settlement-branches">
               <div>
                 <span class="inscription">EXERCISE</span>
@@ -1438,8 +1273,9 @@
             </div>
           </div>
 
-          <div class="reading-block" id="cash-outcomes">
+          <div class="reading-block reading-flow" id="cash-outcomes">
             <h3>Collateral after cash expiration</h3>
+            <p class="prose">Expiration divides the backing assets between the buyer's reserved payoff and the shareholders' remaining pool. Change the option type or final price to see that allocation; both amounts stay in the collateral token until claimed.</p>
             <div class="cash-accounting interactive-example">
               <div class="cash-inputs">
                 <label for="cash-kind-demo">Cash vault example</label
@@ -1541,8 +1377,9 @@
             </dl>
           </div>
 
-          <div class="reading-block" id="cash-missing-reports">
+          <div class="reading-block reading-flow" id="cash-missing-reports">
             <h3>Missing report: the obligation stays locked</h3>
+            <p class="prose">The contracts cannot calculate a cash payoff without a valid report. They keep the backing assets committed until publication recovers or the parties agree to unwind.</p>
             <div class="recovery-map">
               <div>
                 <span class="inscription">BLOCKED</span>
@@ -1562,30 +1399,12 @@
                 </p>
               </div>
             </div>
-            <ol class="route-strip" aria-label="Missing-report recovery">
-              <li>
-                <span class="route-index">01</span>
-                <h4>Recover publication</h4>
-                <p>
-                  Admin rotates publishers and may disable new cash admissions.
-                </p>
-              </li>
-              <li>
-                <span class="route-index">02</span>
-                <h4>Reconstruct the report</h4>
-                <p>
-                  A replacement supplies each missing vault report using the
-                  approved price for the original expiry, not today's price.
-                </p>
-              </li>
-              <li>
-                <span class="route-index">03</span>
-                <h4>Or agree an unwind</h4>
-                <p>
-                  Follow the <a href="#early-exit">unwind procedure</a>.
-                </p>
-              </li>
-            </ol>
+            <p class="prose">To recover, the admin can rotate publishers and
+              disable new cash admissions while the replacement reconstructs
+              each missing report. The replacement must use the approved price
+              for the original expiry, not today's price. The buyer and
+              shareholders can also follow the
+              <a href="#early-exit">unwind procedure</a>.</p>
             <p class="boundary-note">
               Recovery remains available under the
               <a href="#cash-availability">cash admission rules</a> and
@@ -1602,33 +1421,18 @@
       </section>
 
       <section id="terms">
-        <div class="main">
-          <h2>Vault terms</h2>
-          <div class="constraint-map">
-            <div>
-              <span class="inscription">AT CREATION</span>
-              <h3>Set the permitted trade</h3>
-              <span class="constraint-set"
-                >Terms · pairs · exercise policy</span
-              >
-            </div>
-            <span class="map-arrow" aria-hidden="true">→</span>
-            <div>
-              <span class="inscription">WHILE OPEN</span>
-              <h3>Tighten the allowed set</h3>
-              <span class="constraint-set narrow"
-                >Either → one · disable pairs</span
-              >
-            </div>
-            <span class="map-arrow" aria-hidden="true">→</span>
-            <div>
-              <span class="inscription">AT ACTIVATION</span>
-              <h3>Validate the signed bid</h3>
-              <span class="constraint-set final"
-                >All current checks must pass</span
-              >
-            </div>
-          </div>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 07</p>
+            <h2>Vault terms</h2>
+            <p class="section-intro">
+              The owner sets the vault's permitted trade before LPs deposit, including
+              tokens, price limits, expiry and exercise rules. These terms constrain the
+              bids that can activate. While the vault is Open, the owner can tighten
+              certain limits but cannot relax LP protections or change immutable fields.
+              The table gives the exact rules for each field.
+            </p>
+          </header>
           <div class="terms">
             <div class="row head">
               <span>Term</span><span>Check at activation</span
@@ -1776,8 +1580,17 @@
       </section>
 
       <section id="versions">
-        <div class="main">
-          <h2>New release. Original positions.</h2>
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 08</p>
+            <h2>Releases and existing vaults</h2>
+            <p class="section-intro">
+              Ivy deploys new versions as separate contract suites. Existing vaults keep
+              their original code and Hub; they do not move to a new release. The release
+              registry is a directory that recommends a Hub for new vaults. The example
+              below shows why a new recommendation leaves an existing position on Hub A.
+            </p>
+          </header>
           <div class="release-atlas interactive-example">
             <div class="registry-node">
               <span class="inscription">PERMANENT DISCOVERY ADDRESS</span>
@@ -1873,77 +1686,50 @@
 
       <section class="dev" id="developers">
         <div class="devgrid">
-          <div class="main">
+          <div class="main reading-flow">
+            <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 09</p>
             <h2>Contracts and entrypoints</h2>
-            <div class="contract-atlas">
-              <div class="contract-hub">
-                <span class="inscription">COORDINATION</span>
-                <h3>IvyVaultsHub</h3>
-                <p>
-                  Creates vaults, verifies bids and runs the lifecycle.
-                  Token-moving entrypoints use <code>nonReentrant</code>.
-                </p>
+            <p class="section-intro">
+              The Hub is the common entrypoint for vault operations, while each vault
+              clone holds its own assets. The list below explains the supporting
+              contracts; the method reference that follows is grouped by phase.
+            </p>
+          </header>
+            <dl class="contract-reference">
+              <div>
+                <dt><code>IvyVaultsHub</code></dt>
+                <dd>Creates vaults, verifies bids and runs the lifecycle. Token-moving
+                  entrypoints use <code>nonReentrant</code>.</dd>
               </div>
-              <div class="contract-branches">
-                <div>
-                  <span class="inscription">CUSTODY</span>
-                  <h4>IvyVault</h4>
-                  <p>
-                    EIP-1167 clone. Per-token reserves; ordinary Hub transfers
-                    spend only unreserved assets. Premium also has a fixed
-                    independent budget.
-                  </p>
-                </div>
-                <div>
-                  <span class="inscription">OWNERSHIP</span>
-                  <h4>IvyShares</h4>
-                  <p>
-                    ERC-1155 shares. Only the Hub mints or burns.
-                  </p>
-                </div>
-                <div>
-                  <span class="inscription">ACCOUNTING</span>
-                  <h4>IvyPremiums · IvyUnwind</h4>
-                  <p>
-                    Premium checkpoints preserve entitlements; only a guarded
-                    Hub claim initiates payment. Unwind tracks the proposal and
-                    current-holder consent.
-                  </p>
-                </div>
-                <div>
-                  <span class="inscription">FIXED LIBRARIES</span>
-                  <h4>IvyVaultRules · IvyOptionSettlement</h4>
-                  <p>
-                    Rules enforce admission and Open-owner tightening.
-                    Settlement handles exercise, cash and residual claims in
-                    guarded Hub storage. Links are fixed in Hub bytecode.
-                  </p>
-                </div>
+              <div>
+                <dt><code>IvyVault</code></dt>
+                <dd>An EIP-1167 clone that holds assets and per-token reserves.
+                  Ordinary Hub transfers spend only unreserved assets; premium
+                  also has its own fixed budget.</dd>
               </div>
-            </div>
+              <div>
+                <dt><code>IvyShares</code></dt>
+                <dd>Tracks ownership with ERC-1155 shares. Only the Hub mints or burns.</dd>
+              </div>
+              <div>
+                <dt><code>IvyPremiums</code> and <code>IvyUnwind</code></dt>
+                <dd>Premium checkpoints preserve entitlements, and only a guarded
+                  Hub claim starts payment. Unwind tracks the proposal and
+                  current-shareholder consent.</dd>
+              </div>
+              <div>
+                <dt><code>IvyVaultRules</code> and <code>IvyOptionSettlement</code></dt>
+                <dd>Fixed libraries linked into Hub bytecode. Rules enforce admission
+                  and owner tightening while Open; settlement handles exercise,
+                  cash payments and residual claims in guarded Hub storage.</dd>
+              </div>
+            </dl>
             <h3>Share changes run accounting first</h3>
-            <ol
-              class="route-strip"
-              aria-label="Share-transfer accounting order"
-            >
-              <li>
-                <span class="route-index">01</span>
-                <h4>Before balances change</h4>
-                <p>Notify premium and unwind modules.</p>
-              </li>
-              <li>
-                <span class="route-index">02</span>
-                <h4>Preserve & invalidate</h4>
-                <p>
-                  Checkpoint premium entitlements and invalidate affected votes.
-                </p>
-              </li>
-              <li>
-                <span class="route-index">03</span>
-                <h4>Receiver callback</h4>
-                <p>Run only after those accounting hooks.</p>
-              </li>
-            </ol>
+            <p class="prose">Before share balances change, the share contract
+              notifies the premium and unwind modules. They checkpoint premium
+              entitlements and invalidate affected consent votes. Receiver
+              callbacks run only after that accounting is complete.</p>
             <dl class="rule-ledger">
               <div>
                 <dt>Indicative prices</dt>
@@ -1954,13 +1740,10 @@
                 </dd>
               </div>
             </dl>
-            <div class="fig"><span>Deployment order</span></div>
-            <div class="deployment-line" aria-label="Deployment order">
-              <span>2 libraries</span><b>→</b><span>Vault implementation</span
-              ><b>→</b><span>Hub</span><b>→</b><span>Shares</span><b>→</b
-              ><span>Premiums</span><b>→</b><span>Unwind</span><b>→</b
-              ><span>Indicative feed</span>
-            </div>
+            <h3>Deployment order</h3>
+            <p class="prose">Deploy the two libraries first, then the vault
+              implementation, Hub, Shares, Premiums, Unwind and indicative feed,
+              in that order. Each contract's address is part of the fixed deployment.</p>
             <dl class="rule-ledger">
               <div>
                 <dt>Verification</dt>
@@ -1979,8 +1762,9 @@
                 </dd>
               </div>
             </dl>
+            <h3>Entrypoints by phase</h3>
             <div class="fig">
-              <span>Calls by phase</span
+              <span>Caller permissions</span
               ><span
                 >Roles · <b>DEFAULT_ADMIN</b> · <b>GUARDIAN</b> ·
                 <b>BID_MASTER</b> · <b>MARKET_MAKER</b> ·
@@ -2144,7 +1928,7 @@
               </div>
             </div>
 
-            <div class="fig" style="margin-top: 30px">
+            <div class="fig">
               <span>Defaults and events</span
               ><span>timing defaults are snapshotted at vault creation</span>
             </div>
@@ -2185,7 +1969,7 @@
                 </tbody>
               </table>
             </div>
-            <p class="muted small" style="margin-top: 14px">
+            <p class="muted small">
               See the <a href="operations.html">operator runbook</a> for
               deployment, reports, transaction commands and recovery, or the
               <a href="project-setup.html#build-and-verify"
@@ -2194,6 +1978,160 @@
               for build instructions.
             </p>
           </div>
+        </div>
+      </section>
+
+      <section id="early-exit">
+        <div class="main reading-flow">
+          <header class="chapter-heading">
+            <p class="chapter-eyebrow">Section 10</p>
+            <h2>Unwind by agreement</h2>
+            <p class="section-intro">
+              An unwind ends a Live option by agreement between the buyer and every
+              current shareholder. They can negotiate a refund to the buyer, which current
+              LPs fund separately. This is an alternative to exercising or waiting for
+              expiration; the proposal, consent and funding must all be valid when it
+              executes.
+            </p>
+          </header>
+            <ol class="procedure-steps" aria-label="Unwind requirements">
+              <li>The owner or buyer proposes an unwind using a snapshot of the Live position.</li>
+              <li>The buyer signs, and every current shareholder approves.</li>
+              <li>Current LPs separately fund any negotiated refund.</li>
+              <li>Anyone can execute once the agreement is valid, while the vault
+                is Live and no later than the proposal deadline.</li>
+            </ol>
+            <p class="prose">In this example, LP A holds 60% of the shares and
+              LP B holds 40%. A 100 USDC refund needs 60 USDC from A and 40 USDC
+              from B, as well as the buyer's signature and both LPs' consent.</p>
+            <div
+              class="consent-example interactive-example"
+              aria-label="Illustrative unwind consent and refund"
+            >
+              <div>
+                <span class="inscription"
+                  >CONSENT EXAMPLE · 60 / 40 OWNERSHIP</span
+                >
+                <div class="consent-controls">
+                  <label
+                    ><input
+                      id="consent-buyer"
+                      type="checkbox"
+                      checked
+                      disabled
+                    />Buyer signature</label
+                  ><label
+                    ><input id="consent-a" type="checkbox" checked disabled />LP
+                    A · 60%</label
+                  ><label
+                    ><input id="consent-b" type="checkbox" checked disabled />LP
+                    B · 40%</label
+                  >
+                </div>
+                <div
+                  class="ownership-bar"
+                  role="img"
+                  aria-label="All current shares approve"
+                >
+                  <span class="ownership-a">60%</span
+                  ><span class="ownership-b">40%</span>
+                </div>
+                <p class="example-status" id="consent-status" role="status">
+                  Buyer signed · 100% of current shares approve
+                </p>
+              </div>
+              <div>
+                <label class="field-label" for="unwind-refund"
+                  >Agreed refund example</label
+                ><select id="unwind-refund" disabled>
+                  <option value="100">100 USDC</option>
+                  <option value="0">Zero refund</option>
+                </select>
+                <div class="refund-equation">
+                  <span>LP A<strong id="refund-a">60 USDC</strong></span
+                  ><span aria-hidden="true">+</span
+                  ><span>LP B<strong id="refund-b">40 USDC</strong></span
+                  ><span aria-hidden="true">→</span
+                  ><span
+                    >Buyer reserve<strong id="refund-total"
+                      >100 USDC</strong
+                    ></span
+                  >
+                </div>
+                <p id="refund-note">
+                  Six-decimal USDC: <code>100000000</code> raw units. The
+                  executing caller supplies no refund tokens.
+                </p>
+              </div>
+            </div>
+            <dl class="rule-ledger">
+              <div>
+                <dt>Snapshot</dt>
+                <dd>
+                  Exercised notional, share supply, refund, nonce and a future
+                  deadline.
+                </dd>
+              </div>
+              <div>
+                <dt>Consent changes</dt>
+                <dd>
+                  Holders may revoke. A nonzero transfer to another holder
+                  invalidates both sender and recipient approvals. They approve
+                  again at their new balances.
+                </dd>
+              </div>
+              <div>
+                <dt>New agreement</dt>
+                <dd>
+                  A replacement proposal or further exercise requires fresh
+                  agreement. After expiry or replacement, propose again while
+                  Live with a new future deadline; the contract assigns the
+                  next nonce, and old signatures and approvals cannot execute
+                  it.
+                </dd>
+              </div>
+              <div>
+                <dt>Funding</dt>
+                <dd>
+                  Each current LP approves the vault clone and funds a
+                  proportional contribution in the premium token, rounded up to
+                  a raw unit. Zero refund needs the same consent but no refund
+                  funding.
+                </dd>
+              </div>
+              <div>
+                <dt>Preserved</dt>
+                <dd>
+                  Completed exercises remain intact. A proposal suspends
+                  neither exercise nor expiration.
+                </dd>
+              </div>
+            </dl>
+            <h3 id="unwind-recovery">Recover refund contributions</h3>
+            <dl class="rule-ledger">
+              <div>
+                <dt>Before execution</dt>
+                <dd>A funder can recover the deposit, including after revocation,
+                  proposal expiry or replacement. Withdrawing also revokes current consent.</dd>
+              </div>
+              <div>
+                <dt>After execution</dt>
+                <dd>Only excess contributions and allocated ceiling surplus can
+                  be recovered. The last surplus participant receives rounding
+                  dust; the buyer receives exactly the agreed refund.</dd>
+              </div>
+              <div>
+                <dt>Original funder</dt>
+                <dd>Recovery stays attached to the funder after share transfers
+                  or burns. Already-claimed premium does not excuse a current
+                  LP from funding its contribution.</dd>
+              </div>
+            </dl>
+            <p class="reference-link">
+              <a href="operations.html#prepare-and-execute-a-unanimous-unwind"
+                >Unwind procedure and commands ↗</a
+              >
+            </p>
         </div>
       </section>
     </main>
