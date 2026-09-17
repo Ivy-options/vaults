@@ -8,6 +8,15 @@ test("every lab computes the documented worked examples inside its own scope", a
   const { page, errors, close } = await openPage(server.url + "test/fixtures/labs.html");
   try {
     await page.evaluate(() => IvyLabs.mountAll(document));
+    // Checkbox/radio rows sit inline (label wraps the input and its text), not stacked.
+    for (const selector of [".consent-controls label", ".registry-node label"]) {
+      const style = await page.evaluate((s) => {
+        const cs = getComputedStyle(document.querySelector(s));
+        return { display: cs.display, columnGap: cs.columnGap };
+      }, selector);
+      assert.equal(style.display, "flex", selector);
+      assert.equal(style.columnGap, "8px", selector);
+    }
     // Fees: 200 bps on 1,000 USDC.
     assert.equal(await page.textContent("#fee-rate-output"), "200 bps · 2%");
     assert.equal(await page.textContent("#fee-net"), "980 USDC");

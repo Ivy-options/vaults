@@ -95,6 +95,13 @@ input[type="range"] {
   gap: 18px;
   margin: 22px 0;
 }
+.consent-controls label,
+.registry-node label {
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
 /* .consent-example (roman.css theme override) */
 .consent-example {
@@ -136,6 +143,9 @@ input[type="range"] {
   color: var(--ink);
   margin-top: 8px;
 }
+.fee-distribution .fee-labels strong {
+  font: 32px var(--atlas-serif);
+}
 
 /* .fee-laboratory (roman.css theme override) */
 .fee-laboratory {
@@ -147,6 +157,9 @@ input[type="range"] {
 }
 
 /* .fee-distribution .fee-labels (roman.css theme override) */
+.fee-distribution .fee-labels strong {
+  font: 500 clamp(20px, 2.2vw, 28px) var(--body);
+}
 .fee-distribution .fee-labels span::before {
   content: "";
   display: inline-block;
@@ -775,6 +788,9 @@ input[type="range"] {
 }
 .card.lab .release-branches {
   gap: 0;
+}
+.card.lab .release-branches > div::before {
+  display: none;
 }
 .card.lab .cash-balance-labels strong {
   font-size: 18px;
