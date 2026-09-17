@@ -342,6 +342,12 @@
   }
 
   /* ---------- Input ---------- */
+  // Active touch pointers, keyed by pointerId, holding each finger's latest
+  // PointerEvent. Shared between wireInput (single-pointer drag) and wireTouch
+  // (two-finger pinch) so a second finger touching down is never mistaken for
+  // a continuation of a one-finger drag: a drag only ever follows the pointer
+  // that started it, and stops the moment a second touch pointer joins.
+  const touchPts = new Map();
   function wireInput() {
     const { mapEl } = M;
     mapEl.addEventListener("wheel", (e) => {
@@ -358,11 +364,18 @@
     }, { passive: false });
     let drag = null, swallowClick = false;
     mapEl.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "touch") {
+        touchPts.set(e.pointerId, e);
+        // A second finger starts a pinch, not a drag: drop any drag in
+        // progress (and its "dragging" class) without swallowing the next click.
+        if (touchPts.size > 1) { drag = null; mapEl.classList.remove("dragging"); return; }
+      }
       if (e.button !== 0 || e.target.closest("input, a, select, button, label")) return;
       drag = { x: e.clientX, y: e.clientY, cx: M.cam.x, cy: M.cam.y, moved: false, id: e.pointerId };
     });
     mapEl.addEventListener("pointermove", (e) => {
-      if (!drag) return;
+      if (e.pointerType === "touch") touchPts.set(e.pointerId, e);
+      if (!drag || e.pointerId !== drag.id || touchPts.size > 1) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
       if (!drag.moved) mapEl.setPointerCapture(drag.id); // capture only once it is really a drag, so plain clicks keep their target
@@ -372,7 +385,12 @@
       clampCam();
       apply(false);
     });
-    const endDrag = () => { if (drag?.moved) { swallowClick = true; document.body.classList.add("touched"); } drag = null; mapEl.classList.remove("dragging"); };
+    const endDrag = (e) => {
+      if (e.pointerType === "touch") touchPts.delete(e.pointerId);
+      if (!drag || e.pointerId !== drag.id) return;
+      if (drag.moved) { swallowClick = true; document.body.classList.add("touched"); }
+      drag = null; mapEl.classList.remove("dragging");
+    };
     mapEl.addEventListener("pointerup", endDrag);
     mapEl.addEventListener("pointercancel", endDrag);
     mapEl.addEventListener("click", (e) => {
@@ -484,16 +502,16 @@
     mapEl.addEventListener("focusin", (e) => { const card = e.target.closest(".card"); if (card) focused = M.tree.byId.get(card.dataset.id); });
   }
 
-  /* ---------- Touch: one finger pans (pointer events already do), two fingers pinch ---------- */
+  /* ---------- Touch: one finger pans (via wireInput's pointer handlers), two fingers pinch ---------- */
   function wireTouch() {
-    const mapEl = M.mapEl, pts = new Map();
+    // touchPts (shared with wireInput) already tracks each finger's latest
+    // event and drops a drag as soon as a second finger joins, so this only
+    // has to read it — no separate pointer bookkeeping to fight over.
+    const mapEl = M.mapEl;
     let pinch = null;
-    mapEl.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") pts.set(e.pointerId, e); });
     mapEl.addEventListener("pointermove", (e) => {
-      if (e.pointerType !== "touch" || !pts.has(e.pointerId)) return;
-      pts.set(e.pointerId, e);
-      if (pts.size !== 2) return;
-      const [a, b] = [...pts.values()];
+      if (e.pointerType !== "touch" || touchPts.size !== 2) return;
+      const [a, b] = [...touchPts.values()];
       const r = mapEl.getBoundingClientRect();
       const mid = { x: (a.clientX + b.clientX) / 2 - r.left, y: (a.clientY + b.clientY) / 2 - r.top };
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -506,7 +524,7 @@
       clampCam();
       apply(false);
     });
-    const lift = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+    const lift = () => { if (touchPts.size < 2) pinch = null; };
     mapEl.addEventListener("pointerup", lift);
     mapEl.addEventListener("pointercancel", lift);
   }
