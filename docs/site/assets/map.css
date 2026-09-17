@@ -15,3 +15,108 @@ body.map-ready #document { display: none; }
 body.map-ready.reading #map,
 body.map-ready.reading #toolbar { display: none; }
 body.map-ready.reading #document { display: block; overflow: auto; }
+
+/* ---------- Connectors ---------- */
+.line { position: absolute; background: var(--line-strong); opacity: 0.7; }
+.line.main { background: linear-gradient(90deg, var(--line-strong), var(--accent) 55%, var(--line-strong)); opacity: 1; }
+.line.rule { opacity: 0.5; }
+.pin { position: absolute; width: 14px; height: 14px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--paper); border: 2px solid var(--accent); }
+.pin.pin-main { width: 22px; height: 22px; margin: -10px 0 0 -10px; background: var(--accent); }
+
+/* ---------- Cards: fixed tiles, content by tier ---------- */
+.card { position: absolute; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.card:hover { border-color: var(--line-strong); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card.probe { visibility: hidden; pointer-events: none; }
+.card > [data-tier] { position: absolute; inset: 0; padding: 18px 20px; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; display: flex; flex-direction: column; min-width: 0; }
+.card > .measure { position: static; opacity: 1; visibility: visible; }
+.card[data-show="0"] > [data-tier="0"], .card[data-show="1"] > [data-tier="1"], .card[data-show="2"] > [data-tier="2"], .card[data-show="3"] > [data-tier="3"] { opacity: 1; visibility: visible; }
+.card p { margin: 0; text-align: start; color: var(--muted); }
+.card small { margin-top: auto; font: 10px var(--mono); letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+.card .when { font: 11px var(--mono); letter-spacing: 0.09em; color: var(--faint); margin-bottom: 4px; }
+
+/* Station 360×200 */
+.card.station { border-color: var(--line-strong); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); }
+.card.station h2 { margin: 4px 0 0; font: 800 52px/1 var(--display); letter-spacing: -0.02em; }
+.card.station [data-tier="1"] h2 { font-size: 30px; margin-bottom: 8px; }
+.card.station [data-tier="1"] p { font-size: 15px; line-height: 1.45; }
+.card.station [data-tier="1"] small { margin-top: 8px; }
+.card.station [data-tier="3"] h2 { font-size: 14px; }
+
+/* Custody 220×170 */
+.card.custody h3 { margin: 0 0 6px; font: 700 16px/1.2 var(--display); }
+.card.custody [data-tier="1"] h3 { font-size: 22px; }
+.card.custody dl { margin: 0; font-size: 9px; line-height: 1.4; }
+.card.custody dt { color: var(--accent); font: 8px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 4px; }
+.card.custody dd { margin: 0; color: var(--muted); }
+
+/* Moment 300×170 */
+.card.moment h3 { margin: 0; font: 700 27px/1.15 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
+.card.moment [data-tier="2"] h3 { font-size: 17px; margin-bottom: 6px; }
+.card.moment [data-tier="2"] p { font-size: 11.5px; line-height: 1.5; }
+/* A Roman painting sits faintly behind the moments that have one; it never competes with the text. */
+.card.moment .watermark.painting { position: absolute; inset: 0; opacity: 0.14; pointer-events: none; -webkit-mask-image: linear-gradient(90deg, transparent 30%, #000 75%); mask-image: linear-gradient(90deg, transparent 30%, #000 75%); }
+.card.moment .watermark.painting img { width: 100%; height: 100%; object-fit: cover; object-position: right center; }
+.card.moment > [data-tier] { z-index: 1; }
+.card.moment [data-tier="3"] { padding: 10px 12px; }
+.card.moment [data-tier="3"] .when { font-size: 5.5px; margin-bottom: 2px; }
+.card.moment [data-tier="3"] h3 { font-size: 9px; margin-bottom: 3px; }
+.card.moment [data-tier="3"] p { font-size: 6px; line-height: 1.4; color: var(--faint); }
+
+/* Action: header as tall as its text (--header), colour says who, a badge names them, the portrait is a watermark behind. */
+.card.action { --actor: var(--faint); background: color-mix(in oklab, var(--actor) 7%, var(--paper)); border-color: color-mix(in oklab, var(--actor) 30%, var(--line)); }
+.card.action.owner { --actor: var(--c-owner); }
+.card.action.lp { --actor: var(--c-lp); }
+.card.action.buyer { --actor: var(--c-mm); }
+.card.action.bid { --actor: var(--c-bid); }
+.card.action.has-details { background: color-mix(in oklab, var(--actor) 9%, var(--panel)); }
+.card.action.dim { border-color: var(--line); background: var(--paper); }
+.card.action.dim > [data-tier] { opacity: 0.45; }
+.card.action.dim[data-show="0"] > [data-tier="0"], .card.action.dim[data-show="1"] > [data-tier="1"], .card.action.dim[data-show="2"] > [data-tier="2"], .card.action.dim[data-show="3"] > [data-tier="3"] { opacity: 0.45; }
+.card.action > [data-tier] { height: var(--header, auto); inset: 0 0 auto 0; z-index: 1; flex-direction: row; flex-wrap: wrap; align-content: flex-start; column-gap: 12px; padding: 14px 16px; }
+.card.action .watermark { position: absolute; right: 6px; top: 4px; height: calc(var(--header, 150px) - 8px); width: 40%; opacity: 0.16; pointer-events: none; -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); }
+.portrait { display: block; width: 100%; height: 100%; }
+.portrait svg { display: block; width: 100%; height: 100%; }
+.portrait.generic { display: grid; place-items: center; }
+.portrait.generic i { width: 60%; aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed var(--line-strong); display: grid; place-items: center; font: 700 200% var(--mono); color: var(--faint); font-style: normal; }
+.badge { display: inline-block; flex: 0 0 auto; font-family: var(--roman-font, "Cinzel", Georgia, serif); font-size: 11px; letter-spacing: 0.08em; line-height: 1; color: var(--actor); border: 1px solid color-mix(in oklab, var(--actor) 45%, transparent); background: color-mix(in oklab, var(--actor) 12%, transparent); border-radius: 999px; padding: 4px 10px 3px; white-space: nowrap; }
+.card.action h4 { flex: 1 1 100px; align-self: center; margin: 0; font: 700 20px/1.15 var(--display); }
+.card.action [data-tier="0"], .card.action [data-tier="1"] { flex-direction: column; flex-wrap: nowrap; row-gap: 4px; align-items: center; justify-content: center; text-align: center; }
+.card.action [data-tier="0"] .badge { font-size: 20px; padding: 8px 18px 6px; }
+.card.action [data-tier="1"] h4 { flex: 0 0 auto; font-size: 17px; text-wrap: balance; }
+.card.action [data-tier="2"] { column-gap: 10px; padding: 12px; }
+.card.action [data-tier="2"] .badge { font-size: 9px; padding: 3px 8px 2px; }
+.card.action [data-tier="2"] h4 { flex-basis: 100%; font-size: 14px; margin: 8px 0 4px; }
+.card.action [data-tier="2"] p { flex-basis: 100%; font-size: 10.5px; line-height: 1.45; }
+.card.action [data-tier="2"] small { flex-basis: 100%; margin-top: 6px; font-size: 8px; }
+.card.action [data-tier="3"] { padding: 10px 12px; column-gap: 8px; }
+.card.action [data-tier="3"] .badge { font-size: 6px; padding: 2px 6px 1.5px; }
+.card.action [data-tier="3"] h4 { flex-basis: 100%; font-size: 9px; margin: 4px 0 2px; }
+.card.action [data-tier="3"] p { flex-basis: 100%; font-size: 6px; line-height: 1.4; color: var(--faint); }
+
+/* Tile 132 wide, content-sized */
+.card.tile, .card.lab { background: var(--code-bg); border-radius: 8px; }
+.card.tile > [data-tier], .card.lab > [data-tier] { padding: 8px 9px; }
+.card.tile [data-tier="0"], .card.lab [data-tier="0"] { align-items: center; justify-content: center; }
+.card .more { width: 28px; height: 4px; border-radius: 2px; background: var(--line-strong); opacity: 0.6; }
+.card.tile h5, .card.lab h5 { margin: 0; font: 700 9px/1.2 var(--display); }
+.card.tile [data-tier="2"] { justify-content: center; align-items: center; text-align: center; }
+.card.tile [data-tier="2"] h5 { font-size: 11px; color: var(--muted); }
+.card.tile [data-tier="3"] h5 { font-size: 6.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.card.tile .body { font-size: 5.6px; line-height: 1.45; color: var(--ink); text-align: start; }
+.card.tile .body p { color: var(--ink); margin-bottom: 3px; }
+.card.tile .body b, .card.tile .body strong { color: var(--accent); }
+.card.tile .body code { font-size: 5px; padding: 0 0.2em; margin: 0; background: color-mix(in oklab, var(--ink) 8%, transparent); border-radius: 1px; white-space: nowrap; }
+.card.tile .body pre { font-size: 4.8px; line-height: 1.4; margin: 3px 0; padding: 4px; overflow: hidden; white-space: pre-wrap; }
+.card.tile .body table { font-size: 5px; border-collapse: collapse; width: 100%; }
+.card.tile .body th, .card.tile .body td { padding: 1.5px 3px; border-bottom: 0.5px solid var(--line); text-align: start; vertical-align: top; }
+.card.tile .body ul, .card.tile .body ol { margin: 2px 0; padding-left: 8px; }
+.card.tile .body a { color: var(--accent); }
+.card.tile .body .f { display: block; margin-bottom: 2px; }
+.card.tile .body .f b { margin-right: 3px; }
+/* Labs render at natural size; they are big in world px. */
+.card.lab [data-tier="2"] { padding: 14px 16px; }
+.card.lab h5 { font-size: 13px; margin-bottom: 8px; }
+.card.lab .lab-host { font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) { #world, .card > [data-tier] { transition-duration: 0s !important; } }

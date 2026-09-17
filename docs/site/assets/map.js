@@ -3,6 +3,9 @@
   const $ = (s, scope = document) => scope.querySelector(s);
   const $$ = (s, scope = document) => [...scope.querySelectorAll(s)];
   const KINDS = ["station", "moment", "action", "tile", "lab", "custody"];
+  // document.currentScript is only live during this synchronous run, so capture the
+  // assets/ base now (relative to this script's own URL) for use inside later renders.
+  const ASSET_BASE = document.currentScript ? new URL(".", document.currentScript.src).href : "assets/";
 
   // Walk nested <section data-kind> elements. Heading = label; data-* = tier text; body = everything else.
   function readDocument(root) {
@@ -124,5 +127,130 @@
     return { width, height: Math.max(life.bottom, shelf.bottom) + 80, lines };
   }
 
-  window.IvyMap = { readDocument, layoutWorld, GEOMETRY: G };
+  /* ---------- Cast ---------- */
+  const CROPS = { owner: "24 76 477 580", lp: "504 76 425 580", buyer: "931 76 461 580", bid: "1394 76 533 580" };
+  const ACTOR_NAMES = { owner: "Owner", lp: "LP", buyer: "Buyer", bid: "Bid master", anyone: "Anyone", publisher: "Price publisher", admin: "Admin", guardian: "Guardian", all: "All parties" };
+  const GLYPHS = { anyone: "?", publisher: "$", admin: "A", guardian: "G", all: "∀" };
+  let clipSeq = 0;
+  function portrait(key) {
+    if (!CROPS[key]) return `<span class="portrait generic" aria-hidden="true"><i>${GLYPHS[key] || "?"}</i></span>`;
+    const [x, y, w, h] = CROPS[key].split(" ");
+    const id = `map-clip-${clipSeq++}`;
+    return `<span class="portrait"><svg viewBox="${CROPS[key]}" aria-hidden="true" focusable="false"><defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath></defs><image href="${ASSET_BASE}operator-portraits.webp" width="1942" height="809" clip-path="url(#${id})"/></svg></span>`;
+  }
+  const badge = (n) => `<span class="badge">${ACTOR_NAMES[n.actor] || n.actor}</span>`;
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  /* ---------- Tier layers per kind ----------
+     A card must never show the same text at two consecutive tiers: each tier
+     adds or removes information rather than just resizing it. */
+  function layersFor(n) {
+    const t = esc(n.label), when = n.when ? `<span class="when">${esc(n.when)}</span>` : "";
+    switch (n.kind) {
+      case "station": {
+        const count = n.children.filter((c) => c.kind === "moment").length;
+        return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p>${esc(n.tagline)}</p><small>${count} ${n.band === "shelf" ? "topics" : "moments"} · zoom in</small>`, 3: `<h2 class="compact">${t}</h2>` };
+      }
+      case "moment":
+        return { 0: `<h3>${t}</h3>`, 2: `${when}<h3>${t}</h3><p>${esc(n.summary)}</p>`, 3: `${when}<h3>${t}</h3>` };
+      case "action": {
+        const head = n.actor ? badge(n) : "";
+        const more = n.children.length ? `<small>${n.children.length} details · zoom in</small>` : "";
+        const layers = { 0: head || `<h4>${t}</h4>`, 1: `${head}<h4>${t}</h4>`, 2: `${head}<h4>${t}</h4><p>${esc(n.summary)}</p>${more}` };
+        if (n.children.length) layers[3] = `${head}<h4>${t}</h4>`; // the parent recedes to a badge + title only while its tiles are being read
+        return layers;
+      }
+      case "tile":
+        return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${t}</h5>`, 3: `<h5>${t}</h5><div class="body">${n.bodyHtml}</div>` };
+      case "lab":
+        return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${t}</h5><div class="lab-host">${n.bodyHtml}</div>` };
+      case "custody":
+        return { 1: `<h3>${t}</h3>`, 2: `<h3>${t}</h3><div class="body">${n.bodyHtml}</div>` };
+    }
+  }
+  const lodOf = (s) => (s < 0.55 ? 0 : s < 1.1 ? 1 : s < 2.4 ? 2 : 3);
+
+  function render(tree, world, worldEl, mapEl) {
+    const lines = document.createElement("div");
+    lines.className = "lines";
+    lines.innerHTML = world.lines.map((l) => l.kind.startsWith("pin")
+      ? `<i class="pin ${l.kind}" style="left:${l.x}px;top:${l.y}px"></i>`
+      : `<i class="line ${l.kind}" style="left:${l.x}px;top:${l.y}px;width:${l.w}px;height:${l.h}px"></i>`).join("");
+    worldEl.style.width = `${world.width}px`;
+    worldEl.style.height = `${world.height}px`;
+    worldEl.replaceChildren(lines);
+    tree.nodes.forEach((n) => {
+      const el = document.createElement("div");
+      el.className = `card ${n.kind}${n.actor ? " " + n.actor : ""}${n.dim ? " dim" : ""}${n.children.length && n.kind === "action" ? " has-details" : ""}`;
+      el.dataset.id = n.id;
+      el.dataset.kind = n.kind;
+      el.tabIndex = -1;
+      el.setAttribute("aria-label", n.label);
+      const layers = layersFor(n);
+      const watermark = n.kind === "action" && n.actor ? `<div class="watermark" aria-hidden="true">${portrait(n.actor)}</div>`
+        : n.kind === "moment" && n.illustration ? `<div class="watermark painting" aria-hidden="true"><img src="${ASSET_BASE}${esc(n.illustration)}" alt="" loading="lazy" decoding="async"></div>` : "";
+      el.innerHTML = watermark + Object.entries(layers).map(([tier, html]) => `<div data-tier="${tier}"${tier === "3" && n.kind !== "tile" ? ' class="compact"' : ""}>${html}</div>`).join("");
+      el.dataset.tiers = Object.keys(layers).join(",");
+      el.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px${n.headerH ? `;--header:${n.headerH}px` : ""}`;
+      n.el = el;
+      worldEl.append(el);
+    });
+  }
+  let currentLod = -1;
+  function setLod(lod, worldEl = $("#world")) {
+    if (lod === currentLod) return;
+    currentLod = lod;
+    worldEl.dataset.lod = lod;
+    $$(".card", worldEl).forEach((el) => {
+      const tiers = el.dataset.tiers.split(",").map(Number);
+      el.dataset.show = String(Math.max(-1, ...tiers.filter((t) => t <= lod)));
+    });
+  }
+
+  // Measure a tile or lab (its deepest layer) or an action header (its tallest reading layer) at the card width.
+  function makeMeasurer(worldEl) {
+    const probe = document.createElement("div");
+    probe.className = "card probe";
+    worldEl.append(probe);
+    const heightOf = (n, tier, width) => {
+      const html = layersFor(n)[tier];
+      if (!html) return 0;
+      probe.className = `card probe ${n.kind}`;
+      probe.style.width = `${width}px`;
+      probe.innerHTML = `<div data-tier="${tier}" class="measure">${html}</div>`;
+      const h = probe.firstElementChild.offsetHeight + 2;
+      probe.innerHTML = "";
+      return h;
+    };
+    return (n) => {
+      if (n.kind === "action") return Math.max(heightOf(n, 2, G.action[0]), heightOf(n, 3, G.action[0]));
+      return heightOf(n, n.kind === "lab" ? 2 : 3, spanW(n.kind === "lab" ? 2 : n.span));
+    };
+  }
+
+  function mount() {
+    // R1/R6: reveal the map and measure only after web fonts are ready, since
+    // fonts change text heights; the caller awaits document.fonts.ready first.
+    document.body.classList.add("map-ready");
+    window.scrollTo(0, 0);
+    const doc = $("#document"), worldEl = $("#world"), mapEl = $("#map");
+    if (!doc || !worldEl) return null;
+    const tree = readDocument(doc);
+    const world = layoutWorld(tree.nodes, makeMeasurer(worldEl));
+    render(tree, world, worldEl, mapEl);
+    $(".probe", worldEl)?.remove();
+    // Labs live in the cards now; the document keeps a placeholder so it still reads without JS.
+    tree.nodes.filter((n) => n.kind === "lab").forEach((n) => { n.source.querySelectorAll(":scope > *:not(h5)").forEach((c) => c.remove()); });
+    if (window.IvyLabs?.mountAll) window.IvyLabs.mountAll(worldEl);
+    setLod(0, worldEl);
+    return { tree, world, worldEl, mapEl };
+  }
+
+  function boot() {
+    document.fonts.ready.then(() => { window.IvyMap.mounted = mount(); });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+
+  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G };
 })();
