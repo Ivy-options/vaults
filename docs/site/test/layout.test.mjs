@@ -49,3 +49,38 @@ test("layoutWorld centres stations over rows, stacks actions and sizes tiles", a
     await server.close();
   }
 });
+
+test("layoutWorld centres a moment-less station in its column without overlapping its neighbour", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html");
+  try {
+    const out = await page.evaluate(() => {
+      const root = document.createElement("div");
+      root.innerHTML = `
+        <article>
+          <section data-kind="station" id="s-empty">
+            <h2>Empty station</h2>
+            <section data-kind="custody" id="s-empty-custody"><h3>Custody</h3></section>
+          </section>
+          <section data-kind="station" id="s-with-moment">
+            <h2>Station with a moment</h2>
+            <section data-kind="moment" id="s-with-moment-m1"><h3>Moment</h3></section>
+          </section>
+        </article>`;
+      const { nodes } = IvyMap.readDocument(root);
+      const world = IvyMap.layoutWorld(nodes, () => 60);
+      const g = (id) => { const n = nodes.find((n) => n.id === id); return { x: n.x, y: n.y, w: n.w, h: n.h, column: n.column }; };
+      return { G: IvyMap.GEOMETRY, lines: world.lines, empty: g("s-empty"), custody: g("s-empty-custody"), withMoment: g("s-with-moment") };
+    });
+    const { G } = out;
+    assert.equal(out.empty.column.w, G.station[0] + 2 * (G.gap + G.custody[0]) + 2 * G.columnPad);
+    assert.equal(out.empty.x + out.empty.w / 2, out.empty.column.x + out.empty.column.w / 2);
+    assert.equal(out.custody.x, out.empty.x + out.empty.w + G.gap);
+    assert.ok(out.lines.every((l) => l.w >= 0 && l.h >= 0), "no line has negative width or height");
+    assert.equal(out.withMoment.column.x, out.empty.column.x + out.empty.column.w);
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
