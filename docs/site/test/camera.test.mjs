@@ -56,6 +56,14 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     assert.ok((await state(page)).scale > home.scale);
     await page.click("[data-home]"); await settle(page);
     assert.equal((await state(page)).scale, home.scale);
+    // The reader cannot zoom out past "whole world fits": the wheel handler and
+    // zoomBy both clamp their floor to homeScale() (not homeScale() * 0.8).
+    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
+    for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(20); }
+    await settle(page, 200);
+    await page.evaluate(() => IvyMap.zoomBy(1 / 1.5));
+    await settle(page, 200);
+    assert.equal((await state(page)).scale, home.scale, "cannot zoom out past the home/fit scale");
     assert.deepEqual(errors, []);
   } finally {
     await close();
@@ -63,16 +71,34 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
   }
 });
 
+// The fit-scale formula, computed independently in the page from the map's
+// current client size and the world's intrinsic size — same shape as map.js's
+// own homeScale(), but not calling into IvyMap at all, so this can't pass just
+// because the handler happens to leave the camera untouched.
+const independentFitScale = (page) =>
+  page.evaluate(() => {
+    const map = document.querySelector("#map"), world = document.querySelector("#world");
+    const W = parseFloat(world.style.width), H = parseFloat(world.style.height);
+    return Math.min(map.clientWidth / (W + 160), map.clientHeight / (H + 160));
+  });
+
 test("resize at home re-fits; resize while zoomed keeps the camera path", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html");
   try {
     await page.waitForFunction(() => document.querySelectorAll("#world .card").length > 0);
     // At home (whole-map view), a resize should re-fit to the new viewport (R9).
-    await page.setViewportSize({ width: 1200, height: 800 });
+    // Read the scale before resizing, resize to a clearly different size, and
+    // read the scale again WITHOUT calling home() ourselves — if the resize
+    // handler's re-fit branch were removed, the camera would stay at the old
+    // scale and both assertions below would fail.
+    const preResizeScale = (await state(page)).scale;
+    await page.setViewportSize({ width: 1000, height: 700 });
     await settle(page, 200);
-    const fitScale = await page.evaluate(() => { IvyMap.home(false); return IvyMap.state().scale; });
-    assert.equal((await state(page)).scale, fitScale);
+    const postResizeScale = (await state(page)).scale;
+    const expectedFitScale = await independentFitScale(page);
+    assert.notEqual(postResizeScale, preResizeScale, "resize at home changes the scale");
+    assert.equal(postResizeScale, expectedFitScale, "resize at home re-fits to the new viewport");
     // Zoomed into a moment, a resize keeps the path unchanged (just clamps).
     await page.evaluate(() => IvyMap.flyTo("lps-deposit-collateral", false));
     const zoomedPath = (await state(page)).path;

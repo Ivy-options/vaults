@@ -330,7 +330,7 @@
   }
   function zoomBy(f) {
     const { cam } = M, px = vw() / 2, py = vh() / 2;
-    const ns = clamp(cam.s * f, homeScale() * 0.8, MAX);
+    const ns = clamp(cam.s * f, homeScale(), MAX);
     cam.x = px - (px - cam.x) * (ns / cam.s);
     cam.y = py - (py - cam.y) * (ns / cam.s);
     cam.s = ns;
@@ -345,7 +345,7 @@
       e.preventDefault();
       const r = mapEl.getBoundingClientRect(), { cam } = M;
       const px = e.clientX - r.left, py = e.clientY - r.top;
-      const ns = clamp(cam.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), homeScale() * 0.8, MAX);
+      const ns = clamp(cam.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), homeScale(), MAX);
       cam.x = px - (px - cam.x) * (ns / cam.s);
       cam.y = py - (py - cam.y) * (ns / cam.s);
       cam.s = ns;
