@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>fixture</title>
+<link rel="stylesheet" href="../../assets/docs.css"><link rel="stylesheet" href="../../assets/roman.css"><link rel="stylesheet" href="../../assets/labs.css"><link rel="stylesheet" href="../../assets/map.css">
+<script src="../../assets/labs.js" defer></script><script src="../../assets/map.js" defer></script></head>
+<body>
+<div class="toolbar" id="toolbar"><nav id="crumbs"></nav><form id="search" role="search"><input id="search-input" type="search"><ul id="search-results" hidden></ul></form><div class="zoom"><button data-zoom="-">−</button><span id="zoom-level"></span><button data-zoom="+">+</button><button data-home>Fit</button><button id="reading-toggle" aria-pressed="false">Reading view</button></div></div>
+<div id="map" tabindex="0"><div id="world"></div></div>
+<main id="document"><article><h1>Fixture</h1>
+<section data-kind="station" id="open" data-tagline="Funding the vault.">
+  <h2>Open</h2>
+  <p>Long station text.</p>
+  <section data-kind="custody" id="open-custody"><h3>What the vault holds</h3><dl><dt>Backing</dt><dd>Deposited collateral</dd></dl></section>
+  <section data-kind="moment" id="lps-deposit-collateral" data-when="while Open">
+    <h3>LPs deposit collateral</h3>
+    <p>LPs add collateral and receive shares.</p>
+    <section data-kind="action" data-actor="lp" id="add-funds">
+      <h4>Add funds</h4>
+      <p>A deposit adds collateral and mints shares.</p>
+      <section data-kind="tile" id="who-may-deposit"><h5>Who may deposit</h5><p>Only the owner unless public deposits are enabled.</p></section>
+      <section data-kind="tile" id="approvals" data-span="2"><h5>Approvals</h5><p>Approvals target the vault clone.</p></section>
+    </section>
+    <section data-kind="action" data-actor="owner" data-dim id="waits"><h4>Waits</h4><p>Nothing to do.</p></section>
+  </section>
+  <section data-kind="moment" id="owner-opens-the-auction" data-when="before expiry"><h3>Owner opens the auction</h3><p>Anyone may open after the schedule.</p>
+    <section data-kind="action" data-actor="owner" id="open-or-schedule"><h4>Open or schedule</h4><p>Needs collateral.</p>
+      <section data-kind="lab" id="fee-lab"><h5>Fee example</h5><div class="lab-body"><input type="range" id="fee-rate" min="0" max="10000" step="10" value="200"><output id="fee-rate-output"></output><b id="fee-net"></b><b id="fee-treasury"></b></div></section>
+    </section>
+  </section>
+</section>
+<section data-kind="station" data-band="shelf" id="terms" data-tagline="Every parameter.">
+  <h2>Vault terms</h2>
+  <section data-kind="moment" id="strike-limit"><h3>strikeLimit</h3><p>Per quote token.</p>
+    <section data-kind="action" id="strike-limit-rules"><h4>Rules</h4><p>Calls raise, puts lower.</p></section>
+  </section>
+</section>
+</article></main>
+</body></html>
