@@ -9,7 +9,7 @@
 html:has(body.map-ready) { height: 100%; overflow: hidden; }
 body.map-ready { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 body.map-ready #map { display: block; flex: 1 1 auto; }
-body.map-ready #toolbar { display: block; }
+body.map-ready #toolbar { display: flex; }
 body.map-ready #document { display: none; }
 
 body.map-ready.reading #map,
@@ -124,3 +124,24 @@ body.map-ready.reading #document { display: block; overflow: auto; }
 .card.lab .lab-host { font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) { #world, .card > [data-tier] { transition-duration: 0s !important; } }
+
+/* ---------- Toolbar ---------- */
+.toolbar { flex: 0 0 auto; display: flex; align-items: center; gap: 18px; height: 46px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--paper); font: 12px var(--mono); letter-spacing: 0.05em; }
+#crumbs { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; white-space: nowrap; }
+#crumbs i { color: var(--line-strong); font-style: normal; }
+#crumbs button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
+#crumbs button[aria-current] { color: var(--ink); cursor: default; }
+#search { position: relative; margin-left: auto; }
+#search-input { width: 220px; font: 12px var(--body); padding: 5px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); color: var(--ink); }
+#search-results { position: absolute; right: 0; top: 34px; z-index: 20; list-style: none; margin: 0; padding: 4px; min-width: 320px; max-width: 480px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+#search-results li button { display: block; width: 100%; text-align: start; background: none; border: 0; padding: 6px 8px; font: 12px var(--body); color: var(--ink); cursor: pointer; border-radius: 4px; }
+#search-results li button:hover, #search-results li button:focus-visible { background: var(--accent-soft); outline: none; }
+#search-results li small { display: block; font: 10px var(--mono); color: var(--faint); }
+.toolbar .zoom { display: flex; align-items: center; gap: 4px; }
+.toolbar .zoom button { font: 13px var(--mono); background: none; border: 1px solid var(--line-strong); color: var(--ink); border-radius: 6px; min-width: 28px; height: 28px; padding: 0 8px; cursor: pointer; }
+.toolbar .zoom button:hover, .toolbar .zoom button[aria-pressed="true"] { border-color: var(--accent); }
+#zoom-level { min-width: 44px; text-align: center; color: var(--faint); }
+#map { cursor: grab; touch-action: none; user-select: none; background: radial-gradient(circle at 20% 0%, oklch(0.7 0.18 38 / 0.08), transparent 50%), var(--paper); }
+#map.dragging { cursor: grabbing; }
+#map.dragging * { pointer-events: none; }
+#world { transition: transform 0.85s cubic-bezier(0.25, 0.7, 0.15, 1); }

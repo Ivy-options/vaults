@@ -228,6 +228,10 @@
     };
   }
 
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const MAX = 3.2;
+  let M = null; // mounted state: { tree, world, worldEl, mapEl, cam, W, H }
+
   function mount() {
     // R1/R6: reveal the map and measure only after web fonts are ready, since
     // fonts change text heights; the caller awaits document.fonts.ready first.
@@ -242,9 +246,167 @@
     // Labs live in the cards now; the document keeps a placeholder so it still reads without JS.
     tree.nodes.filter((n) => n.kind === "lab").forEach((n) => { n.source.querySelectorAll(":scope > *:not(h5)").forEach((c) => c.remove()); });
     if (window.IvyLabs?.mountAll) window.IvyLabs.mountAll(worldEl);
-    setLod(0, worldEl);
-    return { tree, world, worldEl, mapEl };
+    M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height };
+    wireInput();
+    home(false);
+    return M;
   }
+
+  /* ---------- Camera ---------- */
+  const vw = () => M.mapEl.clientWidth, vh = () => M.mapEl.clientHeight;
+  const homeScale = () => Math.min(vw() / (M.W + 160), vh() / (M.H + 160));
+  const clampCam = () => {
+    const { cam, W, H } = M;
+    cam.x = clamp(cam.x, Math.min(0, vw() - W * cam.s) - 200, Math.max(0, vw() - W * cam.s) + 200);
+    cam.y = clamp(cam.y, Math.min(0, vh() - H * cam.s) - 200, Math.max(0, vh() - H * cam.s) + 200);
+  };
+  const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function apply(animate) {
+    const { cam, worldEl } = M;
+    worldEl.style.transition = animate && !reduced() ? "" : "none";
+    worldEl.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.s})`;
+    if (!(animate && !reduced())) requestAnimationFrame(() => (worldEl.style.transition = ""));
+    setLod(lodOf(cam.s), worldEl);
+    paintPath();
+    M.mapEl.dispatchEvent(new CustomEvent("map:moved"));
+  }
+  // Frame a world rect. minS forces at least that zoom so the next tier is readable.
+  function fly(x, y, w, h, minS = 0, pad = 40, animate = true) {
+    const both = Math.min(vw() / (w + pad * 2), vh() / (h + pad * 2));
+    const s = clamp(Math.max(both, minS), homeScale(), MAX);
+    const fits = (h + pad * 2) * s <= vh();
+    M.cam = { s, x: vw() / 2 - (x + w / 2) * s, y: fits ? vh() / 2 - (y + h / 2) * s : (pad - y + 40) * s };
+    clampCam();
+    apply(animate);
+  }
+  const home = (animate = true) => fly(0, -60, M.W, M.H + 60, 0, 60, animate);
+  function flyToNode(n, animate = true) {
+    if (n.kind === "station") return fly(n.column.x, n.y - 60, n.column.w, n.column.h + 60, 0.62, 40, animate);
+    if (n.kind === "moment") return fly(n.x, n.y - 40, n.w, (n.bottom ?? n.y + n.h) - n.y + 40, 1.2, 40, animate);
+    if (n.kind === "action") return fly(n.x, n.y, n.w, n.h, n.children.length ? 2.5 : 1.3, 40, animate);
+    if (n.kind === "custody") return fly(n.x, n.y, n.w, n.h, 1.3, 40, animate);
+    if (n.kind === "lab") return fly(n.x, n.y, n.w, n.h, 1.2, 40, animate);
+    return fly(n.x, n.y, n.w, n.h, MAX, 40, animate);
+  }
+  const flyTo = (id, animate = true) => { const n = M.tree.byId.get(id); if (n) flyToNode(n, animate); return !!n; };
+
+  // Where are we? Derived from the world point under the viewport centre.
+  function here() {
+    const { cam, tree } = M;
+    const cx = (vw() / 2 - cam.x) / cam.s, cy = (vh() / 2 - cam.y) / cam.s;
+    const hit = (n) => cx >= n.x && cx <= n.x + n.w && cy >= n.y && cy <= n.y + n.h;
+    const path = [];
+    // At (or below) the whole-map fit scale, no single station is "current" —
+    // gate on homeScale() itself rather than a fixed constant, since the fit
+    // scale depends on how much content there is.
+    if (cam.s <= homeScale() + 1e-6) return path;
+    const station = tree.nodes.find((n) => n.kind === "station" && cx >= n.column.x && cx < n.column.x + n.column.w && cy >= n.y - 80 && cy <= n.y + n.column.h + 80);
+    if (!station) return path;
+    path.push(station);
+    const moment = station.children.find((n) => n.kind === "moment" && cx >= n.x - G.gap / 2 && cx < n.x + n.w + G.gap / 2 && cy >= n.y - 60);
+    if (!moment || cam.s < 0.9) return path;
+    path.push(moment);
+    const action = moment.children.find((n) => n.kind === "action" && hit(n));
+    if (!action || cam.s < 1.6) return path;
+    path.push(action);
+    const tile = action.children.find((n) => hit(n));
+    if (tile && cam.s >= 2.6) path.push(tile);
+    return path;
+  }
+  const crumbLabel = (n) => (n.kind === "action" && n.actor ? `${ACTOR_NAMES[n.actor]}: ${n.label}` : n.label);
+  function paintPath() {
+    const crumbs = $("#crumbs");
+    if (!crumbs) return;
+    const path = here();
+    crumbs.innerHTML = [`<button type="button" data-home>Whole map</button>`, ...path.map((n) => `<button type="button" data-fly="${n.id}">${esc(crumbLabel(n))}</button>`)].join("<i>›</i>");
+    crumbs.lastElementChild.setAttribute("aria-current", "location");
+    const level = $("#zoom-level");
+    if (level) level.textContent = `${Math.round(M.cam.s * 100)}%`;
+  }
+  function zoomOut() {
+    const path = here();
+    if (path.length < 2) return home();
+    flyToNode(path[path.length - 2]);
+  }
+  function zoomBy(f) {
+    const { cam } = M, px = vw() / 2, py = vh() / 2;
+    const ns = clamp(cam.s * f, homeScale() * 0.8, MAX);
+    cam.x = px - (px - cam.x) * (ns / cam.s);
+    cam.y = py - (py - cam.y) * (ns / cam.s);
+    cam.s = ns;
+    clampCam();
+    apply(true);
+  }
+
+  /* ---------- Input ---------- */
+  function wireInput() {
+    const { mapEl } = M;
+    mapEl.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const r = mapEl.getBoundingClientRect(), { cam } = M;
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      const ns = clamp(cam.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), homeScale() * 0.8, MAX);
+      cam.x = px - (px - cam.x) * (ns / cam.s);
+      cam.y = py - (py - cam.y) * (ns / cam.s);
+      cam.s = ns;
+      clampCam();
+      apply(false);
+      document.body.classList.add("touched");
+    }, { passive: false });
+    let drag = null, swallowClick = false;
+    mapEl.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || e.target.closest("input, a, select, button, label")) return;
+      drag = { x: e.clientX, y: e.clientY, cx: M.cam.x, cy: M.cam.y, moved: false, id: e.pointerId };
+    });
+    mapEl.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+      if (!drag.moved) mapEl.setPointerCapture(drag.id); // capture only once it is really a drag, so plain clicks keep their target
+      drag.moved = true;
+      mapEl.classList.add("dragging");
+      M.cam.x = drag.cx + dx; M.cam.y = drag.cy + dy;
+      clampCam();
+      apply(false);
+    });
+    const endDrag = () => { if (drag?.moved) { swallowClick = true; document.body.classList.add("touched"); } drag = null; mapEl.classList.remove("dragging"); };
+    mapEl.addEventListener("pointerup", endDrag);
+    mapEl.addEventListener("pointercancel", endDrag);
+    mapEl.addEventListener("click", (e) => {
+      if (swallowClick) { swallowClick = false; return; }
+      if (e.target.closest("input, a, select, button, label, .lab-host")) return;
+      const card = e.target.closest(".card");
+      if (!card) return;
+      const node = M.tree.byId.get(card.dataset.id);
+      const path = here();
+      if (path[path.length - 1] === node && node.kind !== "station") return zoomOut();
+      flyToNode(node);
+      document.body.classList.add("touched");
+    });
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-fly], [data-home], [data-zoom]");
+      if (!b) return;
+      if (b.dataset.home !== undefined) home();
+      else if (b.dataset.fly !== undefined) flyTo(b.dataset.fly);
+      else zoomBy(b.dataset.zoom === "+" ? 1.5 : 1 / 1.5);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.target.closest("input, textarea, select")) return;
+      if (e.key === "Escape") zoomOut();
+      if (e.key === "+" || e.key === "=") zoomBy(1.5);
+      if (e.key === "-") zoomBy(1 / 1.5);
+      if (e.key === "0") home();
+    });
+    // R9: at the whole-map view, resizing re-fits; otherwise it clamps and
+    // keeps the camera in place rather than moving the reader's viewpoint.
+    addEventListener("resize", () => {
+      if (!here().length) return home(false);
+      clampCam();
+      apply(false);
+    });
+  }
+
+  const state = () => ({ scale: M.cam.s, lod: currentLod, path: here().map((n) => n.id) });
 
   function boot() {
     document.fonts.ready.then(() => { window.IvyMap.mounted = mount(); });
@@ -252,5 +414,5 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 
-  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G };
+  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G, state, flyTo, home, zoomOut, zoomBy, here, _cam: () => ({ ...M.cam }) };
 })();
