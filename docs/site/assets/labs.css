@@ -1,5 +1,24 @@
 /* Styling for the interactive labs mounted inside map cards. Every rule below
-   is copied unchanged from atlas.css, roman.css and docs.css. */
+   is copied unchanged from atlas.css, roman.css and docs.css, except the two
+   marked "guide.css" — the fee lab's range input and its end labels are reset
+   there (not in atlas.css), and without that reset the input's default
+   UA margin overflows a 276px-wide lab card by a couple of pixels. */
+
+/* input[type="range"], .range-ends (guide.css) */
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--guide-green);
+  cursor: pointer;
+  margin: 12px 0 0;
+  padding: 0;
+  height: 24px;
+}
+.range-ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--faint);
+  font: 10px var(--mono);
+}
 
 /* .interactive-example (atlas.css) */
 .interactive-example input[type="checkbox"],
@@ -26,6 +45,246 @@
   .interactive-example input,
   .interactive-example select {
     display: none;
+  }
+}
+
+/* .inscription (atlas.css) */
+.inscription {
+  display: block;
+  color: var(--bronze);
+  font: 10px/1.6 var(--mono);
+  letter-spacing: 0.1em;
+  text-align: start;
+}
+
+/* .example-status (atlas.css) */
+.example-status {
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: start;
+  color: var(--muted);
+  min-height: 2.5em;
+}
+
+/* .field-label (atlas.css) */
+.field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+
+/* .display-rounding (atlas.css) */
+.display-rounding {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: start;
+}
+
+/* .consent-example, .consent-controls (atlas.css) */
+.consent-example {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  padding-block: 30px;
+  border-block: 1px solid var(--line-strong);
+}
+.consent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 22px 0;
+}
+
+/* .consent-example (roman.css theme override) */
+.consent-example {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* .fee-laboratory, .fee-controls, .large-amount (atlas.css) */
+.fee-laboratory {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 40px;
+  padding: 30px 0;
+  align-items: center;
+  border-block: 1px solid var(--line);
+}
+.fee-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.large-amount {
+  font-family: var(--atlas-serif);
+  font-size: 43px;
+  font-weight: 400;
+}
+.large-amount small {
+  font: 12px var(--mono);
+}
+.fee-controls > span,
+.fee-controls label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.fee-controls label {
+  margin-top: 18px;
+}
+.fee-controls output {
+  display: block;
+  color: var(--ink);
+  margin-top: 8px;
+}
+
+/* .fee-laboratory (roman.css theme override) */
+.fee-laboratory {
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 32px;
+}
+.fee-laboratory {
+  border-bottom: 0;
+}
+
+/* .fee-distribution .fee-labels (roman.css theme override) */
+.fee-distribution .fee-labels span::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  background: var(--ink);
+}
+.fee-distribution .fee-labels > div:last-child span::before {
+  background: var(--accent);
+}
+
+/* .release-atlas (atlas.css) */
+.release-atlas {
+  margin: 30px 0;
+}
+
+/* .cash-accounting and its children (atlas.css) */
+.cash-accounting {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  padding-block: 24px;
+}
+.cash-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cash-inputs label,
+.cash-inputs > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.cash-inputs output {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink);
+}
+.cash-inputs select {
+  width: 100%;
+  min-width: 0;
+}
+.cash-distribution {
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  padding: 24px;
+}
+.cash-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.cash-total > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.cash-total strong {
+  font-size: 22px;
+  font-weight: 500;
+}
+.cash-split-label {
+  margin: 20px 0 12px;
+  font-size: 12px;
+  text-align: start;
+}
+.cash-balance-labels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 18px;
+  text-align: start;
+}
+.cash-balance-labels span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.cash-balance-labels strong {
+  display: block;
+  font-size: clamp(18px, 2vw, 25px);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0 4px;
+}
+.cash-balance-labels .cash-allocation-label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--ink);
+}
+.cash-allocation-label i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+}
+.cash-buyer-key {
+  background: var(--accent);
+}
+.cash-pool-key {
+  background: var(--ink);
+}
+.cash-balance-labels p {
+  margin: 16px 0 0;
+  font-size: 12px;
+  text-align: start;
+}
+.cash-balance-labels p span {
+  margin-top: 6px;
+}
+#cash-outcome-note {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin: 20px 0 0;
+  font-size: 12px;
+  text-align: start;
+}
+.cash-distribution .display-rounding {
+  margin: 8px 0 0;
+  font-size: 10px;
+  text-align: start;
+}
+#cash-calculation {
+  font: 11px var(--mono);
+  color: var(--muted);
+  margin: 12px 0 0;
+  text-align: start;
+}
+@media (max-width: 380px) {
+  .cash-balance-labels strong {
+    font-size: 16px;
+  }
+  .cash-total strong {
+    font-size: 20px;
   }
 }
 
@@ -494,4 +753,105 @@
   padding: 16px 20px;
   color: var(--accent);
   border-bottom: 1px solid var(--line);
+}
+
+/* A mounted lab card (.card.lab, from map.css) is always ~276 world px wide —
+   narrower than every breakpoint above. Apply the same narrow-viewport variants
+   of the moved rules unconditionally instead of behind @media, since the card's
+   CSS pixel width does not track the browser viewport width. Values below are
+   copied unchanged from the @media (max-width: 760px)/(max-width: 1150px) blocks
+   in docs.css/atlas.css/roman.css; where two source blocks target the same
+   selector, both are kept, in source order, so the cascade resolves the same way
+   it would at a real narrow viewport. */
+.card.lab .calc .inputs {
+  grid-template-columns: 1fr;
+}
+.card.lab .consent-example,
+.card.lab .fee-laboratory,
+.card.lab .cash-accounting,
+.card.lab .release-branches {
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+.card.lab .release-branches {
+  gap: 0;
+}
+.card.lab .cash-balance-labels strong {
+  font-size: 18px;
+}
+.card.lab .cash-distribution {
+  padding: 16px;
+}
+.card.lab .cash-balance-labels {
+  gap: 12px;
+}
+.card.lab .fee-controls {
+  max-width: 100%;
+}
+.card.lab .plate-select {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.card.lab .plate-select button {
+  padding: 13px 8px;
+  font-size: 10px;
+}
+.card.lab .actor-route {
+  gap: 24px;
+}
+.card.lab .actor-route strong {
+  font-size: 14px;
+}
+.card.lab .actor-route span {
+  font-size: 10px;
+}
+.card.lab .actor-route li + li::before {
+  left: -19px;
+  top: 0;
+  font-size: 18px;
+}
+.card.lab .settled-example {
+  margin-top: 15px;
+  flex-direction: row;
+  align-items: center;
+}
+.card.lab .settled-example select {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  font-size: 11px;
+}
+.card.lab .custody-compartments,
+.card.lab .custody-compartments.with-buyer-reserve {
+  grid-template-columns: 1fr;
+  padding: 7px;
+  gap: 7px;
+}
+.card.lab .custody-compartments > div {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.card.lab .custody-compartments h4 {
+  font-size: 17px;
+  margin: 0;
+}
+.card.lab .custody-compartments p {
+  grid-column: 2;
+  font-size: 11px;
+}
+.card.lab .cash-balance-labels strong {
+  font-size: 16px;
+}
+.card.lab .cash-total strong {
+  font-size: 20px;
+}
+
+/* No source breakpoint ever gets this narrow, so there is no existing rule to
+   copy for this one: the registry's 32px, single-word "IvyVaultsRegistry"
+   heading cannot wrap and overflows a 276px card unless it can break. */
+.card.lab .registry-node h3 {
+  overflow-wrap: anywhere;
 }

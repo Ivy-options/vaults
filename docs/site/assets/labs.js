@@ -11,8 +11,8 @@
     const sync = () => {
       const bps = Number(rate.value), fee = (1000 * bps) / 10000;
       out.textContent = `${bps.toLocaleString("en-US")} bps · ${bps / 100}%`;
-      net.textContent = `${(1000 - fee).toLocaleString("en-US")} USDC`;
-      treasury.textContent = `${fee.toLocaleString("en-US")} USDC`;
+      net.textContent = `${1000 - fee} USDC`;
+      treasury.textContent = `${fee} USDC`;
       if (bar) { bar.children[0].style.width = `${100 - bps / 100}%`; bar.children[1].style.width = `${bps / 100}%`; bar.setAttribute("aria-label", `${1000 - fee} USDC to LPs; ${fee} USDC to treasury`); }
     };
     rate.addEventListener("input", sync);
