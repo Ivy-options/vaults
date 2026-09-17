@@ -248,7 +248,9 @@
     if (window.IvyLabs?.mountAll) window.IvyLabs.mountAll(worldEl);
     M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height };
     wireInput();
-    home(false);
+    wireSearch(); wireKeys(); wireTouch(); wireChrome();
+    followHash(false);
+    addEventListener("hashchange", () => followHash(true));
     return M;
   }
 
@@ -268,6 +270,7 @@
     if (!(animate && !reduced())) requestAnimationFrame(() => (worldEl.style.transition = ""));
     setLod(lodOf(cam.s), worldEl);
     paintPath();
+    syncHash();
     M.mapEl.dispatchEvent(new CustomEvent("map:moved"));
   }
   // Frame a world rect. minS forces at least that zoom so the next tier is readable.
@@ -406,6 +409,125 @@
     });
   }
 
+  /* ---------- Hash and aliases ---------- */
+  const ALIASES = {}; // old anchor id → node id. Filled by content tasks.
+  const resolveHash = (hash) => { const id = decodeURIComponent((hash || "").replace(/^#/, "")); if (!id) return null; return M.tree.byId.get(id) || M.tree.byId.get(ALIASES[id]) || null; };
+  let settingHash = false;
+  function syncHash() {
+    const path = here();
+    const id = path.length ? path[path.length - 1].id : "";
+    if (location.hash.replace(/^#/, "") === id) return;
+    settingHash = true;
+    history.replaceState(null, "", id ? `#${id}` : location.pathname + location.search);
+    settingHash = false;
+  }
+  function followHash(animate) {
+    if (settingHash) return;
+    const n = resolveHash(location.hash);
+    if (n) flyToNode(n, animate); else if (location.hash === "" || location.hash === "#") home(animate);
+  }
+
+  /* ---------- Search ---------- */
+  const textOf = (n) => `${n.label} ${n.when} ${n.tagline} ${n.summary} ${n.source.textContent}`.replace(/\s+/g, " ").toLowerCase();
+  function search(query) {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const scored = M.tree.nodes.map((n) => {
+      const label = n.label.toLowerCase(), text = textOf(n);
+      const score = label === q ? 4 : label.includes(q) ? 3 : n.summary.toLowerCase().includes(q) ? 2 : text.includes(q) ? 1 : 0;
+      return { node: n, score };
+    }).filter((h) => h.score).sort((a, b) => b.score - a.score || a.node.depth - b.node.depth);
+    return scored.slice(0, 8).map((h) => ({ node: h.node, path: pathLabels(h.node) }));
+  }
+  const pathLabels = (n) => { const out = []; for (let p = n.parent; p; p = p.parent) out.unshift(p.label); return out; };
+  function wireSearch() {
+    const input = $("#search-input"), list = $("#search-results");
+    if (!input || !list) return;
+    let hits = [];
+    const paint = () => {
+      hits = search(input.value);
+      list.hidden = !hits.length;
+      list.innerHTML = hits.map((h, i) => `<li><button type="button" data-hit="${i}">${esc(h.node.label)}<small>${esc(h.path.join(" › "))}</small></button></li>`).join("");
+    };
+    input.addEventListener("input", paint);
+    input.addEventListener("focus", paint);
+    input.closest("form").addEventListener("submit", (e) => { e.preventDefault(); if (hits[0]) go(hits[0]); });
+    list.addEventListener("click", (e) => { const b = e.target.closest("[data-hit]"); if (b) go(hits[+b.dataset.hit]); });
+    document.addEventListener("click", (e) => { if (!e.target.closest("#search")) list.hidden = true; });
+    function go(hit) { list.hidden = true; input.blur(); flyToNode(hit.node); focusCard(hit.node); }
+  }
+
+  /* ---------- Keyboard navigation between cards ---------- */
+  let focused = null;
+  function focusCard(n) { focused = n; n.el.focus({ preventScroll: true }); }
+  function wireKeys() {
+    const mapEl = M.mapEl;
+    mapEl.addEventListener("keydown", (e) => {
+      if (e.target.closest("input, select, textarea")) return;
+      const path = here();
+      const current = focused && M.tree.byId.get(focused.id) ? focused : path[path.length - 1] || null;
+      const siblings = (n) => (n.parent ? n.parent.children : M.tree.nodes.filter((s) => s.kind === "station" && s.band === n.band));
+      let next = null;
+      if (e.key === "Home") next = M.tree.nodes.find((s) => s.kind === "station");
+      else if (!current) { if (e.key.startsWith("Arrow")) next = M.tree.nodes.find((s) => s.kind === "station"); }
+      else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        const list = siblings(current), i = list.indexOf(current);
+        next = list[(i + (e.key === "ArrowRight" ? 1 : list.length - 1)) % list.length];
+      } else if (e.key === "ArrowDown") next = current.children.find((c) => c.kind !== "custody") || current.children[0] || null;
+      else if (e.key === "ArrowUp") next = current.parent;
+      else if (e.key === "Enter" && current) { e.preventDefault(); flyToNode(current); focusCard(current); return; }
+      if (!next) return;
+      e.preventDefault();
+      flyToNode(next);
+      focusCard(next);
+    });
+    mapEl.addEventListener("focusin", (e) => { const card = e.target.closest(".card"); if (card) focused = M.tree.byId.get(card.dataset.id); });
+  }
+
+  /* ---------- Touch: one finger pans (pointer events already do), two fingers pinch ---------- */
+  function wireTouch() {
+    const mapEl = M.mapEl, pts = new Map();
+    let pinch = null;
+    mapEl.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") pts.set(e.pointerId, e); });
+    mapEl.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "touch" || !pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, e);
+      if (pts.size !== 2) return;
+      const [a, b] = [...pts.values()];
+      const r = mapEl.getBoundingClientRect();
+      const mid = { x: (a.clientX + b.clientX) / 2 - r.left, y: (a.clientY + b.clientY) / 2 - r.top };
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      if (!pinch) { pinch = { dist, s: M.cam.s }; return; }
+      const { cam } = M;
+      const ns = clamp(pinch.s * (dist / pinch.dist), homeScale() * 0.8, MAX);
+      cam.x = mid.x - (mid.x - cam.x) * (ns / cam.s);
+      cam.y = mid.y - (mid.y - cam.y) * (ns / cam.s);
+      cam.s = ns;
+      clampCam();
+      apply(false);
+    });
+    const lift = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+    mapEl.addEventListener("pointerup", lift);
+    mapEl.addEventListener("pointercancel", lift);
+  }
+
+  /* ---------- Reading view and theme ---------- */
+  function wireChrome() {
+    const toggle = $("#reading-toggle");
+    if (toggle) toggle.addEventListener("click", () => {
+      const on = document.body.classList.toggle("reading");
+      toggle.setAttribute("aria-pressed", String(on));
+      if (on) { const n = here().at(-1); if (n) n.source.scrollIntoView({ block: "start" }); }
+    });
+    if (new URLSearchParams(location.search).get("view") === "text") { document.body.classList.add("reading"); toggle?.setAttribute("aria-pressed", "true"); }
+    const theme = $("#themeToggle"), root = document.documentElement;
+    if (theme) {
+      const label = () => (theme.textContent = `Theme · ${root.dataset.theme}`);
+      theme.addEventListener("click", () => { root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark"; try { localStorage.setItem("ivy-theme", root.dataset.theme); } catch (_) {} label(); M.mapEl.dispatchEvent(new CustomEvent("map:theme")); });
+      label();
+    }
+  }
+
   const state = () => ({ scale: M.cam.s, lod: currentLod, path: here().map((n) => n.id) });
 
   function boot() {
@@ -414,5 +536,5 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 
-  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G, state, flyTo, home, zoomOut, zoomBy, here, _cam: () => ({ ...M.cam }) };
+  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G, state, flyTo, home, zoomOut, zoomBy, here, _cam: () => ({ ...M.cam }), ALIASES, search, resolveHash };
 })();

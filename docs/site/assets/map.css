@@ -12,9 +12,10 @@ body.map-ready #map { display: block; flex: 1 1 auto; }
 body.map-ready #toolbar { display: flex; }
 body.map-ready #document { display: none; }
 
-body.map-ready.reading #map,
-body.map-ready.reading #toolbar { display: none; }
-body.map-ready.reading #document { display: block; overflow: auto; }
+/* The toolbar stays put in reading view: it still shows where the reader is,
+   and its reading-toggle button is the only way back to the map. */
+body.map-ready.reading #map { display: none; }
+body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 auto; }
 
 /* ---------- Connectors ---------- */
 .line { position: absolute; background: var(--line-strong); opacity: 0.7; }
