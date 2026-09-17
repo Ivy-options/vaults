@@ -871,3 +871,18 @@ input[type="range"] {
 .card.lab .registry-node h3 {
   overflow-wrap: anywhere;
 }
+
+/* Map cards are sized from a lab's initial state, and route buttons swap the
+   content afterwards. Reserve the tallest actor-routes state so the card fits
+   every route. Measured at the 276px card width: the button grid is 82px; the
+   Market maker route (three steps) is 115px with no note, the LP route is 68px
+   plus a 42px note (110px). The reserve sits on the whole widget rather than on
+   .actor-route alone, because a 115px route list plus the LP note would still
+   overflow. */
+.card.lab [data-lab="actor-routes"] {
+  min-height: calc(82px + 115px);
+}
+/* Safety net: any lab state that still grows scrolls inside its card. */
+.card.lab > [data-tier] {
+  overflow-y: auto;
+}

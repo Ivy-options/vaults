@@ -76,7 +76,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
   }
 });
 
-test("a lab card is sized to its mounted widget, not its empty markup", async () => {
+test("a lab card is sized to its mounted widget and fits every actor route", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "index-map.html");
   try {
@@ -90,6 +90,17 @@ test("a lab card is sized to its mounted widget, not its empty markup", async ()
       }, lod);
       assert.ok(size.sh <= size.ch + 1, `vertical overflow at lod ${lod}: ${JSON.stringify(size)}`);
       assert.ok(size.sw <= size.cw + 1, `horizontal overflow at lod ${lod}: ${JSON.stringify(size)}`);
+    }
+    await page.evaluate(() => IvyMap.flyTo("actor-routes-lab", false));
+    const card = page.locator('#world .card[data-id="actor-routes-lab"]');
+    for (const route of [0, 1, 2, 3]) {
+      await card.locator(`[data-route="${route}"]`).click();
+      const size = await card.evaluate((c) => {
+        const layer = c.querySelector(`:scope > [data-tier="${c.dataset.show}"]`);
+        return { pressed: c.querySelector("[aria-pressed=true]").dataset.route, sh: layer.scrollHeight, ch: layer.clientHeight };
+      });
+      assert.equal(size.pressed, String(route));
+      assert.ok(size.sh <= size.ch + 1, `vertical overflow after picking route ${route}: ${JSON.stringify(size)}`);
     }
     assert.deepEqual(errors, []);
   } finally {
