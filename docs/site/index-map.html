@@ -31,6 +31,94 @@
   <div id="map" tabindex="0" aria-label="Lifecycle map"><div id="world"></div></div>
   <main id="document" class="content doc-page"><article>
     <h1>Ivy Vaults</h1>
+    <section data-kind="station" id="before-the-vault" data-tagline="A vault is one smart contract for one option trade. The buyer pays a premium for the right to trade at a strike; depositors back it.">
+      <h2>Before the vault</h2>
+      <p>Deposit assets to back one option, earn its premium, and claim what remains when the option ends. An Ivy vault is a smart contract for a single option trade. The buyer pays an upfront premium for the right to trade an agreed asset at an agreed price, the strike. Using that right is exercising. Depositors provide the backing, so what they receive depends on whether the buyer exercises. Selling another option requires a new vault.</p>
+      <p>For example, an option on WETH might have a strike of 3,000 USDC per WETH. WETH is the underlying token; USDC is the quote token. A call gives the buyer the right to buy WETH at the strike; a put gives the right to sell it.</p>
+      <p>With physical settlement, exercising exchanges those tokens. With cash settlement, the buyer receives the calculated payoff from the assets deposited in the vault instead.</p>
+      <section data-kind="moment" id="who-is-around-a-vault" data-when="every vault">
+        <h3>Who is around a vault</h3>
+        <p>LPs supply the seller's collateral and receive shares. A market maker buys the option. The owner manages the vault, the bid master selects the offer, and the protocol administrator is a separate role.</p>
+        <section data-kind="action" data-actor="owner" id="owner-sets-the-terms"><h4>Sets the terms</h4><p>The owner creates the vault and sets its tokens and trading terms. The owner may also be an LP and can fund the vault alone, accept deposits from other LPs, or both.</p></section>
+        <section data-kind="action" data-actor="lp" id="lp-supplies-collateral"><h4>Supplies collateral</h4><p>The LP deposits collateral, the asset set aside to meet the option's payment obligations, and receives shares in one vault. Shares determine its part of the premium and remaining assets.</p></section>
+        <section data-kind="action" data-actor="buyer" id="market-maker-buys-the-option"><h4>Buys and manages the option</h4><p>The market maker is the option buyer and manages the position through settlement. It proposes the premium and terms in a signed bid within the owner's limits, pays the premium at activation, and holds the right to exercise.</p></section>
+        <section data-kind="action" data-actor="bid" id="bid-master-selects"><h4>Selects and submits</h4><p>The bid master runs the auction off-chain, selects a buyer's signed bid and submits it to the Hub for activation.</p></section>
+        <section data-kind="action" data-actor="admin" id="protocol-administrator"><h4>Runs the protocol settings</h4><p>The protocol administrator manages global settings and permissions. That is separate from owning a vault.</p></section>
+        <section data-kind="action" data-actor="anyone" id="how-instructions-reach-a-vault"><h4>How instructions reach a vault</h4><p>Every instruction goes through the shared Hub, which validates it and calls the individual vault. Pick a character to see the route.</p>
+          <section data-kind="lab" id="actor-routes-lab"><h5>Who calls what</h5><div data-lab="actor-routes">
+            <div class="plate-select" aria-label="Highlight an instruction route">
+              <button type="button" data-route="0" aria-pressed="true">Owner</button>
+              <button type="button" data-route="1" aria-pressed="false">LP</button>
+              <button type="button" data-route="2" aria-pressed="false">Market maker</button>
+              <button type="button" data-route="3" aria-pressed="false">Bid master</button>
+            </div>
+            <ol class="actor-route" aria-label="Selected actor route"><li><strong>Market maker</strong><span>Offers premium and terms</span></li><li><strong>Bid master</strong><span>Selects off-chain</span></li><li><strong>Hub</strong><span>Collects premium and activates</span></li></ol>
+            <p class="vault-route-note" role="status"></p>
+          </div></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="how-custody-works" data-when="one Hub, many vaults">
+        <h3>How custody works</h3>
+        <p>The Hub validates instructions, collects the premium and moves the vault to Live. The individual vault holds the tokens and reserves, so token approvals target the vault's address.</p>
+        <section data-kind="action" data-actor="anyone" id="hub-and-vaults"><h4>One Hub, separate vaults</h4><p>The Hub is the shared entry point. It validates and coordinates and holds no tokens. Each vault holds its own tokens and reserves.</p>
+          <section data-kind="tile" id="hub-holds-nothing"><h5>The Hub holds nothing</h5><p>The Hub validates and coordinates calls to separate vaults. It has no token custody.</p></section>
+          <section data-kind="tile" id="approvals-target-the-vault"><h5>Approvals target the vault</h5><p>Approve the individual vault's address, never the Hub.</p></section>
+          <section data-kind="tile" id="pull-and-push"><h5>pull and push</h5><p>The Hub calls <code>pull(token, from, amount)</code> to receive tokens and <code>push(...)</code> to send them.</p></section>
+          <section data-kind="tile" id="deposit-routes"><h5>Two deposit routes</h5><p>Deposit calls can use the Hub or the vault directly; token approval targets the vault.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="who-may-act-for-the-buyer" data-when="set by the buyer">
+        <h3>Who may act for the buyer</h3>
+        <p>The buyer can use one wallet for the whole trade: it submits transactions and receives the assets. To split those jobs, the buyer can choose an executor, a recipient, or both.</p>
+        <section data-kind="action" data-actor="buyer" id="executor-and-recipient"><h4>Executor and recipient</h4><p>An executor submits exercise and payout-claim transactions for the buyer. A recipient is the address that receives the buyer's assets.</p>
+          <section data-kind="tile" id="executor"><h5>Executor</h5><p>An operator or bot. For physical exercise it must supply and approve the tokens that pay the vault.</p></section>
+          <section data-kind="tile" id="recipient"><h5>Recipient</h5><p>For example, an operator submits while the vault sends assets straight to the buyer's treasury or multisig.</p></section>
+          <section data-kind="tile" id="only-the-buyer-changes-them"><h5>Only the buyer changes them</h5><p>The buyer uses <code>set-execution</code>; an executor cannot change where assets are sent. A zero executor address revokes delegation.</p></section>
+          <section data-kind="tile" id="swap-adapter-not-implemented"><h5>A future swap adapter</h5><p>A recipient adapter could swap and route tokens, for example through NEAR. This is not implemented; setting a recipient alone does not swap.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="what-a-pause-means" data-when="any time">
+        <h3>What a pause means</h3>
+        <p>The guardian, an address with permission to pause new activity, can stop new commitments across the protocol or for one vault. This is called an admission pause.</p>
+        <section data-kind="action" data-actor="guardian" id="admission-pause-action"><h4>Pause new commitments</h4><p>A pause blocks new commitments but lets existing positions run under their normal rules, on their normal deadlines.</p>
+          <section data-kind="tile" id="what-a-pause-blocks"><h5>What it blocks</h5><p>New creation where applicable, deposits, auction opening and activation.</p></section>
+          <section data-kind="tile" id="what-a-pause-never-stops"><h5>What it never stops</h5><p>Withdrawals, transfers, exercise, expiration, claims and agreed unwinds that meet their normal rules.</p></section>
+          <section data-kind="tile" id="deadlines-do-not-move"><h5>Deadlines do not move</h5><p>A pause does not extend any deadline.</p></section>
+          <section data-kind="tile" id="how-to-pause"><h5>How to pause</h5><p><code>pause</code> with <code>vaultId: "0"</code> for global admission, or a specific ID for one vault. A paused vault must be unpaused before another deposit or auction.</p></section>
+        </section>
+      </section>
+    </section>
+    <section data-kind="station" id="open" data-tagline="Funding the vault and setting the terms. No option has been sold.">
+      <h2>Open</h2>
+      <p>No option has been sold yet. This is the stage for funding the vault and preparing the terms offered to buyers.</p>
+      <section data-kind="custody" id="open-custody"><h3>What the vault holds</h3><dl><dt>I · Backing</dt><dd>Deposited collateral: the vault's current balance of the chosen collateral token.</dd><dt>II · Premium and fees</dt><dd>Empty: no buyer payment has been collected.</dd></dl></section>
+      <section data-kind="moment" id="owner-creates-the-vault" data-when="t₀"><h3>Owner creates the vault</h3><p>The owner creates the vault with a fixed expiry, the two tokens, the settlement style, and the terms buyers may bid against. Expiry never moves after this.</p>
+        <section data-kind="action" data-actor="owner" id="set-the-terms"><h4>Set the terms</h4><p>A call vault can require a minimum strike and a minimum premium; a buyer's offer must meet both. While Open, limits can only get stricter, and immutable fields cannot change.</p>
+          <section data-kind="tile" id="token-roles"><h5>Three token roles</h5><p>Underlying, quote and premium. Collateral is whichever of the first two LPs deposit: 10 WETH for a covered call, 30,000 USDC for a cash-secured put at a 3,000 strike.</p></section>
+          <section data-kind="tile" id="calls-and-puts-pairs"><h5>Pairs</h5><p>A call may list several quote/premium pairs; a put accepts exactly one pair whose quote token is the collateral. The premium token may be the underlying, the quote, or a third token.</p></section>
+          <section data-kind="tile" id="settlement-choice"><h5>Physical or cash</h5><p>Physical at launch. Cash or Either require the optional cash feature enabled at creation; physical-only terms can never be loosened to cash.</p></section>
+          <section data-kind="tile" id="every-term" data-span="2"><h5>Every term, one by one</h5><p>The full list of terms, what activation checks for each, and what the owner may still change, is on the <a href="#vault-terms">Vault terms</a> shelf.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="lps-deposit-collateral" data-when="while Open"><h3>LPs deposit collateral</h3><p>LPs add collateral and receive shares in proportion. Only the owner may deposit unless the vault was created with public deposits enabled.</p>
+        <section data-kind="action" data-actor="lp" id="add-funds"><h4>Add funds</h4><p>A deposit adds collateral and mints shares. Deposits must not be paused.</p>
+          <section data-kind="tile" id="who-may-deposit"><h5>Who may deposit</h5><p>Anyone other than the owner can deposit only if the vault was created with <code>publicDeposits</code> enabled. Vaults default to private deposits.</p></section>
+          <section data-kind="tile" id="shares"><h5>Shares</h5><p>Shares determine an LP's part of the premium and of whatever remains at the end.</p></section>
+          <section data-kind="tile" id="approve-then-deposit"><h5>Approve, then deposit</h5><p>Each depositor runs <code>approve-token</code>, then <code>deposit</code> with the same raw amount. Approvals target the clone, never the Hub.</p></section>
+        </section>
+        <section data-kind="action" data-actor="lp" id="take-funds-back"><h4>Take funds back</h4><p>Return some or all shares to withdraw the matching collateral. The contract burns those shares. This route exists only while Open.</p></section>
+      </section>
+      <section data-kind="moment" id="owner-may-tighten-the-terms" data-when="any time while Open"><h3>Owner may tighten the terms</h3><p>The owner may only strengthen LP protections, for example by raising the minimum premium. Loosening terms after LPs have committed is not possible.</p>
+        <section data-kind="action" data-actor="owner" id="tighten-terms"><h4>Tighten terms</h4><p>Raise the minimum premium, raise the strike limit for calls or lower it for puts, disable a pair, lower the permitted in-the-money distance. Never the other way.</p></section>
+        <section data-kind="action" data-actor="owner" id="hand-over-ownership"><h4>Hand over ownership</h4><p>Management of the vault can be transferred to another address. There is no dedicated CLI command; use the ABI.</p></section>
+      </section>
+      <section data-kind="moment" id="owner-opens-or-schedules-the-auction" data-when="before expiry"><h3>Owner opens or schedules the auction</h3><p>The owner opens the auction directly or sets a start time. Once that time is reached anyone may submit the opening transaction; nothing happens by itself.</p>
+        <section data-kind="action" data-actor="owner" id="open-or-schedule"><h4>Open or schedule</h4><p>Open manually with <code>openAuction</code>, or set <code>auctionStartsAt</code>. Zero means only the owner may open.</p>
+          <section data-kind="tile" id="opening-conditions"><h5>Conditions</h5><p>Admissions unpaused, a nonzero collateral balance at or above <code>minCollateral</code>, and expiry still in the future.</p></section>
+          <section data-kind="tile" id="anyone-may-open-on-schedule"><h5>Anyone may open on schedule</h5><p>Once the scheduled time is reached, anyone can submit the opening transaction. A schedule does not submit it automatically.</p></section>
+        </section>
+      </section>
+    </section>
     <!-- Content sections are added in Tasks 9–12. -->
   </article></main>
   <footer><a href="license.html">License · BUSL-1.1</a></footer>

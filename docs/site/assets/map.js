@@ -428,7 +428,10 @@
   }
 
   /* ---------- Hash and aliases ---------- */
-  const ALIASES = {}; // old anchor id → node id. Filled by content tasks.
+  const ALIASES = { // old anchor id → node id. Filled by content tasks.
+    overview: "before-the-vault", participants: "who-is-around-a-vault", "execution-permissions": "who-may-act-for-the-buyer", "admission-pause": "what-a-pause-means",
+    lifecycle: "open", "token-roles-and-collateral": "token-roles", "admission-pause-and-stalled-auctions": "how-to-pause",
+  };
   const resolveHash = (hash) => { const id = decodeURIComponent((hash || "").replace(/^#/, "")); if (!id) return null; return M.tree.byId.get(id) || M.tree.byId.get(ALIASES[id]) || null; };
   let settingHash = false;
   function syncHash() {
