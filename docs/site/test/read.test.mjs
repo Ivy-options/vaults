@@ -31,3 +31,37 @@ test("readDocument turns nested sections into a node tree", async () => {
     await server.close();
   }
 });
+
+test("readDocument throws on authoring errors", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html");
+  try {
+    const results = await page.evaluate(() => {
+      const buildRoot = (html) => {
+        const div = document.createElement("div");
+        div.innerHTML = html;
+        return div.firstElementChild;
+      };
+      const tryRead = (html) => {
+        try {
+          IvyMap.readDocument(buildRoot(html));
+          return null;
+        } catch (e) {
+          return e.message;
+        }
+      };
+      return {
+        duplicate: tryRead('<main><article><section data-kind="station" id="dup"><h2>A</h2></section><section data-kind="station" id="dup"><h2>B</h2></section></article></main>'),
+        unknownKind: tryRead('<main><article><section data-kind="bogus" id="x"><h2>A</h2></section></article></main>'),
+        missingId: tryRead('<main><article><section data-kind="station"><h2>A</h2></section></article></main>'),
+      };
+    });
+    assert.match(results.duplicate, /Duplicate node id/);
+    assert.match(results.unknownKind, /Unknown data-kind/);
+    assert.match(results.missingId, /Section without id/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
