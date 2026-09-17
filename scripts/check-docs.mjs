@@ -64,8 +64,8 @@ for (const file of ["docs.css", "guide.css", "atlas.css", "roman.css", "referenc
   }
 }
 const ids = pageIds.get(pagePath);
-const js = readFileSync(resolve(site, "assets/docs.js"), "utf8");
-for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "atlas.js"]) {
+const js = readFileSync(resolve(site, "assets/labs.js"), "utf8");
+for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "atlas.js", "labs.js", "map.js"]) {
   new Script(readFileSync(resolve(site, "assets", file), "utf8"));
 }
 
@@ -103,19 +103,19 @@ const documentElement = {
   getAttribute: (key) => attributes.get(key),
   setAttribute: (key, value) => attributes.set(key, value),
 };
-runInNewContext(js, {
-  document: {
-    documentElement,
-    getElementById: (id) => elements[id],
-    querySelectorAll: () => [],
-  },
-  window: {
-    addEventListener() {},
-    matchMedia: () => ({ matches: true, addEventListener() {} }),
-  },
+// `window` is self-referential, as in a real browser, so that labs.js's closing
+// `window.IvyLabs = {...}` also defines the bare `IvyLabs` global used below.
+const sandbox = {
+  document: { documentElement, addEventListener() {}, querySelector: () => null },
+  scope: { querySelector: (s) => elements[s.replace(/^#/, "")] || null, querySelectorAll: () => [] },
+  CSS: { escape: (s) => s },
   localStorage: { getItem: () => null, setItem() {} },
   getComputedStyle: () => ({ getPropertyValue: () => "#888" }),
-});
+  addEventListener() {},
+  matchMedia: () => ({ matches: true, addEventListener() {} }),
+};
+sandbox.window = sandbox;
+runInNewContext(js + "\nIvyLabs.payoff(scope);", sandbox);
 function update(values) {
   for (const [id, value] of Object.entries(values)) elements[id].value = value;
   inputCallbacks.dep();

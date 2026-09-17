@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Labs fixture</title>
+    <link rel="stylesheet" href="../../assets/docs.css" />
+    <link rel="stylesheet" href="../../assets/roman.css" />
+    <link rel="stylesheet" href="../../assets/labs.css" />
+  </head>
+  <body>
+    <main id="document">
+      <article>
+        <div class="fee-laboratory interactive-example" data-lab="fees">
+          <div class="fee-controls">
+            <span class="inscription">ILLUSTRATIVE ACTIVATION</span
+            ><strong class="large-amount">1,000 <small>USDC</small></strong
+            ><span>Gross premium, before fees</span
+            ><label for="fee-rate"
+              >Vault fee fixed at creation
+              <output id="fee-rate-output">200 bps · 2%</output></label
+            ><input
+              id="fee-rate"
+              type="range"
+              min="0"
+              max="10000"
+              step="10"
+              value="200"
+              disabled
+            />
+            <div class="range-ends">
+              <span>0 bps</span><span>10,000 bps</span>
+            </div>
+          </div>
+          <div class="fee-distribution">
+            <div
+              class="fee-bar"
+              id="fee-example-bar"
+              role="img"
+              aria-label="980 USDC to LPs and 20 USDC to treasury"
+            >
+              <span></span><i></i>
+            </div>
+            <div class="fee-labels" role="status" aria-atomic="true">
+              <div>
+                <span>LP premium</span><strong id="fee-net">980 USDC</strong>
+              </div>
+              <div>
+                <span>Treasury fee</span
+                ><strong id="fee-treasury">20 USDC</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="calc" data-lab="payoff">
+          <p id="calcError" class="calc-error" role="status" hidden></p>
+          <div class="inputs">
+            <label
+              >Kind
+              <select id="kind">
+                <option value="call">Covered call</option>
+                <option value="put">Cash-secured put</option>
+              </select>
+            </label>
+            <label
+              ><span id="depLabel">Deposit (WETH)</span
+              ><input id="dep" type="number" step="any" value="10" aria-describedby="calcError"
+            /></label>
+            <label id="entryPriceField"
+              >Today's WETH price (USDC)<input
+                id="entryPrice"
+                aria-describedby="calcError"
+                type="number"
+                min="0.01"
+                step="any"
+                value="3000"
+            /></label>
+            <label
+              >Strike price (USDC / WETH)<input
+                id="strike"
+                aria-describedby="calcError"
+                type="number"
+                step="any"
+                value="3000"
+            /></label>
+            <label
+              >Premium (USDC / WETH)<input
+                id="prem"
+                aria-describedby="calcError"
+                type="number"
+                step="any"
+                value="100"
+            /></label>
+            <label
+              >Capital committed (days)<input
+                id="days"
+                aria-describedby="calcError"
+                type="number"
+                min="0.01"
+                step="any"
+                value="30"
+            /></label>
+          </div>
+          <div class="body">
+            <div class="chart">
+              <svg
+                id="calcChart"
+                viewBox="0 0 420 250"
+                role="img"
+                aria-label="LP total value including earned premium versus illustrative market price, assuming physical exercise when in the money"
+              ></svg>
+              <div class="figcap">
+                <span
+                  >LP total value including earned premium, quote terms</span
+                ><span
+                  ><span class="sw"></span>LP total &nbsp;
+                  <span class="sw dash"></span>hold collateral</span
+                >
+              </div>
+            </div>
+            <div
+              class="results"
+              tabindex="0"
+              role="region"
+              aria-label="Calculated physical delivery results"
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>LP total, including earned premium</th>
+                    <th class="num">WETH</th>
+                    <th class="num">USDC</th>
+                    <th>Market maker</th>
+                  </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+              </table>
+              <div class="derived">
+                <span>Notional <b id="notional">10 WETH</b></span
+                ><span
+                  >Premium earned at activation
+                  <b id="premTotal">1,000 USDC</b></span
+                ><span
+                  >Premium yield for this period
+                  <b id="premiumYield">–</b></span
+                ><span>Estimated annual premium rate (APR) <b id="premiumApr">–</b></span
+                ><span id="calcNote"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cash-accounting interactive-example" data-lab="cashAmounts">
+          <div class="cash-inputs">
+            <label for="cash-kind-demo">Cash vault example</label
+            ><select id="cash-kind-demo" disabled>
+              <option value="call">Call · 10 WETH</option>
+              <option value="put">Put · 30,000 USDC</option></select
+            ><label for="cash-price-demo"
+              >Final expiry price
+              <output id="cash-price-output"
+                >3,300 USDC / WETH</output
+              ></label
+            ><input
+              id="cash-price-demo"
+              type="range"
+              min="2200"
+              max="3800"
+              step="100"
+              value="3300"
+              disabled
+            /><span>10 WETH notional · 3,000 strike</span>
+          </div>
+          <div class="cash-distribution">
+            <div class="cash-total">
+              <span>Vault collateral</span>
+              <strong id="cash-total-value">10 WETH</strong>
+            </div>
+            <p class="cash-split-label">Allocation after <code>expire()</code></p>
+            <div
+              class="cash-balance-bar"
+              role="img"
+              aria-label="Buyer payout 0.9091 WETH; pool 9.0909 WETH"
+            >
+              <span id="cash-buyer-bar"></span><i></i>
+            </div>
+            <div class="cash-balance-labels" role="status">
+              <div>
+                <span class="cash-allocation-label"><i class="cash-buyer-key" aria-hidden="true"></i>Buyer reserve</span
+                ><strong id="cash-buyer-value">0.9091 WETH</strong>
+                <span id="cash-buyer-percent">9.09% of collateral</span>
+                <p><code>claimPayout()</code><span>Paid to the configured recipient.</span></p>
+              </div>
+              <div>
+                <span class="cash-allocation-label"><i class="cash-pool-key" aria-hidden="true"></i>Shareholder pool</span
+                ><strong id="cash-pool-value">9.0909 WETH</strong>
+                <span id="cash-pool-percent">90.91% of collateral</span>
+                <p><code>claim()</code><span>Collected in proportion to shares.</span></p>
+              </div>
+            </div>
+            <p id="cash-outcome-note">Both allocations stay in WETH until claimed.</p>
+            <p id="cash-calculation">
+              10 × (3,300 − 3,000) / 3,300 ≈ 0.9091 WETH
+            </p>
+            <p class="display-rounding">
+              Token amounts rounded to four decimals; percentages to two.
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="consent-example interactive-example"
+          aria-label="Illustrative unwind consent and refund"
+          data-lab="consent"
+        >
+          <div>
+            <span class="inscription"
+              >CONSENT EXAMPLE · 60 / 40 OWNERSHIP</span
+            >
+            <div class="consent-controls">
+              <label
+                ><input
+                  id="consent-buyer"
+                  type="checkbox"
+                  checked
+                  disabled
+                />Buyer signature</label
+              ><label
+                ><input id="consent-a" type="checkbox" checked disabled />LP
+                A · 60%</label
+              ><label
+                ><input id="consent-b" type="checkbox" checked disabled />LP
+                B · 40%</label
+              >
+            </div>
+            <div
+              class="ownership-bar"
+              role="img"
+              aria-label="All current shares approve"
+            >
+              <span class="ownership-a">60%</span
+              ><span class="ownership-b">40%</span>
+            </div>
+            <p class="example-status" id="consent-status" role="status">
+              Buyer signed · 100% of current shares approve
+            </p>
+          </div>
+          <div>
+            <label class="field-label" for="unwind-refund"
+              >Agreed refund example</label
+            ><select id="unwind-refund" disabled>
+              <option value="100">100 USDC</option>
+              <option value="0">Zero refund</option>
+            </select>
+            <div class="refund-equation">
+              <span>LP A<strong id="refund-a">60 USDC</strong></span
+              ><span aria-hidden="true">+</span
+              ><span>LP B<strong id="refund-b">40 USDC</strong></span
+              ><span aria-hidden="true">→</span
+              ><span
+                >Buyer reserve<strong id="refund-total"
+                  >100 USDC</strong
+                ></span
+              >
+            </div>
+            <p id="refund-note">
+              A 100 USDC refund is <code>100000000</code> raw units when USDC
+              has six decimal places. The LPs fund it before execution;
+              the caller who executes the agreement does not supply it.
+            </p>
+          </div>
+        </div>
+
+        <div class="release-atlas interactive-example" data-lab="releases">
+          <div class="registry-node">
+            <span class="inscription">PERMANENT DISCOVERY ADDRESS</span>
+            <h3>IvyVaultsRegistry</h3>
+            <fieldset>
+              <legend>Illustrative recommendation</legend>
+              <label
+                ><input
+                  type="radio"
+                  name="recommended-release"
+                  value="A"
+                  checked
+                  disabled
+                />Release A</label
+              ><label
+                ><input
+                  type="radio"
+                  name="recommended-release"
+                  value="B"
+                  disabled
+                />Release B</label
+              >
+            </fieldset>
+            <p id="release-status" class="example-status" role="status">
+              Recommended for new creation: Hub A. Existing position stays on
+              Hub A.
+            </p>
+          </div>
+          <div class="release-branches">
+            <div data-release="A" class="is-recommended">
+              <span class="release-badge">Recommended</span>
+              <h4>Hub A</h4>
+              <div class="vault-address">Chain + Hub A + vault 1</div>
+              <span class="fixed-position"
+                >Existing position · permanently bound</span
+              >
+            </div>
+            <div data-release="B">
+              <span class="release-badge">Available release</span>
+              <h4>Hub B</h4>
+              <div class="vault-address">Chain + Hub B + vault 1</div>
+              <span>Independent position identity</span>
+            </div>
+          </div>
+        </div>
+
+        <div data-lab="custody">
+          <label
+            >Phase
+            <select name="phase">
+              <option value="0">0 · Created</option>
+              <option value="1">1 · Auction live</option>
+              <option value="2">2 · Live</option>
+              <option value="3">3 · Settled</option>
+            </select>
+          </label>
+          <label class="settled-example" hidden
+            >Settlement illustration
+            <select aria-label="Settlement illustration">
+              <option value="physical">Physical exercise / expiry</option>
+              <option value="cash">Cash expiry</option>
+              <option value="unwind">Unwind with a refund</option>
+            </select>
+          </label>
+          <div class="custody-compartments">
+            <div class="custody-backing">
+              <span class="compartment-index" aria-hidden="true">I</span>
+              <h4></h4>
+              <p></p>
+            </div>
+            <div class="custody-premium">
+              <span class="compartment-index" aria-hidden="true">II</span>
+              <h4></h4>
+              <p></p>
+            </div>
+            <div class="custody-buyer" hidden>
+              <span class="compartment-index" aria-hidden="true">III</span>
+              <h4>Buyer payout reserve</h4>
+              <p></p>
+            </div>
+          </div>
+        </div>
+
+        <div data-lab="actor-routes">
+          <div class="plate-select" aria-label="Highlight an instruction route">
+            <button type="button" data-route="0" aria-pressed="true">Owner</button>
+            <button type="button" data-route="1" aria-pressed="false">LP</button>
+            <button type="button" data-route="2" aria-pressed="false">Market maker</button>
+            <button type="button" data-route="3" aria-pressed="false">Bid master</button>
+          </div>
+          <ol class="actor-route" aria-label="Selected actor route"></ol>
+          <p class="vault-route-note" role="status"></p>
+        </div>
+      </article>
+    </main>
+    <script src="../../assets/labs.js"></script>
+  </body>
+</html>
