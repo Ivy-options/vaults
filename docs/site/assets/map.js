@@ -218,6 +218,7 @@
       probe.className = `card probe ${n.kind}`;
       probe.style.width = `${width}px`;
       probe.innerHTML = `<div data-tier="${tier}" class="measure">${html}</div>`;
+      if (n.kind === "lab") window.IvyLabs?.mountAll(probe); // labs fill their DOM on mount; measure the rendered initial state
       const h = probe.firstElementChild.offsetHeight + 2;
       probe.innerHTML = "";
       return h;

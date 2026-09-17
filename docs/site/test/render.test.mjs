@@ -75,3 +75,25 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
     await server.close();
   }
 });
+
+test("a lab card is sized to its mounted widget, not its empty markup", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "index-map.html");
+  try {
+    await page.waitForFunction(() => IvyMap.mounted);
+    for (const lod of [2, 3]) {
+      const size = await page.evaluate((lod) => {
+        IvyMap.setLod(lod);
+        const card = document.querySelector('#world .card[data-id="actor-routes-lab"]');
+        const layer = card.querySelector(`:scope > [data-tier="${card.dataset.show}"]`);
+        return { sh: layer.scrollHeight, ch: layer.clientHeight, sw: layer.scrollWidth, cw: layer.clientWidth };
+      }, lod);
+      assert.ok(size.sh <= size.ch + 1, `vertical overflow at lod ${lod}: ${JSON.stringify(size)}`);
+      assert.ok(size.sw <= size.cw + 1, `horizontal overflow at lod ${lod}: ${JSON.stringify(size)}`);
+    }
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
