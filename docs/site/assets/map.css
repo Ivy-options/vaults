@@ -38,6 +38,8 @@ body.map-ready.reading #document { display: block; overflow: auto; }
 /* Station 360×200 */
 .card.station { border-color: var(--line-strong); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); }
 .card.station h2 { margin: 4px 0 0; font: 800 52px/1 var(--display); letter-spacing: -0.02em; }
+/* Far-range tiers (0, 1) read as a poster: centred both ways. Reading tier 3 stays left-aligned. */
+.card.station [data-tier="0"], .card.station [data-tier="1"] { align-items: center; justify-content: center; text-align: center; }
 .card.station [data-tier="1"] h2 { font-size: 30px; margin-bottom: 8px; }
 .card.station [data-tier="1"] p { font-size: 15px; line-height: 1.45; }
 .card.station [data-tier="1"] small { margin-top: 8px; }
@@ -52,6 +54,8 @@ body.map-ready.reading #document { display: block; overflow: auto; }
 
 /* Moment 300×170 */
 .card.moment h3 { margin: 0; font: 700 27px/1.15 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
+/* Far-range tier 0 reads as a poster: centred both ways. Reading tiers (2, 3) stay left-aligned. */
+.card.moment [data-tier="0"] { align-items: center; justify-content: center; text-align: center; }
 .card.moment [data-tier="2"] h3 { font-size: 17px; margin-bottom: 6px; }
 .card.moment [data-tier="2"] p { font-size: 11.5px; line-height: 1.5; }
 /* A Roman painting sits faintly behind the moments that have one; it never competes with the text. */

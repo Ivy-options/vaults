@@ -44,18 +44,31 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
     for (const { id, t2, t3 } of tierPairs) {
       if (t2 != null && t3 != null) assert.notEqual(t3, t2, `tier 3 repeats tier 2 text verbatim for ${id}`);
     }
-    // Every tier: the shown layer must fit inside its card.
+    // Every tier: the shown layer must fit inside its card. Far-range tiers (station 0/1,
+    // moment 0) must read centred, like a poster; reading tiers stay left-aligned.
+    const textAligns = {};
     for (const lod of [0, 1, 2, 3]) {
-      const overflow = await page.evaluate((lod) => {
+      const { overflow, align } = await page.evaluate((lod) => {
         IvyMap.setLod(lod);
-        return [...document.querySelectorAll("#world .card")].flatMap((card) => {
+        const overflow = [...document.querySelectorAll("#world .card")].flatMap((card) => {
           const layer = card.querySelector(`:scope > [data-tier="${card.dataset.show}"]`);
           if (!layer) return [];
           return layer.scrollHeight > layer.clientHeight + 1 || layer.scrollWidth > layer.clientWidth + 1 ? [`${card.dataset.id}@${lod}`] : [];
         });
+        const alignOf = (id) => {
+          const card = document.querySelector(`.card[data-id="${id}"]`);
+          const layer = card?.querySelector(`:scope > [data-tier="${card.dataset.show}"]`);
+          return layer ? getComputedStyle(layer).textAlign : null;
+        };
+        return { overflow, align: { open: alignOf("open"), moment: alignOf("lps-deposit-collateral") } };
       }, lod);
       assert.deepEqual(overflow, [], `overflowing layers at lod ${lod}`);
+      textAligns[lod] = align;
     }
+    assert.equal(textAligns[0].open, "center", "station reads centred at lod 0");
+    assert.equal(textAligns[0].moment, "center", "moment reads centred at lod 0");
+    assert.equal(textAligns[1].open, "center", "station stays centred at lod 1");
+    assert.ok(["start", "left"].includes(textAligns[2].moment), "moment reading tier is left-aligned at lod 2");
     assert.deepEqual(errors, []);
   } finally {
     await close();
