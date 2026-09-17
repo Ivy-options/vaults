@@ -1,0 +1,17 @@
+/* Lifecycle map. Layout is in world px; the camera scales #world. */
+#map { display: none; position: relative; overflow: hidden; }
+#toolbar { display: none; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+/* Before mount (no JS) the page is a normal scrollable document. Mount adds
+   body.map-ready, which switches to the full-screen map; body.map-ready.reading
+   switches back to a scrollable #document within the fixed viewport. */
+html:has(body.map-ready) { height: 100%; overflow: hidden; }
+body.map-ready { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+body.map-ready #map { display: block; flex: 1 1 auto; }
+body.map-ready #toolbar { display: block; }
+body.map-ready #document { display: none; }
+
+body.map-ready.reading #map,
+body.map-ready.reading #toolbar { display: none; }
+body.map-ready.reading #document { display: block; overflow: auto; }

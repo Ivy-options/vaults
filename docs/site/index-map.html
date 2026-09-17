@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ivy Vaults · Protocol map</title>
+  <meta name="description" content="How Ivy Vaults work, as one zoomable map: physical delivery, collateral, shares, option auctions, claims and the optional cash settlement feature.">
+  <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
+  <link rel="icon" type="image/png" href="assets/ivy-logo.png">
+  <link rel="stylesheet" href="assets/docs.css">
+  <link rel="stylesheet" href="assets/roman.css">
+  <link rel="stylesheet" href="assets/labs.css">
+  <link rel="stylesheet" href="assets/map.css">
+  <script src="assets/labs.js" defer></script>
+  <script src="assets/map.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#document">Skip to content</a>
+  <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol guide"><img src="assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Protocol map</span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
+  <div class="toolbar" id="toolbar">
+    <nav id="crumbs" aria-label="Where you are"></nav>
+    <form id="search" role="search"><input type="search" id="search-input" placeholder="Search the map" aria-label="Search the map" autocomplete="off"><ul id="search-results" hidden></ul></form>
+    <div class="zoom">
+      <button type="button" data-zoom="-" aria-label="Zoom out">−</button>
+      <span id="zoom-level">100%</span>
+      <button type="button" data-zoom="+" aria-label="Zoom in">+</button>
+      <button type="button" data-home>Fit</button>
+      <button type="button" id="reading-toggle" aria-pressed="false">Reading view</button>
+    </div>
+  </div>
+  <div id="map" tabindex="0" aria-label="Lifecycle map"><div id="world"></div></div>
+  <main id="document" class="content doc-page"><article>
+    <h1>Ivy Vaults</h1>
+    <!-- Content sections are added in Tasks 9–12. -->
+  </article></main>
+  <footer><a href="license.html">License · BUSL-1.1</a></footer>
+</body>
+</html>
