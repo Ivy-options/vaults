@@ -10,6 +10,23 @@ const pagePath = resolve(root, "docs/site/index.html");
 const html = readFileSync(pagePath, "utf8");
 const site = dirname(pagePath);
 const generated = buildDocs({ check: true });
+// The map page carries two generated regions (README fragments) that
+// buildDocs fills in place; fail loudly if a region is missing or still empty.
+const mapPath = resolve(
+  site,
+  existsSync(resolve(site, "index-map.html")) ? "index-map.html" : "index.html"
+);
+const mapHtml = readFileSync(mapPath, "utf8");
+for (const name of ["project-setup", "operator-examples"]) {
+  const region = mapHtml.match(
+    new RegExp(`<!-- generated:${name} -->([\\s\\S]*?)<!-- /generated:${name} -->`)
+  );
+  assert.ok(region, `Missing generated region ${name} in ${mapPath}`);
+  assert.ok(
+    /data-kind="tile"/.test(region[1]),
+    `Generated region ${name} is empty. Run npm run docs:build.`
+  );
+}
 // Reference pages are hand-maintained HTML; check every page in the site.
 const pages = [
   ...new Set([

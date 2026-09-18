@@ -42,6 +42,131 @@ const slug = (text) =>
     .trim()
     .replace(/\s/g, "-");
 
+// The renderer configuration (heading ids, link mapping to site pages, table
+// wrapping, the download treatment of .json/.sol codespans) is shared between
+// the standalone reference pages and the fragments spliced into the map.
+function makeRenderer(page, requests) {
+  const headings = [];
+  const usedIds = new Map();
+  const renderer = new Renderer();
+  renderer.heading = function ({ tokens, depth }) {
+    const content = this.parser.parseInline(tokens);
+    const base = slug(content);
+    const count = usedIds.get(base) || 0;
+    usedIds.set(base, count + 1);
+    const id = count ? `${base}-${count}` : base;
+    if (depth === 2 || depth === 3) headings.push({ id, content, depth });
+    return `<h${depth} id="${id}">${
+      depth === 1 ? escape(page.title) : content
+    }</h${depth}>\n`;
+  };
+  renderer.link = function ({ href, title, tokens }) {
+    const [path, anchor] = href.split("#");
+    let target = href;
+    if (path && !/^[a-z]+:/i.test(path)) {
+      const absolute = resolve(
+        root,
+        dirname(page.source),
+        decodeURIComponent(path)
+      );
+      // Reference pages live in docs/site and are edited there directly.
+      const mapped =
+        destinations.get(absolute) ??
+        (absolute.startsWith(site + "/") && absolute.endsWith(".html")
+          ? relative(site, absolute)
+          : undefined);
+      if (!mapped)
+        throw new Error(`No site destination for ${page.source}: ${href}`);
+      target = mapped + (anchor ? `#${anchor}` : "");
+    }
+    if (/\.md(?:$|#|\?)/i.test(target))
+      throw new Error(`Markdown link in site: ${target}`);
+    const download = /\.(json|sol)$/.test(target) ? " download" : "";
+    return `<a href="${escape(target)}"${
+      title ? ` title="${escape(title)}"` : ""
+    }${download}>${this.parser.parseInline(tokens)}</a>`;
+  };
+  const defaultTable = renderer.table;
+  renderer.table = function (token) {
+    return `<div class="tablewrap" tabindex="0" role="region" aria-label="${escape(
+      page.title
+    )} reference table">${defaultTable.call(this, token)}</div>\n`;
+  };
+  renderer.codespan = function ({ text }) {
+    const code = `<code>${escape(text)}</code>`;
+    return requests.includes(text)
+      ? `<a href="assets/requests/${escape(text)}" download>${code}</a>`
+      : code;
+  };
+  return { renderer, headings };
+}
+
+// A Markdown block becomes one map tile. A list with many items would render
+// as one absurdly tall card, so long lists are split into several tiles of a
+// few items each; every other block type stays whole.
+const TILE_TITLES = {
+  list: "Checklist",
+  code: "Commands",
+  table: "Table",
+  paragraph: "Note",
+};
+const MAX_LIST_ITEMS_PER_TILE = 6;
+// A single-column tile (data-span 1) is too narrow to wrap a long inline
+// <code> span, which the tile stylesheet sets to white-space: nowrap; that
+// overflows the card instead of wrapping. Widen any paragraph carrying one.
+const MAX_INLINE_CODE_LEN = 30;
+function longestCodespan(token) {
+  let max = 0;
+  const walk = (t) => {
+    if (!t || typeof t !== "object") return;
+    if (t.type === "codespan") max = Math.max(max, t.text.length);
+    if (Array.isArray(t.tokens)) t.tokens.forEach(walk);
+    if (Array.isArray(t.items)) t.items.forEach(walk);
+  };
+  walk(token);
+  return max;
+}
+function toChunks(block) {
+  if (block.type === "list" && block.items.length > MAX_LIST_ITEMS_PER_TILE) {
+    const groups = [];
+    for (let i = 0; i < block.items.length; i += MAX_LIST_ITEMS_PER_TILE)
+      groups.push(block.items.slice(i, i + MAX_LIST_ITEMS_PER_TILE));
+    return groups.map((items) => ({ ...block, items }));
+  }
+  return [block];
+}
+function buildAction(shell, section, render) {
+  const blocks = section.blocks;
+  const summaryIndex = blocks.findIndex((b) => b.type === "paragraph");
+  const summary = summaryIndex >= 0 ? blocks[summaryIndex] : null;
+  const rest = blocks.filter((_, i) => i !== summaryIndex);
+  const titleSeq = new Map();
+  let tileSeq = 0;
+  const tiles = rest
+    .flatMap(toChunks)
+    .map((block) => {
+      tileSeq += 1;
+      const base = TILE_TITLES[block.type] || "Note";
+      const count = (titleSeq.get(base) || 0) + 1;
+      titleSeq.set(base, count);
+      const title = count > 1 ? `${base} ${count}` : base;
+      const span =
+        block.type === "list" ||
+        block.type === "code" ||
+        block.type === "table" ||
+        longestCodespan(block) > MAX_INLINE_CODE_LEN
+          ? ' data-span="2"'
+          : "";
+      return `<section data-kind="tile" id="${shell.id}-${tileSeq}"${span}><h5>${escape(
+        title
+      )}</h5>${render([block])}</section>\n`;
+    })
+    .join("");
+  return `<section data-kind="action" id="${shell.id}"><h4>${shell.title}</h4>${
+    summary ? render([summary]) : "<p></p>"
+  }${tiles}</section>\n`;
+}
+
 export function buildDocs({ check = false } = {}) {
   const outputs = new Map();
   const requests = readdirSync(resolve(root, "examples/operator"))
@@ -63,58 +188,7 @@ export function buildDocs({ check = false } = {}) {
   }
   for (const page of pages) {
     const source = readFileSync(resolve(root, page.source), "utf8");
-    const headings = [];
-    const usedIds = new Map();
-    const renderer = new Renderer();
-    renderer.heading = function ({ tokens, depth }) {
-      const content = this.parser.parseInline(tokens);
-      const base = slug(content);
-      const count = usedIds.get(base) || 0;
-      usedIds.set(base, count + 1);
-      const id = count ? `${base}-${count}` : base;
-      if (depth === 2 || depth === 3) headings.push({ id, content, depth });
-      return `<h${depth} id="${id}">${
-        depth === 1 ? escape(page.title) : content
-      }</h${depth}>\n`;
-    };
-    renderer.link = function ({ href, title, tokens }) {
-      const [path, anchor] = href.split("#");
-      let target = href;
-      if (path && !/^[a-z]+:/i.test(path)) {
-        const absolute = resolve(
-          root,
-          dirname(page.source),
-          decodeURIComponent(path)
-        );
-        // Reference pages live in docs/site and are edited there directly.
-        const mapped =
-          destinations.get(absolute) ??
-          (absolute.startsWith(site + "/") && absolute.endsWith(".html")
-            ? relative(site, absolute)
-            : undefined);
-        if (!mapped)
-          throw new Error(`No site destination for ${page.source}: ${href}`);
-        target = mapped + (anchor ? `#${anchor}` : "");
-      }
-      if (/\.md(?:$|#|\?)/i.test(target))
-        throw new Error(`Markdown link in site: ${target}`);
-      const download = /\.(json|sol)$/.test(target) ? " download" : "";
-      return `<a href="${escape(target)}"${
-        title ? ` title="${escape(title)}"` : ""
-      }${download}>${this.parser.parseInline(tokens)}</a>`;
-    };
-    const defaultTable = renderer.table;
-    renderer.table = function (token) {
-      return `<div class="tablewrap" tabindex="0" role="region" aria-label="${escape(
-        page.title
-      )} reference table">${defaultTable.call(this, token)}</div>\n`;
-    };
-    renderer.codespan = function ({ text }) {
-      const code = `<code>${escape(text)}</code>`;
-      return requests.includes(text)
-        ? `<a href="assets/requests/${escape(text)}" download>${code}</a>`
-        : code;
-    };
+    const { renderer, headings } = makeRenderer(page, requests);
     const body = new Marked({ renderer, gfm: true }).parse(source);
     const navigation = headings
       .map(
@@ -159,6 +233,90 @@ export function buildDocs({ check = false } = {}) {
 `
     );
   }
+
+  // Fill the empty action shells left inside docs/site/index-map.html (Task 12)
+  // with content rendered from the README markdown, so the guide's prose stays
+  // the single source of truth. Shell ids and titles are untouched; only the
+  // region between the marker comments is (re)written.
+  const mapName = existsSync(resolve(site, "index-map.html"))
+    ? "index-map.html"
+    : "index.html";
+  const mapPath = resolve(site, mapName);
+  let mapHtml = readFileSync(mapPath, "utf8");
+  const fragments = [
+    { name: "project-setup", source: "README.md" },
+    { name: "operator-examples", source: "examples/operator/README.md" },
+  ];
+  for (const fragment of fragments) {
+    const page = pages.find((p) => p.source === fragment.source);
+    const { renderer } = makeRenderer(page, requests);
+    const render = (fragmentTokens) =>
+      new Marked({ renderer, gfm: true }).parser(fragmentTokens);
+    const tokens = new Marked({ gfm: true }).lexer(
+      readFileSync(resolve(root, page.source), "utf8")
+    );
+
+    // Split the body at each H2 into sections; content before the first H2
+    // (e.g. README's opening tagline) belongs to no shell and is dropped.
+    const sections = [];
+    let current = null;
+    for (const t of tokens) {
+      if (t.type === "space" || (t.type === "heading" && t.depth === 1))
+        continue;
+      if (t.type === "heading" && t.depth === 2) {
+        current = { title: t.text, blocks: [] };
+        sections.push(current);
+        continue;
+      }
+      if (current) current.blocks.push(t);
+    }
+    // A source with no H2 (the operator README) puts its whole body, minus
+    // the H1 and blank-line spacer tokens, into one section.
+    if (!sections.length)
+      sections.push({
+        title: null,
+        blocks: tokens.filter(
+          (t) => t.type !== "space" && !(t.type === "heading" && t.depth === 1)
+        ),
+      });
+
+    const marker = new RegExp(
+      `(<!-- generated:${fragment.name} -->)([\\s\\S]*?)(<!-- /generated:${fragment.name} -->)`
+    );
+    const match = mapHtml.match(marker);
+    if (!match)
+      throw new Error(`Missing generated:${fragment.name} markers in ${mapName}`);
+    // Match just the opening `<section id><h4>title</h4>` of each top-level
+    // action, regardless of whether it is still an empty shell (freshly from
+    // Task 12) or already carries generated content from a previous build,
+    // so rebuilding is idempotent: the id and title always anchor the region.
+    const shells = [
+      ...match[2].matchAll(
+        /<section data-kind="action" id="([^"]+)"><h4>([^<]*)<\/h4>/g
+      ),
+    ].map(([, id, title]) => ({ id, title }));
+    if (!shells.length)
+      throw new Error(
+        `No empty action shells found for generated:${fragment.name} in ${mapName}`
+      );
+
+    const bySlug = new Map(
+      sections.filter((s) => s.title).map((s) => [slug(s.title), s])
+    );
+    const whole = sections.length === 1 && sections[0].title === null;
+    let out = "";
+    for (const shell of shells) {
+      const section = whole ? sections[0] : bySlug.get(shell.id);
+      if (!section)
+        throw new Error(
+          `No Markdown H2 in ${page.source} maps to shell #${shell.id} (fragment ${fragment.name}); check the heading text and its slug.`
+        );
+      out += buildAction(shell, section, render);
+    }
+    mapHtml = mapHtml.replace(marker, `$1\n${out}$3`);
+  }
+  outputs.set(mapName, mapHtml);
+
   for (const [name, contents] of outputs) {
     const target = resolve(site, name);
     if (check) {
