@@ -433,6 +433,11 @@
     overview: "before-the-vault", participants: "who-is-around-a-vault", "execution-permissions": "who-may-act-for-the-buyer", "admission-pause": "what-a-pause-means",
     lifecycle: "open", "token-roles-and-collateral": "token-roles", "admission-pause-and-stalled-auctions": "how-to-pause",
     makers: "market-makers-sign-bids-off-chain", "prepare-fund-and-activate": "sign-a-bid",
+    "platform-fees": "buyer-has-paid-the-premium", "premium-treatment": "earned-payments", "platform-fee-and-share-transfer-administration": "claim-premium",
+    outcomes: "outcomes-lab", "exercise-and-expiration": "buyer-may-now-exercise", "exercise-windows": "when-it-is-allowed",
+    "cash-settlement": "cash-the-vault-needs-a-price", "cash-availability": "enable-cash", "expiry-price": "publish-a-price", "cash-exercise-windows": "cash-windows",
+    "cash-missing-reports": "missing-report", "reports-exercise-and-expiration": "publish-a-price", "enable-cash-after-physical-launch": "enable-procedure",
+    "early-exit": "ending-early-by-agreement", "unwind-recovery": "recover-after-execution", "prepare-and-execute-a-unanimous-unwind": "agreed-unwind", "worked-unwind-scenarios": "worked-scenarios",
   };
   const resolveHash = (hash) => { const id = decodeURIComponent((hash || "").replace(/^#/, "")); if (!id) return null; return M.tree.byId.get(id) || M.tree.byId.get(ALIASES[id]) || null; };
   let settingHash = false;

@@ -882,6 +882,15 @@ input[type="range"] {
 .card.lab [data-lab="actor-routes"] {
   min-height: calc(82px + 115px);
 }
+/* The payoff calculator is sized from its first state, a 10 WETH covered call.
+   Validation errors and the put (no entry-price field) are shorter, but larger
+   amounts wrap the result numbers onto extra lines. Measured at the 276px card
+   width: the call inputs are 535px and the results body is 814px with a
+   five-digit WETH deposit (775px at 10 WETH), so the reserve covers vault sizes
+   up to that, plus the 2px border; anything larger scrolls inside the card. */
+.card.lab [data-lab="payoff"] {
+  min-height: calc(535px + 814px + 2px);
+}
 /* Safety net: any lab state that still grows scrolls inside its card. */
 .card.lab > [data-tier] {
   overflow-y: auto;
