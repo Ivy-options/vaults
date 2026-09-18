@@ -582,7 +582,563 @@
         </section>
       </section>
     </section>
-    <!-- Content sections are added in Tasks 9–12. -->
+<section data-kind="station" data-band="shelf" id="vault-terms" data-tagline="Every term the owner sets before LPs deposit: what activation checks, and how far the owner may move it afterward.">
+      <h2>Vault terms</h2>
+      <p>Before LPs deposit, the owner defines which trades the vault may accept: the tokens, the expiry, the exercise rules and the limits a buyer's bid must meet. Some limits can tighten while the vault is Open; LP protections cannot be relaxed, and immutable fields never change.</p>
+      <section data-kind="moment" id="strike-limit"><h3>strikeLimit bounds the strike</h3><p>strikeLimit sets, per quote token, the strike a bid may offer.</p>
+        <section data-kind="action" id="strike-limit-rules"><h4>Rules</h4><p>Checked at activation, against the bid's strike.</p>
+          <section data-kind="tile" id="strike-limit-activation-check"><h5>Activation check</h5><p>Per quote token. Calls: strike ≥ limit, and 0 means no limit. Puts: strike ≤ limit, and the limit must be nonzero.</p></section>
+          <section data-kind="tile" id="strike-limit-owner-changes"><h5>Owner changes</h5><p>Calls: raise only. Puts: lower only.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="min-premium"><h3>minPremium is the floor on the gross premium</h3><p>minPremium is the minimum gross premium the buyer's offer must meet, per accepted quote-token pair.</p>
+        <section data-kind="action" id="min-premium-rules"><h4>Rules</h4><p>Checked against the buyer's offered premium at activation.</p>
+          <section data-kind="tile" id="min-premium-activation-check"><h5>Activation check</h5><p>The minimum gross premium per whole underlying token, set separately for each accepted quote-token pair. The buyer's offer must meet or exceed it.</p></section>
+          <section data-kind="tile" id="min-premium-owner-changes"><h5>Owner changes</h5><p>Raise only.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="min-collateral"><h3>minCollateral gates when the auction can open</h3><p>minCollateral is the minimum total share supply required before the auction can open.</p>
+        <section data-kind="action" id="min-collateral-rules"><h4>Rules</h4><p>Checked when the owner or a scheduled caller opens the auction.</p>
+          <section data-kind="tile" id="min-collateral-activation-check"><h5>Check</h5><p>The minimum total share supply required to open the auction. While Open, those shares correspond to the deposited collateral.</p></section>
+          <section data-kind="tile" id="min-collateral-owner-changes"><h5>Owner changes</h5><p>Raise only.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="expiry"><h3>expiry never moves</h3><p>expiry is the exact timestamp fixed at creation that opening and activation must occur before.</p>
+        <section data-kind="action" id="expiry-rules"><h4>Rules</h4><p>Checked whenever the auction opens or a bid activates.</p>
+          <section data-kind="tile" id="expiry-activation-check"><h5>Check</h5><p>Exact timestamp fixed at creation; opening and activation must occur before it.</p></section>
+          <section data-kind="tile" id="expiry-owner-changes"><h5>Owner changes</h5><p>Immutable.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="allowed-exercise"><h3>allowedExercise sets European, American or Either</h3><p>allowedExercise lists which exercise styles a bid may pick.</p>
+        <section data-kind="action" id="allowed-exercise-rules"><h4>Rules</h4><p>Each bid picks exactly one style within the allowed policy.</p>
+          <section data-kind="tile" id="allowed-exercise-activation-check"><h5>Activation check</h5><p>European, American, or Either. Each bid picks one.</p></section>
+          <section data-kind="tile" id="allowed-exercise-owner-changes"><h5>Owner changes</h5><p>Either may narrow to one style; never back to Either.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="allowed-settlement"><h3>allowedSettlement is Physical unless cash is enabled</h3><p>allowedSettlement lists which settlement types a bid may pick.</p>
+        <section data-kind="action" id="allowed-settlement-rules"><h4>Rules</h4><p>Cash activation also checks the protocol-wide cash flag.</p>
+          <section data-kind="tile" id="allowed-settlement-activation-check"><h5>Activation check</h5><p>Physical at launch. Cash or Either require the optional cash feature enabled at creation; cash activation also checks the flag.</p></section>
+          <section data-kind="tile" id="allowed-settlement-owner-changes"><h5>Owner changes</h5><p>Either may narrow to one policy; never back to Either.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="price-feed-and-max-in-the-money"><h3>priceFeed and maxInTheMoneyBps bound the strike to spot</h3><p>These two optionally limit how far a bid's strike may differ from the market price, in the buyer's favor.</p>
+        <section data-kind="action" id="price-feed-and-max-in-the-money-rules"><h4>Rules</h4><p>Both this check and strikeLimit must pass for the bid to activate.</p>
+          <section data-kind="tile" id="price-feed-and-max-in-the-money-activation-check" data-span="2"><h5>Activation check</h5><p><span class="f"><b>Calls</b><code>strike ≥ spot·(10000−bps)/10000</code></span><span class="f"><b>Puts</b><code>strike ≤ spot·(10000+bps)/10000</code></span></p><p>spot is the price from priceFeed; bps is the permitted difference in basis points.</p></section>
+          <section data-kind="tile" id="price-feed-and-max-in-the-money-owner-changes"><h5>Owner changes</h5><p>bps: lower only. Feed address: fixed.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="max-price-age"><h3>maxPriceAge limits how old an activation report may be</h3><p>maxPriceAge is the oldest activation price-feed observation the vault will accept, in seconds.</p>
+        <section data-kind="action" id="max-price-age-rules"><h4>Rules</h4><p>Checked only when the optional activation price feed is configured.</p>
+          <section data-kind="tile" id="max-price-age-activation-check"><h5>Activation check</h5><p>The oldest observation the optional activation feed may use, in seconds. An older report rejects activation; it imposes no price requirement on physical exercise or expiration.</p></section>
+          <section data-kind="tile" id="max-price-age-owner-changes"><h5>Owner changes</h5><p>Lower only, never to zero.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="max-settlement-price-age"><h3>The cash settlement price age is fixed</h3><p>maxSettlementPriceAge is the maximum age for a cash settlement report.</p>
+        <section data-kind="action" id="max-settlement-price-age-rules"><h4>Rules</h4><p>Physical-only vaults may leave it at zero.</p>
+          <section data-kind="tile" id="max-settlement-price-age-activation-check"><h5>Activation check</h5><p>Optional cash only: Cash or Either vaults require a positive maximum age. Physical-only vaults may use zero.</p></section>
+          <section data-kind="tile" id="max-settlement-price-age-owner-changes"><h5>Owner changes</h5><p>Immutable.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="vault-token-choices"><h3>pairs fix the accepted quote and premium tokens</h3><p>pairs is the owner's list of allowed strike currencies and each one's premium token, set at creation.</p>
+        <section data-kind="action" id="vault-token-choices-rules"><h4>Rules</h4><p>The buyer's bid chooses one enabled entry from the list.</p>
+          <section data-kind="tile" id="vault-token-choices-activation-check"><h5>Activation check</h5><p>Calls may list several pairs; puts have exactly one, with the strike priced in the deposited token. While Open, entries can be disabled but never added or changed.</p></section>
+          <section data-kind="tile" id="vault-token-choices-owner-changes"><h5>Owner changes</h5><p>Disable only.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="partial-exercise"><h3>allowPartialExercise is fixed before deposits</h3><p>allowPartialExercise decides whether the buyer must exercise all remaining notional in one call, or may exercise in parts.</p>
+        <section data-kind="action" id="partial-exercise-rules"><h4>Rules</h4><p>Fixed before the first deposit; it never changes afterward.</p>
+          <section data-kind="tile" id="partial-exercise-activation-check"><h5>Check</h5><p>True permits partial exercise; false requires all remaining notional in one call.</p></section>
+          <section data-kind="tile" id="partial-exercise-owner-changes"><h5>Owner changes</h5><p>Immutable.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="public-deposits-underlying-collateral"><h3>publicDeposits decides who may fund the vault</h3><p>publicDeposits, underlying and collateral fix the deposit token and whether other users may join as LPs.</p>
+        <section data-kind="action" id="public-deposits-underlying-collateral-rules"><h4>Rules</h4><p>Set once, at creation, alongside the token choice.</p>
+          <section data-kind="tile" id="public-deposits-underlying-collateral-activation-check"><h5>Check</h5><p>The owner fixes the underlying and collateral tokens and decides whether other users may deposit.</p></section>
+          <section data-kind="tile" id="public-deposits-underlying-collateral-owner-changes"><h5>Owner changes</h5><p>Immutable.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="auction-starts-at"><h3>auctionStartsAt schedules a public opening</h3><p>auctionStartsAt is the scheduled time from which anyone may open the auction.</p>
+        <section data-kind="action" id="auction-starts-at-rules"><h4>Rules</h4><p>Checked when a non-owner submits the opening transaction.</p>
+          <section data-kind="tile" id="auction-starts-at-activation-check"><h5>Check</h5><p>The scheduled time from which anyone may submit the opening transaction. Zero means no public schedule: only the owner may open it.</p></section>
+          <section data-kind="tile" id="auction-starts-at-owner-changes"><h5>Owner changes</h5><p>Any value, any time while Open.</p></section>
+        </section>
+      </section>
+    </section>
+<section data-kind="station" data-band="shelf" id="operator-runbook" data-tagline="Deploying an immutable Hub suite and running individual vaults by hand: what the CLI simulates, prints and never signs.">
+      <h2>Operator runbook</h2>
+      <p>This runbook covers deploying an immutable Hub suite and running individual vaults by hand. The CLI reads a JSON request, simulates the call, and prints either EIP-712 typed data or the calldata of a transaction. It never signs anything; bids, reports and agreements are signed by wallets or multisigs from the printed typed data.</p>
+      <p>Before touching a live chain, run <code>npm ci</code>, <code>npm run compile</code>, <code>npm run typecheck</code>, <code>npm run check:size</code> and <code>npm test -- --no-compile</code>. <code>npm test -- --no-compile test/17-local-rehearsal.test.ts</code> runs the whole sequence below on a throwaway local EVM and never touches your configured RPC or wallets.</p>
+      <section data-kind="moment" id="token-roles-and-collateral"><h3>Token roles decide what backs the trade</h3><p>A vault deals with three token roles: underlying, quote and premium; collateral is whichever of the first two LPs deposit.</p>
+        <section data-kind="action" id="token-role-definitions"><h4>What each role means</h4><p>The underlying is the asset the option is written on; the quote token measures the strike; the premium token is what the buyer pays.</p>
+          <section data-kind="tile" id="collateral-is-not-a-fourth-role"><h5>Collateral is not a fourth role</h5><p>It is whichever of the underlying or quote token the LPs actually deposit for that vault.</p></section>
+          <section data-kind="tile" id="call-and-put-collateral-examples" data-span="2"><h5>Two examples at a 3,000 strike</h5><ul><li>Covered call: 10 WETH deposited; full exercise pays 30,000 USDC in, 10 WETH out.</li><li>Cash-secured put: 30,000 USDC deposited; full exercise takes 10 WETH in, pays 30,000 USDC out.</li></ul></section>
+          <section data-kind="tile" id="how-many-pairs-a-vault-lists"><h5>How many pairs</h5><p>A call may list several quote/premium pairs before activation; the winning bid picks one. A put accepts exactly one, whose quote token must be the collateral.</p></section>
+          <section data-kind="tile" id="cash-means-the-collateral-token"><h5>"Cash" means the collateral token</h5><p>Cash settlement pays intrinsic value in the collateral token — WETH for this call, USDC for this put — not a stablecoin payout.</p></section>
+          <section data-kind="tile" id="budgets-stay-separate"><h5>Budgets stay separate</h5><p>Even when token addresses overlap, the vault keeps premium, platform fee and buyer-reserve budgets apart from each other and from the residual pool.</p></section>
+          <section data-kind="tile" id="settlement-proceeds-join-the-pool"><h5>Where settlement proceeds go</h5><p>They join the residual pool shareholders claim after reserves; earned premium is claimed separately.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="requests-are-json-with-string-amounts"><h3>Requests are JSON with string amounts</h3><p>A request file is JSON with the command's fields; every ID and amount is written as a string so it never loses precision.</p>
+        <section data-kind="action" id="write-the-request-file"><h4>Write the request file</h4><p>Copy the example files, replace placeholders, and write raw integer amounts as strings; a request normally carries rpc, sender, hub, vaultId and the command's own fields.</p>
+          <section data-kind="tile" id="request-unit-conventions" data-span="2"><h5>Units</h5><p>USDC has six decimals, so 100 USDC is <code>"100000000"</code>. Strike and spot are quote units per whole underlying; premium is premium-token units per whole underlying.</p></section>
+          <section data-kind="tile" id="example-cli-invocations" data-span="2"><h5>Three commands</h5><pre><code class="language-sh">npm run operator -- prepare-vault vault.json
+npm run operator -- inspect-bid activation.json
+npm run operator -- expire expiration.json</code></pre></section>
+        </section>
+        <section data-kind="action" id="simulate-then-send"><h4>Simulate first, and never sign automatically</h4><p>Without --send, every command only simulates and prints calldata; the CLI reads the chain, sender, destination, arguments and result before anything is sent.</p>
+          <section data-kind="tile" id="chain-state-can-move-runbook"><h5>State can move</h5><p>Chain state can shift between your preflight and inclusion; the contracts recheck everything at execution.</p></section>
+          <section data-kind="tile" id="cli-never-loads-keys"><h5>The CLI never signs</h5><p>--send submits through eth_sendTransaction using a signer the RPC exposes via eth_accounts. The CLI never loads private keys.</p></section>
+          <section data-kind="tile" id="hardware-wallet-or-safe"><h5>Hardware wallet or Safe</h5><p>Take the printed transaction and submit it through that wallet's own flow.</p></section>
+          <section data-kind="tile" id="two-commands-never-send"><h5>Two commands never send</h5><p>inspect-bid and the typed-* commands cannot send at all.</p></section>
+          <section data-kind="tile" id="usd-figures-are-your-input"><h5>USD figures are your input</h5><p>Any USD figure the CLI shows comes from the valuation you supplied; it cannot tell you whether that valuation is current.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="deploy-once-and-recover-from-the-journal"><h3>Deploy once and recover from the journal</h3><p>Deploying the Hub suite and resuming an interrupted deployment both run through the same journal, kept separately from the release registry's own journal.</p>
+        <section data-kind="action" id="pick-roles-and-build"><h4>Pick roles and compile the exact build</h4><p>Pick a dedicated deployer, a Hub administrator (a multisig in production) and, if needed, an indicative report signer; a physical-only deployment needs neither a settlement publisher nor a methodology.</p>
+          <section data-kind="tile" id="report-signer-as-a-contract"><h5>A contract signer</h5><p>If the report signer is a contract, it must implement ERC-1271.</p></section>
+          <section data-kind="tile" id="resume-with-the-same-build"><h5>Resume with the same build</h5><p>Compile the exact build you intend to deploy, and use that same build if you resume an interrupted run.</p></section>
+        </section>
+        <section data-kind="action" id="generate-the-plan"><h4>Generate and inspect the plan</h4><p>Fill deployment.json with RPC, deployer, admin and reportSigner, then generate the deployment plan.</p>
+          <section data-kind="tile" id="deployment-defaults" data-span="2"><h5>Defaults</h5><p><span class="f"><b>exerciseWindow</b><code>3600 seconds</code></span><span class="f"><b>auctionTimeout</b><code>259200 seconds</code></span></p></section>
+          <section data-kind="tile" id="eight-step-deploy-order" data-span="2"><h5>Fixed deployment order</h5><ol><li>IvyVaultRules</li><li>IvyOptionSettlement</li><li>IvyVault</li><li>IvyVaultsHub</li><li>IvyShares</li><li>IvyPremiums</li><li>IvyUnwind</li><li>IvyPriceFeed</li></ol></section>
+          <section data-kind="tile" id="why-libraries-deploy-first"><h5>Why the libraries go first</h5><p>The plan links their predicted addresses into the Hub bytecode and records every runtime link offset.</p></section>
+          <section data-kind="tile" id="one-job-for-the-deployer"><h5>One job at a time</h5><p>Do not use the deployer address for anything else while the sequence is running.</p></section>
+        </section>
+        <section data-kind="action" id="execute-and-recover"><h4>Execute, and recover if interrupted</h4><p>Fill deployment-run.json with the plan and journal files, then execute; if the run is interrupted, rerun the same command with the same files and build.</p>
+          <section data-kind="tile" id="three-journal-writes"><h5>Three journal writes</h5><p>Before each submission, again once the hash is known, and again after verified inclusion.</p></section>
+          <section data-kind="tile" id="what-resume-checks" data-span="2"><h5>What resume checks</h5><p>Each existing step must match on creation data, sender, nonce, receipt, runtime code and every peer binding, including embedded library links.</p></section>
+          <section data-kind="tile" id="a-lost-submission-hash"><h5>A lost submission hash</h5><p>Recovered by scanning chain history from the journal's start block.</p></section>
+          <section data-kind="tile" id="when-recovery-stops"><h5>When recovery stops</h5><p>Nonce drift, evidence from the wrong chain, or an unknown or replaced pending transaction. Investigate that transaction; never delete the journal or guess a new sequence.</p></section>
+          <section data-kind="tile" id="plans-dont-cross-builds" data-span="2"><h5>Plans don't cross builds</h5><p>Plans from earlier builds cannot be reused with this manifest-v6, eight-step build. An interrupted deployment must be recovered with its original build and plan.</p></section>
+        </section>
+        <section data-kind="action" id="what-a-complete-journal-guarantees"><h4>What a complete journal guarantees</h4><p>The journal reports complete: true only after constructor bindings, library links and Hub administration all verify.</p>
+          <section data-kind="tile" id="starting-roles-after-deploy"><h5>Starting roles</h5><p>The administrator holds DEFAULT_ADMIN_ROLE and GUARDIAN_ROLE; nobody holds the settlement publisher role, and cashSettlementEnabled() is false.</p></section>
+          <section data-kind="tile" id="grant-before-trading" data-span="2"><h5>Grant before trading</h5><p>Grant BID_MASTER_ROLE to the auction operator and MARKET_MAKER_ROLE to each accepted buyer, with grant-role requests naming role and account.</p></section>
+          <section data-kind="tile" id="default-admin-role-is-hashed"><h5>DEFAULT_ADMIN_ROLE is special</h5><p>The CLI hashes role strings, so manage it through its exact zero bytes32 value using the contract ABI instead.</p></section>
+          <section data-kind="tile" id="no-upgrade-transactions"><h5>No upgrade transactions</h5><p>There are no wiring, library-replacement or upgrade transactions after deployment; library calls run against Hub storage under the Hub's own authorization.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="prepare-fund-and-activate"><h3>Prepare, fund and activate a vault by hand</h3><p>Preparing, funding and activating a vault runs through checking terms, sizing the minimum, depositing, opening the auction and activating a signed bid.</p>
+        <section data-kind="action" id="check-terms-and-policies"><h4>Check tokens, policies and the exact expiry</h4><p>For a physical launch use terms.allowedSettlement: 0 and terms.maxSettlementPriceAge: 0; for Cash or Either, confirm cashSettlementEnabled() first.</p>
+          <section data-kind="tile" id="activation-feed-is-separate"><h5>The activation feed is separate</h5><p>terms.priceFeed and terms.maxPriceAge configure the optional indicative check and are independent of settlement; any policy may leave the feed unset.</p></section>
+          <section data-kind="tile" id="a-removed-field"><h5>A removed field</h5><p>The old settlementPriceFeed field no longer exists.</p></section>
+          <section data-kind="tile" id="two-fixed-choices-at-prepare" data-span="2"><h5>Two fixed choices</h5><p>Set terms.allowPartialExercise to an explicit boolean; it is fixed forever. Vaults default to private deposits, so set terms.publicDeposits: true to allow pooling.</p></section>
+          <section data-kind="tile" id="token-list-is-operator-side"><h5>The token list is operator-side</h5><p>The request's token list is an operational allowlist for the CLI, not an on-chain whitelist.</p></section>
+        </section>
+        <section data-kind="action" id="size-and-price-it"><h4>Size the vault and price the strike</h4><p>Set a positive minTradeUsdE6 that fits the product, and supply a reviewed collateral USD price and a market quote for every accepted quote token.</p>
+          <section data-kind="tile" id="what-prepare-vault-computes" data-span="2"><h5>What prepare-vault computes</h5><p>Checks the wallet balance against the minimum, sets minCollateral to the owner's prepared amount, and turns outOfTheMoneyBps into an absolute strike, rounded up for calls and down for puts.</p></section>
+          <section data-kind="tile" id="a-pooled-vaults-floor"><h5>A pooled vault's floor</h5><p>minTradeUsdE6 sets the opening floor; the final supply may be larger.</p></section>
+          <section data-kind="tile" id="the-cli-does-not-price-anything"><h5>The CLI does not price anything</h5><p>Work out the APR yourself from the agreed premium, the commitment value and the exact duration.</p></section>
+        </section>
+        <section data-kind="action" id="create-fund-open"><h4>Create, fund and open the auction</h4><p>Run prepare-vault, submit createVault, then have each depositor approve and deposit before the owner opens the auction.</p>
+          <section data-kind="tile" id="read-the-vault-id"><h5>Read the vault ID</h5><p>From the receipt or the Hub getters, alongside the clone address.</p></section>
+          <section data-kind="tile" id="approve-then-deposit-runbook"><h5>Approve, then deposit</h5><p>approve-token for the collateral token and amount, then deposit with the same raw amount. Approvals target the clone, never the Hub.</p></section>
+          <section data-kind="tile" id="or-call-the-vault-directly"><h5>Or call the vault directly</h5><p>vault.deposit(amount) is also fine and follows the same admission rules.</p></section>
+          <section data-kind="tile" id="opening-the-auction-details" data-span="2"><h5>Opening the auction</h5><p>The owner runs open-auction; if auctionStartsAt is nonzero, anyone may open it once that time passes. Read the auctionId and totalShares after opening — the bid commits to both. Deposits and withdrawals stop; transfers still work if enabled.</p></section>
+        </section>
+        <section data-kind="action" id="sign-and-activate"><h4>Sign the bid and activate it</h4><p>The buyer signs a typed bid, then the bid master submits it for activation.</p>
+          <section data-kind="tile" id="typed-bid-reads-the-chain"><h5>typed-bid reads the chain</h5><p>The exact expiry, current auctionId, collateral amount and accepted pairHash come from the chain; executor defaults to zero and recipient to the buyer.</p></section>
+          <section data-kind="tile" id="signed-domain-runbook"><h5>Signed domain</h5><p>IvyVaultsHub, version 2, the chainId and the Hub address.</p></section>
+          <section data-kind="tile" id="approving-the-premium-runbook" data-span="2"><h5>Approving the premium</h5><p><code>floor(premium × totalNotional / underlyingUnit)</code>; for a put, notional is <code>floor(collateral × underlyingUnit / strike)</code>.</p></section>
+          <section data-kind="tile" id="what-inspect-bid-checks"><h5>What inspect-bid checks</h5><p>The real signature, the USD minimum and the collateral valuation, simulating activation as the bid master: role, signature, policies, oracle band and premium funding.</p></section>
+          <section data-kind="tile" id="physical-exercise-funding-is-separate"><h5>A separate later obligation</h5><p>Funding a later physical exercise is a separate obligation of whoever calls it.</p></section>
+          <section data-kind="tile" id="after-activation-runbook" data-span="2"><h5>After activation</h5><p>LPs can claim-premium straight away; if transfers are enabled, a recipient of shares also receives the proportional unclaimed premium. File the signed bid and activation receipt with the launch record.</p></section>
+          <section data-kind="tile" id="cancel-and-reopen-runbook"><h5>Cancel and reopen</h5><p>A buyer can burn an unused nonce with cancelBid(nonce) through the ABI. A cancelled or reopened auction gets a new auctionId, needing a new typed bid.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="reports-exercise-and-expiration"><h3>Publish reports, exercise and expire</h3><p>Reports set the settlement price; exercise and expiration then use it, along with the physical delivery deadlines.</p>
+        <section data-kind="action" id="publish-activation-reports"><h4>Publish an indicative activation report</h4><p>Indicative activation reports go through typed-report with kind: "spot", under the feed's own signed domain.</p>
+          <section data-kind="tile" id="spot-report-domain"><h5>Signed domain</h5><p>IvyPriceFeed, version 1, the chainId and the feed address; the feed's immutable signer signs, and anyone may relay with publish-spot.</p></section>
+          <section data-kind="tile" id="only-spot-reports-on-this-path"><h5>Only spot reports here</h5><p>Cash settlement uses the Hub commands below, not this path.</p></section>
+        </section>
+        <section data-kind="action" id="publish-cash-reports"><h4>Publish a cash settlement report</h4><p>Cash reports are raw quote-token units per whole underlying: 2,500 USDC per WETH is 2500000000.</p>
+          <section data-kind="tile" id="exercise-report-fields" data-span="2"><h5>publish-settlement-exercise</h5><p>hub, vaultId, settlementMethodology and report: {price, observedAt, validUntil}. A direct Hub call from the publisher, no separate signature; the vault must be Live and cash-settled.</p></section>
+          <section data-kind="tile" id="exercise-report-checks"><h5>What is checked</h5><p>Timestamps must be positive, not future, and strictly later than the previous observation for that vault.</p></section>
+          <section data-kind="tile" id="expiry-report-fields" data-span="2"><h5>publish-settlement-expiry</h5><p>hub, vaultId, settlementMethodology and report: {price, validUntil}; publish for a Live cash vault at or after expiry, no later than validUntil.</p></section>
+          <section data-kind="tile" id="final-price-write-once-runbook"><h5>Write-once, no correction</h5><p>A final price is write-once per vault, with no administrator correction. A late publication submits the same calculation with a current deadline.</p></section>
+          <section data-kind="tile" id="separate-transactions-per-vault"><h5>Separate per vault</h5><p>Two vaults with the same pair and expiry still need separate transactions and may receive different prices.</p></section>
+          <section data-kind="tile" id="check-the-preview-before-sending"><h5>Check before sending</h5><p>The preview shows the derived underlying, quote and expiry; check the pair, expiry, units and vault ID before sending.</p></section>
+        </section>
+        <section data-kind="action" id="approve-the-methodology"><h4>Approve a methodology before cash goes live</h4><p>The methodology names the operator, sources, sampling, weighting, rounding, missing-data and outage rules, evidence retention and freshness settings.</p>
+          <section data-kind="tile" id="the-expiry-method"><h5>The expiry method</h5><p>A 30-minute average ending at the vault's exact expiry, calculated off-chain.</p></section>
+          <section data-kind="tile" id="referenced-per-request"><h5>Referenced per request</h5><p>Reference the methodology artifact through settlementMethodology in each vault's preparation and publication requests, and keep the evidence per vault.</p></section>
+          <section data-kind="tile" id="nothing-verified-on-chain"><h5>Nothing is verified on-chain</h5><p>Neither the contracts nor the CLI verify sources or compute the average; synthetic test reports are rehearsal data only.</p></section>
+          <section data-kind="tile" id="physical-needs-none-of-this"><h5>Physical needs none of this</h5><p>Physical deployments need no methodology.</p></section>
+        </section>
+        <section data-kind="action" id="enable-cash-after-physical-launch"><h4>Enable cash after a physical launch</h4><p>Grant the publisher role with grant-settlement-publisher, then the admin runs set-cash-settlement-enabled with hub, enabled: true and publisher.</p>
+          <section data-kind="tile" id="granting-enables-nothing"><h5>Granting alone enables nothing</h5><p>The role grant does not enable cash by itself.</p></section>
+          <section data-kind="tile" id="what-the-cli-checks-on-enable" data-span="2"><h5>What the CLI checks</h5><p>It checks that the nominated address holds the role and previews the current and requested flag; the transaction itself carries only setCashSettlementEnabled(true).</p></section>
+          <section data-kind="tile" id="the-setter-is-admin-only"><h5>The setter is admin-only</h5><p>It deliberately ignores role membership; a direct contract call skips the CLI's publisher check entirely.</p></section>
+          <section data-kind="tile" id="roles-never-move-the-flag"><h5>Roles never move the flag</h5><p>Granting, revoking or renouncing a role never changes the flag.</p></section>
+          <section data-kind="tile" id="disabling-cash" data-span="2"><h5>Disabling cash</h5><p>enabled: false blocks new Cash and Either vaults and cash bid activation, including in auctions already open, with no publisher needed. Physical bids still activate, including in existing Either vaults.</p></section>
+          <section data-kind="tile" id="existing-positions-keep-their-rules"><h5>Existing positions keep their rules</h5><p>Publication, exercise, expiration, claims and agreed unwind continue while the flag is off.</p></section>
+        </section>
+        <section data-kind="action" id="eoa-and-optional-contract-publishers"><h4>EOA and optional contract publishers</h4><p>The simple path is an EOA: grant it the role, enable cash, and have it submit the two publish commands for each activated cash vault.</p>
+          <section data-kind="tile" id="nothing-extra-to-deploy"><h5>Nothing extra to deploy</h5><p>No feed address to configure, no interface to implement and no helper to deploy; each vault has its own stored reports.</p></section>
+          <section data-kind="tile" id="a-contract-can-hold-the-role"><h5>A contract can hold the role too</h5><p>It computes the report under its own approved policy and calls the Hub's publication functions; the Hub only checks the caller's address.</p></section>
+          <section data-kind="tile" id="the-helper-must-authenticate-callers"><h5>The helper must authenticate callers</h5><p>An open forwarding contract with the role would let anyone publish.</p></section>
+          <section data-kind="tile" id="example-publisher-reference" data-span="2"><h5>Reference example</h5><p>ExampleSettlementPublisher shows owner access control in front of the write-side interface — a demonstration of the trust boundary, not a production data source.</p></section>
+        </section>
+        <section data-kind="action" id="publisher-rotation-and-incidents"><h4>Publisher rotation and incidents</h4><p>DEFAULT_ADMIN_ROLE on the Hub controls SETTLEMENT_PRICE_PUBLISHER_ROLE, using grant-settlement-publisher and revoke-settlement-publisher.</p>
+          <section data-kind="tile" id="no-on-chain-quorum" data-span="2"><h5>No on-chain quorum</h5><p>Any holder may publish for any eligible cash vault; holding the role in several accounts creates no quorum. Put a threshold inside a publisher multisig instead.</p></section>
+          <section data-kind="tile" id="rotating-a-publisher"><h5>Rotating a publisher</h5><p>Grant a replacement, revoke the old one, then verify the Hub address and resulting membership.</p></section>
+          <section data-kind="tile" id="old-data-survives-revocation"><h5>Old data survives revocation</h5><p>Observations stay usable until their limit passes or a newer one replaces them; final prices survive forever.</p></section>
+          <section data-kind="tile" id="revocation-cannot-undo-a-payment"><h5>Revocation cannot undo a payment</h5><p>It stops future publications only; a missing report keeps the obligation and collateral locked until a valid report or an agreed unwind.</p></section>
+          <section data-kind="tile" id="check-before-publishing-final"><h5>Check before publishing final</h5><p>A wrong exercise observation can be superseded by a later verified one; a wrong final expiry price cannot be corrected by anyone.</p></section>
+          <section data-kind="tile" id="if-every-admin-key-is-lost"><h5>If every admin key is lost</h5><p>Publisher governance is lost with it. See the <a href="#cash-settlement-pricing">pricing specification</a> for these boundaries in detail.</p></section>
+        </section>
+        <section data-kind="action" id="physical-exercise-deadlines"><h4>Physical exercise deadlines</h4><p>For physical options the deadline is expiry + exerciseWindow; American holders can exercise from activation, European holders from expiry.</p>
+          <section data-kind="tile" id="who-funds-and-approves-exercise"><h5>Who funds and approves</h5><p>The buyer or its current executor submits exercise with an underlying amount; the caller funds and approves the clone — quote tokens for a call, underlying for a put.</p></section>
+          <section data-kind="tile" id="only-the-buyer-changes-execution"><h5>Only the buyer changes them</h5><p>set-execution changes the executor or recipient; a zero executor address revokes delegation.</p></section>
+        </section>
+        <section data-kind="action" id="cash-exercise-and-expiry-rules"><h4>Cash exercise and expiration rules</h4><p>American cash exercise before expiry uses the exercise observation, never the indicative feed; at or after expiry both styles use the finalized report.</p>
+          <section data-kind="tile" id="zero-payout-reverts-runbook"><h5>A zero payout reverts</h5><p>At or after expiry.</p></section>
+          <section data-kind="tile" id="who-may-expire-and-when"><h5>Who may expire, and when</h5><p>Anyone may expire a physical option at or after its deadline and a cash option at or after expiry; reaching a deadline does nothing by itself.</p></section>
+          <section data-kind="tile" id="cash-expire-reserves-the-payout"><h5>Cash expire reserves the payout</h5><p>expire prices the remaining notional and reserves the buyer's payout for claim-payout.</p></section>
+        </section>
+        <section data-kind="action" id="claim-and-reconcile"><h4>Claim and reconcile custody</h4><p>After settlement, holders call claim with a share amount, which burns those shares for a proportional slice of the unreserved balances.</p>
+          <section data-kind="tile" id="what-stays-reserved-runbook"><h5>What stays reserved</h5><p>Unpaid premium, premium dust, buyer payouts and refunds, and recoverable unwind contributions.</p></section>
+          <section data-kind="tile" id="claim-premium-survives-burning"><h5>claim-premium survives burning</h5><p>Still works for holders with unpaid credit, even after burning every share.</p></section>
+          <section data-kind="tile" id="reading-custody" data-span="2"><h5>Reading custody</h5><p>vault.reserved(token), vault.buyerReserved(token) and the premium module's claimable(vaultId, holder); the Hub's pendingPayout tracks only cash settlement in collateral, not unwind refunds.</p></section>
+        </section>
+        <section data-kind="action" id="if-a-report-is-missing-runbook"><h4>If a report is missing</h4><p>A cash vault stays Live and locked until a valid report or a unanimous unwind; a stale or missing feed never settles anything to zero.</p>
+          <section data-kind="tile" id="recovery-options-runbook"><h5>Recovery options</h5><p>The admin can rotate publishers; nobody can correct a finalized price.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="admission-pause-and-stalled-auctions"><h3>Pause admissions and unblock stalled auctions</h3><p>A guardian pauses new commitments globally or for one vault; a stuck auction can still be cancelled to return it to Open.</p>
+        <section data-kind="action" id="guardian-pause"><h4>Guardian pauses admissions</h4><p>pause with vaultId: "0" pauses global admission, or a specific ID pauses one vault.</p>
+          <section data-kind="tile" id="what-pause-blocks-runbook"><h5>What is blocked</h5><p>Creation, deposits, opening and activation, as applicable.</p></section>
+          <section data-kind="tile" id="what-pause-does-not-block"><h5>What continues</h5><p>Withdrawals, transfers, exercise, reports, settlement, claims and agreed unwinds; no deadline moves.</p></section>
+        </section>
+        <section data-kind="action" id="unblock-a-stalled-auction"><h4>Unblock a stalled auction</h4><p>The owner may cancel-auction immediately while paused or after expiry; otherwise it waits out the timeout snapshotted at creation. A bid master may cancel any time.</p>
+          <section data-kind="tile" id="what-cancelling-does"><h5>What cancelling does</h5><p>Returns the vault to Open and clears the schedule; holders can then withdraw.</p></section>
+          <section data-kind="tile" id="must-unpause-before-reopening"><h5>Must unpause first</h5><p>A paused vault must be unpaused before it admits another deposit or auction; an expired vault cannot reopen.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="premium-treatment-and-emergency-boundaries"><h3>What premium and fees do in every emergency</h3><p>Premium and fees, once earned, are never clawed back by a cancellation, an unwind, a pause or normal settlement; admission pause is the only emergency control.</p>
+        <section data-kind="action" id="premium-treatment-table"><h4>Premium and fees, by event</h4><p>What happens to earned premium and fees, and to any refund or continuation, for five events.</p>
+          <section data-kind="tile" id="premium-events-table" data-span="2"><h5>Five events</h5><table><thead><tr><th>Event</th><th>Premium and fees</th></tr></thead><tbody><tr><td>Auction cancelled before activation</td><td>Nothing collected; vault returns to Open.</td></tr><tr><td>Unwind consent revoked, expired or replaced</td><td>Unchanged; each LP can recover its contribution, and the Live position continues under its normal deadlines.</td></tr><tr><td>Unwind executed</td><td>Retained; LPs separately fund the refund.</td></tr><tr><td>Admission paused</td><td>Unchanged; exercise, expiry, claims and unwind continue.</td></tr><tr><td>Normal exercise or expiration</td><td>Retained and claimable.</td></tr></tbody></table></section>
+          <section data-kind="tile" id="no-automatic-refund"><h5>No automatic refund</h5><p>LPs may already have claimed their premium, so an unwind refund is negotiated and funded on its own, never drawn from premium, fees or collateral.</p></section>
+        </section>
+        <section data-kind="action" id="only-emergency-control"><h4>The only emergency control</h4><p>Admission pause is the only emergency control; a full execution freeze would be a separate product decision.</p>
+          <section data-kind="tile" id="a-freeze-is-not-this-design"><h5>Not this design</h5><p>A full freeze would need its own specification for permissions, affected actions, deadlines, resumption and outstanding payments.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="prepare-and-execute-a-unanimous-unwind"><h3>Run a unanimous unwind step by step</h3><p>Only a Live vault can be unwound; the proposal, consent and funding must all be valid when the agreement executes.</p>
+        <section data-kind="action" id="worked-unwind-scenarios"><h4>Three worked scenarios</h4><p>Zero refund, a funded refund, and an expired or replaced proposal.</p>
+          <section data-kind="tile" id="zero-refund-scenario"><h5>Zero refund</h5><p>Propose refund: "0", collect every approval and the buyer's signature, execute. No token approval, no funding.</p></section>
+          <section data-kind="tile" id="funded-refund-scenario"><h5>100 USDC at 60/40</h5><p>Propose refund: "100000000"; with six-decimal USDC, the two LPs fund 60 and 40 USDC via approve-token and fund-unwind, then anyone executes.</p></section>
+          <section data-kind="tile" id="expired-proposal-scenario"><h5>Expired or replaced proposal</h5><p>Nonce 1 cannot execute after its deadline. Proposing again gets nonce 2; nothing signed or approved for nonce 1 works for it.</p></section>
+        </section>
+        <section data-kind="action" id="propose-approve-fund-execute"><h4>Propose, approve, fund, execute</h4><p>The owner or buyer calls propose-unwind with a future deadline and a refund in raw premium-token units; every current shareholder then approves.</p>
+          <section data-kind="tile" id="typed-unwind-fields"><h5>typed-unwind</h5><p>Returns the active agreement: vaultId, nonce, deadline, exercisedNotional, supply and refund, under the EIP-712 domain bound to this chain and the unwind module.</p></section>
+          <section data-kind="tile" id="required-contribution-formula" data-span="2"><h5>Required contribution</h5><p><code>ceil(refund × current shares / proposal supply)</code>, available as unwind.requiredContribution(vaultId, balance). Funding can happen before or after voting and can be topped up.</p></section>
+          <section data-kind="tile" id="revert-on-share-movement"><h5>Funding reverts on a share move</h5><p>If a token callback moves the funder's shares during funding, even away and straight back, the funding transaction reverts.</p></section>
+          <section data-kind="tile" id="execute-unwind-mechanics"><h5>Executing the agreement</h5><p>Anyone can submit execute-unwind with vaultId, nonce and signature; the executing caller supplies no tokens. No refund tokens leave the vault at that moment.</p></section>
+        </section>
+        <section data-kind="action" id="recover-a-contribution"><h4>Recover a funded contribution</h4><p>Before execution, a funder can call withdraw-unwind-contribution with the original nonce and get the whole deposit back.</p>
+          <section data-kind="tile" id="withdrawing-revokes-consent"><h5>Withdrawing revokes consent</h5><p>Withdrawing from the current proposal also revokes that holder's approval.</p></section>
+          <section data-kind="tile" id="surplus-recovery-formula" data-span="2"><h5>Surplus recovery</h5><p>Each recovery gets <code>floor(remaining surplus × holder ceiling / remaining total ceilings)</code>; the last participant to recover takes the leftover dust.</p></section>
+          <section data-kind="tile" id="recovery-stays-tied-to-funder"><h5>Tied to the original funder</h5><p>Recovery stays attached through later transfers or burns; already-claimed premium does not excuse a current LP from funding.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="every-command-and-its-fields"><h3>Every command and its fields</h3><p>Every operator command, and the additional request fields each one needs beyond the common envelope.</p>
+        <section data-kind="action" id="common-envelope"><h4>Every request shares an envelope</h4><p>All requests include rpc and sender; Hub calls include hub and usually vaultId. Transaction commands simulate first; add --send only for explicit submission.</p>
+          <section data-kind="tile" id="enums-reference" data-span="2"><h5>Enums</h5><p>Exercise style: 0 European, 1 American, policy also 2 Either. Settlement: 0 Physical, 1 Cash, policy also 2 Either.</p></section>
+        </section>
+        <section data-kind="action" id="command-table"><h4>The full command table</h4><p>Commands grouped by what they touch: deployment, vault preparation, bidding, reporting, position management and administration.</p>
+          <section data-kind="tile" id="deployment-commands" data-span="2"><h5>Deployment</h5><ul><li>prepare-deployment — deployer, admin, reportSigner; optional exerciseWindow, auctionTimeout, uri, methodology metadata.</li><li>deploy — planFile, journalFile; requires --send.</li></ul></section>
+          <section data-kind="tile" id="vault-and-bid-commands" data-span="2"><h5>Vault and bid</h5><ul><li>prepare-vault — terms, pairs, supportedTokens, collateralAmount, collateralPriceUsdE6, minTradeUsdE6, marketQuotes.</li><li>typed-bid — bid fields; optional executor, recipient.</li><li>inspect-bid / activate — complete bid, signature, collateralPriceUsdE6, minTradeUsdE6.</li></ul></section>
+          <section data-kind="tile" id="reporting-commands" data-span="2"><h5>Reporting</h5><ul><li>typed-report — feed, kind: "spot", report.</li><li>publish-spot — feed, report, signature.</li><li>publish-settlement-exercise / -expiry — hub, vaultId, settlementMethodology, report.</li><li>grant/revoke-settlement-publisher — hub, account.</li><li>set-cash-settlement-enabled — hub, enabled; enabling also needs publisher.</li></ul></section>
+          <section data-kind="tile" id="position-commands" data-span="2"><h5>Position</h5><ul><li>approve-token — token, amount.</li><li>deposit / withdraw / exercise / claim — amount.</li><li>open-auction / cancel-auction / expire / claim-premium / claim-payout — no additional fields.</li><li>set-execution — executor, recipient.</li></ul></section>
+          <section data-kind="tile" id="unwind-commands" data-span="2"><h5>Unwind</h5><ul><li>propose-unwind — deadline, refund.</li><li>typed-unwind / revoke-unwind — no additional fields.</li><li>approve-unwind / withdraw-unwind-contribution — nonce.</li><li>fund-unwind — nonce, amount.</li><li>execute-unwind — nonce, signature.</li></ul></section>
+          <section data-kind="tile" id="admin-commands"><h5>Administration</h5><p>pause — paused boolean. grant-role — role string, account; vaultId unnecessary.</p></section>
+          <section data-kind="tile" id="no-dedicated-cli-command"><h5>No dedicated command</h5><p>Owner tightening, auction scheduling, ownership transfer, role revocation, metadata and future-default changes: use the contract ABI.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="platform-fee-and-share-transfer-administration"><h3>Administer fees and share transfers</h3><p>The platform fee is set globally but fixed per vault at creation; enabling transfers lets shares carry unpaid premium credit with them.</p>
+        <section data-kind="action" id="fee-rate-and-treasury"><h4>Set the rate and the treasury</h4><p>DEFAULT_ADMIN_ROLE manages transfers and the treasury address; PLATFORM_FEE_MANAGER_ROLE manages the rate, from 0 to 10,000 bps.</p>
+          <section data-kind="tile" id="fresh-deployment-fee-defaults"><h5>Fresh deployment defaults</h5><p>Transfers disabled, a zero platform fee, and the admin as treasury.</p></section>
+          <section data-kind="tile" id="rate-fixed-at-vault-creation" data-span="2"><h5>Fixed at creation</h5><p>Vault creation saves the current global rate in vaultPlatformFeeBps(vaultId); later global changes affect only newly created vaults. Cancelling and reopening an auction does not change the saved rate.</p></section>
+          <section data-kind="tile" id="activation-locks-in-the-rate"><h5>Activation locks it in</h5><p>Uses the saved rate and the current treasury, then records the applied rate, amount and recipient; a later treasury change never redirects an already allocated fee.</p></section>
+          <section data-kind="tile" id="fee-formula-runbook"><h5>The fee formula</h5><p><span class="f"><b>Fee</b><code>floor(gross × rateBps / 10,000)</code></span>At 200 bps, 1,000 USDC gross sends 20 USDC to the treasury and 980 to LPs.</p></section>
+          <section data-kind="tile" id="claiming-the-platform-fee"><h5>Claiming the fee</h5><p>Anyone can call claimPlatformFee() once, paying the snapshotted recipient; a vault cannot be its own treasury.</p></section>
+        </section>
+        <section data-kind="action" id="transfer-administration"><h4>Administer share transfers</h4><p>setTransfersEnabled(bool) controls whether shares move at all; a transfer carries a proportional share of the sender's unpaid premium with it.</p>
+          <section data-kind="tile" id="transfer-formula-runbook" data-span="2"><h5>What moves</h5><p><code>floor(unclaimed × amount / pre-transfer balance)</code> of the sender's premium credit; a full transfer moves all of it, and claimed amounts never move.</p></section>
+          <section data-kind="tile" id="burns-and-batches"><h5>Burns and batches</h5><p>Burns preserve unpaid credit, including partial burns; duplicate IDs in a batch are aggregated before the proportional accounting.</p></section>
+          <section data-kind="tile" id="zero-and-self-transfers"><h5>Zero and self transfers</h5><p>Move no entitlement and do not invalidate unwind consent, but still require transfers to be enabled.</p></section>
+        </section>
+        <section data-kind="action" id="fee-admin-commands"><h4>Commands</h4><p>set-platform-fee, set-platform-treasury, set-transfers and claim-platform-fee each take the usual hub and sender fields and simulate before building calldata.</p>
+          <section data-kind="tile" id="inspect-bid-fee-preview"><h5>Preview at inspect-bid</h5><p>Reports the gross premium, the saved vaultPlatformFeeBps, the platform fee and the net premium at that rate.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="request-examples-to-copy"><h3>Request examples to copy</h3><p>Copyable request templates for every command in this runbook, with the placeholders each one needs replaced before use.</p>
+        <!-- generated:operator-examples -->
+        <section data-kind="action" id="operator-request-examples"><h4>The example files</h4></section>
+        <!-- /generated:operator-examples -->
+      </section>
+    </section>
+<section data-kind="station" data-band="shelf" id="cash-settlement-pricing" data-tagline="Who may publish a settlement price, what the Hub checks, and what happens when a report is missing or wrong.">
+      <h2>Cash settlement pricing</h2>
+      <p>Cash-settled vaults pay intrinsic value out of the collateral, so someone has to tell the Hub what the price was. The Hub owns the prices and the publisher authority; an EOA or an optional helper contract publishes, and nothing else is consulted.</p>
+      <p>Which accounts publish in production, and how they compute their prices, are deployment decisions and are not encoded anywhere in the contracts.</p>
+      <section data-kind="moment" id="physical-only-launch-and-later-cash-activation"><h3>A new Hub starts physical-only</h3><p>A fresh Hub grants no publisher role and leaves cashSettlementEnabled false; only DEFAULT_ADMIN_ROLE can later flip it.</p>
+        <section data-kind="action" id="flag-and-role-are-independent"><h4>The flag and the role are independent</h4><p>setCashSettlementEnabled(bool) is admin-only and emits CashSettlementEnabledUpdated; granting, revoking or renouncing the publisher role never changes the flag.</p>
+          <section data-kind="tile" id="while-the-flag-is-false"><h5>While the flag is false</h5><p>The Hub rejects Cash/Either creation and cash bid activation, including in auctions already open. Physical bids still activate, including in existing Either vaults.</p></section>
+          <section data-kind="tile" id="physical-only-is-locked"><h5>Physical-only is locked</h5><p>A physical-only vault can never be loosened to cash.</p></section>
+          <section data-kind="tile" id="flag-gates-only-new-positions"><h5>The flag gates only new positions</h5><p>Disabling it never blocks publication, exercise, expiration, claims or agreed unwind for live cash positions.</p></section>
+          <section data-kind="tile" id="before-enabling-checklist"><h5>Before enabling</h5><p>Have an approved methodology and a publisher with the role; the CLI's enable command checks this as a preflight, not something the contract stores.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="payment-authority-and-routing"><h3>Indicative and authoritative prices are kept apart</h3><p>An indicative price may constrain the winning strike; it can never authorize a settlement payment.</p>
+        <section data-kind="action" id="required-price-by-action"><h4>Which price each action needs</h4><p>The table lists what each action requires, from activation to physical exercise.</p>
+          <section data-kind="tile" id="required-price-table" data-span="2"><h5>Required price, by action</h5><table><thead><tr><th>Action</th><th>Required price</th></tr></thead><tbody><tr><td>Activation, indicative checks on</td><td>Fresh priceFeed.spot(...)</td></tr><tr><td>American cash exercise before expiry</td><td>Fresh, unexpired exercise observation</td></tr><tr><td>Cash exercise at/after expiry</td><td>Finalized price for the fixed expiry</td></tr><tr><td>Cash expiration</td><td>Same final price, for remaining notional</td></tr><tr><td>Physical exercise/expiration</td><td>Nothing</td></tr></tbody></table></section>
+          <section data-kind="tile" id="no-fallback-to-indicative"><h5>No fallback</h5><p>There is no fallback from an authoritative report to the indicative feed; the exact expiry timestamp is the boundary.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="public-interface"><h3>One observation and one final price per vault</h3><p>The Hub stores one exercise observation and one final expiry value per vault ID; the linked settlement library reads that storage directly.</p>
+        <section data-kind="action" id="interface-functions"><h4>The interface</h4><p>Both publication functions require the publisher role and a Live, cash-settled vault; the Hub derives the pair and expiry from the vault's own state.</p>
+          <section data-kind="tile" id="settlement-interface-code" data-span="2"><h5>Solidity interface</h5><pre><code class="language-solidity">bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE;
+bool public cashSettlementEnabled;
+
+function setCashSettlementEnabled(bool enabled) external;
+
+function publishExercisePrice(
+    uint256 vaultId, uint256 price,
+    uint64 observedAt, uint64 validUntil
+) external;
+
+function exercisePrice(uint256 vaultId)
+    external view returns (uint256 price, uint256 observedAt, uint256 validUntil);
+
+function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
+
+function settlementPrice(uint256 vaultId)
+    external view returns (uint256 price);</code></pre></section>
+          <section data-kind="tile" id="rejected-callers"><h5>Rejected callers</h5><p>Unknown, pre-activation, physical and finalized positions are all rejected; prices must be positive.</p></section>
+          <section data-kind="tile" id="each-vault-stands-alone"><h5>Each vault stands alone</h5><p>Identical underlying, quote and expiry still need separate transactions; publishing one vault never populates or blocks another.</p></section>
+          <section data-kind="tile" id="no-settlement-feed-field"><h5>No settlement feed field</h5><p>maxSettlementPriceAge must be positive for any vault that permits cash settlement and cannot be loosened by tightening.</p></section>
+        </section>
+        <section data-kind="action" id="interchangeable-publishers"><h4>Interchangeable publishers</h4><p>An EOA with the role submits either publication transaction directly; a helper contract can hold the same role and call the same functions through the minimal write-side interface.</p>
+          <section data-kind="tile" id="hub-never-reads-the-helper"><h5>The Hub never reads the helper</h5><p>It never stores the helper as a dependency of any vault; the helper may compute prices under its own approved policy.</p></section>
+          <section data-kind="tile" id="an-example-helper-ships"><h5>An example ships in the repo</h5><p>Access-controlled, with tests for both EOA and contract publication; no helper is deployed by default.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="exercise-observations"><h3>Observations must strictly increase</h3><p>The Hub stores the latest (price, observedAt, validUntil) per vault; publication needs a strictly increasing observedAt for that vault.</p>
+        <section data-kind="action" id="observation-rules"><h4>Publication and consumption rules</h4><p>Publication requires 0 &lt; observedAt ≤ block.timestamp ≤ validUntil, rejecting expired or non-increasing submissions.</p>
+          <section data-kind="tile" id="equal-timestamp-different-price"><h5>Equal timestamp, different price</h5><p>Still rejected; different vaults may share an observation timestamp.</p></section>
+          <section data-kind="tile" id="exercise-consumption-check" data-span="2"><h5>Checked at exercise, not publication</h5><p>A positive stored price, a non-future observation, block.timestamp − observedAt ≤ maxSettlementPriceAge, and block.timestamp ≤ validUntil; both bounds inclusive.</p></section>
+          <section data-kind="tile" id="no-other-vaults-report-counts"><h5>No other vault counts</h5><p>An observation published after expiry cannot stand in for the final expiry price.</p></section>
+          <section data-kind="tile" id="affects-only-later-exercises"><h5>Affects only later exercises</h5><p>A new observation cannot change a payment that already happened; pick validity windows that fit the freshness limit.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="exact-expiry-and-finality"><h3>Final prices are write-once, forever</h3><p>Final prices are keyed by vault ID, taken from the vault's activated expiry; once stored, every later publication for that vault is rejected.</p>
+        <section data-kind="action" id="finality-rules"><h4>Publication window and permanence</h4><p>Publication requires block.timestamp ≥ expiry and is accepted through validUntil inclusive.</p>
+          <section data-kind="tile" id="no-challenge-period"><h5>No challenge period</h5><p>Finality is immediate and write-once; there is no administrative correction, deletion or retroactive change to payouts already made.</p></section>
+          <section data-kind="tile" id="final-prices-stay-readable"><h5>Readable forever</h5><p>Final prices stay readable after settlement; the submission deadline does not expire a stored value.</p></section>
+          <section data-kind="tile" id="late-publication-is-allowed"><h5>Late publication is allowed</h5><p>For as long as the cash position is Live, without an arbitrary cutoff: reconstruct the approved calculation for the original expiry with a current deadline.</p></section>
+          <section data-kind="tile" id="never-substitute-a-price"><h5>Never substitute</h5><p>Never a current market price, another vault's report, or a different expiry.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="price-methodology-and-operational-approval"><h3>Prices are raw quote-token units</h3><p>Prices are integer quote-token units per whole underlying token; for WETH/USDC, 2,500 USDC per WETH is 2500000000.</p>
+        <section data-kind="action" id="methodology-requirements"><h4>What a production methodology needs</h4><p>The proposed expiry method is a 30-minute average ending at the exact expiry; a production methodology must also name sources, sampling, weighting, rounding and missing-data handling.</p>
+          <section data-kind="tile" id="contracts-attest-not-verify"><h5>The contracts attest, not verify</h5><p>They attest who published; they do not prove the source was accurate or compute either method.</p></section>
+          <section data-kind="tile" id="record-before-enabling-production"><h5>Record before enabling</h5><p>The approved methodology, the responsible operators, where evidence lives and the freshness configuration.</p></section>
+          <section data-kind="tile" id="physical-needs-none-of-it"><h5>Physical needs none of it</h5><p>Physical-only deployments need none of this, and passing synthetic tests approves nothing.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="governance-rotation-and-trust"><h3>Any role holder can publish for any vault</h3><p>The Hub admin controls the flag and the publisher role; any role holder may publish for any eligible cash vault, with no per-vault list and no on-chain quorum.</p>
+        <section data-kind="action" id="rotation-and-survival"><h4>Rotation is the whole recovery procedure</h4><p>Granting a replacement and revoking the old publisher changes no vault terms and stops future publication transactions, including queued ones landing afterward.</p>
+          <section data-kind="tile" id="no-outstanding-signatures"><h5>No outstanding signatures</h5><p>Settlement uses transactions rather than signed messages, so there is nothing to invalidate.</p></section>
+          <section data-kind="tile" id="stored-data-survives-revocation"><h5>Stored data survives revocation</h5><p>Observations stay usable until their limit passes or a newer one replaces them; final prices survive permanently.</p></section>
+          <section data-kind="tile" id="trust-for-the-life-of-the-position"><h5>Trust for the life of the position</h5><p>Publisher identity is mutable, so depositors trust the Hub administrator and every authorized publisher for as long as the position is open.</p></section>
+          <section data-kind="tile" id="losing-admin-vs-publisher-keys"><h5>Losing keys</h5><p>Losing every admin key ends governance recovery; losing every publisher while the admin still works is fixed by rotation.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="failure-and-incident-procedure"><h3>A missing report never settles at zero</h3><p>A missing, stale or invalid observation, or a missing final report, makes the relevant action revert; it never settles the vault at zero or releases collateral to LPs.</p>
+        <section data-kind="action" id="incident-response"><h4>Responding to an incident</h4><p>If coverage is lost, disable new cash admissions if appropriate and rotate authority; the replacement publishes each missing vault's report.</p>
+          <section data-kind="tile" id="a-wrong-observation-is-fixable"><h5>A wrong observation is fixable</h5><p>Publish a strictly later, verified observation; exercises already completed stay final.</p></section>
+          <section data-kind="tile" id="a-wrong-final-price-is-not"><h5>A wrong final price is not</h5><p>It cannot be corrected by anyone; any negotiated remedy happens off-chain and cannot seize existing claimant balances.</p></section>
+          <section data-kind="tile" id="pause-does-not-block-pricing"><h5>Pause does not block pricing</h5><p>Admission pause leaves publication, exercise, expiration, claims and agreed unwind available and moves no deadline.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="deployment-and-tooling-notes"><h3>A fresh immutable deployment is required</h3><p>The per-vault publication APIs and price storage layout belong to this build, requiring a fresh deployment; there is no in-place upgrade of live positions.</p>
+        <section data-kind="action" id="tooling-notes"><h4>What the CLI and plans enforce</h4><p>set-cash-settlement-enabled takes a boolean and, when enabling, a nonzero publisher that already holds the role; disabling needs no publisher.</p>
+          <section data-kind="tile" id="manifest-v6-only"><h5>Manifest v6 only</h5><p>Plans use manifest version 6; obsolete plans are rejected.</p></section>
+          <section data-kind="tile" id="a-default-deployment-is-empty"><h5>A default deployment is empty</h5><p>No publisher, no automatic enablement and no cash methodology.</p></section>
+          <section data-kind="tile" id="distinct-request-shapes"><h5>Distinct request shapes</h5><p>Publication requests name hub, vaultId and settlementMethodology, separate from the indicative spot typed reports.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="what-production-still-needs"><h3>Passing tests authorizes nothing</h3><p>The shipped implementation supports American exercise, direct role publication and immediate irreversible finality, but ships with no named operator accounts and no approved per-pair methodology.</p>
+        <section data-kind="action" id="production-gap"><h4>What is missing</h4><p>No approved per-pair methodology, no freshness configuration and no named admin or operator accounts.</p>
+          <section data-kind="tile" id="tests-dont-authorize-production"><h5>Tests do not authorize production</h5><p>Passing the local tests does not authorize a production deployment or a production price.</p></section>
+        </section>
+      </section>
+    </section>
+<section data-kind="station" data-band="shelf" id="releases-and-registry" data-tagline="One permanent registry address lets new releases coexist with vaults that stay on the Hub that created them.">
+      <h2>Releases and registry</h2>
+      <p>Ivy ships new functionality as new immutable deployments rather than upgrades. IvyVaultsRegistry gives integrations one permanent address per chain to discover them; registering and recommending a release are separate administrator actions.</p>
+      <section data-kind="moment" id="existing-vaults-never-move"><h3>Existing vaults keep their original Hub</h3><p>Existing vaults keep their original code and Hub; the registry only recommends a Hub for new vaults.</p>
+        <section data-kind="action" id="registry-example-action"><h4>Why a new recommendation leaves an old position alone</h4><p>For new creation, the frontend discovers the recommended release and sends the transaction directly to its Hub; an existing position ignores the current recommendation entirely.</p>
+          <section data-kind="lab" id="releases-lab"><h5>Recommended release vs. an existing position</h5><div class="release-atlas interactive-example" data-lab="releases">
+            <div class="registry-node">
+              <span class="inscription">PERMANENT DISCOVERY ADDRESS</span>
+              <h3>IvyVaultsRegistry</h3>
+              <fieldset>
+                <legend>Illustrative recommendation</legend>
+                <label
+                  ><input
+                    type="radio"
+                    name="recommended-release"
+                    value="A"
+                    checked
+                    disabled
+                  />Release A</label
+                ><label
+                  ><input
+                    type="radio"
+                    name="recommended-release"
+                    value="B"
+                    disabled
+                  />Release B</label
+                >
+              </fieldset>
+              <p id="release-status" class="example-status" role="status">
+                Recommended for new creation: Hub A. Existing position stays on
+                Hub A.
+              </p>
+            </div>
+            <div class="release-branches">
+              <div data-release="A" class="is-recommended">
+                <span class="release-badge">Recommended</span>
+                <h4>Hub A</h4>
+                <div class="vault-address">Chain + Hub A + vault 1</div>
+                <span class="fixed-position"
+                  >Existing position · permanently bound</span
+                >
+              </div>
+              <div data-release="B">
+                <span class="release-badge">Available release</span>
+                <h4>Hub B</h4>
+                <div class="vault-address">Chain + Hub B + vault 1</div>
+                <span>Independent position identity</span>
+              </div>
+            </div>
+          </div></section>
+          <section data-kind="tile" id="new-creation-rule"><h5>New creation</h5><p>The frontend discovers the recommended release; the user sends the creation transaction directly to its Hub.</p></section>
+          <section data-kind="tile" id="existing-position-rule"><h5>Existing position</h5><p>Exercise, expiration and claims use its original chain, Hub and local vault ID, regardless of the current recommendation. Vault IDs may repeat across Hubs.</p></section>
+          <section data-kind="tile" id="registry-authority-rule"><h5>Registry authority</h5><p>Its administrator adds releases and changes the recommendation. Registrations cannot be replaced or deleted; the registry has no authority over vault funds.</p></section>
+          <section data-kind="tile" id="recommendation-limits-rule"><h5>Recommendation limits</h5><p>Recommending a new release does not move, pause or change an older position's code. Appearing in the registry does not establish that a release was audited.</p></section>
+          <section data-kind="tile" id="immutable-deployment-rule"><h5>Immutable deployment</h5><p>An existing vault keeps the code and Hub it was created with; its original settlement, unwind, pause, transfer and cash-publication rules still apply.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="what-remains-fixed"><h3>Registering a release changes nothing about old vaults</h3><p>A registration can never be overwritten or removed, and the registry cannot replace Hub code, rewire modules, call vault operations or move assets.</p>
+        <section data-kind="action" id="fixed-guarantees"><h4>What stays true regardless of new releases</h4><p>Each vault stays bound to the Hub that created it; an older Hub remains directly usable under its own admission rules, including for new vault creation.</p>
+          <section data-kind="tile" id="release-id-is-not-a-version"><h5>A release ID is not a version</h5><p>It has nothing to do with the Hub's version() string, the EIP-712 domain version, or the deployment-plan format version.</p></section>
+          <section data-kind="tile" id="registry-does-not-audit"><h5>The registry does not audit</h5><p>It does not validate source code or audit quality; the administrator is responsible for what gets registered and recommended.</p></section>
+          <section data-kind="tile" id="immutability-cuts-both-ways"><h5>Immutability cuts both ways</h5><p>A defect cannot be patched in place; a new release may fix it for future positions, while existing positions keep their original rules.</p></section>
+          <section data-kind="tile" id="no-emergency-migration"><h5>No emergency migration</h5><p>The registry adds no emergency withdrawal and no forced migration.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="deploy-the-registry-once"><h3>The registry deploys once, on its own</h3><p>The registry is a single-contract deployment with its own preparation, journal and administrator, independent of any Hub.</p>
+        <section data-kind="action" id="registry-deployment-steps"><h4>Deploy and resume</h4><p>Prepare a request with rpc, deployer and admin, save the predicted deployment, then execute with deploy-registry --send.</p>
+          <section data-kind="tile" id="registry-deploy-commands" data-span="2"><h5>Commands</h5><pre><code class="language-sh">node scripts/operator.mjs prepare-registry-deployment registry-deployment.json &gt; registry-plan.json
+node scripts/operator.mjs deploy-registry registry-run.json --send</code></pre></section>
+          <section data-kind="tile" id="registry-recovery"><h5>Resuming</h5><p>Use the same command, files and registry artifact; recovery verifies creation evidence before adopting existing code and never creates a second registry.</p></section>
+          <section data-kind="tile" id="shared-deployer-order"><h5>Sharing a deployer</h5><p>If it shares a deployer with a Hub suite, finish the registry first and never let it consume a nonce from an already-prepared Hub sequence.</p></section>
+          <section data-kind="tile" id="registry-admin-independent"><h5>Independent administrator</h5><p>Choose the registry administrator independently of the Hub administrator; the registry holds no Hub role.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="register-and-recommend-a-release"><h3>Registering and recommending are two transactions</h3><p>A release bundle carries the manifest, journal and artifacts together; registering it and recommending it are separate, simulated-first operations.</p>
+        <section data-kind="action" id="register-recommend-steps"><h4>Bundle, register, then recommend</h4><p>Prepare a release bundle from the completed Hub deployment, register it, verify it, then recommend it.</p>
+          <section data-kind="tile" id="bundle-format"><h5>The bundle</h5><p>format: 1, interfaceFormat: "ivy-vaults-v2", plus manifest, journal and artifacts, so interfaces and evidence travel with the release.</p></section>
+          <section data-kind="tile" id="register-commands" data-span="2"><h5>Commands</h5><pre><code class="language-sh">node scripts/operator.mjs register-version register-release.json
+node scripts/operator.mjs register-version register-release.json --send</code></pre></section>
+          <section data-kind="tile" id="hash-commits-to-evidence"><h5>The hash commits to evidence</h5><p>Registration hashes the whole bundle into manifestHashOf(releaseId); do not edit the bundle after registering.</p></section>
+          <section data-kind="tile" id="only-registered-can-be-recommended"><h5>Only registered releases</h5><p>Can be recommended; a new registry starts with no recommendation, and registering alone leaves it alone.</p></section>
+          <section data-kind="tile" id="no-editing-after-registration"><h5>No fixing a mistake in place</h5><p>A registration cannot be edited; a corrected deployment gets a new release ID.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="prepare-transactions-for-a-selected-release"><h3>Naming a release resolves to its Hub</h3><p>Operator requests may keep naming hub directly, or supply registry, releaseId and releaseBundleFile to resolve one instead.</p>
+        <section data-kind="action" id="release-selection-rules"><h4>How selection is checked</h4><p>If hub is also present it must match the registration; only prepare-vault may omit releaseId and take the current recommendation.</p>
+          <section data-kind="tile" id="existing-vault-needs-explicit-release"><h5>Existing vaults must be explicit</h5><p>Commands for an existing vault must name the release or use the original explicit Hub; they never pick a Hub from a moving recommendation.</p></section>
+          <section data-kind="tile" id="fails-before-calldata"><h5>Fails before calldata</h5><p>Missing, incompatible or mismatched release evidence fails before any calldata is encoded.</p></section>
+          <section data-kind="tile" id="pin-the-release-id-when-repeating"><h5>Pin it when repeating</h5><p>Every CLI invocation prepares afresh, including with --send, so pass releaseId explicitly when repeating a command.</p></section>
+          <section data-kind="tile" id="a-future-interface-is-rejected"><h5>An incompatible interface is rejected</h5><p>A future interface needs its own reviewed tooling adapter, rejected by this build rather than interpreted through the current ABI.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="frontend-integration"><h3>The frontend lives outside this repository</h3><p>What lives here is the resolution interface, examples and integration notes; the transaction frontend and any wallet application are maintained elsewhere.</p>
+        <section data-kind="action" id="frontend-contract"><h4>What an integration must do</h4><p>The reusable resolver and operator transaction builder show the contract a frontend should follow, in six steps.</p>
+          <section data-kind="tile" id="frontend-integration-steps" data-span="2"><h5>Six steps</h5><ol><li>Configure a registry address per chain; resolve the recommendation only for a new position.</li><li>Load and verify the release's manifest and artifacts; an unknown format is an error, never a fallback.</li><li>Show the selected Hub and release before the user commits.</li><li>Store positions by (chainId, hubAddress, vaultId).</li><li>Return to that exact Hub for an existing position.</li><li>Keep older artifacts and interfaces available and supported.</li></ol></section>
+          <section data-kind="tile" id="resolve-release-signature" data-span="2"><h5>resolveRelease</h5><p>Exported from scripts/releases.mjs; takes a JSON-RPC provider, a request with the parsed releaseBundle, supported artifacts and an optional {allowRecommended: true}.</p></section>
+          <section data-kind="tile" id="resolve-release-returns"><h5>What it returns</h5><p>The concrete Hub, chain, registry, release ID, bundle hash and saved artifacts.</p></section>
+          <section data-kind="tile" id="uncached-code-reads"><h5>Uncached reads</h5><p>Runtime verification reads code with uncached eth_getCode, and recovery reads block height without the provider cache.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="finding-vault-creation-in-the-source"><h3>createVault clones one implementation per Hub</h3><p>The user calls createVault(terms, pairs) on the Hub address, implemented in contracts/IvyVaultsHub.sol.</p>
+        <section data-kind="action" id="clone-mechanics"><h4>What happens on-chain</h4><p>The function increments the local vault counter, calls Clones.clone(vaultImplementation), and initializes the new clone in the same transaction.</p>
+          <section data-kind="tile" id="one-implementation-per-suite"><h5>One implementation per suite</h5><p>Deployed once per Hub suite; every clone has its own address and storage. The registry plays no part in this path.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="objective"><h3>One address lets releases coexist</h3><p>One permanent discovery address per chain lets future Hub releases coexist with existing vaults, without moving them.</p>
+        <section data-kind="action" id="registry-objective-facts"><h4>What the registry never does</h4><p>The registry never executes vault transactions and never holds authority over funds; new features ship as new deployments.</p>
+          <section data-kind="tile" id="existing-positions-stay-where-created"><h5>Positions stay where created</h5><p>Every deployed Hub, vault implementation and module keeps its original code and bindings.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="registry-contract"><h3>The registry has five functions and one administrator</h3><p>IvyVaultsRegistry is non-upgradeable, with an explicit nonzero administrator and a small public interface.</p>
+        <section data-kind="action" id="registry-function-list"><h4>The interface and its checks</h4><p>Only the administrator can register a release or change the recommendation.</p>
+          <section data-kind="tile" id="registry-interface-code" data-span="2"><h5>Solidity interface</h5><pre><code class="language-solidity">registerVersion(uint256 releaseId, address hub, bytes32 manifestHash)
+setRecommendedVersion(uint256 releaseId)
+hubOf(uint256 releaseId)
+manifestHashOf(uint256 releaseId)
+recommendedVersion()</code></pre></section>
+          <section data-kind="tile" id="registration-rejections"><h5>What registration rejects</h5><p>Zero release IDs, Hub addresses that are zero or have no code, empty manifest hashes, and any release ID or Hub address already registered.</p></section>
+          <section data-kind="tile" id="registration-is-permanent"><h5>Permanent once made</h5><p>A registration can never be replaced or deleted; recommending an unregistered release fails, and a fresh registry has no recommendation.</p></section>
+          <section data-kind="tile" id="release-id-is-just-an-id"><h5>A release ID is just an ID</h5><p>Unrelated to IvyVaultsHub.version(), EIP-712 domain versions, or deployment-manifest format versions; registering code proves nothing about audit status.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="deployment-and-evidence"><h3>Registering verifies deployment evidence first</h3><p>Before preparing a registration, the tooling verifies the chain, the Hub deployment evidence, runtime code and module and library bindings against the saved manifest.</p>
+        <section data-kind="action" id="evidence-verification"><h4>What gets checked and kept</h4><p>The verified release manifest is committed alongside its on-chain hash, and artifacts and interfaces for older releases are preserved.</p>
+          <section data-kind="tile" id="unsupported-format-fails-loudly"><h5>Unsupported formats fail loudly</h5><p>Nothing is ever encoded with the current build's ABI or signing rules on the assumption that an older release matches.</p></section>
+          <section data-kind="tile" id="registry-never-shares-a-hub-nonce"><h5>Never shares a Hub nonce</h5><p>The registry never takes a nonce inside a Hub deployment sequence; each operation is simulated before explicit execution.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="resolution-and-integration"><h3>A resolver turns a release into a Hub address</h3><p>A reusable release-resolution function turns a selected registry release into a concrete Hub address with verified matching artifacts.</p>
+        <section data-kind="action" id="resolution-guarantees"><h4>What resolution guarantees</h4><p>Prepared transactions and typed signatures bind the selected Hub and chain, so a later recommendation change cannot redirect them.</p>
+          <section data-kind="tile" id="existing-position-must-name-release"><h5>Existing positions name their release</h5><p>Anything touching an existing position must name its release or original Hub; it never follows the current recommendation implicitly.</p></section>
+          <section data-kind="tile" id="mismatched-hub-is-rejected"><h5>Mismatched inputs are rejected</h5><p>A request supplying both a Hub address and a registry release is rejected if they disagree.</p></section>
+          <section data-kind="tile" id="a-positions-identity-tuple"><h5>A position's identity</h5><p>(chainId, hubAddress, vaultId), since local vault IDs can overlap across releases.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="coexistence-and-lifecycle-guarantees"><h3>Changing the recommendation changes nothing else</h3><p>Changing the recommendation changes future default selection and nothing else: no pause, no migration, no changed owner or terms.</p>
+        <section data-kind="action" id="lifecycle-guarantees-list"><h4>What keeps working exactly as before</h4><p>Lifecycle, pause, fee, publisher and share-transfer controls on an existing Hub keep working exactly as before.</p>
+          <section data-kind="tile" id="nothing-invalidated-by-recommendation"><h5>Nothing invalidated</h5><p>A recommendation change does not invalidate bids, remove old claims or replace module bindings.</p></section>
+          <section data-kind="tile" id="old-hub-stays-directly-callable"><h5>The old Hub stays callable</h5><p>Including for new vault creation under its own admission rules; a recommendation is not an on-chain admission restriction.</p></section>
+          <section data-kind="tile" id="governed-by-its-original-deployment"><h5>Governed by its original deployment</h5><p>Settlement and consensual unwind on an old position are governed by its original deployment; live code cannot be patched.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="validation"><h3>Tests exercise two Hub suites at once</h3><p>The tests work through public interfaces: the registry contract, deployment recovery, release resolution and two independent Hub suites driven through their vault lifecycle.</p>
+        <section data-kind="action" id="validation-scenarios"><h4>What the scenarios cover</h4><p>Unauthorized administration, permanent registrations, duplicate and invalid inputs, and transactions prepared before a recommendation change.</p>
+          <section data-kind="tile" id="validation-scenario-list" data-span="2"><h5>Scenarios</h5><ul><li>Missing recommendations and unknown releases.</li><li>Chain, manifest, artifact and Hub mismatches.</li><li>Preserved explicit-Hub requests.</li><li>Unsupported release formats.</li><li>Registry deployment recovery.</li></ul></section>
+          <section data-kind="tile" id="overlapping-vault-ids-scenario" data-span="2"><h5>Overlapping vault IDs</h5><p>One scenario deploys two Hub suites with overlapping vault IDs, registers and recommends the new release, then exercises, expires and claims the old positions, checking balances and bindings rather than registry state alone.</p></section>
+        </section>
+      </section>
+    </section>
+<section data-kind="station" data-band="shelf" id="project" data-tagline="Building, verifying and contributing to this repository, plus the license terms it ships under.">
+      <h2>Project</h2>
+      <p>Smart contracts for single-use covered-call and cash-secured-put vaults.</p>
+      <section data-kind="moment" id="project-setup-basics"><h3>How this repository is built, tested and documented</h3><p>Everything below is generated from the repository's own README and LICENSE files, so it stays in sync with the code and its terms.</p>
+        <!-- generated:project-setup -->
+        <section data-kind="action" id="read-the-guide"><h4>Read the guide before changing anything</h4></section>
+        <section data-kind="action" id="build-and-verify"><h4>Build, verify and test the contracts</h4></section>
+        <section data-kind="action" id="solidity-style"><h4>Follow the Solidity style guide</h4></section>
+        <section data-kind="action" id="edit-the-docs"><h4>Edit the docs and keep them in sync</h4></section>
+        <section data-kind="action" id="license"><h4>License terms for using this code</h4></section>
+        <!-- /generated:project-setup -->
+        <section data-kind="action" id="full-license-text"><h4>Read the full license text</h4><p>The complete BUSL-1.1 license, including the exact production-use restriction and change date, is on its own page.</p><p><a href="license.html">Read the full license →</a></p></section>
+      </section>
+    </section>
   </article></main>
   <footer><a href="license.html">License · BUSL-1.1</a></footer>
 </body>
