@@ -444,6 +444,144 @@
         </section>
       </section>
     </section>
+    <section data-kind="station" id="settled" data-tagline="The option is over. Shareholders and the buyer claim what is theirs.">
+      <h2>Settled</h2>
+      <p>The option is over, and no further exercise is possible. Shareholders and the buyer each claim their own share of what remains, in a separate transaction.</p>
+      <section data-kind="custody" id="settled-custody"><h3>What the vault holds</h3><dl><dt>I · Backing</dt><dd>Shareholder pool: remaining collateral and proceeds, minus reserves.</dd><dt>II · Premium and fees</dt><dd>Premium and fee reserves: owed, not yet paid.</dd><dt>III · Buyer payout</dt><dd>Only when a cash-expiry payoff or unwind refund is owed.</dd></dl></section>
+      <section data-kind="moment" id="the-option-is-over" data-when="full exercise, expiration or unwind" data-illustration="roman-residual-pool.webp"><h3>The option is over</h3><p>The option is over, and no further exercise is possible: it reached Settled through full exercise, expiration or an executed unwind agreement.</p>
+        <section data-kind="action" data-actor="anyone" id="nothing-moves-by-itself"><h4>Nothing moves by itself</h4><p>Reaching Settled does not automatically distribute the remaining assets among shareholders and the buyer.</p>
+          <section data-kind="tile" id="claims-require-transactions"><h5>Claims require transactions</h5><p>Each side claims separately: one transaction claims the remaining pool, another claims any buyer payout, and neither happens on its own.</p></section>
+          <section data-kind="tile" id="a-different-token-mix"><h5>A different token mix</h5><p>With physical exercise, the buyer exchanges tokens with the vault at the strike, so LPs may receive a different mix of tokens from their deposit.</p></section>
+          <section data-kind="tile" id="premium-and-fees-are-kept" data-span="2"><h5>Premium and fees are kept</h5><table><thead><tr><th>Event</th><th>Premium and fees</th></tr></thead><tbody><tr><td>Auction cancelled before activation</td><td>Nothing collected.</td></tr><tr><td>Unwind consent revoked, or proposal expired or replaced</td><td>Earned LP premium and platform fees remain unchanged.</td></tr><tr><td>Unwind executed</td><td>Earned LP premium and platform fees are retained.</td></tr><tr><td>Admission paused</td><td>Earned premium, fee and claim entitlements are unchanged.</td></tr><tr><td>Normal exercise or expiration</td><td>Earned premium and fees remain retained and claimable.</td></tr></tbody></table></section>
+          <section data-kind="tile" id="the-only-emergency-control" data-span="2"><h5>The only emergency control</h5><p>Admission pause is the only emergency control. A full execution freeze would be a separate product decision, with its own specification for permissions, affected actions, deadlines, resumption and outstanding payments.</p></section>
+          <section data-kind="lab" id="custody-lab"><h5>What the vault holds, by phase</h5><div data-lab="custody">
+            <label
+              >Phase
+              <select name="phase">
+                <option value="0">0 · Created</option>
+                <option value="1">1 · Auction live</option>
+                <option value="2">2 · Live</option>
+                <option value="3">3 · Settled</option>
+              </select>
+            </label>
+            <label class="settled-example" hidden
+              >Settlement illustration
+              <select aria-label="Settlement illustration">
+                <option value="physical">Physical exercise / expiry</option>
+                <option value="cash">Cash expiry</option>
+                <option value="unwind">Unwind with a refund</option>
+              </select>
+            </label>
+            <div class="custody-compartments">
+              <div class="custody-backing">
+                <span class="compartment-index" aria-hidden="true">I</span>
+                <h4></h4>
+                <p></p>
+              </div>
+              <div class="custody-premium">
+                <span class="compartment-index" aria-hidden="true">II</span>
+                <h4></h4>
+                <p></p>
+              </div>
+              <div class="custody-buyer" hidden>
+                <span class="compartment-index" aria-hidden="true">III</span>
+                <h4>Buyer payout reserve</h4>
+                <p></p>
+              </div>
+            </div>
+          </div></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="shareholders-claim-what-is-left" data-when="any time after"><h3>Shareholders claim what is left</h3><p>The option has ended. Shareholders can now collect what remains of the pool, whenever they choose to.</p>
+        <section data-kind="action" data-actor="lp" id="claim"><h4>Claim your share</h4><p>Holders call claim(vaultId, shares) to exchange shares for a proportional part of the remaining collateral and exercise proceeds.</p>
+          <section data-kind="tile" id="proportional-claims"><h5>10% of shares, 10% of the pool</h5><p>A holder of 10% of the remaining shares can claim 10% of the available pool, subject to token rounding.</p></section>
+          <section data-kind="tile" id="reserves-are-excluded"><h5>Reserves are excluded</h5><p>Reserved premium, platform fees and buyer payouts are excluded from the pool: a reserve is set aside for a specific payment, not available for this claim.</p></section>
+          <section data-kind="tile" id="shares-are-burned"><h5>Shares are burned</h5><p>The shares are burned when claimed.</p></section>
+          <section data-kind="tile" id="reconciliation-getters" data-span="2"><h5>Getters to reconcile custody</h5><ul><li><code>vault.reserved(token)</code> · reserved balances.</li><li><code>vault.buyerReserved(token)</code> · the buyer payout reserve.</li><li><code>claimable(vaultId, holder)</code> · unpaid premium credit.</li><li><code>vault.unwindReserved()</code> · the funded unwind refund.</li><li><code>unwind.contributions(vaultId, nonce, holder)</code> · a funder's original deposit, until recovery.</li></ul></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="buyer-claims-any-payout" data-when="if a reserve exists"><h3>Buyer claims any payout</h3><p>If a buyer payout reserve exists, from a cash-expiry payoff or an unwind refund, the buyer or its executor can claim it at any time after.</p>
+        <section data-kind="action" data-actor="buyer" id="claim-payout"><h4>Claim the payout</h4><p>The buyer or its executor calls claimPayout(vaultId) if a payout is waiting in the buyer reserve; the claim sends those assets to the configured recipient.</p>
+          <section data-kind="tile" id="cash-expiry-payout"><h5>A cash-expiry payout</h5><p>For a cash-settled vault, the reserve can hold an owed cash-expiry payout, set aside when the vault was expired rather than exercised.</p></section>
+          <section data-kind="tile" id="unwind-refund-claim"><h5>An unwind refund</h5><p>Or a refund from an executed, separately funded unwind agreement between the buyer and every current shareholder.</p></section>
+          <section data-kind="tile" id="physical-already-paid"><h5>Physical exercise already paid</h5><p>Physical exercise already pays the recipient in the exercise transaction, so it leaves no later buyer payout to claim.</p></section>
+          <section data-kind="tile" id="pendingPayout-scope"><h5>What <code>pendingPayout</code> tracks</h5><p>The Hub's <code>pendingPayout</code> tracks only cash settlement in collateral, not unwind refunds.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="what-each-side-ends-up-with" data-when="the summary"><h3>What each side ends up with</h3><p>An LP's result depends on both the premium earned and the assets left when the option ends. The table below shows the pool before individual claims.</p>
+        <section data-kind="action" data-actor="lp" id="outcomes-table"><h4>What LPs end up with</h4><p>The result depends on whether the option expired without exercise or settled physically, and on the vault's kind: a covered call depositing WETH, or a cash-secured put depositing USDC.</p>
+          <section data-kind="tile" id="expired-covered-call"><h5>Expired · covered call</h5><p>The deposited WETH stays in the pool.</p></section>
+          <section data-kind="tile" id="expired-cash-secured-put"><h5>Expired · cash-secured put</h5><p>The deposited USDC stays in the pool.</p></section>
+          <section data-kind="tile" id="physical-covered-call" data-span="2"><h5>Physical settlement · covered call</h5><p>The buyer takes the exercised WETH and pays USDC at the strike; the pool keeps that USDC and any unexercised WETH.</p></section>
+          <section data-kind="tile" id="physical-cash-secured-put" data-span="2"><h5>Physical settlement · cash-secured put</h5><p>The vault buys the exercised WETH from the buyer at the strike; the pool keeps that WETH and any unspent USDC.</p></section>
+          <section data-kind="tile" id="worked-full-exercise" data-span="2"><h5>Full exercise at 3,000</h5><p>LPs deposited 10 WETH for a call at 3,000 USDC per WETH. Full exercise: the buyer pays 30,000 USDC and receives the 10 WETH.</p></section>
+        </section>
+        <section data-kind="action" data-actor="buyer" id="cash-outcomes"><h4>The cash payoff, in the collateral token</h4><p>For a cash-settled vault, expiration divides the backing assets between the buyer's reserved payoff and the shareholders' pool; both amounts stay in the collateral token until claimed.</p>
+          <section data-kind="lab" id="cash-lab"><h5>Split the collateral by final price</h5><div class="cash-accounting interactive-example" data-lab="cashAmounts">
+            <div class="cash-inputs">
+              <label for="cash-kind-demo">Cash vault example</label
+              ><select id="cash-kind-demo" disabled>
+                <option value="call">Call · 10 WETH</option>
+                <option value="put">Put · 30,000 USDC</option></select
+              ><label for="cash-price-demo"
+                >Final expiry price
+                <output id="cash-price-output"
+                  >3,300 USDC / WETH</output
+                ></label
+              ><input
+                id="cash-price-demo"
+                type="range"
+                min="2200"
+                max="3800"
+                step="100"
+                value="3300"
+                disabled
+              /><span>10 WETH notional · 3,000 strike</span>
+            </div>
+            <div class="cash-distribution">
+              <div class="cash-total">
+                <span>Vault collateral</span>
+                <strong id="cash-total-value">10 WETH</strong>
+              </div>
+              <p class="cash-split-label">Allocation after <code>expire()</code></p>
+              <div
+                class="cash-balance-bar"
+                role="img"
+                aria-label="Buyer payout 0.9091 WETH; pool 9.0909 WETH"
+              >
+                <span id="cash-buyer-bar"></span><i></i>
+              </div>
+              <div class="cash-balance-labels" role="status">
+                <div>
+                  <span class="cash-allocation-label"><i class="cash-buyer-key" aria-hidden="true"></i>Buyer reserve</span
+                  ><strong id="cash-buyer-value">0.9091 WETH</strong>
+                  <span id="cash-buyer-percent">9.09% of collateral</span>
+                  <p><code>claimPayout()</code><span>Paid to the configured recipient.</span></p>
+                </div>
+                <div>
+                  <span class="cash-allocation-label"><i class="cash-pool-key" aria-hidden="true"></i>Shareholder pool</span
+                  ><strong id="cash-pool-value">9.0909 WETH</strong>
+                  <span id="cash-pool-percent">90.91% of collateral</span>
+                  <p><code>claim()</code><span>Collected in proportion to shares.</span></p>
+                </div>
+              </div>
+              <p id="cash-outcome-note">Both allocations stay in WETH until claimed.</p>
+              <p id="cash-calculation">
+                10 × (3,300 − 3,000) / 3,300 ≈ 0.9091 WETH
+              </p>
+              <p class="display-rounding">
+                Token amounts rounded to four decimals; percentages to two.
+              </p>
+            </div>
+          </div></section>
+          <section data-kind="tile" id="call-payout-formula" data-span="2"><h5>Call payout, at expiry</h5><p><span class="f"><b>Call</b><code>N × max(S − K, 0) / S</code></span></p><p>N is the remaining notional, K the strike and S the applicable reported price. At or below the strike, the payout is zero and the remaining WETH stays in the pool.</p></section>
+          <section data-kind="tile" id="put-payout-formula" data-span="2"><h5>Put payout, at expiry</h5><p><span class="f"><b>Put</b><code>N × max(K − S, 0)</code></span></p><p>At or above the strike, the payout is zero and the remaining USDC stays in the pool.</p></section>
+          <section data-kind="tile" id="worked-put-at-2700"><h5>A put at 2,700</h5><p>At 2,700 USDC per WETH: 10 × (3,000 − 2,700) = 3,000 USDC for the buyer; 27,000 USDC remains in the pool.</p></section>
+          <section data-kind="tile" id="historical-binding"><h5>Historical binding</h5><p>Expiry outcomes use the final price for the vault's original expiry, even when the transaction happens later.</p></section>
+          <section data-kind="tile" id="payouts-round-down"><h5>Payouts round down</h5><p>Buyer payouts round down on-chain.</p></section>
+        </section>
+      </section>
+    </section>
     <!-- Content sections are added in Tasks 9–12. -->
   </article></main>
   <footer><a href="license.html">License · BUSL-1.1</a></footer>

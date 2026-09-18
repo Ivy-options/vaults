@@ -891,6 +891,24 @@ input[type="range"] {
 .card.lab [data-lab="payoff"] {
   min-height: calc(535px + 814px + 2px);
 }
+/* The custody lab is sized from its first state, phase 0 with two compartments
+   and no settlement-illustration picker (245px). Settled (phase 3) shows a
+   third, buyer-payout compartment plus that picker; the tallest combination,
+   phase 3 with the unwind illustration, measures 483px at the 276px card
+   width. Reserve that height so switching phase or illustration never grows
+   the card. */
+.card.lab [data-lab="custody"] {
+  min-height: 483px;
+}
+/* The cash-amounts demo is sized from its first state, the call at 2,200
+   USDC/WETH (792px). The put's USDC allocation figures are wider than the
+   call's WETH figures and wrap onto extra lines; the tallest combination, the
+   put at 3,000 USDC/WETH or above, measures 876px at the 276px card width.
+   Reserve that height so switching the demo kind or price never grows the
+   card. */
+.card.lab [data-lab="cashAmounts"] {
+  min-height: 876px;
+}
 /* Safety net: any lab state that still grows scrolls inside its card. */
 .card.lab > [data-tier] {
   overflow-y: auto;
