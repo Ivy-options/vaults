@@ -18,6 +18,8 @@ const mapPath = resolve(
 );
 const mapHtml = readFileSync(mapPath, "utf8");
 for (const name of ["project-setup", "operator-examples"]) {
+  const open = `<!-- generated:${name} -->`;
+  const close = `<!-- /generated:${name} -->`;
   const region = mapHtml.match(
     new RegExp(`<!-- generated:${name} -->([\\s\\S]*?)<!-- /generated:${name} -->`)
   );
@@ -25,6 +27,20 @@ for (const name of ["project-setup", "operator-examples"]) {
   assert.ok(
     /data-kind="tile"/.test(region[1]),
     `Generated region ${name} is empty. Run npm run docs:build.`
+  );
+  // A splice bug (e.g. using a string replacement where generated content
+  // contains "$"-sequences that get reinterpreted as capture references) can
+  // leave a stray copy of the marker comment inside the generated content
+  // itself. Each marker must appear exactly once: at its region boundary.
+  assert.equal(
+    mapHtml.split(open).length - 1,
+    1,
+    `Marker ${open} appears more than once in ${mapPath} (a corrupted splice leaves a stray copy inside the generated content). Run npm run docs:build.`
+  );
+  assert.equal(
+    mapHtml.split(close).length - 1,
+    1,
+    `Marker ${close} appears more than once in ${mapPath}. Run npm run docs:build.`
   );
 }
 // Reference pages are hand-maintained HTML; check every page in the site.

@@ -110,10 +110,23 @@ const TILE_TITLES = {
   table: "Table",
   paragraph: "Note",
 };
+// Tuned against docs/site/test/coverage.test.mjs's "no tile overflows" lint,
+// which renders the map at every zoom tier and fails if a tile's visible
+// layer scrolls. A tile is 132px wide (G.tile in map.js) or 276px at
+// data-span="2"; past ~6 rendered list items the single-column card grows
+// taller than its neighbours (not a scroll overflow, but the "absurdly tall
+// tiles" this task calls out), so longer lists are chunked into more tiles
+// instead of shrinking to fit. If a README grows a longer list, re-run
+// docs:test — this constant is what the lint is guarding.
 const MAX_LIST_ITEMS_PER_TILE = 6;
-// A single-column tile (data-span 1) is too narrow to wrap a long inline
-// <code> span, which the tile stylesheet sets to white-space: nowrap; that
-// overflows the card instead of wrapping. Widen any paragraph carrying one.
+// A single-column tile (data-span 1, 132px wide, see G.tile in map.js) is too
+// narrow to wrap a long inline <code> span, which the tile stylesheet sets to
+// white-space: nowrap; that overflows the card's scrollWidth instead of
+// wrapping, which is exactly what coverage.test.mjs's overflow check at every
+// zoom tier catches. Widening to data-span="2" (276px) gives the span room to
+// fit unwrapped. 30 was picked empirically against the two READMEs' longest
+// inline code (URLs and file paths in backticks); docs:test will fail loudly
+// if a future README paragraph needs a different cutoff.
 const MAX_INLINE_CODE_LEN = 30;
 function longestCodespan(token) {
   let max = 0;
@@ -137,7 +150,12 @@ function toChunks(block) {
 }
 function buildAction(shell, section, render) {
   const blocks = section.blocks;
-  const summaryIndex = blocks.findIndex((b) => b.type === "paragraph");
+  // Only the section's very first block, if it is a paragraph, becomes the
+  // action's summary <p>. Reaching past it for a later paragraph would pull
+  // that text ahead of whatever precedes it in the Markdown (e.g. a list),
+  // reordering the section; every current shell's Markdown does start with a
+  // paragraph, so this never needs to fall through in practice today.
+  const summaryIndex = blocks.length && blocks[0].type === "paragraph" ? 0 : -1;
   const summary = summaryIndex >= 0 ? blocks[summaryIndex] : null;
   const rest = blocks.filter((_, i) => i !== summaryIndex);
   const titleSeq = new Map();
@@ -304,6 +322,19 @@ export function buildDocs({ check = false } = {}) {
       sections.filter((s) => s.title).map((s) => [slug(s.title), s])
     );
     const whole = sections.length === 1 && sections[0].title === null;
+    // The inverse of the shell-with-no-section error below: a heading whose
+    // slug matches no shell would otherwise be silently dropped from the map.
+    if (!whole) {
+      const shellIds = new Set(shells.map((s) => s.id));
+      for (const section of sections) {
+        if (!section.title) continue;
+        const key = slug(section.title);
+        if (!shellIds.has(key))
+          throw new Error(
+            `README H2 "${section.title}" (slug ${key}) in ${page.source} has no matching shell; expected <section data-kind="action" id="${key}"> inside generated:${fragment.name} in ${mapName}.`
+          );
+      }
+    }
     let out = "";
     for (const shell of shells) {
       const section = whole ? sections[0] : bySlug.get(shell.id);
@@ -313,7 +344,14 @@ export function buildDocs({ check = false } = {}) {
         );
       out += buildAction(shell, section, render);
     }
-    mapHtml = mapHtml.replace(marker, `$1\n${out}$3`);
+    // Use a replacer FUNCTION, not a template string: generated content can
+    // itself contain "$"-sequences (e.g. a dollar amount like "$10,000" from
+    // examples/operator/README.md), and String.replace() reinterprets "$n"
+    // in a *string* replacement as a capture-group backreference. That once
+    // silently corrupted the built page (a "$1" inside "$10,000" was replaced
+    // by capture group 1, the opening marker comment, eating the digits). A
+    // function's return value is inserted verbatim, with no such reparsing.
+    mapHtml = mapHtml.replace(marker, (_match, open, _old, close) => `${open}\n${out}${close}`);
   }
   outputs.set(mapName, mapHtml);
 
