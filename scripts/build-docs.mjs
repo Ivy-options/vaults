@@ -180,7 +180,7 @@ function toChunks(block) {
   }
   return [block];
 }
-function buildAction(shell, section, render) {
+export function buildAction(shell, section, render) {
   const blocks = section.blocks;
   // Only the section's very first block, if it is a paragraph, becomes the
   // action's summary <p>. Reaching past it for a later paragraph would pull
@@ -195,6 +195,20 @@ function buildAction(shell, section, render) {
   const tiles = rest
     .flatMap(toChunks)
     .map((block) => {
+      // A heading block would render as an <h3> (etc.) direct child of the
+      // tile <section>, alongside the tile's own <h5> title. map.js's
+      // readDocument (bodyOf) filters heading children out of a node's body,
+      // so that text would stay visible in the reading view but silently
+      // vanish from the map card, with nothing failing. Neither README has a
+      // stray H3 today, so this is a build-time guard against one landing
+      // here later, not a live bug.
+      if (block.type === "heading")
+        throw new Error(
+          `Heading "${block.text}" inside generated section #${shell.id} ` +
+            `would be dropped from the map card (map.js's readDocument filters heading ` +
+            `children out of a tile's body while it stays visible in the reading view). ` +
+            `Give it its own H2 section instead, or fold it into the surrounding prose.`
+        );
       tileSeq += 1;
       const base = TILE_TITLES[block.type] || "Note";
       const count = (titleSeq.get(base) || 0) + 1;
