@@ -13,50 +13,32 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
 const pages = [
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
-];
-// README.md and examples/operator/README.md are no longer rendered as their
-// own pages; their content is folded into generated regions inside index.html
-// (see the `fragments` loop below). They keep title/source metadata here so
-// that loop can share makeRenderer with the standalone pages above.
-const fragments = [
-  { name: "project-setup", source: "README.md", title: "Project setup" },
   {
-    name: "operator-examples",
     source: "examples/operator/README.md",
+    output: "operator-examples.html",
     title: "Operator request examples",
   },
 ];
+// README.md is no longer rendered as its own page; its content is folded into
+// a generated region inside index.html (see the `fragments` loop below). It
+// keeps title/source metadata here so that loop can share makeRenderer with
+// the standalone pages above.
+const fragments = [{ name: "project-setup", source: "README.md", title: "Project setup" }];
 const destinations = new Map(
   pages.map((page) => [resolve(root, page.source), page.output])
 );
 destinations.set(resolve(root, "docs/site/index.html"), "index.html");
-// The two READMEs above, and the standalone pages they used to produce, are
-// retired; any Markdown link that targets them resolves straight to the
-// map's corresponding node instead of through a redirect stub.
+// README.md is retired as its own page; any Markdown link that targets it
+// resolves straight to the map's corresponding node instead of through a
+// redirect stub. examples/operator/README.md is rendered as its own page
+// again (see `pages` above), so it needs no such override: the `pages.map`
+// destination set a few lines up already points it at operator-examples.html.
 destinations.set(resolve(root, "README.md"), "index.html#project");
-destinations.set(
-  resolve(root, "examples/operator/README.md"),
-  "index.html#operator-request-examples"
-);
-destinations.set(
-  resolve(root, "examples/operator"),
-  "index.html#operator-request-examples"
-);
-destinations.set(resolve(root, "docs/site/operations.html"), "index.html#operator-runbook");
-destinations.set(
-  resolve(root, "docs/site/operator-examples.html"),
-  "index.html#operator-request-examples"
-);
 destinations.set(resolve(root, "docs/site/project-setup.html"), "index.html#project");
-destinations.set(
-  resolve(root, "docs/site/registry-specification.html"),
-  "index.html#releases-and-registry"
-);
 destinations.set(
   resolve(root, "docs/site/settlement-pricing.html"),
   "index.html#cash-settlement-pricing"
 );
-destinations.set(resolve(root, "docs/site/releases.html"), "index.html#releases-and-registry");
 const escape = (text) =>
   String(text).replace(
     /[&<>"']/g,

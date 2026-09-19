@@ -10,11 +10,11 @@ const pagePath = resolve(root, "docs/site/index.html");
 const html = readFileSync(pagePath, "utf8");
 const site = dirname(pagePath);
 const generated = buildDocs({ check: true });
-// The map page carries two generated regions (README fragments) that
-// buildDocs fills in place; fail loudly if a region is missing or still empty.
+// The map page carries a generated region (a README fragment) that
+// buildDocs fills in place; fail loudly if it is missing or still empty.
 const mapPath = pagePath;
 const mapHtml = readFileSync(mapPath, "utf8");
-for (const name of ["project-setup", "operator-examples"]) {
+for (const name of ["project-setup"]) {
   const open = `<!-- generated:${name} -->`;
   const close = `<!-- /generated:${name} -->`;
   const region = mapHtml.match(

@@ -496,11 +496,8 @@
     "cash-missing-reports": "missing-report", "reports-exercise-and-expiration": "publish-a-price", "enable-cash-after-physical-launch": "enable-procedure",
     "early-exit": "ending-early-by-agreement", "unwind-recovery": "recover-after-execution", "prepare-and-execute-a-unanimous-unwind": "agreed-unwind", "worked-unwind-scenarios": "worked-scenarios",
     "cash-outcomes": "cash-outcomes", "premium-treatment-and-emergency-boundaries": "premium-and-fees-are-kept",
-    terms: "vault-terms", versions: "existing-vaults-never-move",
-    "manual-ivy-vault-operations": "operator-runbook", "requests-and-submission": "requests-are-json-with-string-amounts", "deploy-and-recover": "deploy-once-and-recover-from-the-journal",
-    "eoa-and-optional-contract-publishers": "eoa-and-optional-contract-publishers", "publisher-rotation-and-incidents": "publisher-rotation-and-incidents", "command-reference": "every-command-and-its-fields",
-    "operator-request-examples": "operator-request-examples", "ivy-vaults": "project",
-    "authoritative-cash-settlement-pricing": "cash-settlement-pricing", "immutable-release-registry": "releases-and-registry", "releases-and-the-permanent-registry": "releases-and-registry",
+    terms: "vault-terms", "ivy-vaults": "project",
+    "authoritative-cash-settlement-pricing": "cash-settlement-pricing",
   };
   const resolveHash = (hash) => { const id = decodeURIComponent((hash || "").replace(/^#/, "")); if (!id) return null; return M.tree.byId.get(id) || M.tree.byId.get(ALIASES[id]) || null; };
   let settingHash = false;
