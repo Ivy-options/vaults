@@ -13,21 +13,18 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
 const pages = [
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
+  { source: "README.md", output: "project-setup.html", title: "Project setup" },
   {
     source: "examples/operator/README.md",
     output: "operator-examples.html",
     title: "Operator request examples",
   },
-  { source: "README.md", output: "project-setup.html", title: "Project setup" },
 ];
 const destinations = new Map(
   pages.map((page) => [resolve(root, page.source), page.output])
 );
 destinations.set(resolve(root, "docs/site/index.html"), "index.html");
-destinations.set(
-  resolve(root, "docs/site/settlement-pricing.html"),
-  "index.html#cash-settlement-interface-and-governance"
-);
+destinations.set(resolve(root, "examples/operator"), "operator-examples.html");
 const escape = (text) =>
   String(text).replace(
     /[&<>"']/g,
@@ -44,65 +41,6 @@ const slug = (text) =>
     .replace(/[^\p{L}\p{N}\s_-]/gu, "")
     .trim()
     .replace(/\s/g, "-");
-
-// The renderer configuration (heading ids, link mapping to site pages, table
-// wrapping, the download treatment of .json/.sol codespans) is shared across
-// every standalone reference page.
-function makeRenderer(page, requests) {
-  const headings = [];
-  const usedIds = new Map();
-  const renderer = new Renderer();
-  renderer.heading = function ({ tokens, depth }) {
-    const content = this.parser.parseInline(tokens);
-    const base = slug(content);
-    const count = usedIds.get(base) || 0;
-    usedIds.set(base, count + 1);
-    const id = count ? `${base}-${count}` : base;
-    if (depth === 2 || depth === 3) headings.push({ id, content, depth });
-    return `<h${depth} id="${id}">${
-      depth === 1 ? escape(page.title) : content
-    }</h${depth}>\n`;
-  };
-  renderer.link = function ({ href, title, tokens }) {
-    const [path, anchor] = href.split("#");
-    let target = href;
-    if (path && !/^[a-z]+:/i.test(path)) {
-      const absolute = resolve(
-        root,
-        dirname(page.source),
-        decodeURIComponent(path)
-      );
-      // Reference pages live in docs/site and are edited there directly.
-      const mapped =
-        destinations.get(absolute) ??
-        (absolute.startsWith(site + "/") && absolute.endsWith(".html")
-          ? relative(site, absolute)
-          : undefined);
-      if (!mapped)
-        throw new Error(`No site destination for ${page.source}: ${href}`);
-      target = mapped + (anchor ? `#${anchor}` : "");
-    }
-    if (/\.md(?:$|#|\?)/i.test(target))
-      throw new Error(`Markdown link in site: ${target}`);
-    const download = /\.(json|sol)$/.test(target) ? " download" : "";
-    return `<a href="${escape(target)}"${
-      title ? ` title="${escape(title)}"` : ""
-    }${download}>${this.parser.parseInline(tokens)}</a>`;
-  };
-  const defaultTable = renderer.table;
-  renderer.table = function (token) {
-    return `<div class="tablewrap" tabindex="0" role="region" aria-label="${escape(
-      page.title
-    )} reference table">${defaultTable.call(this, token)}</div>\n`;
-  };
-  renderer.codespan = function ({ text }) {
-    const code = `<code>${escape(text)}</code>`;
-    return requests.includes(text)
-      ? `<a href="assets/requests/${escape(text)}" download>${code}</a>`
-      : code;
-  };
-  return { renderer, headings };
-}
 
 export function buildDocs({ check = false } = {}) {
   const outputs = new Map();
@@ -125,7 +63,58 @@ export function buildDocs({ check = false } = {}) {
   }
   for (const page of pages) {
     const source = readFileSync(resolve(root, page.source), "utf8");
-    const { renderer, headings } = makeRenderer(page, requests);
+    const headings = [];
+    const usedIds = new Map();
+    const renderer = new Renderer();
+    renderer.heading = function ({ tokens, depth }) {
+      const content = this.parser.parseInline(tokens);
+      const base = slug(content);
+      const count = usedIds.get(base) || 0;
+      usedIds.set(base, count + 1);
+      const id = count ? `${base}-${count}` : base;
+      if (depth === 2 || depth === 3) headings.push({ id, content, depth });
+      return `<h${depth} id="${id}">${
+        depth === 1 ? escape(page.title) : content
+      }</h${depth}>\n`;
+    };
+    renderer.link = function ({ href, title, tokens }) {
+      const [path, anchor] = href.split("#");
+      let target = href;
+      if (path && !/^[a-z]+:/i.test(path)) {
+        const absolute = resolve(
+          root,
+          dirname(page.source),
+          decodeURIComponent(path)
+        );
+        // Reference pages live in docs/site and are edited there directly.
+        const mapped =
+          destinations.get(absolute) ??
+          (absolute.startsWith(site + "/") && absolute.endsWith(".html")
+            ? relative(site, absolute)
+            : undefined);
+        if (!mapped)
+          throw new Error(`No site destination for ${page.source}: ${href}`);
+        target = mapped + (anchor ? `#${anchor}` : "");
+      }
+      if (/\.md(?:$|#|\?)/i.test(target))
+        throw new Error(`Markdown link in site: ${target}`);
+      const download = /\.(json|sol)$/.test(target) ? " download" : "";
+      return `<a href="${escape(target)}"${
+        title ? ` title="${escape(title)}"` : ""
+      }${download}>${this.parser.parseInline(tokens)}</a>`;
+    };
+    const defaultTable = renderer.table;
+    renderer.table = function (token) {
+      return `<div class="tablewrap" tabindex="0" role="region" aria-label="${escape(
+        page.title
+      )} reference table">${defaultTable.call(this, token)}</div>\n`;
+    };
+    renderer.codespan = function ({ text }) {
+      const code = `<code>${escape(text)}</code>`;
+      return requests.includes(text)
+        ? `<a href="assets/requests/${escape(text)}" download>${code}</a>`
+        : code;
+    };
     const body = new Marked({ renderer, gfm: true }).parse(source);
     const navigation = headings
       .map(
@@ -147,7 +136,9 @@ export function buildDocs({ check = false } = {}) {
   <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
   <link rel="icon" type="image/png" href="assets/ivy-logo.png">
   <link rel="stylesheet" href="assets/docs.css">
+  <link rel="stylesheet" href="assets/guide.css">
   <link rel="stylesheet" href="assets/reference.css">
+  <link rel="stylesheet" href="assets/atlas.css">
   <link rel="stylesheet" href="assets/roman.css">
   <script src="assets/reference.js" defer></script>
 </head>
@@ -168,7 +159,6 @@ export function buildDocs({ check = false } = {}) {
 `
     );
   }
-
   for (const [name, contents] of outputs) {
     const target = resolve(site, name);
     if (check) {

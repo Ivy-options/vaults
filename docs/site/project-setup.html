@@ -8,7 +8,9 @@
   <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
   <link rel="icon" type="image/png" href="assets/ivy-logo.png">
   <link rel="stylesheet" href="assets/docs.css">
+  <link rel="stylesheet" href="assets/guide.css">
   <link rel="stylesheet" href="assets/reference.css">
+  <link rel="stylesheet" href="assets/atlas.css">
   <link rel="stylesheet" href="assets/roman.css">
   <script src="assets/reference.js" defer></script>
 </head>
@@ -19,12 +21,11 @@
 <a href="#build-and-verify">Build and verify</a>
 <a href="#solidity-style">Solidity style</a>
 <a href="#edit-the-docs">Edit the docs</a>
-<a href="#reference-pages">Reference pages</a>
 <a href="#license">License</a></nav></details></aside>
   <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
 <p>Smart contracts for single-use covered-call and cash-secured-put vaults.</p>
 <h2 id="read-the-guide">Read the guide</h2>
-<p>Start with the <a href="index.html">lifecycle map</a>, a single zoomable page covering how vaults work, interactive examples and cash settlement pricing. Deploying a Hub suite, running vaults by hand, the release registry, the request templates and this project setup page each live on their own reference pages, linked from the map&#39;s apex card (see &quot;Reference pages&quot; below).</p>
+<p>Start with the <a href="index.html">HTML protocol guide</a> for how vaults work and interactive examples. For deployment and transaction commands, see the <a href="operations.html">operator runbook</a>. There is also an experimental <a href="v2/index.html">protocol map</a>, a single zoomable page covering the same lifecycle — linked from the guide, still finding its footing alongside it.</p>
 <p>Open <code>docs/site/index.html</code> directly in your browser. To serve the docs locally, run this from the repository root:</p>
 <pre><code class="language-sh">python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
 </code></pre>
@@ -56,20 +57,13 @@ npm run format:solidity:check
 </code></pre>
 <p>Formatting is configured in <code>foundry.toml</code>. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
 <h2 id="edit-the-docs">Edit the docs</h2>
-<p>Edit the map directly in <code>docs/site/index.html</code>; it is entirely hand-written. This file is rendered as its own standalone page, <code>docs/site/project-setup.html</code>; the operator request examples and license pages are generated from <code>examples/operator/README.md</code> and <code>LICENSE.md</code> the same way.</p>
+<p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README; <code>operator-examples.html</code> is generated from <code>examples/operator/README.md</code>. The license page is generated from <code>LICENSE.md</code>.</p>
 <p>After changing docs or request templates, rebuild, check, and test:</p>
 <pre><code class="language-sh">npm run docs:build
 npm run docs:check
 npm run docs:test
 </code></pre>
-<h2 id="reference-pages">Reference pages</h2>
-<p>Deploying a Hub suite, running vaults by hand, and the permanent release registry each have their own standalone reference page, kept out of the interactive map so their long command sequences and tables read as ordinary documents.</p>
-<ul>
-<li><a href="operations.html">Operator runbook</a>: deploying an immutable Hub suite and running individual vaults by hand.</li>
-<li><a href="operator-examples.html">Operator request examples</a>: copyable request templates for every runbook command.</li>
-<li><a href="registry-specification.html">Release registry specification</a>: the permanent registry contract and what it does and does not guarantee.</li>
-<li><a href="releases.html">Releases and integration</a>: deploying the registry, registering and recommending releases, and integrating a frontend.</li>
-</ul>
+<p><code>docs:check</code> and <code>docs:test</code> cover both the guide and the experimental map in <code>docs/site/v2/</code>.</p>
 <h2 id="license">License</h2>
 <p><strong>Business Source License 1.1 (BUSL-1.1).</strong> Copying, modification,
 redistribution, and non-production use are permitted under the <a href="license.html">license</a>.

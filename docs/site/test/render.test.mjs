@@ -78,7 +78,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
 
 test("a lab card is sized to its mounted widget and fits every actor route", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html");
   try {
     await page.waitForFunction(() => IvyMap.mounted);
     for (const lod of [2, 3]) {

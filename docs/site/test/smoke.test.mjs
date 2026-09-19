@@ -5,7 +5,7 @@ import { openPage } from "./_browser.mjs";
 
 test("the map page loads without errors and mounts the engine", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html");
   try {
     assert.equal(await page.evaluate(() => typeof window.IvyMap), "object");
     assert.ok(await page.$("#map"), "#map mount exists");

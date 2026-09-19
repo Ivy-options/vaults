@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { startServer } from "./_server.mjs";
 import { openPage, settle } from "./_browser.mjs";
 
-// These run against the real docs/site/index.html rather than the small
+// These run against the real docs/site/v2/index.html (the map) rather than the small
 // fixture: the fixture's proportions happen to be height-bound, which hid the
 // regression where home()'s fit scale (via fly()) and homeScale() disagreed
 // on the real, width-bound map (findings 1 and 2 of the whole-branch review).
@@ -16,7 +16,7 @@ const independentFitScale = (page) =>
 
 test("an unresolvable hash still shows the map, at the fit scale, instead of leaving every card unshown", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html#no-such-anchor");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html#no-such-anchor");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
     await settle(page, 300);
@@ -41,7 +41,7 @@ test("an unresolvable hash still shows the map, at the fit scale, instead of lea
 // no-op instead; only a hash matching nothing at all still goes home.
 test("the skip link's #map hash leaves the camera in place; a hash matching nothing still goes home", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html#open");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html#open");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
     await settle(page, 300);
@@ -81,7 +81,7 @@ test("the skip link's #map hash leaves the camera in place; a hash matching noth
 // the fit view, same as before roots existed.
 test("flying out from a station reaches the root, and out of the root reaches the fit view", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html#open");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html#open");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
     await settle(page, 300);
@@ -101,7 +101,7 @@ test("flying out from a station reaches the root, and out of the root reaches th
 
 test("loading with no hash stays at the fit view and never rewrites the URL to a station nobody chose", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
     await settle(page, 300);

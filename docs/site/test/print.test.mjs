@@ -12,7 +12,7 @@ import { openPage, settle } from "./_browser.mjs";
 // happened to be framing, and the document itself was unreachable to print.
 test("printing the mounted map shows the document, not the fixed-height viewport", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "index.html");
+  const { page, errors, close } = await openPage(server.url + "v2/index.html");
   let dir;
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
