@@ -146,3 +146,12 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 #map.dragging { cursor: grabbing; }
 #map.dragging * { pointer-events: none; }
 #world { transition: transform 0.85s cubic-bezier(0.25, 0.7, 0.15, 1); }
+
+/* ---------- Print: the map is a screen-only widget, so printing shows the
+   underlying document instead of one page of whatever the viewport framed. */
+@media print {
+  html:has(body.map-ready) { height: auto; overflow: visible; }
+  body.map-ready { height: auto; overflow: visible; }
+  body.map-ready #map, body.map-ready #toolbar { display: none; }
+  body.map-ready #document, body.map-ready.reading #document { display: block; overflow: visible; height: auto; }
+}
