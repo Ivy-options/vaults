@@ -36,15 +36,32 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 .card small { margin-top: auto; font: 10px var(--mono); letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
 .card .when { font: 11px var(--mono); letter-spacing: 0.09em; color: var(--faint); margin-bottom: 4px; }
 
+/* Compact tier (closest zoom): a station, moment, or action-with-tiles recedes
+   to a name/badge alone once the reader has zoomed in far enough to read its
+   own children instead. Centre what's left on both axes rather than pinning
+   it to the top-left corner (each kind's own rules below size the type up so
+   it reads as a deliberate title card, not tiny leftover text), and let the
+   card itself recede here — lighter fill, quieter border, no shadow — so it
+   reads as a frame around the tiles or moments being read, not a card with
+   content missing from it. */
+.card > [data-tier].compact { align-items: center; justify-content: center; text-align: center; }
+.card.station[data-show="3"], .card.moment[data-show="3"], .card.action.has-details[data-show="3"] {
+  background: color-mix(in oklab, var(--panel) 45%, transparent);
+  border-color: color-mix(in oklab, var(--line) 55%, transparent);
+  box-shadow: none;
+}
+
 /* Station 360×200 */
 .card.station { border-color: var(--line-strong); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); }
 .card.station h2 { margin: 4px 0 0; font: 800 52px/1 var(--display); letter-spacing: -0.02em; }
-/* Far-range tiers (0, 1) read as a poster: centred both ways. Reading tier 3 stays left-aligned. */
+/* Far-range tiers (0, 1) read as a poster: centred both ways; the compact tier
+   (3, once zoomed in on one of this station's own moments) is centred by the
+   shared .compact rule above and sized up here to match. */
 .card.station [data-tier="0"], .card.station [data-tier="1"] { align-items: center; justify-content: center; text-align: center; }
 .card.station [data-tier="1"] h2 { font-size: 30px; margin-bottom: 8px; }
 .card.station [data-tier="1"] p { font-size: 15px; line-height: 1.45; }
 .card.station [data-tier="1"] small { margin-top: 8px; }
-.card.station [data-tier="3"] h2 { font-size: 14px; }
+.card.station [data-tier="3"] h2 { font-size: 32px; }
 
 /* Custody 220×170 */
 .card.custody h3 { margin: 0 0 6px; font: 700 16px/1.2 var(--display); }
@@ -55,7 +72,10 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 
 /* Moment 300×170 */
 .card.moment h3 { margin: 0; font: 700 27px/1.15 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
-/* Far-range tier 0 reads as a poster: centred both ways. Reading tiers (2, 3) stay left-aligned. */
+/* Far-range tier 0 reads as a poster: centred both ways. Reading tier 2 stays
+   left-aligned; the compact tier (3, once zoomed in on one of this moment's
+   own children) is centred by the shared .compact rule above and sized up
+   here to match. */
 .card.moment [data-tier="0"] { align-items: center; justify-content: center; text-align: center; }
 .card.moment [data-tier="2"] h3 { font-size: 17px; margin-bottom: 6px; }
 .card.moment [data-tier="2"] p { font-size: 11.5px; line-height: 1.5; }
@@ -63,9 +83,9 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 .card.moment .watermark.painting { position: absolute; inset: 0; opacity: 0.14; pointer-events: none; -webkit-mask-image: linear-gradient(90deg, transparent 30%, #000 75%); mask-image: linear-gradient(90deg, transparent 30%, #000 75%); }
 .card.moment .watermark.painting img { width: 100%; height: 100%; object-fit: cover; object-position: right center; }
 .card.moment > [data-tier] { z-index: 1; }
-.card.moment [data-tier="3"] { padding: 10px 12px; }
-.card.moment [data-tier="3"] .when { font-size: 5.5px; margin-bottom: 2px; }
-.card.moment [data-tier="3"] h3 { font-size: 9px; margin-bottom: 3px; }
+.card.moment [data-tier="3"] { padding: 14px 16px; }
+.card.moment [data-tier="3"] .when { font-size: 11px; margin-bottom: 6px; }
+.card.moment [data-tier="3"] h3 { font-size: 22px; margin-bottom: 0; }
 .card.moment [data-tier="3"] p { font-size: 6px; line-height: 1.4; color: var(--faint); }
 
 /* Action: header as tall as its text (--header), colour says who, a badge names them, the portrait is a watermark behind. */
@@ -86,7 +106,7 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 .portrait.generic i { width: 60%; aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed var(--line-strong); display: grid; place-items: center; font: 700 200% var(--mono); color: var(--faint); font-style: normal; }
 .badge { display: inline-block; flex: 0 0 auto; font-family: var(--roman-font, "Cinzel", Georgia, serif); font-size: 11px; letter-spacing: 0.08em; line-height: 1; color: var(--actor); border: 1px solid color-mix(in oklab, var(--actor) 45%, transparent); background: color-mix(in oklab, var(--actor) 12%, transparent); border-radius: 999px; padding: 4px 10px 3px; white-space: nowrap; }
 .card.action h4 { flex: 1 1 100px; align-self: center; margin: 0; font: 700 20px/1.15 var(--display); }
-.card.action [data-tier="0"], .card.action [data-tier="1"] { flex-direction: column; flex-wrap: nowrap; row-gap: 4px; align-items: center; justify-content: center; text-align: center; }
+.card.action [data-tier="0"], .card.action [data-tier="1"], .card.action [data-tier="3"] { flex-direction: column; flex-wrap: nowrap; row-gap: 4px; align-items: center; justify-content: center; text-align: center; }
 .card.action [data-tier="0"] .badge { font-size: 20px; padding: 8px 18px 6px; }
 .card.action [data-tier="1"] h4 { flex: 0 0 auto; font-size: 17px; text-wrap: balance; }
 .card.action [data-tier="2"] { column-gap: 10px; padding: 12px; }
@@ -94,9 +114,9 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 .card.action [data-tier="2"] h4 { flex-basis: 100%; font-size: 14px; margin: 8px 0 4px; }
 .card.action [data-tier="2"] p { flex-basis: 100%; font-size: 10.5px; line-height: 1.45; }
 .card.action [data-tier="2"] small { flex-basis: 100%; margin-top: 6px; font-size: 8px; }
-.card.action [data-tier="3"] { padding: 10px 12px; column-gap: 8px; }
-.card.action [data-tier="3"] .badge { font-size: 6px; padding: 2px 6px 1.5px; }
-.card.action [data-tier="3"] h4 { flex-basis: 100%; font-size: 9px; margin: 4px 0 2px; }
+.card.action [data-tier="3"] { padding: 16px; }
+.card.action [data-tier="3"] .badge { font-size: 13px; padding: 5px 12px 4px; }
+.card.action [data-tier="3"] h4 { flex: 0 0 auto; font-size: 18px; margin: 8px 0 0; text-wrap: balance; }
 .card.action [data-tier="3"] p { flex-basis: 100%; font-size: 6px; line-height: 1.4; color: var(--faint); }
 
 /* Tile 132 wide, content-sized */
