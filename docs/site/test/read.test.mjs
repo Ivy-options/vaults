@@ -54,11 +54,16 @@ test("readDocument throws on authoring errors", async () => {
         duplicate: tryRead('<main><article><section data-kind="station" id="dup"><h2>A</h2></section><section data-kind="station" id="dup"><h2>B</h2></section></article></main>'),
         unknownKind: tryRead('<main><article><section data-kind="bogus" id="x"><h2>A</h2></section></article></main>'),
         missingId: tryRead('<main><article><section data-kind="station"><h2>A</h2></section></article></main>'),
+        // A <section> with no data-kind at all is invisible to the
+        // ":scope > section[data-kind]" walk, so without a check it would
+        // silently drop its whole subtree from the map instead of erroring.
+        missingKind: tryRead('<main><article><section data-kind="station" id="s"><h2>A</h2><section id="orphan"><h3>B</h3></section></section></article></main>'),
       };
     });
     assert.match(results.duplicate, /Duplicate node id/);
     assert.match(results.unknownKind, /Unknown data-kind/);
     assert.match(results.missingId, /Section without id/);
+    assert.match(results.missingKind, /Section without data-kind/);
     assert.deepEqual(errors, []);
   } finally {
     await close();

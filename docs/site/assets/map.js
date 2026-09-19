@@ -13,6 +13,12 @@
     const bodyOf = (el) => $$(":scope > *", el).filter((c) => !/^H[1-6]$/.test(c.tagName) && c.tagName !== "SECTION");
     function visit(el, parent, band) {
       const kind = el.dataset.kind;
+      // A <section> that never got a data-kind is invisible to the
+      // ":scope > section[data-kind]" walk below, so without this check its
+      // whole subtree would silently vanish from the map while staying
+      // visible in the reading view — the same class of authoring mistake as
+      // an unknown kind or a missing id, so it gets the same treatment.
+      if (kind === undefined) throw new Error(`Section without data-kind under ${parent?.id ?? "root"}`);
       if (!KINDS.includes(kind)) throw new Error(`Unknown data-kind on #${el.id}`);
       if (!el.id) throw new Error(`Section without id under ${parent?.id ?? "root"}`);
       const heading = $(":scope > h2, :scope > h3, :scope > h4, :scope > h5", el);
@@ -35,10 +41,10 @@
       if (byId.has(node.id)) throw new Error(`Duplicate node id ${node.id}`);
       nodes.push(node); byId.set(node.id, node);
       if (parent) parent.children.push(node);
-      $$(":scope > section[data-kind]", el).forEach((child) => visit(child, node, band));
+      $$(":scope > section", el).forEach((child) => visit(child, node, band));
       return node;
     }
-    $$(":scope > section[data-kind]", root.querySelector("article") || root).forEach((el) =>
+    $$(":scope > section", root.querySelector("article") || root).forEach((el) =>
       visit(el, null, el.dataset.band === "shelf" ? "shelf" : "life"));
     return { nodes, byId };
   }
@@ -247,7 +253,7 @@
     // Labs live in the cards now; the document keeps a placeholder so it still reads without JS.
     tree.nodes.filter((n) => n.kind === "lab").forEach((n) => { n.source.querySelectorAll(":scope > *:not(h5)").forEach((c) => c.remove()); });
     if (window.IvyLabs?.mountAll) window.IvyLabs.mountAll(worldEl);
-    M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height };
+    M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height, atHome: true };
     wireInput();
     wireSearch(); wireKeys(); wireTouch(); wireChrome();
     followHash(false);
@@ -270,6 +276,13 @@
     worldEl.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.s})`;
     if (!(animate && !reduced())) requestAnimationFrame(() => (worldEl.style.transition = ""));
     setLod(lodOf(cam.s), worldEl);
+    // Recorded now, with the viewport size as it is at this exact moment,
+    // because a "resize" event fires only after the browser has already
+    // resized #map — by then vw()/vh() (and so homeScale()) already reflect
+    // the NEW viewport, while cam.s is still the OLD fit scale, so comparing
+    // them live in the resize handler produces false negatives. The resize
+    // handler instead trusts this pre-resize snapshot (R9).
+    M.atHome = here().length === 0;
     paintPath();
     syncHash();
     M.mapEl.dispatchEvent(new CustomEvent("map:moved"));
@@ -283,7 +296,17 @@
     clampCam();
     apply(animate);
   }
-  const home = (animate = true) => fly(0, -60, M.W, M.H + 60, 0, 60, animate);
+  // Fits and centres the whole world directly from homeScale(), rather than
+  // routing through fly() with its own pad/minS shape — fly()'s fit formula
+  // (w+pad*2 / h+pad*2) and homeScale()'s (W+160 / H+160) disagree on a
+  // width-bound map, so a scale computed via fly() never exactly equals
+  // homeScale() and here()'s "am I at the fit view" gate never fires.
+  function home(animate = true) {
+    const s = homeScale();
+    M.cam = { s, x: (vw() - M.W * s) / 2, y: (vh() - M.H * s) / 2 };
+    clampCam();
+    apply(animate);
+  }
   function flyToNode(n, animate = true) {
     if (n.kind === "station") return fly(n.column.x, n.y - 60, n.column.w, n.column.h + 60, 0.62, 40, animate);
     if (n.kind === "moment") return fly(n.x, n.y - 40, n.w, (n.bottom ?? n.y + n.h) - n.y + 40, 1.2, 40, animate);
@@ -302,8 +325,11 @@
     const path = [];
     // At (or below) the whole-map fit scale, no single station is "current" —
     // gate on homeScale() itself rather than a fixed constant, since the fit
-    // scale depends on how much content there is.
-    if (cam.s <= homeScale() + 1e-6) return path;
+    // scale depends on how much content there is. The tolerance is relative
+    // (not a fixed epsilon): homeScale() is a few hundredths on the real map,
+    // so a fixed 1e-6 absolute margin is meaningless noise either way, but a
+    // relative margin scales with whatever the fit scale actually is.
+    if (cam.s <= homeScale() * (1 + 1e-6)) return path;
     const station = tree.nodes.find((n) => n.kind === "station" && cx >= n.column.x && cx < n.column.x + n.column.w && cy >= n.y - 80 && cy <= n.y + n.column.h + 80);
     if (!station) return path;
     path.push(station);
@@ -322,8 +348,34 @@
     const crumbs = $("#crumbs");
     if (!crumbs) return;
     const path = here();
-    crumbs.innerHTML = [`<button type="button" data-home>Whole map</button>`, ...path.map((n) => `<button type="button" data-fly="${n.id}">${esc(crumbLabel(n))}</button>`)].join("<i>›</i>");
-    crumbs.lastElementChild.setAttribute("aria-current", "location");
+    const items = [{ key: "home", label: "Whole map" }, ...path.map((n) => ({ key: n.id, label: crumbLabel(n) }))];
+    // Patch existing buttons in place instead of rebuilding innerHTML: apply()
+    // repaints the crumbs on every camera move, including the one a crumb
+    // click itself just caused, so tearing down and recreating every button
+    // would drop focus to <body> the instant the reader activates one. Only
+    // the tail grows or shrinks; buttons that survive are relabelled in
+    // place, never removed and recreated.
+    const buttons = $$("#crumbs > button");
+    while (buttons.length > items.length) {
+      crumbs.removeChild(crumbs.lastElementChild); // trailing button
+      crumbs.removeChild(crumbs.lastElementChild); // its separator
+      buttons.pop();
+    }
+    while (buttons.length < items.length) {
+      if (buttons.length) crumbs.append(Object.assign(document.createElement("i"), { textContent: "›" }));
+      const btn = document.createElement("button");
+      btn.type = "button";
+      crumbs.append(btn);
+      buttons.push(btn);
+    }
+    items.forEach((item, i) => {
+      const btn = buttons[i];
+      if (item.key === "home") { if (!("home" in btn.dataset)) btn.dataset.home = ""; delete btn.dataset.fly; }
+      else { if (btn.dataset.fly !== item.key) btn.dataset.fly = item.key; delete btn.dataset.home; }
+      if (btn.textContent !== item.label) btn.textContent = item.label;
+      if (i === items.length - 1) btn.setAttribute("aria-current", "location");
+      else btn.removeAttribute("aria-current");
+    });
     const level = $("#zoom-level");
     if (level) level.textContent = `${Math.round(M.cam.s * 100)}%`;
   }
@@ -421,8 +473,13 @@
     });
     // R9: at the whole-map view, resizing re-fits; otherwise it clamps and
     // keeps the camera in place rather than moving the reader's viewpoint.
+    // Uses M.atHome (set by the last apply(), before the viewport changed)
+    // rather than recomputing here() here: by the time this handler runs the
+    // browser has already resized #map, so a live here() would compare the
+    // OLD cam.s against the NEW homeScale() and wrongly conclude we had
+    // navigated away from home.
     addEventListener("resize", () => {
-      if (!here().length) return home(false);
+      if (M.atHome) return home(false);
       clampCam();
       apply(false);
     });
@@ -458,7 +515,11 @@
   function followHash(animate) {
     if (settingHash) return;
     const n = resolveHash(location.hash);
-    if (n) flyToNode(n, animate); else if (location.hash === "" || location.hash === "#") home(animate);
+    // An empty hash and an unresolvable one both land on the whole map: falling
+    // through to home() unconditionally (instead of only for "" and "#") means
+    // a stale or mistyped anchor still shows the reader something, rather than
+    // leaving every card unshown because apply() never ran.
+    if (n) flyToNode(n, animate); else home(animate);
   }
 
   /* ---------- Search ---------- */
@@ -533,7 +594,7 @@
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       if (!pinch) { pinch = { dist, s: M.cam.s }; return; }
       const { cam } = M;
-      const ns = clamp(pinch.s * (dist / pinch.dist), homeScale() * 0.8, MAX);
+      const ns = clamp(pinch.s * (dist / pinch.dist), homeScale(), MAX);
       cam.x = mid.x - (mid.x - cam.x) * (ns / cam.s);
       cam.y = mid.y - (mid.y - cam.y) * (ns / cam.s);
       cam.s = ns;

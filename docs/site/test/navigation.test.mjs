@@ -48,6 +48,31 @@ test("hash, aliases, search, keyboard and reading view", async () => {
   }
 });
 
+// Reproduces the regression: paintPath() used to rebuild #crumbs.innerHTML on
+// every apply(), including the one a crumb click itself triggers, which threw
+// away the very button the reader just activated and dropped focus to <body>.
+test("activating a breadcrumb keeps focus on it instead of dropping to <body>", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html");
+  try {
+    await page.waitForFunction(() => IvyMap.mounted);
+    await page.evaluate(() => IvyMap.flyTo("add-funds", false));
+    await settle(page, 200);
+    const result = await page.evaluate(() => {
+      const btn = document.querySelector('#crumbs button[data-fly="lps-deposit-collateral"]');
+      btn.focus();
+      btn.click();
+      return { keptFocus: document.activeElement === btn, activeTag: document.activeElement?.tagName || null };
+    });
+    assert.deepEqual((await state(page)).path, ["open", "lps-deposit-collateral"], "the crumb click flew to that node");
+    assert.ok(result.keptFocus, `focus moved to <${result.activeTag}> instead of staying on the clicked crumb`);
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
+
 test("without JavaScript the document is a readable page with every heading", async () => {
   const server = await startServer();
   const { chromium } = await import("playwright");
