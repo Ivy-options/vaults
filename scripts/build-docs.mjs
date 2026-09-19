@@ -18,23 +18,12 @@ const pages = [
     output: "operator-examples.html",
     title: "Operator request examples",
   },
+  { source: "README.md", output: "project-setup.html", title: "Project setup" },
 ];
-// README.md is no longer rendered as its own page; its content is folded into
-// a generated region inside index.html (see the `fragments` loop below). It
-// keeps title/source metadata here so that loop can share makeRenderer with
-// the standalone pages above.
-const fragments = [{ name: "project-setup", source: "README.md", title: "Project setup" }];
 const destinations = new Map(
   pages.map((page) => [resolve(root, page.source), page.output])
 );
 destinations.set(resolve(root, "docs/site/index.html"), "index.html");
-// README.md is retired as its own page; any Markdown link that targets it
-// resolves straight to the map's corresponding node instead of through a
-// redirect stub. examples/operator/README.md is rendered as its own page
-// again (see `pages` above), so it needs no such override: the `pages.map`
-// destination set a few lines up already points it at operator-examples.html.
-destinations.set(resolve(root, "README.md"), "index.html#project");
-destinations.set(resolve(root, "docs/site/project-setup.html"), "index.html#project");
 destinations.set(
   resolve(root, "docs/site/settlement-pricing.html"),
   "index.html#cash-settlement-interface-and-governance"
@@ -57,8 +46,8 @@ const slug = (text) =>
     .replace(/\s/g, "-");
 
 // The renderer configuration (heading ids, link mapping to site pages, table
-// wrapping, the download treatment of .json/.sol codespans) is shared between
-// the standalone reference pages and the fragments spliced into the map.
+// wrapping, the download treatment of .json/.sol codespans) is shared across
+// every standalone reference page.
 function makeRenderer(page, requests) {
   const headings = [];
   const usedIds = new Map();
@@ -113,104 +102,6 @@ function makeRenderer(page, requests) {
       : code;
   };
   return { renderer, headings };
-}
-
-// A Markdown block becomes one map tile. A list with many items would render
-// as one absurdly tall card, so long lists are split into several tiles of a
-// few items each; every other block type stays whole.
-const TILE_TITLES = {
-  list: "Checklist",
-  code: "Commands",
-  table: "Table",
-  paragraph: "Note",
-};
-// Tuned against docs/site/test/coverage.test.mjs's "no tile overflows" lint,
-// which renders the map at every zoom tier and fails if a tile's visible
-// layer scrolls. A tile is 132px wide (G.tile in map.js) or 276px at
-// data-span="2"; past ~6 rendered list items the single-column card grows
-// taller than its neighbours (not a scroll overflow, but the "absurdly tall
-// tiles" this task calls out), so longer lists are chunked into more tiles
-// instead of shrinking to fit. If a README grows a longer list, re-run
-// docs:test — this constant is what the lint is guarding.
-const MAX_LIST_ITEMS_PER_TILE = 6;
-// A single-column tile (data-span 1, 132px wide, see G.tile in map.js) is too
-// narrow to wrap a long inline <code> span, which the tile stylesheet sets to
-// white-space: nowrap; that overflows the card's scrollWidth instead of
-// wrapping, which is exactly what coverage.test.mjs's overflow check at every
-// zoom tier catches. Widening to data-span="2" (276px) gives the span room to
-// fit unwrapped. 30 was picked empirically against the two READMEs' longest
-// inline code (URLs and file paths in backticks); docs:test will fail loudly
-// if a future README paragraph needs a different cutoff.
-const MAX_INLINE_CODE_LEN = 30;
-function longestCodespan(token) {
-  let max = 0;
-  const walk = (t) => {
-    if (!t || typeof t !== "object") return;
-    if (t.type === "codespan") max = Math.max(max, t.text.length);
-    if (Array.isArray(t.tokens)) t.tokens.forEach(walk);
-    if (Array.isArray(t.items)) t.items.forEach(walk);
-  };
-  walk(token);
-  return max;
-}
-function toChunks(block) {
-  if (block.type === "list" && block.items.length > MAX_LIST_ITEMS_PER_TILE) {
-    const groups = [];
-    for (let i = 0; i < block.items.length; i += MAX_LIST_ITEMS_PER_TILE)
-      groups.push(block.items.slice(i, i + MAX_LIST_ITEMS_PER_TILE));
-    return groups.map((items) => ({ ...block, items }));
-  }
-  return [block];
-}
-export function buildAction(shell, section, render) {
-  const blocks = section.blocks;
-  // Only the section's very first block, if it is a paragraph, becomes the
-  // action's summary <p>. Reaching past it for a later paragraph would pull
-  // that text ahead of whatever precedes it in the Markdown (e.g. a list),
-  // reordering the section; every current shell's Markdown does start with a
-  // paragraph, so this never needs to fall through in practice today.
-  const summaryIndex = blocks.length && blocks[0].type === "paragraph" ? 0 : -1;
-  const summary = summaryIndex >= 0 ? blocks[summaryIndex] : null;
-  const rest = blocks.filter((_, i) => i !== summaryIndex);
-  const titleSeq = new Map();
-  let tileSeq = 0;
-  const tiles = rest
-    .flatMap(toChunks)
-    .map((block) => {
-      // A heading block would render as an <h3> (etc.) direct child of the
-      // tile <section>, alongside the tile's own <h5> title. map.js's
-      // readDocument (bodyOf) filters heading children out of a node's body,
-      // so that text would stay visible in the reading view but silently
-      // vanish from the map card, with nothing failing. Neither README has a
-      // stray H3 today, so this is a build-time guard against one landing
-      // here later, not a live bug.
-      if (block.type === "heading")
-        throw new Error(
-          `Heading "${block.text}" inside generated section #${shell.id} ` +
-            `would be dropped from the map card (map.js's readDocument filters heading ` +
-            `children out of a tile's body while it stays visible in the reading view). ` +
-            `Give it its own H2 section instead, or fold it into the surrounding prose.`
-        );
-      tileSeq += 1;
-      const base = TILE_TITLES[block.type] || "Note";
-      const count = (titleSeq.get(base) || 0) + 1;
-      titleSeq.set(base, count);
-      const title = count > 1 ? `${base} ${count}` : base;
-      const span =
-        block.type === "list" ||
-        block.type === "code" ||
-        block.type === "table" ||
-        longestCodespan(block) > MAX_INLINE_CODE_LEN
-          ? ' data-span="2"'
-          : "";
-      return `<section data-kind="tile" id="${shell.id}-${tileSeq}"${span}><h5>${escape(
-        title
-      )}</h5>${render([block])}</section>\n`;
-    })
-    .join("");
-  return `<section data-kind="action" id="${shell.id}"><h4>${shell.title}</h4>${
-    summary ? render([summary]) : "<p></p>"
-  }${tiles}</section>\n`;
 }
 
 export function buildDocs({ check = false } = {}) {
@@ -277,102 +168,6 @@ export function buildDocs({ check = false } = {}) {
 `
     );
   }
-
-  // Fill the empty action shells left inside docs/site/index.html (Task 12)
-  // with content rendered from the README markdown, so the guide's prose stays
-  // the single source of truth. Shell ids and titles are untouched; only the
-  // region between the marker comments is (re)written.
-  const mapName = "index.html";
-  const mapPath = resolve(site, mapName);
-  let mapHtml = readFileSync(mapPath, "utf8");
-  for (const fragment of fragments) {
-    const { renderer } = makeRenderer(fragment, requests);
-    const render = (fragmentTokens) =>
-      new Marked({ renderer, gfm: true }).parser(fragmentTokens);
-    const tokens = new Marked({ gfm: true }).lexer(
-      readFileSync(resolve(root, fragment.source), "utf8")
-    );
-
-    // Split the body at each H2 into sections; content before the first H2
-    // (e.g. README's opening tagline) belongs to no shell and is dropped.
-    const sections = [];
-    let current = null;
-    for (const t of tokens) {
-      if (t.type === "space" || (t.type === "heading" && t.depth === 1))
-        continue;
-      if (t.type === "heading" && t.depth === 2) {
-        current = { title: t.text, blocks: [] };
-        sections.push(current);
-        continue;
-      }
-      if (current) current.blocks.push(t);
-    }
-    // A source with no H2 (the operator README) puts its whole body, minus
-    // the H1 and blank-line spacer tokens, into one section.
-    if (!sections.length)
-      sections.push({
-        title: null,
-        blocks: tokens.filter(
-          (t) => t.type !== "space" && !(t.type === "heading" && t.depth === 1)
-        ),
-      });
-
-    const marker = new RegExp(
-      `(<!-- generated:${fragment.name} -->)([\\s\\S]*?)(<!-- /generated:${fragment.name} -->)`
-    );
-    const match = mapHtml.match(marker);
-    if (!match)
-      throw new Error(`Missing generated:${fragment.name} markers in ${mapName}`);
-    // Match just the opening `<section id><h4>title</h4>` of each top-level
-    // action, regardless of whether it is still an empty shell (freshly from
-    // Task 12) or already carries generated content from a previous build,
-    // so rebuilding is idempotent: the id and title always anchor the region.
-    const shells = [
-      ...match[2].matchAll(
-        /<section data-kind="action" id="([^"]+)"><h4>([^<]*)<\/h4>/g
-      ),
-    ].map(([, id, title]) => ({ id, title }));
-    if (!shells.length)
-      throw new Error(
-        `No empty action shells found for generated:${fragment.name} in ${mapName}`
-      );
-
-    const bySlug = new Map(
-      sections.filter((s) => s.title).map((s) => [slug(s.title), s])
-    );
-    const whole = sections.length === 1 && sections[0].title === null;
-    // The inverse of the shell-with-no-section error below: a heading whose
-    // slug matches no shell would otherwise be silently dropped from the map.
-    if (!whole) {
-      const shellIds = new Set(shells.map((s) => s.id));
-      for (const section of sections) {
-        if (!section.title) continue;
-        const key = slug(section.title);
-        if (!shellIds.has(key))
-          throw new Error(
-            `README H2 "${section.title}" (slug ${key}) in ${fragment.source} has no matching shell; expected <section data-kind="action" id="${key}"> inside generated:${fragment.name} in ${mapName}.`
-          );
-      }
-    }
-    let out = "";
-    for (const shell of shells) {
-      const section = whole ? sections[0] : bySlug.get(shell.id);
-      if (!section)
-        throw new Error(
-          `No Markdown H2 in ${fragment.source} maps to shell #${shell.id} (fragment ${fragment.name}); check the heading text and its slug.`
-        );
-      out += buildAction(shell, section, render);
-    }
-    // Use a replacer FUNCTION, not a template string: generated content can
-    // itself contain "$"-sequences (e.g. a dollar amount like "$10,000" from
-    // examples/operator/README.md), and String.replace() reinterprets "$n"
-    // in a *string* replacement as a capture-group backreference. That once
-    // silently corrupted the built page (a "$1" inside "$10,000" was replaced
-    // by capture group 1, the opening marker comment, eating the digits). A
-    // function's return value is inserted verbatim, with no such reparsing.
-    mapHtml = mapHtml.replace(marker, (_match, open, _old, close) => `${open}\n${out}${close}`);
-  }
-  outputs.set(mapName, mapHtml);
 
   for (const [name, contents] of outputs) {
     const target = resolve(site, name);

@@ -4,7 +4,7 @@ Smart contracts for single-use covered-call and cash-secured-put vaults.
 
 ## Read the guide
 
-Start with the [lifecycle map](docs/site/index.html), a single zoomable page covering how vaults work, interactive examples and cash settlement pricing. Deploying a Hub suite, running vaults by hand, the release registry and the request templates live on their own reference pages, linked from the map's "Project" station (see "Reference pages" below).
+Start with the [lifecycle map](docs/site/index.html), a single zoomable page covering how vaults work, interactive examples and cash settlement pricing. Deploying a Hub suite, running vaults by hand, the release registry, the request templates and this project setup page each live on their own reference pages, linked from the map's apex card (see "Reference pages" below).
 
 Open `docs/site/index.html` directly in your browser. To serve the docs locally, run this from the repository root:
 
@@ -55,7 +55,7 @@ Formatting is configured in `foundry.toml`. Declaration ordering and control-flo
 
 ## Edit the docs
 
-Edit the map and its hand-written content directly in `docs/site/`. One region of the map is generated: the project-setup station from this README. The operator request examples and license pages are generated from `examples/operator/README.md` and `LICENSE.md`.
+Edit the map directly in `docs/site/index.html`; it is entirely hand-written. This file is rendered as its own standalone page, `docs/site/project-setup.html`; the operator request examples and license pages are generated from `examples/operator/README.md` and `LICENSE.md` the same way.
 
 After changing docs or request templates, rebuild, check, and test:
 

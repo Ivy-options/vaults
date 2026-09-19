@@ -10,36 +10,6 @@ const pagePath = resolve(root, "docs/site/index.html");
 const html = readFileSync(pagePath, "utf8");
 const site = dirname(pagePath);
 const generated = buildDocs({ check: true });
-// The map page carries a generated region (a README fragment) that
-// buildDocs fills in place; fail loudly if it is missing or still empty.
-const mapPath = pagePath;
-const mapHtml = readFileSync(mapPath, "utf8");
-for (const name of ["project-setup"]) {
-  const open = `<!-- generated:${name} -->`;
-  const close = `<!-- /generated:${name} -->`;
-  const region = mapHtml.match(
-    new RegExp(`<!-- generated:${name} -->([\\s\\S]*?)<!-- /generated:${name} -->`)
-  );
-  assert.ok(region, `Missing generated region ${name} in ${mapPath}`);
-  assert.ok(
-    /data-kind="tile"/.test(region[1]),
-    `Generated region ${name} is empty. Run npm run docs:build.`
-  );
-  // A splice bug (e.g. using a string replacement where generated content
-  // contains "$"-sequences that get reinterpreted as capture references) can
-  // leave a stray copy of the marker comment inside the generated content
-  // itself. Each marker must appear exactly once: at its region boundary.
-  assert.equal(
-    mapHtml.split(open).length - 1,
-    1,
-    `Marker ${open} appears more than once in ${mapPath} (a corrupted splice leaves a stray copy inside the generated content). Run npm run docs:build.`
-  );
-  assert.equal(
-    mapHtml.split(close).length - 1,
-    1,
-    `Marker ${close} appears more than once in ${mapPath}. Run npm run docs:build.`
-  );
-}
 // Old deep links alias to a node id at runtime (IvyMap.ALIASES in
 // assets/map.js) rather than being DOM ids themselves; parse the keys out of
 // that object literal so the anchor check below can accept either form.

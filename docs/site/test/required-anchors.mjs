@@ -10,8 +10,6 @@ export const REQUIRED = [
   "reports-exercise-and-expiration", "enable-cash-after-physical-launch",
   "admission-pause-and-stalled-auctions", "premium-treatment-and-emergency-boundaries", "prepare-and-execute-a-unanimous-unwind", "worked-unwind-scenarios",
   "platform-fee-and-share-transfer-administration",
-  // operator-examples.html, project-setup.html
-  "ivy-vaults", "read-the-guide", "build-and-verify", "solidity-style", "edit-the-docs", "license",
   // settlement-pricing.html
   "authoritative-cash-settlement-pricing", "physical-only-launch-and-later-cash-activation", "payment-authority-and-routing", "public-interface", "interchangeable-publishers",
   "exercise-observations", "exact-expiry-and-finality", "price-methodology-and-operational-approval", "governance-rotation-and-trust", "failure-and-incident-procedure",

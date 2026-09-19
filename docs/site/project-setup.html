@@ -1,5 +1,83 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>Moved · Ivy Vaults</title>
-<meta http-equiv="refresh" content="0; url=index.html#project">
-<script>location.replace("index.html" + (location.hash || "#project"));</script>
-</head><body><main id="content"><h1>This page moved</h1><p>The project setup notes now live on the <a href="index.html#project">protocol map</a>.</p></main></body></html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project setup · Ivy Vaults</title>
+  <meta name="description" content="Project setup for Ivy Vaults.">
+  <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
+  <link rel="icon" type="image/png" href="assets/ivy-logo.png">
+  <link rel="stylesheet" href="assets/docs.css">
+  <link rel="stylesheet" href="assets/reference.css">
+  <link rel="stylesheet" href="assets/roman.css">
+  <script src="assets/reference.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol guide"><img src="assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Project setup</span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
+  <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#read-the-guide">Read the guide</a>
+<a href="#build-and-verify">Build and verify</a>
+<a href="#solidity-style">Solidity style</a>
+<a href="#edit-the-docs">Edit the docs</a>
+<a href="#reference-pages">Reference pages</a>
+<a href="#license">License</a></nav></details></aside>
+  <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
+<p>Smart contracts for single-use covered-call and cash-secured-put vaults.</p>
+<h2 id="read-the-guide">Read the guide</h2>
+<p>Start with the <a href="index.html">lifecycle map</a>, a single zoomable page covering how vaults work, interactive examples and cash settlement pricing. Deploying a Hub suite, running vaults by hand, the release registry, the request templates and this project setup page each live on their own reference pages, linked from the map&#39;s apex card (see &quot;Reference pages&quot; below).</p>
+<p>Open <code>docs/site/index.html</code> directly in your browser. To serve the docs locally, run this from the repository root:</p>
+<pre><code class="language-sh">python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
+</code></pre>
+<p>Then visit <code>http://localhost:8000</code>. The documentation works offline and needs no build step to read.</p>
+<h2 id="build-and-verify">Build and verify</h2>
+<p>Use Node.js 22.13.0 or newer on an even-numbered release. From the repository root:</p>
+<pre><code class="language-sh">npm ci
+npm run compile
+npm run typecheck
+npm test -- --no-compile
+</code></pre>
+<p>Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.</p>
+<p>To run one test file, for example the deployment and settlement rehearsal:</p>
+<pre><code class="language-sh">npm test -- test/17-local-rehearsal.test.ts
+</code></pre>
+<h2 id="solidity-style">Solidity style</h2>
+<p>The contracts follow the Solidity style guide (<code>https://docs.soliditylang.org/en/latest/style-guide.html</code>).</p>
+<ul>
+<li>Use four spaces, a 120-character line target, and braces for control-flow bodies.</li>
+<li>Keep imports sorted and separate declarations with blank lines.</li>
+<li>Order contract members: using directives, enums, structs, constants, immutables, storage, events, errors, modifiers, then functions.</li>
+<li>Sort events and errors alphabetically within each contract or interface.</li>
+<li>Order functions: constructor, receive/fallback, external, public, internal, private; put view and pure functions last within each visibility group.</li>
+<li>Preserve storage-variable order, struct-field order, enum values, inheritance order, and modifier execution order during style changes.</li>
+</ul>
+<p>Install Foundry (<code>https://getfoundry.sh/introduction/installation/</code>) to use the formatter (validated with Forge 1.7.1). Hardhat remains the compiler and test runner.</p>
+<pre><code class="language-sh">npm run format:solidity
+npm run format:solidity:check
+</code></pre>
+<p>Formatting is configured in <code>foundry.toml</code>. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
+<h2 id="edit-the-docs">Edit the docs</h2>
+<p>Edit the map directly in <code>docs/site/index.html</code>; it is entirely hand-written. This file is rendered as its own standalone page, <code>docs/site/project-setup.html</code>; the operator request examples and license pages are generated from <code>examples/operator/README.md</code> and <code>LICENSE.md</code> the same way.</p>
+<p>After changing docs or request templates, rebuild, check, and test:</p>
+<pre><code class="language-sh">npm run docs:build
+npm run docs:check
+npm run docs:test
+</code></pre>
+<h2 id="reference-pages">Reference pages</h2>
+<p>Deploying a Hub suite, running vaults by hand, and the permanent release registry each have their own standalone reference page, kept out of the interactive map so their long command sequences and tables read as ordinary documents.</p>
+<ul>
+<li><a href="operations.html">Operator runbook</a>: deploying an immutable Hub suite and running individual vaults by hand.</li>
+<li><a href="operator-examples.html">Operator request examples</a>: copyable request templates for every runbook command.</li>
+<li><a href="registry-specification.html">Release registry specification</a>: the permanent registry contract and what it does and does not guarantee.</li>
+<li><a href="releases.html">Releases and integration</a>: deploying the registry, registering and recommending releases, and integrating a frontend.</li>
+</ul>
+<h2 id="license">License</h2>
+<p><strong>Business Source License 1.1 (BUSL-1.1).</strong> Copying, modification,
+redistribution, and non-production use are permitted under the <a href="license.html">license</a>.
+Production use requires a separate commercial license until the change to
+GPL-2.0-or-later on September 14, 2030, or the fourth anniversary of this version&#39;s
+first public distribution under BUSL-1.1, whichever comes first. No Additional Use
+Grant is provided. Third-party material retains its own licenses.</p>
+</article></main>
+  <footer><a href="index.html">Ivy Vaults · Protocol guide</a> · <a href="license.html">License · BUSL-1.1</a></footer>
+</body>
+</html>
