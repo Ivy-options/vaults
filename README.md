@@ -4,7 +4,7 @@ Smart contracts for single-use covered-call and cash-secured-put vaults.
 
 ## Read the guide
 
-Start with the [HTML protocol guide](docs/site/index.html) for how vaults work and interactive examples. For deployment and transaction commands, see the [operator runbook](docs/site/operations.html).
+Start with the [lifecycle map](docs/site/index.html), a single zoomable page covering how vaults work, interactive examples, and deployment and transaction commands (see its "Operator runbook" station).
 
 Open `docs/site/index.html` directly in your browser. To serve the docs locally, run this from the repository root:
 
@@ -55,13 +55,14 @@ Formatting is configured in `foundry.toml`. Declaration ordering and control-flo
 
 ## Edit the docs
 
-Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README; `operator-examples.html` is generated from `examples/operator/README.md`. The license page is generated from `LICENSE.md`.
+Edit the map and its hand-written content directly in `docs/site/`. Two regions of the map are generated: the project-setup station from this README, and the operator-request-examples action from `examples/operator/README.md`. The license page is generated from `LICENSE.md`.
 
-After changing docs or request templates, rebuild and check:
+After changing docs or request templates, rebuild, check, and test:
 
 ```sh
 npm run docs:build
 npm run docs:check
+npm run docs:test
 ```
 
 ## License

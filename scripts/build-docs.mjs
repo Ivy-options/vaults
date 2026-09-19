@@ -13,10 +13,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
 const pages = [
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
-  { source: "README.md", output: "project-setup.html", title: "Project setup" },
+];
+// README.md and examples/operator/README.md are no longer rendered as their
+// own pages; their content is folded into generated regions inside index.html
+// (see the `fragments` loop below). They keep title/source metadata here so
+// that loop can share makeRenderer with the standalone pages above.
+const fragments = [
+  { name: "project-setup", source: "README.md", title: "Project setup" },
   {
+    name: "operator-examples",
     source: "examples/operator/README.md",
-    output: "operator-examples.html",
     title: "Operator request examples",
   },
 ];
@@ -24,7 +30,33 @@ const destinations = new Map(
   pages.map((page) => [resolve(root, page.source), page.output])
 );
 destinations.set(resolve(root, "docs/site/index.html"), "index.html");
-destinations.set(resolve(root, "examples/operator"), "operator-examples.html");
+// The two READMEs above, and the standalone pages they used to produce, are
+// retired; any Markdown link that targets them resolves straight to the
+// map's corresponding node instead of through a redirect stub.
+destinations.set(resolve(root, "README.md"), "index.html#project");
+destinations.set(
+  resolve(root, "examples/operator/README.md"),
+  "index.html#operator-request-examples"
+);
+destinations.set(
+  resolve(root, "examples/operator"),
+  "index.html#operator-request-examples"
+);
+destinations.set(resolve(root, "docs/site/operations.html"), "index.html#operator-runbook");
+destinations.set(
+  resolve(root, "docs/site/operator-examples.html"),
+  "index.html#operator-request-examples"
+);
+destinations.set(resolve(root, "docs/site/project-setup.html"), "index.html#project");
+destinations.set(
+  resolve(root, "docs/site/registry-specification.html"),
+  "index.html#releases-and-registry"
+);
+destinations.set(
+  resolve(root, "docs/site/settlement-pricing.html"),
+  "index.html#cash-settlement-pricing"
+);
+destinations.set(resolve(root, "docs/site/releases.html"), "index.html#releases-and-registry");
 const escape = (text) =>
   String(text).replace(
     /[&<>"']/g,
@@ -228,9 +260,7 @@ export function buildDocs({ check = false } = {}) {
   <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
   <link rel="icon" type="image/png" href="assets/ivy-logo.png">
   <link rel="stylesheet" href="assets/docs.css">
-  <link rel="stylesheet" href="assets/guide.css">
   <link rel="stylesheet" href="assets/reference.css">
-  <link rel="stylesheet" href="assets/atlas.css">
   <link rel="stylesheet" href="assets/roman.css">
   <script src="assets/reference.js" defer></script>
 </head>
@@ -252,26 +282,19 @@ export function buildDocs({ check = false } = {}) {
     );
   }
 
-  // Fill the empty action shells left inside docs/site/index-map.html (Task 12)
+  // Fill the empty action shells left inside docs/site/index.html (Task 12)
   // with content rendered from the README markdown, so the guide's prose stays
   // the single source of truth. Shell ids and titles are untouched; only the
   // region between the marker comments is (re)written.
-  const mapName = existsSync(resolve(site, "index-map.html"))
-    ? "index-map.html"
-    : "index.html";
+  const mapName = "index.html";
   const mapPath = resolve(site, mapName);
   let mapHtml = readFileSync(mapPath, "utf8");
-  const fragments = [
-    { name: "project-setup", source: "README.md" },
-    { name: "operator-examples", source: "examples/operator/README.md" },
-  ];
   for (const fragment of fragments) {
-    const page = pages.find((p) => p.source === fragment.source);
-    const { renderer } = makeRenderer(page, requests);
+    const { renderer } = makeRenderer(fragment, requests);
     const render = (fragmentTokens) =>
       new Marked({ renderer, gfm: true }).parser(fragmentTokens);
     const tokens = new Marked({ gfm: true }).lexer(
-      readFileSync(resolve(root, page.source), "utf8")
+      readFileSync(resolve(root, fragment.source), "utf8")
     );
 
     // Split the body at each H2 into sections; content before the first H2
@@ -331,7 +354,7 @@ export function buildDocs({ check = false } = {}) {
         const key = slug(section.title);
         if (!shellIds.has(key))
           throw new Error(
-            `README H2 "${section.title}" (slug ${key}) in ${page.source} has no matching shell; expected <section data-kind="action" id="${key}"> inside generated:${fragment.name} in ${mapName}.`
+            `README H2 "${section.title}" (slug ${key}) in ${fragment.source} has no matching shell; expected <section data-kind="action" id="${key}"> inside generated:${fragment.name} in ${mapName}.`
           );
       }
     }
@@ -340,7 +363,7 @@ export function buildDocs({ check = false } = {}) {
       const section = whole ? sections[0] : bySlug.get(shell.id);
       if (!section)
         throw new Error(
-          `No Markdown H2 in ${page.source} maps to shell #${shell.id} (fragment ${fragment.name}); check the heading text and its slug.`
+          `No Markdown H2 in ${fragment.source} maps to shell #${shell.id} (fragment ${fragment.name}); check the heading text and its slug.`
         );
       out += buildAction(shell, section, render);
     }

@@ -12,10 +12,7 @@ const site = dirname(pagePath);
 const generated = buildDocs({ check: true });
 // The map page carries two generated regions (README fragments) that
 // buildDocs fills in place; fail loudly if a region is missing or still empty.
-const mapPath = resolve(
-  site,
-  existsSync(resolve(site, "index-map.html")) ? "index-map.html" : "index.html"
-);
+const mapPath = pagePath;
 const mapHtml = readFileSync(mapPath, "utf8");
 for (const name of ["project-setup", "operator-examples"]) {
   const open = `<!-- generated:${name} -->`;
@@ -43,6 +40,18 @@ for (const name of ["project-setup", "operator-examples"]) {
     `Marker ${close} appears more than once in ${mapPath}. Run npm run docs:build.`
   );
 }
+// Old deep links alias to a node id at runtime (IvyMap.ALIASES in
+// assets/map.js) rather than being DOM ids themselves; parse the keys out of
+// that object literal so the anchor check below can accept either form.
+const mapJs = readFileSync(resolve(site, "assets/map.js"), "utf8");
+const aliasBlock = mapJs.match(/const ALIASES = \{([\s\S]*?)\n  \};/);
+assert.ok(aliasBlock, "Could not find ALIASES block in assets/map.js");
+const mapAliasKeys = new Set(
+  [...aliasBlock[1].matchAll(/(?:^|[\s,{])(?:"([^"]+)"|([A-Za-z_$][\w$]*))\s*:/gm)].map(
+    (match) => match[1] ?? match[2]
+  )
+);
+
 // Reference pages are hand-maintained HTML; check every page in the site.
 const pages = [
   ...new Set([
@@ -80,14 +89,19 @@ for (const path of pages) {
       `Link leaves standalone site: ${url}`
     );
     assert.ok(existsSync(destination), `Missing link: ${path}: ${url}`);
-    if (anchor)
-      assert.ok(
-        pageIds.get(destination)?.includes(decodeURIComponent(anchor)),
-        `Missing anchor: ${path}: ${url}`
-      );
+    if (anchor) {
+      const decodedAnchor = decodeURIComponent(anchor);
+      // Old deep links into the map resolve at runtime through IvyMap.ALIASES
+      // (assets/map.js), not through a DOM id, so an anchor on index.html is
+      // valid if it is either a real id or a key of that alias table.
+      const ok =
+        pageIds.get(destination)?.includes(decodedAnchor) ||
+        (destination === pagePath && mapAliasKeys.has(decodedAnchor));
+      assert.ok(ok, `Missing anchor: ${path}: ${url}`);
+    }
   }
 }
-for (const file of ["docs.css", "guide.css", "atlas.css", "roman.css", "reference.css"]) {
+for (const file of ["docs.css", "roman.css", "reference.css", "labs.css", "map.css"]) {
   const css = readFileSync(resolve(site, "assets", file), "utf8");
   for (const [, url] of css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
     assert.ok(
@@ -98,7 +112,7 @@ for (const file of ["docs.css", "guide.css", "atlas.css", "roman.css", "referenc
 }
 const ids = pageIds.get(pagePath);
 const js = readFileSync(resolve(site, "assets/labs.js"), "utf8");
-for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "atlas.js", "labs.js", "map.js"]) {
+for (const file of ["reference.js", "labs.js", "map.js"]) {
   new Script(readFileSync(resolve(site, "assets", file), "utf8"));
 }
 
