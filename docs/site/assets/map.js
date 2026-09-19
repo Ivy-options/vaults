@@ -28,6 +28,10 @@
         id: el.id, kind, band, source: el, parent, children: [],
         depth: parent ? parent.depth + 1 : 0,
         label: heading ? heading.textContent.trim() : el.id,
+        // Plain-text label drives search and breadcrumbs; titleHtml keeps a tile
+        // heading's own markup (e.g. `<code>` around an identifier) so the card
+        // doesn't flatten it back down to text.
+        titleHtml: heading ? heading.innerHTML.trim() : el.id,
         actor: el.dataset.actor || null,
         dim: el.hasAttribute("data-dim"),
         when: el.dataset.when || "",
@@ -188,8 +192,10 @@
         if (n.children.length) layers[3] = `${head}<h4>${t}</h4>`; // the parent recedes to a badge + title only while its tiles are being read
         return layers;
       }
-      case "tile":
-        return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${t}</h5>`, 3: `<h5>${t}</h5><div class="body">${n.bodyHtml}</div>` };
+      case "tile": {
+        const th = n.titleHtml; // trusted markup from the authored heading, e.g. <code>strikeLimit</code>
+        return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${th}</h5>`, 3: `<h5>${th}</h5><div class="body">${n.bodyHtml}</div>` };
+      }
       case "lab":
         return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${t}</h5><div class="lab-host">${n.bodyHtml}</div>` };
       case "custody":

@@ -142,6 +142,8 @@ body.map-ready.reading #document { display: block; overflow: auto; flex: 1 1 aut
 .card.tile [data-tier="2"] { justify-content: center; align-items: center; text-align: center; }
 .card.tile [data-tier="2"] h5 { font-size: 11px; color: var(--muted); }
 .card.tile [data-tier="3"] h5 { font-size: 6.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.card.tile h5 code { font-family: var(--mono); background: none; padding: 0; }
+.card.tile [data-tier="3"] h5 code { text-transform: none; letter-spacing: normal; }
 .card.tile .body { font-size: 5.6px; line-height: 1.45; color: var(--ink); text-align: start; }
 .card.tile .body p { color: var(--ink); margin-bottom: 3px; }
 .card.tile .body b, .card.tile .body strong { color: var(--accent); }
