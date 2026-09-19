@@ -37,7 +37,7 @@ destinations.set(resolve(root, "README.md"), "index.html#project");
 destinations.set(resolve(root, "docs/site/project-setup.html"), "index.html#project");
 destinations.set(
   resolve(root, "docs/site/settlement-pricing.html"),
-  "index.html#cash-settlement-pricing"
+  "index.html#cash-settlement-interface-and-governance"
 );
 const escape = (text) =>
   String(text).replace(

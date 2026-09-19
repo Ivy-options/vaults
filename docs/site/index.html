@@ -351,14 +351,15 @@
           <section data-kind="tile" id="when-disabled"><h5>When cash is disabled</h5><p>New Cash/Either vaults and cash bids, including pending auctions, are blocked. Physical bids may still activate, including in existing Either vaults.</p></section>
           <section data-kind="tile" id="existing-obligations"><h5>Existing positions keep their rules</h5><p>Existing cash positions retain publication, exercise, expiration, claims and agreed unwind. Disabling removes none of their payment obligations.</p></section>
           <section data-kind="tile" id="enable-procedure" data-span="2"><h5>Enable, in order</h5><ol><li>Grant <code>SETTLEMENT_PRICE_PUBLISHER_ROLE</code> to a regular wallet, a multisig or a helper contract. The grant enables nothing by itself.</li><li>Call <code>setCashSettlementEnabled(true)</code>. The <code>set-cash-settlement-enabled</code> command first checks that the nominated publisher holds the role.</li></ol><p>Cash/Either vaults must set a positive <code>maxSettlementPriceAge</code>.</p></section>
+          <section data-kind="tile" id="physical-only-launch-and-later-cash-activation" data-span="2"><h5>A new Hub starts physical-only</h5><p>A fresh Hub grants no publisher role and leaves <code>cashSettlementEnabled</code> false; only <code>DEFAULT_ADMIN_ROLE</code> can later flip it, by calling <code>setCashSettlementEnabled(bool)</code>, which emits <code>CashSettlementEnabledUpdated</code>. Granting, revoking or renouncing the publisher role never changes the flag itself.</p></section>
         </section>
         <section data-kind="action" data-actor="publisher" id="publish-a-price"><h4>Publish a price for one vault</h4><p>An authorized publisher writes each report into the Hub; the Hub does not fetch the settlement price from a feed or helper. Before expiry a report is an observation; at expiry, one final price.</p>
-          <section data-kind="tile" id="exercise-observation" data-span="2"><h5>Before expiry: an exercise observation</h5><p><code>publishExercisePrice(vaultId, price, observedAt, validUntil)</code></p><p>American cash exercise only. The price must be positive and <code>validUntil</code> not passed. The age limit, <code>maxSettlementPriceAge</code>, is checked at exercise, not publication. A replacement must be observed strictly later.</p></section>
+          <section data-kind="tile" id="exercise-observation" data-span="2"><h5>Before expiry: an exercise observation</h5><p><code>publishExercisePrice(vaultId, price, observedAt, validUntil)</code></p><p>American cash exercise only. The price must be positive and <code>validUntil</code> not passed. The age limit, <code>maxSettlementPriceAge</code>, is checked at exercise, not publication.</p></section>
           <section data-kind="tile" id="final-expiry-price" data-span="2"><h5>At or after expiry: the final price</h5><p><code>publishExpiry(vaultId, price, validUntil)</code></p><p>Published at or after the fixed expiry, before <code>validUntil</code>. It is write-once per vault and, once published, can be used indefinitely.</p></section>
           <section data-kind="tile" id="one-vault-per-report"><h5>One report per vault</h5><p>Every cash vault needs its own transactions keyed by <code>vaultId</code>, even with matching pairs and expiries. The Hub derives underlying, quote and expiry from the Live position.</p></section>
           <section data-kind="tile" id="units-and-authority"><h5>Units and authority</h5><p>Raw quote-token units per whole underlying: 2,500 USDC per WETH is <code>2500000000</code>. The indicative <code>priceFeed</code> can never replace a missing report, and neither can another vault's.</p></section>
-          <section data-kind="tile" id="methodology"><h5>The price methodology</h5><p>The expiry method is a 30-minute average ending at exact expiry, calculated off-chain. Sources, sampling and calculations need approval before enablement. The Hub verifies authority and timing, not market data.</p></section>
           <section data-kind="tile" id="irreversible"><h5>No corrections</h5><p>Final expiry prices cannot be corrected or deleted. Revoking a publisher erases neither its reports nor completed payments. Verify the calculation and vault ID first.</p></section>
+          <section data-kind="tile" id="payment-authority-and-routing" data-span="2"><h5>Required price, by action</h5><table><thead><tr><th>Action</th><th>Required price</th></tr></thead><tbody><tr><td>Activation, indicative checks on</td><td>Fresh priceFeed.spot(...)</td></tr><tr><td>American cash exercise before expiry</td><td>Fresh, unexpired exercise observation</td></tr><tr><td>Cash exercise at/after expiry</td><td>Finalized price for the fixed expiry</td></tr><tr><td>Cash expiration</td><td>Same final price, for remaining notional</td></tr><tr><td>Physical exercise/expiration</td><td>Nothing</td></tr></tbody></table></section>
         </section>
         <section data-kind="action" data-actor="buyer" id="cash-exercise"><h4>Exercise for cash</h4><p>The buyer or executor calls exercise(vaultId, amount), and intrinsic value is paid immediately. The partial-exercise policy still applies; full exercise settles the vault.</p>
           <section data-kind="tile" id="cash-windows" data-span="2"><h5>Cash exercise windows</h5><table><thead><tr><th>Style</th><th><code>exercise</code></th><th><code>expire</code></th><th>Price at exercise</th></tr></thead><tbody><tr><td>American</td><td>Before, at or after expiry, while Live</td><td><code>t ≥ expiry</code></td><td>Observation before expiry; final price at or after</td></tr><tr><td>European</td><td><code>t ≥ expiry</code>, while Live</td><td><code>t ≥ expiry</code></td><td>Final expiry price</td></tr></tbody></table></section>
@@ -369,6 +370,62 @@
           <section data-kind="tile" id="what-is-blocked"><h5>What is blocked</h5><p>Missing, stale or expired observations block early cash exercise. A missing final report blocks exercise at or after expiry, and expiration.</p></section>
           <section data-kind="tile" id="still-available"><h5>What still works</h5><p>Earned-premium claims. A missing price is never treated as zero, and buyer backing cannot be released to LPs.</p></section>
           <section data-kind="tile" id="how-recovery-works" data-span="2"><h5>How recovery works</h5><p>The admin can rotate publishers and disable new cash admissions while the replacement reconstructs each missing report, using the approved price for the original expiry, not today's price. The buyer and shareholders can also <a href="#ending-early-by-agreement">unwind</a>.</p></section>
+          <section data-kind="tile" id="failure-and-incident-procedure" data-span="2"><h5>A wrong report, and what a pause does not do</h5><p>A wrong observation is fixable: publish a strictly later, verified observation; exercises already completed stay final. A wrong final price is not — it cannot be corrected by anyone, and any negotiated remedy happens off-chain and cannot seize existing claimant balances.</p><p>Admission pause leaves publication, exercise, expiration, claims and agreed unwind available, and moves no deadline.</p></section>
+        </section>
+      </section>
+      <section data-kind="moment" id="cash-settlement-interface-and-governance" data-when="cash vaults only"><h3>The pricing interface, and who is trusted</h3><p>The Hub stores one exercise observation and one final expiry value per vault ID; the linked settlement library reads that storage directly, and both publication functions require the publisher role and a Live, cash-settled vault.</p>
+        <section data-kind="action" id="public-interface"><h4>The publication interface</h4><p>The Hub derives the pair and expiry from the vault's own state; nothing else is consulted.</p>
+          <section data-kind="tile" id="settlement-interface-code" data-span="2"><h5>Solidity interface</h5><pre><code class="language-solidity">bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE;
+bool public cashSettlementEnabled;
+
+function setCashSettlementEnabled(bool enabled) external;
+
+function publishExercisePrice(
+    uint256 vaultId, uint256 price,
+    uint64 observedAt, uint64 validUntil
+) external;
+
+function exercisePrice(uint256 vaultId)
+    external view returns (uint256 price, uint256 observedAt, uint256 validUntil);
+
+function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
+
+function settlementPrice(uint256 vaultId)
+    external view returns (uint256 price);</code></pre></section>
+          <section data-kind="tile" id="rejected-callers"><h5>Rejected callers</h5><p>Unknown, pre-activation, physical and finalized positions are all rejected; prices must be positive.</p></section>
+          <section data-kind="tile" id="each-vault-stands-alone"><h5>Each vault stands alone</h5><p>Identical underlying, quote and expiry still need separate transactions; publishing one vault never populates, replaces or blocks another.</p></section>
+        </section>
+        <section data-kind="action" id="interchangeable-publishers"><h4>Interchangeable publishers</h4><p>An EOA with the role submits either publication transaction directly; a helper contract can hold the same role and call the same functions through the minimal write-side interface.</p>
+          <section data-kind="tile" id="hub-never-reads-the-helper"><h5>The Hub never reads the helper</h5><p>It never stores the helper as a dependency of any vault; the helper may compute prices under its own approved policy.</p></section>
+          <section data-kind="tile" id="an-example-helper-ships"><h5>An example ships in the repo</h5><p>Access-controlled, with tests for both EOA and contract publication; no helper is deployed by default.</p></section>
+        </section>
+        <section data-kind="action" id="exercise-observations"><h4>Observations must strictly increase</h4><p>The Hub stores the latest (price, observedAt, validUntil) per vault; publication requires 0 &lt; observedAt ≤ block.timestamp ≤ validUntil, rejecting expired or non-increasing submissions.</p>
+          <section data-kind="tile" id="equal-timestamp-different-price"><h5>Equal timestamp, different price</h5><p>Still rejected; different vaults may share an observation timestamp.</p></section>
+          <section data-kind="tile" id="exercise-consumption-check" data-span="2"><h5>Checked at exercise, not publication</h5><p>A positive stored price, a non-future observation, block.timestamp − observedAt ≤ maxSettlementPriceAge, and block.timestamp ≤ validUntil; both bounds inclusive.</p></section>
+          <section data-kind="tile" id="no-other-vaults-report-counts"><h5>No other vault counts</h5><p>An observation published after expiry cannot stand in for the final expiry price.</p></section>
+          <section data-kind="tile" id="affects-only-later-exercises"><h5>Affects only later exercises</h5><p>A new observation cannot change a payment that already happened; pick validity windows that fit the freshness limit.</p></section>
+        </section>
+        <section data-kind="action" id="exact-expiry-and-finality"><h4>Final prices are write-once, forever</h4><p>Final prices are keyed by vault ID, taken from the vault's activated expiry; once stored, every later publication for that vault is rejected. Publication requires block.timestamp ≥ expiry and is accepted through validUntil inclusive.</p>
+          <section data-kind="tile" id="final-prices-stay-readable"><h5>Readable forever</h5><p>Final prices stay readable after settlement; the submission deadline does not expire a stored value.</p></section>
+          <section data-kind="tile" id="late-publication-is-allowed"><h5>Late publication is allowed</h5><p>For as long as the cash position is Live, without an arbitrary cutoff: reconstruct the approved calculation for the original expiry with a current deadline.</p></section>
+          <section data-kind="tile" id="never-substitute-a-price"><h5>Never substitute</h5><p>Never a current market price, another vault's report, or a different expiry.</p></section>
+        </section>
+        <section data-kind="action" id="price-methodology-and-operational-approval"><h4>What a production methodology needs</h4><p>The expiry method is a 30-minute average ending at exact expiry, calculated off-chain; the Hub verifies authority and timing, not market data. A production methodology must also name sources, sampling, weighting, rounding and missing-data handling.</p>
+          <section data-kind="tile" id="contracts-attest-not-verify"><h5>The contracts attest, not verify</h5><p>They attest who published; they do not prove the source was accurate or compute either method.</p></section>
+          <section data-kind="tile" id="record-before-enabling-production"><h5>Record before enabling</h5><p>The approved methodology, the responsible operators, where evidence lives and the freshness configuration.</p></section>
+          <section data-kind="tile" id="physical-needs-none-of-it"><h5>Physical needs none of it</h5><p>Physical-only deployments need none of this, and passing synthetic tests approves nothing.</p></section>
+          <section data-kind="tile" id="what-production-still-needs" data-span="2"><h5>What production still needs</h5><p>The shipped implementation supports American exercise, direct role publication and immediate irreversible finality — but ships with no named operator accounts and no approved per-pair methodology. Passing the local tests does not authorize a production deployment or a production price.</p></section>
+        </section>
+        <section data-kind="action" id="governance-rotation-and-trust"><h4>Any role holder can publish for any vault</h4><p>The Hub admin controls the flag and the publisher role; any role holder may publish for any eligible cash vault, with no per-vault list and no on-chain quorum.</p>
+          <section data-kind="tile" id="no-outstanding-signatures"><h5>No outstanding signatures</h5><p>Settlement uses transactions rather than signed messages, so there is nothing to invalidate.</p></section>
+          <section data-kind="tile" id="stored-data-survives-revocation"><h5>Stored data survives revocation</h5><p>Observations stay usable until their limit passes or a newer one replaces them; final prices survive permanently.</p></section>
+          <section data-kind="tile" id="trust-for-the-life-of-the-position"><h5>Trust for the life of the position</h5><p>Publisher identity is mutable, so depositors trust the Hub administrator and every authorized publisher for as long as the position is open.</p></section>
+          <section data-kind="tile" id="losing-admin-vs-publisher-keys"><h5>Losing keys</h5><p>Losing every admin key ends governance recovery; losing every publisher while the admin still works is fixed by rotation.</p></section>
+        </section>
+        <section data-kind="action" id="deployment-and-tooling-notes"><h4>A fresh deployment, and what it still needs</h4><p>The per-vault publication APIs and price storage layout belong to this build, requiring a fresh deployment; there is no in-place upgrade of live positions.</p>
+          <section data-kind="tile" id="manifest-v6-only"><h5>Manifest v6 only</h5><p>Plans use manifest version 6; obsolete plans are rejected.</p></section>
+          <section data-kind="tile" id="a-default-deployment-is-empty"><h5>A default deployment is empty</h5><p>No publisher, no automatic enablement and no cash methodology.</p></section>
+          <section data-kind="tile" id="distinct-request-shapes"><h5>Distinct request shapes</h5><p>Publication requests name hub, vaultId and settlementMethodology, separate from the indicative spot typed reports.</p></section>
         </section>
       </section>
       <section data-kind="moment" id="expiry-date-arrives" data-when="fixed at creation"><h3>Expiry date arrives</h3><p>The exact expiry fixed at creation is reached. European exercise can begin, and cash settlement switches to one final price for this original expiry time.</p>
@@ -600,103 +657,6 @@
           <section data-kind="tile" id="worked-put-at-2700"><h5>A put at 2,700</h5><p>At 2,700 USDC per WETH: 10 × (3,000 − 2,700) = 3,000 USDC for the buyer; 27,000 USDC remains in the pool.</p></section>
           <section data-kind="tile" id="historical-binding"><h5>Historical binding</h5><p>Expiry outcomes use the final price for the vault's original expiry, even when the transaction happens later.</p></section>
           <section data-kind="tile" id="payouts-round-down"><h5>Payouts round down</h5><p>Buyer payouts round down on-chain.</p></section>
-        </section>
-      </section>
-    </section>
-<section data-kind="station" data-band="shelf" id="cash-settlement-pricing" data-tagline="Who may publish a settlement price, what the Hub checks, and what happens when a report is missing or wrong.">
-      <h2>Cash settlement pricing</h2>
-      <p>Cash-settled vaults pay intrinsic value out of the collateral, so someone has to tell the Hub what the price was. The Hub owns the prices and the publisher authority; an EOA or an optional helper contract publishes, and nothing else is consulted.</p>
-      <p>Which accounts publish in production, and how they compute their prices, are deployment decisions and are not encoded anywhere in the contracts.</p>
-      <section data-kind="moment" id="physical-only-launch-and-later-cash-activation"><h3>A new Hub starts physical-only</h3><p>A fresh Hub grants no publisher role and leaves cashSettlementEnabled false; only DEFAULT_ADMIN_ROLE can later flip it.</p>
-        <section data-kind="action" id="flag-and-role-are-independent"><h4>The flag and the role are independent</h4><p>setCashSettlementEnabled(bool) is admin-only and emits CashSettlementEnabledUpdated; granting, revoking or renouncing the publisher role never changes the flag.</p>
-          <section data-kind="tile" id="while-the-flag-is-false"><h5>While the flag is false</h5><p>The Hub rejects Cash/Either creation and cash bid activation, including in auctions already open. Physical bids still activate, including in existing Either vaults.</p></section>
-          <section data-kind="tile" id="physical-only-is-locked"><h5>Physical-only is locked</h5><p>A physical-only vault can never be loosened to cash.</p></section>
-          <section data-kind="tile" id="flag-gates-only-new-positions"><h5>The flag gates only new positions</h5><p>Disabling it never blocks publication, exercise, expiration, claims or agreed unwind for live cash positions.</p></section>
-          <section data-kind="tile" id="before-enabling-checklist"><h5>Before enabling</h5><p>Have an approved methodology and a publisher with the role; the CLI's enable command checks this as a preflight, not something the contract stores.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="payment-authority-and-routing"><h3>Indicative and authoritative prices are kept apart</h3><p>An indicative price may constrain the winning strike; it can never authorize a settlement payment.</p>
-        <section data-kind="action" id="required-price-by-action"><h4>Which price each action needs</h4><p>The table lists what each action requires, from activation to physical exercise.</p>
-          <section data-kind="tile" id="required-price-table" data-span="2"><h5>Required price, by action</h5><table><thead><tr><th>Action</th><th>Required price</th></tr></thead><tbody><tr><td>Activation, indicative checks on</td><td>Fresh priceFeed.spot(...)</td></tr><tr><td>American cash exercise before expiry</td><td>Fresh, unexpired exercise observation</td></tr><tr><td>Cash exercise at/after expiry</td><td>Finalized price for the fixed expiry</td></tr><tr><td>Cash expiration</td><td>Same final price, for remaining notional</td></tr><tr><td>Physical exercise/expiration</td><td>Nothing</td></tr></tbody></table></section>
-          <section data-kind="tile" id="no-fallback-to-indicative" data-span="2"><h5>No fallback</h5><p>There is no fallback from an authoritative report to the indicative feed; the exact expiry timestamp is the boundary. Authorization, the partial-exercise policy, the intrinsic-value arithmetic and the payout token are the same as for any other exercise.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="public-interface"><h3>One observation and one final price per vault</h3><p>The Hub stores one exercise observation and one final expiry value per vault ID; the linked settlement library reads that storage directly.</p>
-        <section data-kind="action" id="interface-functions"><h4>The interface</h4><p>Both publication functions require the publisher role and a Live, cash-settled vault; the Hub derives the pair and expiry from the vault's own state.</p>
-          <section data-kind="tile" id="settlement-interface-code" data-span="2"><h5>Solidity interface</h5><pre><code class="language-solidity">bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE;
-bool public cashSettlementEnabled;
-
-function setCashSettlementEnabled(bool enabled) external;
-
-function publishExercisePrice(
-    uint256 vaultId, uint256 price,
-    uint64 observedAt, uint64 validUntil
-) external;
-
-function exercisePrice(uint256 vaultId)
-    external view returns (uint256 price, uint256 observedAt, uint256 validUntil);
-
-function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
-
-function settlementPrice(uint256 vaultId)
-    external view returns (uint256 price);</code></pre></section>
-          <section data-kind="tile" id="rejected-callers"><h5>Rejected callers</h5><p>Unknown, pre-activation, physical and finalized positions are all rejected; prices must be positive.</p></section>
-          <section data-kind="tile" id="each-vault-stands-alone"><h5>Each vault stands alone</h5><p>Identical underlying, quote and expiry still need separate transactions; publishing one vault never populates, replaces or blocks another.</p></section>
-          <section data-kind="tile" id="no-settlement-feed-field"><h5>No settlement feed field</h5><p>maxSettlementPriceAge must be positive for any vault that permits cash settlement, and is immutable — unlike maxPriceAge, which the owner may only lower.</p></section>
-        </section>
-        <section data-kind="action" id="interchangeable-publishers"><h4>Interchangeable publishers</h4><p>An EOA with the role submits either publication transaction directly; a helper contract can hold the same role and call the same functions through the minimal write-side interface.</p>
-          <section data-kind="tile" id="hub-never-reads-the-helper"><h5>The Hub never reads the helper</h5><p>It never stores the helper as a dependency of any vault; the helper may compute prices under its own approved policy.</p></section>
-          <section data-kind="tile" id="an-example-helper-ships"><h5>An example ships in the repo</h5><p>Access-controlled, with tests for both EOA and contract publication; no helper is deployed by default.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="exercise-observations"><h3>Observations must strictly increase</h3><p>The Hub stores the latest (price, observedAt, validUntil) per vault; publication needs a strictly increasing observedAt for that vault.</p>
-        <section data-kind="action" id="observation-rules"><h4>Publication and consumption rules</h4><p>Publication requires 0 &lt; observedAt ≤ block.timestamp ≤ validUntil, rejecting expired or non-increasing submissions.</p>
-          <section data-kind="tile" id="equal-timestamp-different-price"><h5>Equal timestamp, different price</h5><p>Still rejected; different vaults may share an observation timestamp.</p></section>
-          <section data-kind="tile" id="exercise-consumption-check" data-span="2"><h5>Checked at exercise, not publication</h5><p>A positive stored price, a non-future observation, block.timestamp − observedAt ≤ maxSettlementPriceAge, and block.timestamp ≤ validUntil; both bounds inclusive.</p></section>
-          <section data-kind="tile" id="no-other-vaults-report-counts"><h5>No other vault counts</h5><p>An observation published after expiry cannot stand in for the final expiry price.</p></section>
-          <section data-kind="tile" id="affects-only-later-exercises"><h5>Affects only later exercises</h5><p>A new observation cannot change a payment that already happened; pick validity windows that fit the freshness limit.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="exact-expiry-and-finality"><h3>Final prices are write-once, forever</h3><p>Final prices are keyed by vault ID, taken from the vault's activated expiry; once stored, every later publication for that vault is rejected.</p>
-        <section data-kind="action" id="finality-rules"><h4>Publication window and permanence</h4><p>Publication requires block.timestamp ≥ expiry and is accepted through validUntil inclusive.</p>
-          <section data-kind="tile" id="no-challenge-period"><h5>No challenge period</h5><p>Finality is immediate and write-once; there is no administrative correction, deletion or retroactive change to payouts already made.</p></section>
-          <section data-kind="tile" id="final-prices-stay-readable"><h5>Readable forever</h5><p>Final prices stay readable after settlement; the submission deadline does not expire a stored value.</p></section>
-          <section data-kind="tile" id="late-publication-is-allowed"><h5>Late publication is allowed</h5><p>For as long as the cash position is Live, without an arbitrary cutoff: reconstruct the approved calculation for the original expiry with a current deadline.</p></section>
-          <section data-kind="tile" id="never-substitute-a-price"><h5>Never substitute</h5><p>Never a current market price, another vault's report, or a different expiry.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="price-methodology-and-operational-approval"><h3>Prices are raw quote-token units</h3><p>Prices are integer quote-token units per whole underlying token; for WETH/USDC, 2,500 USDC per WETH is 2500000000.</p>
-        <section data-kind="action" id="methodology-requirements"><h4>What a production methodology needs</h4><p>The proposed expiry method is a 30-minute average ending at the exact expiry; a production methodology must also name sources, sampling, weighting, rounding and missing-data handling.</p>
-          <section data-kind="tile" id="contracts-attest-not-verify"><h5>The contracts attest, not verify</h5><p>They attest who published; they do not prove the source was accurate or compute either method.</p></section>
-          <section data-kind="tile" id="record-before-enabling-production"><h5>Record before enabling</h5><p>The approved methodology, the responsible operators, where evidence lives and the freshness configuration.</p></section>
-          <section data-kind="tile" id="physical-needs-none-of-it"><h5>Physical needs none of it</h5><p>Physical-only deployments need none of this, and passing synthetic tests approves nothing.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="governance-rotation-and-trust"><h3>Any role holder can publish for any vault</h3><p>The Hub admin controls the flag and the publisher role; any role holder may publish for any eligible cash vault, with no per-vault list and no on-chain quorum.</p>
-        <section data-kind="action" id="rotation-and-survival"><h4>Rotation is the whole recovery procedure</h4><p>Granting a replacement and revoking the old publisher changes no vault terms and stops future publication transactions, including queued ones landing afterward.</p>
-          <section data-kind="tile" id="no-outstanding-signatures"><h5>No outstanding signatures</h5><p>Settlement uses transactions rather than signed messages, so there is nothing to invalidate.</p></section>
-          <section data-kind="tile" id="stored-data-survives-revocation"><h5>Stored data survives revocation</h5><p>Observations stay usable until their limit passes or a newer one replaces them; final prices survive permanently.</p></section>
-          <section data-kind="tile" id="trust-for-the-life-of-the-position"><h5>Trust for the life of the position</h5><p>Publisher identity is mutable, so depositors trust the Hub administrator and every authorized publisher for as long as the position is open.</p></section>
-          <section data-kind="tile" id="losing-admin-vs-publisher-keys"><h5>Losing keys</h5><p>Losing every admin key ends governance recovery; losing every publisher while the admin still works is fixed by rotation.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="failure-and-incident-procedure"><h3>A missing report never settles at zero</h3><p>A missing, stale or invalid observation, or a missing final report, makes the relevant action revert; it never settles the vault at zero or releases collateral to LPs.</p>
-        <section data-kind="action" id="incident-response"><h4>Responding to an incident</h4><p>If coverage is lost, disable new cash admissions if appropriate and rotate authority; the replacement publishes each missing vault's report.</p>
-          <section data-kind="tile" id="a-wrong-observation-is-fixable"><h5>A wrong observation is fixable</h5><p>Publish a strictly later, verified observation; exercises already completed stay final.</p></section>
-          <section data-kind="tile" id="a-wrong-final-price-is-not"><h5>A wrong final price is not</h5><p>It cannot be corrected by anyone; any negotiated remedy happens off-chain and cannot seize existing claimant balances.</p></section>
-          <section data-kind="tile" id="pause-does-not-block-pricing"><h5>Pause does not block pricing</h5><p>Admission pause leaves publication, exercise, expiration, claims and agreed unwind available and moves no deadline.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="deployment-and-tooling-notes"><h3>A fresh immutable deployment is required</h3><p>The per-vault publication APIs and price storage layout belong to this build, requiring a fresh deployment; there is no in-place upgrade of live positions.</p>
-        <section data-kind="action" id="tooling-notes"><h4>What the CLI and plans enforce</h4><p>set-cash-settlement-enabled takes a boolean and, when enabling, a nonzero publisher that already holds the role; disabling needs no publisher.</p>
-          <section data-kind="tile" id="manifest-v6-only"><h5>Manifest v6 only</h5><p>Plans use manifest version 6; obsolete plans are rejected.</p></section>
-          <section data-kind="tile" id="a-default-deployment-is-empty"><h5>A default deployment is empty</h5><p>No publisher, no automatic enablement and no cash methodology.</p></section>
-          <section data-kind="tile" id="distinct-request-shapes"><h5>Distinct request shapes</h5><p>Publication requests name hub, vaultId and settlementMethodology, separate from the indicative spot typed reports.</p></section>
-        </section>
-      </section>
-      <section data-kind="moment" id="what-production-still-needs"><h3>Passing tests authorizes nothing</h3><p>The shipped implementation supports American exercise, direct role publication and immediate irreversible finality, but ships with no named operator accounts and no approved per-pair methodology.</p>
-        <section data-kind="action" id="production-gap"><h4>What is missing</h4><p>No approved per-pair methodology, no freshness configuration and no named admin or operator accounts.</p>
-          <section data-kind="tile" id="tests-dont-authorize-production"><h5>Tests do not authorize production</h5><p>Passing the local tests does not authorize a production deployment or a production price.</p></section>
         </section>
       </section>
     </section>
