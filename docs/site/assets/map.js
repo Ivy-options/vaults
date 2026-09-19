@@ -515,11 +515,21 @@
   function followHash(animate) {
     if (settingHash) return;
     const n = resolveHash(location.hash);
-    // An empty hash and an unresolvable one both land on the whole map: falling
-    // through to home() unconditionally (instead of only for "" and "#") means
-    // a stale or mistyped anchor still shows the reader something, rather than
-    // leaving every card unshown because apply() never ran.
-    if (n) flyToNode(n, animate); else home(animate);
+    if (n) return flyToNode(n, animate);
+    // A hash that names real page chrome (e.g. the "#map" the skip link
+    // targets, or "#toolbar"/"#document") isn't a content node, but it isn't
+    // nothing either: the browser already put it there on purpose. Treat it
+    // as a navigation no-op and leave the camera exactly where it was, rather
+    // than yanking a zoomed-in reader back to the whole map. Detected by rule
+    // (an element with that id exists, just not a content node) rather than a
+    // hard-coded id list, so any future page-chrome id is covered for free.
+    const id = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+    if (id && document.getElementById(id)) return;
+    // An empty hash and a hash matching nothing at all both land on the whole
+    // map: falling through to home() unconditionally (instead of only for ""
+    // and "#") means a stale or mistyped anchor still shows the reader
+    // something, rather than leaving every card unshown because apply() never ran.
+    home(animate);
   }
 
   /* ---------- Search ---------- */

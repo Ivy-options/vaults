@@ -34,6 +34,47 @@ test("an unresolvable hash still shows the map, at the fit scale, instead of lea
   }
 });
 
+// Regression: the skip link targets "#map", which is page chrome, not a
+// content node. followHash() used to fall through to home() for ANY
+// unresolvable hash, so "Skip to content" while zoomed in threw the reader
+// back to the whole-map view. A hash naming real page chrome must be a
+// no-op instead; only a hash matching nothing at all still goes home.
+test("the skip link's #map hash leaves the camera in place; a hash matching nothing still goes home", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "index.html#open");
+  try {
+    await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
+    await settle(page, 300);
+    const before = await page.evaluate(() => IvyMap.state());
+    assert.deepEqual(before.path, ["open"], "loaded zoomed into the open station");
+    // Activate the real skip link, exactly as a keyboard/screen-reader user
+    // would: it's a fixed, off-screen-until-:focus link (docs.css), so
+    // focus it and press Enter rather than page.click(), which refuses to
+    // click something rendered outside the viewport.
+    await page.focus(".skip-link");
+    await page.keyboard.press("Enter");
+    await settle(page, 300);
+    const afterSkip = await page.evaluate(() => IvyMap.state());
+    assert.equal(await page.evaluate(() => location.hash), "#map", "the skip link did navigate the hash");
+    assert.equal(afterSkip.scale, before.scale, "camera scale is unchanged by the #map skip link");
+    assert.deepEqual(afterSkip.path, before.path, "camera path is unchanged by the #map skip link");
+    // A hash that matches nothing at all still falls through to home().
+    await page.evaluate(() => { location.hash = "#nonsense"; });
+    await settle(page, 300);
+    const cards = await page.evaluate(() => [...document.querySelectorAll("#world .card")]
+      .map((c) => c.hasAttribute("data-show")));
+    assert.ok(cards.length > 0, "cards were rendered");
+    assert.ok(cards.every(Boolean), "every card has a data-show attribute");
+    const expectedFitScale = await independentFitScale(page);
+    assert.equal((await page.evaluate(() => IvyMap._cam().s)), expectedFitScale, "#nonsense lands at the fit scale");
+    assert.deepEqual((await page.evaluate(() => IvyMap.state())).path, [], "#nonsense clears the camera path");
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
+
 test("loading with no hash stays at the fit view and never rewrites the URL to a station nobody chose", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "index.html");
