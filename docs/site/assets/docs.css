@@ -282,43 +282,6 @@ section {
   border-bottom: 1px solid var(--line);
   scroll-margin-top: 12px;
 }
-.main,
-.devgrid {
-  min-width: 0;
-}
-.two,
-.grid2,
-.contracts,
-.calls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.two > div,
-.grid2 > div,
-.contracts > div,
-.calls > div {
-  padding: 20px;
-  min-width: 0;
-}
-.two > div + div,
-.grid2 > div:nth-child(even),
-.contracts > div:nth-child(even),
-.calls > div + div {
-  border-left: 1px solid var(--line);
-}
-.grid2 > div:nth-child(n + 3),
-.contracts > div:nth-child(n + 3) {
-  border-top: 1px solid var(--line);
-}
-.grid2 {
-  margin-top: 18px;
-}
-.grid2 > div {
-  font-size: 14px;
-}
 .k,
 .tok,
 .role {
@@ -371,11 +334,6 @@ section {
   color: var(--ink);
   font-weight: 500;
 }
-.timeline {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
 .step {
   display: flex;
 }
@@ -387,10 +345,6 @@ section {
   flex-direction: column;
   gap: 18px;
   width: 100%;
-}
-.step .idx {
-  color: var(--faint);
-  font: 11px var(--mono);
 }
 .step .name {
   font: 600 19px var(--display);
@@ -428,14 +382,6 @@ section {
 }
 .callout b {
   color: var(--ink);
-}
-.loop {
-  margin-top: 18px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--muted);
 }
 .legend {
   display: flex;
@@ -743,25 +689,6 @@ footer > div {
   h2 {
     font-size: 23px;
   }
-  .two,
-  .grid2,
-  .timeline,
-  .contracts,
-  .calls {
-    grid-template-columns: 1fr;
-  }
-  .two > div + div,
-  .grid2 > div:nth-child(even),
-  .contracts > div:nth-child(even),
-  .calls > div + div {
-    border-left: 0;
-  }
-  .two > div + div,
-  .grid2 > div + div,
-  .contracts > div + div,
-  .calls > div + div {
-    border-top: 1px solid var(--line);
-  }
   .calc .inputs {
     grid-template-columns: 1fr;
   }
@@ -852,187 +779,4 @@ footer > div {
   width: 24px;
   height: 1px;
   background: var(--accent);
-}
-
-/* The introductory deal is read in stages: people, a priced example, then choices. */
-.deal-block {
-  margin-top: 36px;
-}
-.deal-block h3 {
-  font-size: 19px;
-  margin-bottom: 16px;
-}
-.deal-rights {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  padding: 18px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.deal-rights > div {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-}
-.deal-label {
-  display: block;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-}
-.deal-roles {
-  margin: 0;
-}
-.deal-roles > div {
-  display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  gap: 24px;
-  padding: 18px 0;
-  border-top: 1px solid var(--line);
-}
-.deal-roles dt {
-  font-weight: 600;
-  font-size: 14px;
-}
-.deal-roles dt span {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted);
-}
-.deal-roles dd {
-  margin: 0;
-}
-.deal-roles p,
-.deal-compare p {
-  margin: 0;
-}
-.deal-note {
-  color: var(--muted);
-  margin: 18px 0;
-  font-size: 14px;
-}
-.deal-example {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 22px 0 0;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  border-radius: 4px 4px 0 0;
-}
-.deal-example > div {
-  padding: 22px;
-  min-width: 0;
-}
-.deal-example > div + div {
-  border-left: 1px solid var(--line);
-}
-.deal-example dt {
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 12px;
-}
-.deal-example dd {
-  margin: 0;
-}
-.deal-example strong {
-  display: block;
-  font: 600 21px/1.4 var(--display);
-  margin-bottom: 10px;
-}
-.deal-example small {
-  display: block;
-  font: 11px/1.6 var(--mono);
-  color: var(--muted);
-}
-.deal-example dd > span {
-  display: block;
-  font-size: 13px;
-  color: var(--muted);
-}
-.deal-premium {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
-  align-items: center;
-  gap: 24px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-top: 0;
-  background: var(--accent-soft);
-  border-radius: 0 0 4px 4px;
-}
-.deal-premium strong {
-  display: block;
-  font: 500 16px/1.6 var(--mono);
-  margin-top: 6px;
-}
-.deal-operator {
-  color: var(--muted);
-  font-size: 23px;
-}
-.deal-compare {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px;
-}
-.deal-compare > div {
-  padding: 20px;
-  border-top: 2px solid var(--line-strong);
-  background: var(--panel);
-}
-.deal-compare h4 {
-  margin: 0 0 12px;
-  font: 600 16px/1.4 var(--display);
-}
-@media (max-width: 1100px) {
-  .deal-example {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .deal-example > div:nth-child(3) {
-    border-left: 0;
-  }
-  .deal-example > div:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
-  }
-  .deal-premium {
-    gap: 12px;
-  }
-  .deal-premium strong {
-    font-size: 13px;
-  }
-}
-@media (max-width: 760px) {
-  .deal-rights,
-  .deal-compare {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-  .deal-roles > div {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .deal-roles dt span {
-    display: inline;
-    margin-left: 8px;
-  }
-  .deal-example > div {
-    padding: 16px;
-  }
-  .deal-example strong {
-    font-size: 18px;
-  }
-  .deal-premium {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .deal-operator {
-    line-height: 1;
-  }
-  .deal-premium strong {
-    font-size: 16px;
-  }
-  .deal-block {
-    margin-top: 30px;
-  }
 }
