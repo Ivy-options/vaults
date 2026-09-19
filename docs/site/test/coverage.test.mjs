@@ -31,7 +31,7 @@ test("every old anchor resolves, every moment has one summary paragraph, no tile
       assert.deepEqual(overflow, [], `overflow at lod ${lod}`);
     }
     const stations = await page.evaluate(() => IvyMap.mounted.tree.nodes.filter((n) => n.kind === "station").map((n) => n.id));
-    assert.deepEqual(stations, ["before-the-vault", "open", "auction", "live", "settled", "vault-terms", "cash-settlement-pricing", "project"]);
+    assert.deepEqual(stations, ["before-the-vault", "open", "auction", "live", "settled", "cash-settlement-pricing", "project"]);
     assert.deepEqual(errors, []);
   } finally {
     await close();

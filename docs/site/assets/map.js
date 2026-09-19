@@ -496,7 +496,7 @@
     "cash-missing-reports": "missing-report", "reports-exercise-and-expiration": "publish-a-price", "enable-cash-after-physical-launch": "enable-procedure",
     "early-exit": "ending-early-by-agreement", "unwind-recovery": "recover-after-execution", "prepare-and-execute-a-unanimous-unwind": "agreed-unwind", "worked-unwind-scenarios": "worked-scenarios",
     "cash-outcomes": "cash-outcomes", "premium-treatment-and-emergency-boundaries": "premium-and-fees-are-kept",
-    terms: "vault-terms", "ivy-vaults": "project",
+    terms: "owner-fixes-what-bids-may-propose", "ivy-vaults": "project",
     "authoritative-cash-settlement-pricing": "cash-settlement-pricing",
   };
   const resolveHash = (hash) => { const id = decodeURIComponent((hash || "").replace(/^#/, "")); if (!id) return null; return M.tree.byId.get(id) || M.tree.byId.get(ALIASES[id]) || null; };
