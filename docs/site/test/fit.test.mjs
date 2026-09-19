@@ -75,6 +75,30 @@ test("the skip link's #map hash leaves the camera in place; a hash matching noth
   }
 });
 
+// The root (the apex above the whole timeline) sits one level above a
+// station: stepping out of a bare station should reach it, not jump straight
+// past it to the fit view, and stepping out of the root itself should reach
+// the fit view, same as before roots existed.
+test("flying out from a station reaches the root, and out of the root reaches the fit view", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "index.html#open");
+  try {
+    await page.waitForFunction(() => window.IvyMap && IvyMap.mounted);
+    await settle(page, 300);
+    assert.deepEqual((await page.evaluate(() => IvyMap.here().map((n) => n.id))), ["open"], "loaded zoomed into the open station");
+    await page.keyboard.press("Escape");
+    await settle(page, 300);
+    assert.deepEqual((await page.evaluate(() => IvyMap.here().map((n) => n.id))), ["a-vaults-life"], "stepping out of a station reaches the root");
+    await page.keyboard.press("Escape");
+    await settle(page, 300);
+    assert.deepEqual((await page.evaluate(() => IvyMap.here())), [], "stepping out of the root reaches the fit view (\"Whole map\")");
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
+
 test("loading with no hash stays at the fit view and never rewrites the URL to a station nobody chose", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "index.html");

@@ -2,7 +2,7 @@
 (() => {
   const $ = (s, scope = document) => scope.querySelector(s);
   const $$ = (s, scope = document) => [...scope.querySelectorAll(s)];
-  const KINDS = ["station", "moment", "action", "tile", "lab", "custody"];
+  const KINDS = ["station", "moment", "action", "tile", "lab", "custody", "root"];
   // document.currentScript is only live during this synchronous run, so capture the
   // assets/ base now (relative to this script's own URL) for use inside later renders.
   const ASSET_BASE = document.currentScript ? new URL(".", document.currentScript.src).href : "assets/";
@@ -50,16 +50,25 @@
   }
 
   const G = {
-    station: [360, 200], moment: [300, 170], action: [300, 150], custody: [220, 170],
+    station: [360, 200], moment: [300, 170], action: [300, 150], custody: [220, 170], root: [640, 340],
     gap: 40, momentY: 320, actionY: 560, actionGap: 20, tile: 132, tileGap: 12,
-    columnPad: 80, bandGap: 260, minTile: 40,
+    columnPad: 80, bandGap: 260, minTile: 40, rootGap: 120,
   };
   const spanW = (span) => (span >= 2 ? 2 * G.tile + G.tileGap : G.tile);
 
   // Places every node. Stations left to right per band; moments in a centred row; actions stacked; tiles in a two-column grid.
+  // A root card (the apex, above every station) is optional: fixtures and tests
+  // that omit it keep the exact geometry this had before roots existed.
   function layoutWorld(nodes, measure) {
     const lines = [];
     const line = (x, y, w, h, kind) => lines.push({ x, y, w, h, kind });
+    const root = nodes.find((n) => n.kind === "root");
+    // With a root, the life band's main line drops from G.rootGap below the
+    // root card instead of sitting a fixed 40px above y0=0; rootOffset shifts
+    // the whole life band down by exactly that much so the root, in turn,
+    // sits at y=0. Without a root this is 0 and every coordinate below is
+    // identical to the pre-root layout.
+    const rootOffset = root ? G.root[1] + G.rootGap + 40 : 0;
     const layoutBand = (band, y0) => {
       let cursor = 0, bottom = y0;
       nodes.filter((n) => n.kind === "station" && n.band === band).forEach((st) => {
@@ -109,17 +118,24 @@
       });
       return { width: cursor, bottom };
     };
-    const life = layoutBand("life", 0);
+    const life = layoutBand("life", rootOffset);
     const shelfY = life.bottom + G.bandGap;
     const shelf = layoutBand("shelf", shelfY);
-    const width = Math.max(life.width, shelf.width);
-    // Connectors: main line, shelf rule, drops, rows, gaps, pins. Drawn only where no card sits.
+    let width = Math.max(life.width, shelf.width);
     const cx = (n) => n.x + n.w / 2;
-    line(0, -40, life.width, 2, "main");
+    // The life band's main line and its per-station pins: 40px above y0, same
+    // as always — y0 is just rootOffset instead of 0 when a root exists.
+    const mainY = rootOffset - 40;
+    if (root) {
+      Object.assign(root, { x: life.width / 2 - G.root[0] / 2, y: 0, w: G.root[0], h: G.root[1] });
+      width = Math.max(width, root.x + root.w);
+    }
+    // Connectors: root drop, main line, shelf rule, drops, rows, gaps, pins. Drawn only where no card sits.
+    line(0, mainY, life.width, 2, "main");
     if (shelf.width) { line(0, shelfY - 60, shelf.width, 1, "rule"); }
     nodes.filter((n) => n.kind === "station").forEach((st) => {
       const moments = st.children.filter((c) => c.kind === "moment");
-      if (st.band === "life") line(cx(st), -40, 0, 0, "pin-main");
+      if (st.band === "life") line(cx(st), mainY, 0, 0, "pin-main");
       if (!moments.length) return;
       const rowLineY = st.y + G.momentY - 30;
       line(cx(st) - 1, st.y + st.h, 2, rowLineY - (st.y + st.h), "drop");
@@ -130,6 +146,10 @@
         m.children.filter((c) => c.kind === "action").forEach((a) => { line(cx(m) - 1, prev, 2, a.y - prev, "gap"); prev = a.y + a.h; });
       });
     });
+    if (root) {
+      line(cx(root) - 1, root.y + root.h, 2, mainY - (root.y + root.h), "drop");
+      line(cx(root), mainY, 0, 0, "pin-main");
+    }
     return { width, height: Math.max(life.bottom, shelf.bottom) + 80, lines };
   }
 
@@ -153,6 +173,8 @@
   function layersFor(n) {
     const t = esc(n.label), when = n.when ? `<span class="when">${esc(n.when)}</span>` : "";
     switch (n.kind) {
+      case "root":
+        return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p class="tagline">${esc(n.tagline)}</p><div class="body">${n.bodyHtml}</div>` };
       case "station": {
         const count = n.children.filter((c) => c.kind === "moment").length;
         return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p>${esc(n.tagline)}</p><small>${count} ${n.band === "shelf" ? "topics" : "moments"} · zoom in</small>`, 3: `<h2 class="compact">${t}</h2>` };
@@ -308,6 +330,7 @@
     apply(animate);
   }
   function flyToNode(n, animate = true) {
+    if (n.kind === "root") return fly(n.x, n.y, n.w, n.h, 0.6, 40, animate);
     if (n.kind === "station") return fly(n.column.x, n.y - 60, n.column.w, n.column.h + 60, 0.62, 40, animate);
     if (n.kind === "moment") return fly(n.x, n.y - 40, n.w, (n.bottom ?? n.y + n.h) - n.y + 40, 1.2, 40, animate);
     if (n.kind === "action") return fly(n.x, n.y, n.w, n.h, n.children.length ? 2.5 : 1.3, 40, animate);
@@ -331,7 +354,14 @@
     // relative margin scales with whatever the fit scale actually is.
     if (cam.s <= homeScale() * (1 + 1e-6)) return path;
     const station = tree.nodes.find((n) => n.kind === "station" && cx >= n.column.x && cx < n.column.x + n.column.w && cy >= n.y - 80 && cy <= n.y + n.column.h + 80);
-    if (!station) return path;
+    if (!station) {
+      // Not over any station: the root (the apex above the whole timeline) is
+      // the one other thing that can be "current" between the fit view and a
+      // station. It has no children of its own, so an exact hit test is enough.
+      const root = tree.nodes.find((n) => n.kind === "root" && hit(n));
+      if (root) path.push(root);
+      return path;
+    }
     path.push(station);
     const moment = station.children.find((n) => n.kind === "moment" && cx >= n.x - G.gap / 2 && cx < n.x + n.w + G.gap / 2 && cy >= n.y - 60);
     if (!moment || cam.s < 0.9) return path;
@@ -381,7 +411,16 @@
   }
   function zoomOut() {
     const path = here();
-    if (path.length < 2) return home();
+    if (path.length < 2) {
+      // Stepping out of a bare station reaches the root (the level above every
+      // station), not the whole-map fit view directly — the root itself steps
+      // out to the fit view, same as before roots existed.
+      if (path.length === 1 && path[0].kind !== "root") {
+        const root = M.tree.nodes.find((n) => n.kind === "root");
+        if (root) return flyToNode(root);
+      }
+      return home();
+    }
     flyToNode(path[path.length - 2]);
   }
   function zoomBy(f) {

@@ -31,11 +31,15 @@
   <div id="map" tabindex="0" aria-label="Lifecycle map"><div id="world"></div></div>
   <main id="document" class="content doc-page"><article>
     <h1>Ivy Vaults</h1>
+    <section data-kind="root" id="a-vaults-life" data-tagline="One smart contract, one option trade, start to finish.">
+      <h2>A vault's life</h2>
+      <p>For example, an option on WETH might have a strike of 3,000 USDC per WETH. WETH is the underlying token; USDC is the quote token. A call gives the buyer the right to buy WETH at the strike; a put gives the right to sell it.</p>
+      <p>With physical settlement, exercising exchanges those tokens. With cash settlement, the buyer receives the calculated payoff from the assets deposited in the vault instead.</p>
+      <p>Deploying a Hub suite, running vaults by hand, the release registry, the request templates and project setup each have their own reference page: <a href="operations.html">Operator runbook</a>, <a href="operator-examples.html">Operator request examples</a>, <a href="registry-specification.html">Release registry specification</a>, <a href="releases.html">Releases and integration</a>, <a href="project-setup.html">Project setup</a>.</p>
+    </section>
     <section data-kind="station" id="before-the-vault" data-tagline="A vault is one smart contract for one option trade. The buyer pays a premium for the right to trade at a strike; depositors back it.">
       <h2>Before the vault</h2>
       <p>Deposit assets to back one option, earn its premium, and claim what remains when the option ends. An Ivy vault is a smart contract for a single option trade. The buyer pays an upfront premium for the right to trade an agreed asset at an agreed price, the strike. Using that right is exercising. Depositors provide the backing, so what they receive depends on whether the buyer exercises. Selling another option requires a new vault.</p>
-      <p>For example, an option on WETH might have a strike of 3,000 USDC per WETH. WETH is the underlying token; USDC is the quote token. A call gives the buyer the right to buy WETH at the strike; a put gives the right to sell it.</p>
-      <p>With physical settlement, exercising exchanges those tokens. With cash settlement, the buyer receives the calculated payoff from the assets deposited in the vault instead.</p>
       <section data-kind="moment" id="who-is-around-a-vault" data-when="every vault">
         <h3>Who is around a vault</h3>
         <p>LPs supply the seller's collateral and receive shares. A market maker buys the option. The owner manages the vault, the bid master selects the offer, and the protocol administrator is a separate role.</p>
