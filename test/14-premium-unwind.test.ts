@@ -4,20 +4,13 @@ import { ZeroAddress } from "ethers";
 import { deployIvy, fund, WETH_UNIT as W, USDC_UNIT as U, Phase, SettlementType, ExerciseStyle, type IvyContext } from "./helpers/setup.js";
 import { goLive, openVault, makeBid, activate, at, publishExpiryPrice } from "./helpers/scenarios.js";
 import { signBid } from "./helpers/bids.js";
+import { proposeUnwind } from "./helpers/unwind.js";
 
 const connection = await network.create();
 const { networkHelpers } = connection;
-const unwindTypes = { UnwindAgreement: [
-  {name:"vaultId",type:"uint256"},{name:"nonce",type:"uint256"},{name:"deadline",type:"uint64"},
-  {name:"exercisedNotional",type:"uint256"},{name:"supply",type:"uint256"},{name:"refund",type:"uint256"},
-] };
 async function propose(c: IvyContext, id: bigint, refund = 100n * U) {
   const deadline = BigInt(await c.networkHelpers.time.latest()) + 86400n;
-  await c.hub.connect(c.alice).proposeUnwind(id,deadline,refund);
-  const a = await c.unwind.agreements(id);
-  const agreement = {vaultId:a.vaultId,nonce:a.nonce,deadline:a.deadline,exercisedNotional:a.exercisedNotional,supply:a.supply,refund:a.refund};
-  const signature = await c.marketMaker.signTypedData({name:"IvyUnwind",version:"1",chainId:(await c.marketMaker.provider!.getNetwork()).chainId,verifyingContract:await c.unwind.getAddress()},unwindTypes,agreement);
-  return {agreement,signature};
+  return proposeUnwind(c, id, deadline, refund);
 }
 
 describe("activation premium and unanimous unwinds", function () {
@@ -127,7 +120,7 @@ describe("activation premium and unanimous unwinds", function () {
   });
   it("only the owner or buyer proposes; bad signatures and expired agreements cannot unwind", async function () {
     const c = await networkHelpers.loadFixture(fixture); const v = await goLive(c);
-    await expect(c.hub.connect(c.bob).proposeUnwind(v.vaultId,v.bid.expiry,0)).revertedWithCustomError(c.hub,"NotVaultOwner");
+    await expect(c.hub.connect(c.bob).proposeUnwind(v.vaultId,v.bid.expiry,0,"0x")).revertedWithCustomError(c.hub,"NotVaultOwner");
     const a = await propose(c,v.vaultId,0n);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId,a.agreement.nonce);
     await expect(c.hub.executeUnwind(v.vaultId,a.agreement.nonce,"0x")).revertedWithCustomError(c.unwind,"BadSignature");
