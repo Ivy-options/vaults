@@ -11,6 +11,20 @@ const { networkHelpers } = connection;
 async function fixture() { const c = await deployIvy(connection); await c.hub.setTransfersEnabled(true); return c; }
 
 describe("buyer-authenticated unwind proposals", function () {
+  it("rejects an outsider with a fresh valid buyer signature without consuming its nonce", async function () {
+    const c = await networkHelpers.loadFixture(fixture), v = await goLive(c);
+    const deadline = BigInt(await networkHelpers.time.latest()) + 1000n;
+    for (const caller of [c.alice, c.marketMaker]) {
+      const before = await c.unwind.agreements(v.vaultId);
+      const p = await signUnwindProposal(c, v.vaultId, deadline, 0n);
+      await expect(c.hub.connect(c.bob).proposeUnwind(v.vaultId, deadline, 0n, p.signature)).revertedWithCustomError(c.hub, "NotVaultOwner");
+      expect(await c.unwind.agreements(v.vaultId)).deep.eq(before);
+      expect((await c.unwind.agreements(v.vaultId)).nonce).eq(before.nonce);
+      await c.hub.connect(caller).proposeUnwind(v.vaultId, deadline, 0n, p.signature);
+      expect((await c.unwind.agreements(v.vaultId)).nonce).eq(p.agreement.nonce);
+    }
+  });
+
   it("preserves an executable proposal when a non-shareholding owner attempts an unauthorized replacement", async function () {
     const c = await networkHelpers.loadFixture(fixture), v = await goLive(c);
     await c.shares.connect(c.alice).safeTransferFrom(c.alice.address, c.bob.address, v.vaultId, 10n * W, "0x");
