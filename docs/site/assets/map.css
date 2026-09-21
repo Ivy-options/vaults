@@ -84,8 +84,20 @@ body.map-ready #document { display: none; }
    own children) is centred by the shared .compact rule above and sized up
    here to match. */
 .card.moment [data-tier="0"] { align-items: center; justify-content: center; text-align: center; }
-.card.moment [data-tier="2"] h3 { font-size: 18px; margin-bottom: 6px; }
-.card.moment [data-tier="2"] p { font-size: 15.5px; line-height: 1.5; }
+.card.moment [data-tier="2"] h3 { font-size: 18px; margin-bottom: 12px; }
+.card.moment .moment-body { font-size: 15.5px; line-height: 1.55; color: var(--muted); }
+.card.moment .moment-body > * + * { margin-top: 12px; }
+/* Distinct roles and choices keep their own lines at every reading zoom. */
+.card .reading-list { list-style: none; padding: 0; margin: 0; }
+.card .reading-steps { padding: 0 0 0 1.4em; margin: 0; }
+.card .reading-steps li::marker { color: var(--faint); font-variant-numeric: tabular-nums; }
+.card .reading-list li + li, .card .reading-steps li + li { margin-top: 10px; }
+.card .moment-body strong, .card .action-body strong { font-weight: 650; color: var(--ink); }
+.card strong.role-owner { color: var(--c-owner); }
+.card strong.role-lp { color: var(--c-lp); }
+.card strong.role-buyer { color: var(--c-mm); }
+.card strong.role-bid { color: var(--c-bid); }
+.card .moment-body, .card .action-body { text-wrap: pretty; }
 /* A Roman painting sits faintly behind the moments that have one; it never competes with the text. */
 .card.moment .watermark.painting { position: absolute; inset: 0; opacity: 0.14; pointer-events: none; -webkit-mask-image: linear-gradient(90deg, transparent 30%, #000 75%); mask-image: linear-gradient(90deg, transparent 30%, #000 75%); }
 .card.moment .watermark.painting img { width: 100%; height: 100%; object-fit: cover; object-position: right center; }
@@ -117,8 +129,8 @@ body.map-ready #document { display: none; }
 .card.action [data-tier="2"] { column-gap: 10px; padding: 12px; }
 .card.action [data-tier="2"] .badge { font-size: 9px; padding: 3px 8px 2px; }
 .card.action [data-tier="2"] h4 { flex-basis: 100%; font-size: 18px; margin: 8px 0 4px; }
-.card.action .action-body { flex-basis: 100%; font-size: 15.5px; line-height: 1.5; }
-.card.action .action-body p + p { margin-top: 10px; }
+.card.action .action-body { flex-basis: 100%; font-size: 15.5px; line-height: 1.5; color: var(--muted); }
+.card.action .action-body > * + * { margin-top: 12px; }
 .card.action .action-body a { color: var(--accent); }
 .card.action .map-next a { font-weight: 600; }
 .card.action [data-tier="2"] small { flex-basis: 100%; margin-top: 6px; font-size: 8px; }

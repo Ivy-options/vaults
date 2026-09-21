@@ -38,7 +38,7 @@
         tagline: el.dataset.tagline || "",
         span: Number(el.dataset.span || 1),
         illustration: el.dataset.illustration || "",
-        summary: firstP ? firstP.textContent.trim() : "",
+        summary: (firstP || body[0])?.textContent.trim() || "",
         bodyHtml: body.map((c) => c.outerHTML).join(""),
       };
       node.path = parent ? `${parent.path}/${node.id}` : node.id;
@@ -183,7 +183,7 @@
         return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p>${esc(n.tagline)}</p><small>${count} ${n.band === "shelf" ? "topics" : "moments"} · zoom in</small>` };
       }
       case "moment":
-        return { 0: `<h3>${t}</h3>`, 2: `${when}<h3>${t}</h3><p>${esc(n.summary)}</p>` };
+        return { 0: `<h3>${t}</h3>`, 2: `${when}<h3>${t}</h3><div class="moment-body">${n.bodyHtml}</div>` };
       case "action": {
         const head = n.actor ? badge(n) : "";
         const more = n.children.length ? `<small>${n.children.length} details · zoom in</small>` : "";

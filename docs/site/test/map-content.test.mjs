@@ -50,6 +50,33 @@ test("map search returns the relevant card without repeating ancestor chapters",
   assert.deepEqual(hits, ['hub-and-vaults']);
 }));
 
+test("all explanation cards preserve authored structure and fit mobile at reading zoom", () => withMap(async page => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  const ids = await page.locator('#document [data-kind="moment"], #document [data-kind="action"]').evaluateAll(cards => cards.map(card => card.id));
+  for (const id of ids) {
+    await page.evaluate(id => IvyMap.flyTo(id, false), id);
+    const card = page.locator(`.card[data-id="${id}"]`);
+    const body = card.locator('.moment-body, .action-body');
+    assert.ok(await body.isVisible(), id);
+    const content = await page.evaluate(id => {
+      const source = document.getElementById(id);
+      const rendered = document.querySelector(`.card[data-id="${id}"] .moment-body, .card[data-id="${id}"] .action-body`);
+      const authored = [...source.children].filter(el => !/^H[1-6]$/.test(el.tagName) && el.tagName !== 'SECTION');
+      const tier = rendered.parentElement;
+      return {
+        expected: authored.map(el => el.outerHTML).join(''),
+        actual: rendered.innerHTML,
+        overflow: tier.scrollHeight > tier.clientHeight + 1,
+      };
+    }, id);
+    assert.equal(content.actual, content.expected, id);
+    assert.equal(content.overflow, false, id);
+    const box = await card.boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= 320, JSON.stringify({ id, box }));
+  }
+  assert.deepEqual(await page.evaluate(() => IvyMap.search('selects and submits').map(hit => hit.node.id)), ['who-is-around-a-vault']);
+}));
+
 test("a retired text-view URL opens the canonical Guide", () => withMap(async page => {
   assert.equal(await page.evaluate(() => IvyShell.state().mode), 'guide');
   assert.equal(await page.locator('body.reading').count(), 0);
@@ -168,7 +195,9 @@ test("overview cards fit mobile and their measured text stays inside the card", 
   const card = page.locator('.card[data-id="how-custody-works"]');
   const box = await card.boundingBox();
   assert.ok(box.x >= 0 && box.x + box.width <= 320, JSON.stringify(box));
-  assert.ok(await card.locator('[data-tier="2"] p').isVisible());
+  for (const paragraph of await card.locator('[data-tier="2"] p').all()) {
+    assert.ok(await paragraph.isVisible());
+  }
   const overflowing = await page.evaluate(() => [...document.querySelectorAll('.card.moment')].filter(card => {
     const text = card.querySelector('[data-tier="2"]');
     return text.scrollHeight > text.clientHeight + 1;
