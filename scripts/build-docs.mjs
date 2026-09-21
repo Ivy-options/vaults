@@ -12,6 +12,7 @@ import { Marked, Renderer } from "marked";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
 const pages = [
+  { source: "docs/frontend-integration.md", output: "frontend-integration.html", title: "Frontend integration" },
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
   { source: "README.md", output: "project-setup.html", title: "Project setup" },
   {

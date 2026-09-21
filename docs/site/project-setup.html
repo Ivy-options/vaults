@@ -31,6 +31,7 @@
 <pre><code class="language-sh">python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
 </code></pre>
 <p>Then visit <code>http://localhost:8000</code>. The documentation works offline and needs no build step to read.</p>
+<p>Frontend developers can use the <a href="frontend-integration.html">frontend integration guide</a> for release selection and routing transactions to each vault&#39;s original Hub.</p>
 <h2 id="build-and-verify">Build and verify</h2>
 <p>Use Node.js 22.13.0 or newer on an even-numbered release. From the repository root:</p>
 <pre><code class="language-sh">npm ci
@@ -58,7 +59,7 @@ npm run format:solidity:check
 </code></pre>
 <p>Formatting is configured in <code>foundry.toml</code>. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
 <h2 id="edit-the-docs">Edit the docs</h2>
-<p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README; <code>operator-examples.html</code> is generated from <code>examples/operator/README.md</code>. The license page is generated from <code>LICENSE.md</code>.</p>
+<p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README; <code>operator-examples.html</code> is generated from <code>examples/operator/README.md</code>. The frontend integration page is generated from <code>docs/frontend-integration.md</code>; the license page is generated from <code>LICENSE.md</code>.</p>
 <p>After changing docs or request templates, rebuild, check, and test:</p>
 <pre><code class="language-sh">npm run docs:build
 npm run docs:check

@@ -14,6 +14,8 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
 
 Then visit `http://localhost:8000`. The documentation works offline and needs no build step to read.
 
+Frontend developers can use the [frontend integration guide](docs/frontend-integration.md) for release selection and routing transactions to each vault's original Hub.
+
 ## Build and verify
 
 Use Node.js 22.13.0 or newer on an even-numbered release. From the repository root:
@@ -55,7 +57,7 @@ Formatting is configured in `foundry.toml`. Declaration ordering and control-flo
 
 ## Edit the docs
 
-Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README; `operator-examples.html` is generated from `examples/operator/README.md`. The license page is generated from `LICENSE.md`.
+Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README; `operator-examples.html` is generated from `examples/operator/README.md`. The frontend integration page is generated from `docs/frontend-integration.md`; the license page is generated from `LICENSE.md`.
 
 After changing docs or request templates, rebuild, check, and test:
 

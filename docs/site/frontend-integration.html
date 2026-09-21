@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frontend integration · Ivy Vaults</title>
+  <meta name="description" content="Frontend integration for Ivy Vaults.">
+  <script>try { if (localStorage.getItem("ivy-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}</script>
+  <link rel="icon" type="image/png" href="assets/ivy-logo.png">
+  <link rel="stylesheet" href="assets/docs.css">
+  <link rel="stylesheet" href="assets/guide.css">
+  <link rel="stylesheet" href="assets/reference.css">
+  <link rel="stylesheet" href="assets/atlas.css">
+  <link rel="stylesheet" href="assets/roman.css">
+  <script src="assets/reference.js" defer></script>
+  <script src="assets/embed.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol guide"><img src="assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Frontend integration</span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
+  <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#addresses-and-release-assets">Addresses and release assets</a>
+<a href="#stable-identifiers">Stable identifiers</a>
+<a href="#resolve-the-hub-for-a-new-vault">Resolve the Hub for a new vault</a>
+<a href="#create-and-fund-a-vault">Create and fund a vault</a>
+<a href="#open-an-existing-vault">Open an existing vault</a>
+<a href="#discover-every-historical-vault">Discover every historical vault</a>
+<a href="#transactions-and-signatures">Transactions and signatures</a>
+<a href="#recommendation-changes">Recommendation changes</a>
+<a href="#failure-handling">Failure handling</a>
+<a href="#integration-checklist">Integration checklist</a></nav></details></aside>
+  <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="frontend-integration-guide">Frontend integration</h1>
+<p>This guide explains how a frontend uses one permanent <code>IvyVaultsRegistry</code> address while continuing to support vaults created by every immutable Hub release.</p>
+<p>The central rule is:</p>
+<ul>
+<li>Use the registry recommendation when starting a <strong>new vault</strong>.</li>
+<li>Use the vault&#39;s stored <strong>original Hub address</strong> for every later action.</li>
+</ul>
+<p>The registry is a discovery contract. It does not proxy transactions, hold vault state or forward calls to a Hub.</p>
+<pre><code class="language-text">New vault
+  configured registry
+    -&gt; recommendedVersion()
+    -&gt; hubOf(releaseId)
+    -&gt; selected Hub.createVault(...)
+
+Existing vault
+  stored (chainId, hubAddress, vaultId)
+    -&gt; original Hub.deposit/exercise/expire/claim(...)
+</code></pre>
+<h2 id="addresses-and-release-assets">Addresses and release assets</h2>
+<p>Configure one trusted registry address for each supported chain. Do not discover the registry through another mutable service without verifying the result against the application&#39;s chain configuration.</p>
+<p>The on-chain registry provides the release ID, Hub address and manifest hash. It does not store an ABI or the release bundle itself. The frontend therefore also needs a release-bundle store containing the preserved bundle for every supported release. A bundle contains the deployment manifest, deployment evidence and matching contract artifacts.</p>
+<p>For each supported release, verify:</p>
+<ol>
+<li>The connected chain matches the release manifest.</li>
+<li><code>hubOf(releaseId)</code> matches the Hub recorded in the bundle.</li>
+<li><code>manifestHashOf(releaseId)</code> matches the bundle hash.</li>
+<li>The interface format and ABIs are supported by the frontend.</li>
+<li>The deployed code and immutable module bindings match the bundle.</li>
+</ol>
+<p>The reusable <code>resolveRelease</code> function in <code>scripts/releases.mjs</code> performs these checks with an ethers <code>JsonRpcProvider</code> or <code>BrowserProvider</code>. A production frontend can package this resolver and load the JSON bundles from its static assets or a content-addressed release store.</p>
+<h2 id="stable-identifiers">Stable identifiers</h2>
+<p>Vault IDs are local to one Hub. Release 1 and release 2 can both contain <code>vaultId == 1</code>, so <code>vaultId</code> alone is never a globally unique position identifier.</p>
+<p>Persist at least:</p>
+<pre><code class="language-ts">export type IvyVaultReference = {
+  chainId: bigint;
+  registryAddress: string;
+  releaseId: bigint;
+  hubAddress: string;
+  vaultId: bigint;
+  vaultAddress: string;
+};
+</code></pre>
+<p>Use <code>(chainId, hubAddress, vaultId)</code> as the canonical identity in URLs, database keys, caches and analytics. <code>releaseId</code> is useful metadata for finding the matching bundle and ABI. <code>vaultAddress</code> is the clone custody address and the ERC-20 approval target.</p>
+<p>A suitable route is:</p>
+<pre><code class="language-text">/vaults/:chainId/:hubAddress/:vaultId
+</code></pre>
+<p>Do not build an existing-vault route containing only <code>vaultId</code>.</p>
+<h2 id="resolve-the-hub-for-a-new-vault">Resolve the Hub for a new vault</h2>
+<p>Read the recommendation when the user begins a new-vault flow. Resolve and verify that release, then pin its Hub and release ID in the form state. Show both values in the final transaction review.</p>
+<pre><code class="language-ts">import { BrowserProvider, Contract } from &quot;ethers&quot;;
+import { resolveRelease } from &quot;../scripts/releases.mjs&quot;;
+
+const REGISTRY_ABI = [
+  &quot;function recommendedVersion() view returns (uint256)&quot;,
+  &quot;function hubOf(uint256) view returns (address)&quot;,
+  &quot;function manifestHashOf(uint256) view returns (bytes32)&quot;,
+];
+
+export async function resolveRecommendedHub(
+  provider: BrowserProvider,
+  registryAddress: string,
+  releaseBundles: Record&lt;string, unknown&gt;,
+  supportedArtifacts: Record&lt;string, unknown&gt;,
+) {
+  const registry = new Contract(registryAddress, REGISTRY_ABI, provider);
+  const releaseId: bigint = await registry.recommendedVersion();
+
+  if (releaseId === 0n) throw new Error(&quot;Ivy has no recommended release on this chain&quot;);
+
+  const releaseBundle = releaseBundles[releaseId.toString()];
+  if (!releaseBundle) throw new Error(`Unsupported Ivy release ${releaseId}`);
+
+  return resolveRelease(
+    provider,
+    { registry: registryAddress, releaseId, releaseBundle },
+    supportedArtifacts,
+  );
+}
+</code></pre>
+<p><code>resolveRelease</code> returns the concrete Hub, chain, registry, release ID, verified manifest hash and preserved artifacts. Instantiate the Hub with the ABI returned for that release.</p>
+<p>Once resolution completes, do not silently switch the form to another Hub if <code>RecommendedVersionUpdated</code> is emitted. A recommendation change should apply to the next new-vault flow. If the UI offers a “refresh release” action, make the user review any values that depend on the selected release again.</p>
+<h2 id="create-and-fund-a-vault">Create and fund a vault</h2>
+<p>Call <code>createVault</code> directly on the selected Hub. Calling it on <code>IvyVaultsRegistry</code> will revert because the registry has no forwarding interface.</p>
+<pre><code class="language-ts">import { Contract } from &quot;ethers&quot;;
+
+export async function createVault(
+  signer: any,
+  resolvedRelease: any,
+  terms: any,
+  pairs: any[],
+): Promise&lt;IvyVaultReference&gt; {
+  const hub = new Contract(
+    resolvedRelease.hub,
+    resolvedRelease.artifacts.IvyVaultsHub.abi,
+    signer,
+  );
+
+  // Surface validation errors before opening the wallet confirmation.
+  await hub.createVault.staticCall(terms, pairs);
+
+  const transaction = await hub.createVault(terms, pairs);
+  const receipt = await transaction.wait();
+
+  let created: any;
+  for (const log of receipt.logs) {
+    try {
+      const event = hub.interface.parseLog(log);
+      if (event?.name === &quot;VaultCreated&quot;) {
+        created = event;
+        break;
+      }
+    } catch {
+      // The receipt may contain logs emitted by other contracts.
+    }
+  }
+
+  if (!created) throw new Error(&quot;VaultCreated event missing from receipt&quot;);
+
+  return {
+    chainId: BigInt(resolvedRelease.chainId),
+    registryAddress: resolvedRelease.registry,
+    releaseId: BigInt(resolvedRelease.releaseId),
+    hubAddress: resolvedRelease.hub,
+    vaultId: created.args.vaultId,
+    vaultAddress: created.args.vault,
+  };
+}
+</code></pre>
+<p>Treat the mined <code>VaultCreated</code> event as the authoritative identity. A <code>staticCall</code> preview can become stale if another vault is created before the user&#39;s transaction is mined.</p>
+<p>After creation, approve collateral to the emitted clone address and deposit through the original Hub:</p>
+<pre><code class="language-ts">const ERC20_ABI = [&quot;function approve(address,uint256) returns (bool)&quot;];
+const collateralToken = new Contract(terms.collateral, ERC20_ABI, signer);
+
+await (await collateralToken.approve(reference.vaultAddress, depositAmount)).wait();
+
+const hub = new Contract(
+  reference.hubAddress,
+  resolvedRelease.artifacts.IvyVaultsHub.abi,
+  signer,
+);
+await (await hub.deposit(reference.vaultId, depositAmount)).wait();
+await (await hub.openAuction(reference.vaultId)).wait();
+</code></pre>
+<p>The spender is <code>vaultAddress</code>. Never approve the registry or Hub to spend collateral. A direct <code>IvyVault.deposit(amount)</code> is also supported, but the same clone approval is required.</p>
+<h2 id="open-an-existing-vault">Open an existing vault</h2>
+<p>When opening an existing position, start from its stored reference. Do not call <code>recommendedVersion()</code> to select its Hub.</p>
+<ol>
+<li>Confirm that the wallet is connected to <code>reference.chainId</code>.</li>
+<li>Load the bundle and ABI for <code>reference.releaseId</code>.</li>
+<li>Verify that the registry still returns <code>reference.hubAddress</code> for that release. Registrations are permanent, so a mismatch is an integration or configuration error.</li>
+<li>Instantiate <code>IvyVaultsHub</code> at <code>reference.hubAddress</code>.</li>
+<li>Read <code>stateOf(reference.vaultId)</code>, <code>termsOf(reference.vaultId)</code> and <code>vaultOf(reference.vaultId)</code>.</li>
+<li>Send deposits, auction actions, exercise, expiration and claims to that original Hub.</li>
+</ol>
+<p>The current recommendation may point to a newer Hub. That has no effect on the existing vault&#39;s terms, modules, balances or claim paths.</p>
+<h2 id="discover-every-historical-vault">Discover every historical vault</h2>
+<p>The registry does not expose an array of releases. Index its events instead:</p>
+<ol>
+<li>Read <code>VersionRegistered(releaseId, hub, manifestHash)</code> from the registry deployment block onward.</li>
+<li>Persist every registered release. Registrations cannot be removed or replaced.</li>
+<li>For each Hub, read <code>VaultCreated(vaultId, vault, owner, kind, underlying, collateral)</code> from that release&#39;s deployment block onward.</li>
+<li>Key the indexed record by <code>(chainId, hubAddress, vaultId)</code>.</li>
+<li>Use <code>RecommendedVersionUpdated</code> to update the default shown in the new-vault flow.</li>
+</ol>
+<p>The index may run in the browser for small deployments. A backend indexer or subgraph is preferable once event history grows. The indexer should handle chain reorganizations by waiting for the application&#39;s chosen confirmation depth and replaying a small block range when advancing its cursor.</p>
+<p>For a user&#39;s portfolio, query ERC-1155 balances from the share-token contract belonging to each release. The share token ID is the Hub-local vault ID, so its contract address is also part of the balance identity.</p>
+<h2 id="transactions-and-signatures">Transactions and signatures</h2>
+<p>Every wallet transaction must display and target the concrete contract that will execute it:</p>
+<div class="tablewrap" tabindex="0" role="region" aria-label="Frontend integration reference table"><table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Transaction target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Discover recommended release</td>
+<td>Registry read</td>
+</tr>
+<tr>
+<td>Create, deposit, open auction, exercise, expire or claim</td>
+<td>Original Hub</td>
+</tr>
+<tr>
+<td>Approve collateral or premium</td>
+<td>ERC-20 token, with the clone as spender</td>
+</tr>
+<tr>
+<td>Direct deposit or platform-fee claim</td>
+<td>Vault clone</td>
+</tr>
+<tr>
+<td>Read or transfer shares</td>
+<td>Release-specific <code>IvyShares</code> contract</td>
+</tr>
+</tbody></table>
+</div>
+<p>Typed signatures also bind to the concrete immutable deployment:</p>
+<ul>
+<li>Bid domain: <code>name = IvyVaultsHub</code>, <code>version = 2</code>, connected <code>chainId</code>, <code>verifyingContract = hubAddress</code>.</li>
+<li>Unwind domain: <code>name = IvyUnwind</code>, <code>version = 1</code>, connected <code>chainId</code>, <code>verifyingContract =</code> that Hub release&#39;s unwind-module address.</li>
+</ul>
+<p>A registry release ID is not an EIP-712 version. Never rebuild an existing bid or unwind signature against the current recommendation.</p>
+<h2 id="recommendation-changes">Recommendation changes</h2>
+<p>When the registry administrator recommends a new release:</p>
+<ul>
+<li>A newly opened creation flow resolves the new Hub.</li>
+<li>A creation form that already pinned a Hub keeps that selection through signing and confirmation.</li>
+<li>Existing vault pages keep their stored original Hub.</li>
+<li>Historical indexing continues to include every registered release.</li>
+<li>The frontend must have the new release bundle and interface adapter before presenting it as supported.</li>
+</ul>
+<p>If the registry recommends an interface the frontend does not support, disable new-vault creation with a clear “frontend update required” message. Continue serving existing vaults through their preserved release adapters.</p>
+<h2 id="failure-handling">Failure handling</h2>
+<p>Handle these cases explicitly:</p>
+<ul>
+<li><code>recommendedVersion() == 0</code>: new-vault creation is unavailable on this chain.</li>
+<li>Missing bundle or unsupported interface format: do not guess an ABI or substitute the current ABI.</li>
+<li>Registry/bundle Hub mismatch: stop before transaction preparation.</li>
+<li>Wallet chain mismatch: request the correct network before reads, signatures or transactions.</li>
+<li>Recommendation changes during a prepared flow: keep the pinned Hub and show it in the confirmation screen.</li>
+<li>Unknown existing position: require its original Hub or release reference; do not search only the recommended Hub.</li>
+<li>RPC log limits: index releases and vault events in bounded block ranges.</li>
+</ul>
+<h2 id="integration-checklist">Integration checklist</h2>
+<ul>
+<li>Configure one registry address per chain.</li>
+<li>Preserve every supported release bundle and ABI adapter.</li>
+<li>Resolve the recommendation only for new-vault creation.</li>
+<li>Persist <code>(chainId, hubAddress, vaultId)</code> after <code>VaultCreated</code>.</li>
+<li>Approve the vault clone, never the registry or Hub.</li>
+<li>Index all <code>VersionRegistered</code> and per-Hub <code>VaultCreated</code> events.</li>
+<li>Route existing actions and signatures to the original Hub release.</li>
+<li>Fail closed on missing bundles, mismatched hashes and unsupported interfaces.</li>
+<li>Show the selected release ID and Hub before the wallet signs.</li>
+</ul>
+<p>See the <a href="releases.html">release deployment and registration guide</a>, <a href="index.html#execution-permissions">protocol Guide</a>, and <a href="operator-examples.html">operator request examples</a> for the administrative and transaction-preparation workflows.</p>
+</article></main>
+  <footer><a href="index.html">Ivy Vaults · Protocol guide</a> · <a href="license.html">License · BUSL-1.1</a></footer>
+</body>
+</html>
