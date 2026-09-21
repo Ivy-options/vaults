@@ -2,16 +2,13 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { deployIvy, fund, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
 import { goLive, at } from "./helpers/scenarios.js";
-import { UNWIND_TYPES } from "../scripts/operator.mjs";
+import { proposeUnwind } from "./helpers/unwind.js";
 const connection = await network.create();
 const { networkHelpers } = connection;
 async function fixture() { const c = await deployIvy(connection); await c.hub.setTransfersEnabled(true); return c; }
 async function proposal(c: Awaited<ReturnType<typeof fixture>>, id: bigint, refund: bigint) {
-  await c.hub.connect(c.alice).proposeUnwind(id, BigInt(await networkHelpers.time.latest()) + 86400n, refund);
-  const a = await c.unwind.agreements(id);
-  const value = {vaultId:id,nonce:a.nonce,deadline:a.deadline,exercisedNotional:a.exercisedNotional,supply:a.supply,refund:a.refund};
-  const signature = await c.marketMaker.signTypedData({name:"IvyUnwind",version:"1",chainId:(await c.marketMaker.provider!.getNetwork()).chainId,verifyingContract:await c.unwind.getAddress()},UNWIND_TYPES,value);
-  return { ...value, signature };
+  const { agreement, signature } = await proposeUnwind(c, id, BigInt(await networkHelpers.time.latest()) + 86400n, refund);
+  return { ...agreement, signature };
 }
 describe("LP-funded unwind", function () {
   it("requires each current LP to fund their share even after claiming premium", async function () {

@@ -73,6 +73,11 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const address=await hub.unwind(), module=new Contract(address,artifacts.IvyUnwind.abi,provider), a=await module.agreements(r.vaultId);
     return {domain:domain('IvyUnwind','1',address),types:UNWIND_TYPES,value:fields(UNWIND_TYPES.UnwindAgreement,a)};
   }
+  if(command==='typed-unwind-proposal') {
+    const address=await hub.unwind();
+    const [agreement,digest]=await hub.previewUnwind(required(r,'vaultId'),required(r,'deadline'),required(r,'refund'));
+    return {domain:domain('IvyUnwind','1',address),types:UNWIND_TYPES,value:fields(UNWIND_TYPES.UnwindAgreement,agreement),digest};
+  }
   let target=hub, method, args, detail;
   if(command==='register-version'||command==='recommend-version') {
     target=new Contract(required(r,'registry'),REGISTRY_ABI,runner);
@@ -126,12 +131,14 @@ export async function prepareOperation(provider, artifacts, command, r) {
     method=command==='grant-settlement-publisher'?'grantRole':'revokeRole';
     args=[await target.SETTLEMENT_PRICE_PUBLISHER_ROLE(),required(r,'account')];
     detail={pricingAuthority:'authoritative cash settlement',account:r.account};
+  } else if(command==='propose-unwind') {
+    method='proposeUnwind';args=[required(r,'vaultId'),required(r,'deadline'),required(r,'refund'),required(r,'buyerSignature')];
   } else if(command==='publish-spot') {
     target=new Contract(required(r,'feed'),artifacts.IvyPriceFeed.abi,runner);
     detail={pricingAuthority:'indicative activation only; does not supply cash vault settlement prices'};
     method='publishSpot';args=[...REPORT_TYPES.SpotReport.map(f=>required(r.report,f.name)),r.signature];
   } else {
-    const actions={'set-platform-fee':['setPlatformFeeBps',[r.rateBps]],'set-platform-treasury':['setPlatformTreasury',[r.recipient]],'set-transfers':['setTransfersEnabled',[r.enabled]],deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'propose-unwind':['proposeUnwind',[r.vaultId,r.deadline,r.refund]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'fund-unwind':['fundUnwind',[r.vaultId,r.nonce,r.amount]],'withdraw-unwind-contribution':['withdrawUnwindContribution',[r.vaultId,r.nonce]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
+    const actions={'set-platform-fee':['setPlatformFeeBps',[r.rateBps]],'set-platform-treasury':['setPlatformTreasury',[r.recipient]],'set-transfers':['setTransfersEnabled',[r.enabled]],deposit:['deposit',[r.vaultId,r.amount]],withdraw:['withdraw',[r.vaultId,r.amount]],'open-auction':['openAuction',[r.vaultId]],'cancel-auction':['cancelAuction',[r.vaultId]],expire:['expire',[r.vaultId]],exercise:['exercise',[r.vaultId,r.amount]],'claim-premium':['claimPremium',[r.vaultId]],claim:['claim',[r.vaultId,r.amount]],'claim-payout':['claimPayout',[r.vaultId]],'set-execution':['setExecution',[r.vaultId,r.executor,r.recipient]],'approve-unwind':['approveUnwind',[r.vaultId,r.nonce]],'revoke-unwind':['revokeUnwind',[r.vaultId]],'fund-unwind':['fundUnwind',[r.vaultId,r.nonce,r.amount]],'withdraw-unwind-contribution':['withdrawUnwindContribution',[r.vaultId,r.nonce]],'execute-unwind':['executeUnwind',[r.vaultId,r.nonce,r.signature]],pause:['setAdmissionPause',[r.vaultId,r.paused]],'grant-role':['grantRole',[r.role?id(r.role):undefined,r.account]]};
     if(command==='claim-platform-fee') {
       target=new Contract(await hub.vaultOf(r.vaultId),artifacts.IvyVault.abi,runner);method='claimPlatformFee';args=[];
     } else if(command==='approve-token') {

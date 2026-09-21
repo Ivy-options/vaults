@@ -544,13 +544,24 @@ contract IvyVaultsHub is
 
     // Unwind
 
-    function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund) external nonReentrant {
+    function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund, bytes calldata buyerSignature)
+        external
+        nonReentrant
+    {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
         if (msg.sender != s.owner && msg.sender != s.marketMaker) {
             revert NotVaultOwner();
         }
-        unwind.propose(vaultId, deadline, s.exercisedNotional, shareToken.totalSupply(vaultId), refund);
+        unwind.propose(
+            vaultId,
+            deadline,
+            s.exercisedNotional,
+            shareToken.totalSupply(vaultId),
+            refund,
+            s.marketMaker,
+            buyerSignature
+        );
     }
 
     function approveUnwind(uint256 vaultId, uint256 nonce) external nonReentrant {
@@ -603,6 +614,19 @@ contract IvyVaultsHub is
     }
 
     // External views
+
+    /// @notice Preview the next buyer agreement. Intervening proposals or exercises make its signature stale.
+    function previewUnwind(uint256 vaultId, uint64 deadline, uint256 refund)
+        external
+        view
+        returns (UnwindAgreement memory agreement, bytes32 digest)
+    {
+        _requirePhase(vaultId, Phase.Live);
+        return
+            unwind.preview(
+                vaultId, deadline, _state[vaultId].exercisedNotional, shareToken.totalSupply(vaultId), refund
+            );
+    }
 
     function exercisePrice(uint256 vaultId)
         external

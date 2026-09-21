@@ -2,7 +2,7 @@ import {expect} from 'chai';
 import {network} from 'hardhat';
 import {deployIvy,callTerms,callPairs,createVaultAs,fund,WETH_UNIT as W,USDC_UNIT as U,Phase,SettlementType,ExerciseStyle} from './helpers/setup.js';
 import {openVault,activate,goLive,at,publishExpiryPrice} from './helpers/scenarios.js';
-import {UNWIND_TYPES} from '../scripts/operator.mjs';
+import {proposeUnwind} from './helpers/unwind.js';
 const connection=await network.create();const {ethers,networkHelpers}=connection;
 describe('cross-module callbacks and reserve invariants',function(){
  const fixture=async()=>{const c=await deployIvy(connection);await c.hub.setTransfersEnabled(true);return c;};
@@ -11,10 +11,7 @@ describe('cross-module callbacks and reserve invariants',function(){
   const v=await openVault(c,{pair:{premiumToken:await token.getAddress()}});
   await token.mint(c.marketMaker.address,1000n*U);await token.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
   await activate(c,v.vaultId,v.vaultAddress);
-  await c.hub.connect(c.alice).proposeUnwind(v.vaultId,BigInt(await networkHelpers.time.latest())+86400n,100n*U);
-  const a=await c.unwind.agreements(v.vaultId);
-  const value={vaultId:a.vaultId,nonce:a.nonce,deadline:a.deadline,exercisedNotional:a.exercisedNotional,supply:a.supply,refund:a.refund};
-  const sig=await c.marketMaker.signTypedData({name:'IvyUnwind',version:'1',chainId:(await ethers.provider.getNetwork()).chainId,verifyingContract:await c.unwind.getAddress()},UNWIND_TYPES,value);
+  const {agreement:a,signature:sig}=await proposeUnwind(c,v.vaultId,BigInt(await networkHelpers.time.latest())+86400n,100n*U);
   await c.hub.connect(c.alice).approveUnwind(v.vaultId,a.nonce);
   await token.mint(c.alice.address,a.refund);await token.connect(c.alice).approve(v.vaultAddress,a.refund);
   await c.shares.connect(c.alice).setApprovalForAll(await token.getAddress(),true);

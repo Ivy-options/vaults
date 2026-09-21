@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { network } from 'hardhat';
 import { ZeroAddress } from 'ethers';
-import { UNWIND_TYPES } from '../scripts/operator.mjs';
+import { proposeUnwind, signUnwindProposal } from './helpers/unwind.js';
 import { callTerms, callPairs, deployIvy, fund, WETH_UNIT as W, USDC_UNIT as U } from './helpers/setup.js';
 import { at, openVault, goLive, makeBid } from './helpers/scenarios.js';
 import { signBid } from './helpers/bids.js';
@@ -23,12 +23,24 @@ describe('contract buyers and admission boundaries', function () {
     await wallet.connect(c.marketMaker).execute(c.hubAddress, c.hub.interface.encodeFunctionData('setExecution', [v.vaultId, ZeroAddress, c.carol.address]));
     expect((await c.hub.stateOf(v.vaultId)).executor).eq(ZeroAddress);
     const deadline = BigInt(await networkHelpers.time.latest()) + 1000n;
-    await c.hub.connect(c.alice).proposeUnwind(v.vaultId, deadline, 0);
+    const {agreement:a,signature} = await signUnwindProposal(c, v.vaultId, deadline, 100n * U);
+    await wallet.connect(c.marketMaker).setSignaturesEnabled(false);
+    await expect(c.hub.connect(c.alice).proposeUnwind(v.vaultId, deadline, a.refund, signature)).revertedWithCustomError(c.unwind, 'BadSignature');
+    await wallet.connect(c.marketMaker).setSignaturesEnabled(true);
+    await c.hub.connect(c.alice).proposeUnwind(v.vaultId, deadline, a.refund, signature);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId, 1);
-    const a = await c.unwind.agreements(v.vaultId);
-    const value = { vaultId: a.vaultId, nonce: a.nonce, deadline: a.deadline, exercisedNotional: a.exercisedNotional, supply: a.supply, refund: a.refund };
-    const signature = await c.marketMaker.signTypedData({ name: 'IvyUnwind', version: '1', chainId: (await c.admin.provider!.getNetwork()).chainId, verifyingContract: await c.unwind.getAddress() }, UNWIND_TYPES, value);
+    await fund(c, c.usdc, c.alice, v.vaultAddress, a.refund);
+    await c.hub.connect(c.alice).fundUnwind(v.vaultId, a.nonce, a.refund);
+    await wallet.connect(c.marketMaker).setSignaturesEnabled(false);
+    await expect(c.hub.connect(c.carol).executeUnwind(v.vaultId, a.nonce, signature)).revertedWithCustomError(c.unwind, 'BadSignature');
+    await expect(c.hub.connect(c.alice).withdrawUnwindContribution(v.vaultId, a.nonce)).changeTokenBalance(c.ethers, c.usdc, c.alice, a.refund);
+    await wallet.connect(c.marketMaker).setSignaturesEnabled(true);
+    await c.usdc.connect(c.alice).approve(v.vaultAddress, a.refund);
+    await c.hub.connect(c.alice).fundUnwind(v.vaultId, a.nonce, a.refund);
+    await c.hub.connect(c.alice).approveUnwind(v.vaultId, a.nonce);
     await c.hub.connect(c.carol).executeUnwind(v.vaultId, a.nonce, signature);
+    await wallet.connect(c.marketMaker).execute(c.hubAddress, c.hub.interface.encodeFunctionData('claimPayout', [v.vaultId]));
+    expect(await c.usdc.balanceOf(c.carol.address)).eq(a.refund);
     await c.hub.connect(c.alice).claim(v.vaultId, 10n * W);
     await c.hub.connect(c.alice).claimPremium(v.vaultId);
     expect(await c.usdc.balanceOf(v.vaultAddress)).eq(0n);
@@ -51,7 +63,7 @@ describe('contract buyers and admission boundaries', function () {
   });
   it('invalidates an agreement when normal settlement wins the race, without consuming the sponsor refund', async function () {
     const c = await networkHelpers.loadFixture(fixture), v = await goLive(c);
-    await c.hub.connect(c.alice).proposeUnwind(v.vaultId, v.bid.expiry + 7200n, 100n * U);
+    await proposeUnwind(c, v.vaultId, v.bid.expiry + 7200n, 100n * U);
     await c.hub.connect(c.alice).approveUnwind(v.vaultId, 1);
     await fund(c, c.usdc, c.carol, v.vaultAddress, 100n * U);
     await at(c, v.bid.expiry + 3600n);

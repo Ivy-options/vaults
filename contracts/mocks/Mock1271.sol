@@ -5,6 +5,7 @@ import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/Signa
 
 contract Mock1271 {
     address public immutable owner;
+    bool public signaturesEnabled = true;
 
     constructor(address owner_) {
         owner = owner_;
@@ -19,7 +20,14 @@ contract Mock1271 {
         }
     }
 
+    function setSignaturesEnabled(bool enabled) external {
+        require(msg.sender == owner);
+        signaturesEnabled = enabled;
+    }
+
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
-        return SignatureChecker.isValidSignatureNow(owner, hash, signature) ? bytes4(0x1626ba7e) : bytes4(0xffffffff);
+        return signaturesEnabled && SignatureChecker.isValidSignatureNow(owner, hash, signature)
+            ? bytes4(0x1626ba7e)
+            : bytes4(0xffffffff);
     }
 }

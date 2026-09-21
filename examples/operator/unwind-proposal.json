@@ -1,4 +1,5 @@
 {
   "rpc": "http://127.0.0.1:8545", "sender": "OWNER_OR_BUYER_ADDRESS", "hub": "HUB_ADDRESS", "vaultId": "1",
-  "deadline": "FUTURE_UNIX_SECONDS", "refund": "100000000"
+  "deadline": "FUTURE_UNIX_SECONDS", "refund": "100000000",
+  "buyerSignature": "BUYER_SIGNATURE_FROM_TYPED_UNWIND_PROPOSAL"
 }

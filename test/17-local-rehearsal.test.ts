@@ -121,8 +121,12 @@ describe('local operator rehearsal', function () {
     expect((await hub.termsOf(call)).publicDeposits).eq(false);
     await op('claim-premium', owner, { vaultId: call });
     expect(await premiums.claimable(call, owner.address)).eq(0n);
-    await op('propose-unwind', buyer, { vaultId: put, deadline: expiry, refund: 100n * U });
-    const agreement = await typed('typed-unwind', buyer, { vaultId: put });
+    const agreement = await typed('typed-unwind-proposal', buyer, { vaultId: put, deadline: expiry, refund: 100n * U });
+    await rejects(op('propose-unwind', buyer, { vaultId: put, deadline: expiry, refund: 100n * U }), /Missing buyerSignature/);
+    await op('propose-unwind', buyer, { vaultId: put, deadline: expiry, refund: 100n * U, buyerSignature: agreement.signature });
+    await rejects(op('propose-unwind', owner, { vaultId: put, deadline: expiry, refund: 100n * U, buyerSignature: agreement.signature }));
+    const stored = await typed('typed-unwind', buyer, { vaultId: put });
+    expect(stored.value).deep.eq(agreement.value);
     for (const signer of [owner, lp]) await op('approve-unwind', signer, { vaultId: put, nonce: agreement.value.nonce });
     for (const [signer, amount] of [[owner,60n*U],[lp,40n*U]] as const) {
       await usdc.mint(signer.address,amount);

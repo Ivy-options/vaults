@@ -66,17 +66,24 @@ contract IvyUnwind is EIP712 {
         shares = shares_;
     }
 
-    function propose(uint256 id, uint64 deadline, uint256 exercised, uint256 supply, uint256 refund) external onlyHub {
-        if (deadline <= block.timestamp || supply == 0) {
-            revert AgreementInvalid();
+    function propose(
+        uint256 id,
+        uint64 deadline,
+        uint256 exercised,
+        uint256 supply,
+        uint256 refund,
+        address buyer,
+        bytes calldata signature
+    ) external onlyHub {
+        (UnwindAgreement memory a, bytes32 digest) = preview(id, deadline, exercised, supply, refund);
+        if (!SignatureChecker.isValidSignatureNow(buyer, digest, signature)) {
+            revert BadSignature();
         }
-        uint256 nonce = agreements[id].nonce + 1;
-        UnwindAgreement memory a = UnwindAgreement(id, nonce, deadline, exercised, supply, refund);
         agreements[id] = a;
         approvedShares[id] = 0;
         fundedShares[id] = 0;
         approvedRequired[id] = 0;
-        emit Proposed(id, nonce, hashAgreement(a), deadline, exercised, supply, refund);
+        emit Proposed(id, a.nonce, digest, deadline, exercised, supply, refund);
     }
 
     function approve(uint256 id, uint256 nonce, address holder, uint256 balance) external onlyHub {
@@ -195,6 +202,19 @@ contract IvyUnwind is EIP712 {
 
     function refundOf(uint256 id) external view returns (uint256) {
         return agreements[id].refund;
+    }
+
+    /// @notice Construct the next proposal without changing consent or funding.
+    function preview(uint256 id, uint64 deadline, uint256 exercised, uint256 supply, uint256 refund)
+        public
+        view
+        returns (UnwindAgreement memory a, bytes32 digest)
+    {
+        if (deadline <= block.timestamp || supply == 0) {
+            revert AgreementInvalid();
+        }
+        a = UnwindAgreement(id, agreements[id].nonce + 1, deadline, exercised, supply, refund);
+        digest = hashAgreement(a);
     }
 
     function hashAgreement(UnwindAgreement memory a) public view returns (bytes32) {
