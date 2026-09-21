@@ -5,10 +5,13 @@
 
 /* Before mount (no JS) the page is a normal scrollable document. Mount adds
    body.map-ready, which switches to the full-screen map; body.map-ready.reading
-   switches back to a scrollable #document within the fixed viewport. */
+   switches back to a scrollable #document within the fixed viewport. #map and
+   #document both live inside #panel-map, one of the two view panels the app
+   shell stacks in #views (see shell.css) alongside #panel-guide — the map
+   itself doesn't know it now shares the page with the guide iframe. */
 html:has(body.map-ready) { height: 100%; overflow: hidden; }
 body.map-ready { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
-body.map-ready #map { display: block; flex: 1 1 auto; }
+body.map-ready #map { display: block; flex: 1 1 auto; min-height: 0; }
 body.map-ready #toolbar { display: flex; }
 body.map-ready #document { display: none; }
 

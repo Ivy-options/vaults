@@ -510,6 +510,12 @@
       else zoomBy(b.dataset.zoom === "+" ? 1.5 : 1 / 1.5);
     });
     document.addEventListener("keydown", (e) => {
+      // The app shell (shell.js) marks body[data-mode="guide"] while the
+      // Guide view is showing. #map is inert then, which already stops
+      // clicks and keydowns targeted at it, but this listener is on
+      // document, so a key pressed while focus sits on shell chrome (e.g.
+      // the mode toggle itself) would otherwise still reach the camera.
+      if (document.body.dataset.mode === "guide") return;
       if (e.target.closest("input, textarea, select")) return;
       if (e.key === "Escape") zoomOut();
       if (e.key === "+" || e.key === "=") zoomBy(1.5);

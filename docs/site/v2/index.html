@@ -11,12 +11,14 @@
   <link rel="stylesheet" href="../assets/roman.css">
   <link rel="stylesheet" href="../assets/labs.css">
   <link rel="stylesheet" href="../assets/map.css">
+  <link rel="stylesheet" href="../assets/shell.css">
   <script src="../assets/labs.js" defer></script>
   <script src="../assets/map.js" defer></script>
+  <script src="../assets/shell.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#map">Skip to content</a>
-  <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol map"><img src="../assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Protocol map · experimental — <a href="../index.html">classic guide</a></span><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
+  <header class="topbar"><a class="brand" href="index.html" aria-label="Ivy Vaults protocol map"><img src="../assets/ivy-logo.png" alt="" width="23" height="34">Ivy <span>Vaults</span></a><span class="breadcrumb">Documentation / Protocol map · experimental</span><div class="mode-toggle" id="modeToggle" role="tablist" aria-label="View mode"><span class="mode-toggle-thumb" id="modeThumb" aria-hidden="true"></span><button type="button" class="mode-toggle-tab" id="mode-tab-map" role="tab" aria-selected="true" aria-controls="panel-map" tabindex="0"><svg class="mode-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>Map</button><button type="button" class="mode-toggle-tab" id="mode-tab-guide" role="tab" aria-selected="false" aria-controls="panel-guide" tabindex="-1"><svg class="mode-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>Guide</button></div><button class="theme" id="themeToggle" type="button" aria-label="Switch colour theme">Theme</button></header>
   <div class="toolbar" id="toolbar">
     <nav id="crumbs" aria-label="Where you are"></nav>
     <form id="search" role="search"><input type="search" id="search-input" placeholder="Search the map" aria-label="Search the map" autocomplete="off"><ul id="search-results" hidden></ul></form>
@@ -28,8 +30,10 @@
       <button type="button" id="reading-toggle" aria-pressed="false">Reading view</button>
     </div>
   </div>
-  <div id="map" tabindex="0" aria-label="Lifecycle map"><div id="world"></div></div>
-  <main id="document" class="content doc-page"><article>
+  <div id="views">
+    <div id="panel-map" class="view-panel" role="tabpanel" aria-labelledby="mode-tab-map" tabindex="-1">
+      <div id="map" tabindex="0" aria-label="Lifecycle map"><div id="world"></div></div>
+      <main id="document" class="content doc-page"><article>
     <h1>Ivy Vaults</h1>
     <section data-kind="root" id="a-vaults-life" data-tagline="One smart contract, one option trade, start to finish.">
       <h2>A vault's life</h2>
@@ -666,6 +670,9 @@ function settlementPrice(uint256 vaultId)
       </section>
     </section>
   </article></main>
+    </div>
+    <div id="panel-guide" class="view-panel" role="tabpanel" aria-labelledby="mode-tab-guide" tabindex="-1"></div>
+  </div>
   <footer><a href="../index.html">Classic guide</a> · <a href="../license.html">License · BUSL-1.1</a></footer>
 </body>
 </html>

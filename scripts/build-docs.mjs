@@ -141,6 +141,7 @@ export function buildDocs({ check = false } = {}) {
   <link rel="stylesheet" href="assets/atlas.css">
   <link rel="stylesheet" href="assets/roman.css">
   <script src="assets/reference.js" defer></script>
+  <script src="assets/embed.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
