@@ -26,7 +26,7 @@
   <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
 <p>Smart contracts for single-use covered-call and cash-secured-put vaults.</p>
 <h2 id="read-the-guide">Read the guide</h2>
-<p>Start with the <a href="index.html">HTML protocol guide</a> for how vaults work and interactive examples. For deployment and transaction commands, see the <a href="operations.html">operator runbook</a>. There is also an experimental <a href="v2/index.html">protocol map</a>, a single zoomable page covering the same lifecycle — linked from the guide, still finding its footing alongside it.</p>
+<p>Start with the <a href="index.html">HTML protocol guide</a> for how vaults work and interactive examples. The documentation opens in Guide view; use the Guide / Map toggle to explore the lifecycle spatially.</p>
 <p>Open <code>docs/site/index.html</code> directly in your browser. To serve the docs locally, run this from the repository root:</p>
 <pre><code class="language-sh">python3 -m http.server 8000 --bind 127.0.0.1 --directory docs/site
 </code></pre>
@@ -64,7 +64,7 @@ npm run format:solidity:check
 npm run docs:check
 npm run docs:test
 </code></pre>
-<p><code>docs:check</code> and <code>docs:test</code> cover both the guide and the experimental map in <code>docs/site/v2/</code>.</p>
+<p><code>docs:check</code> and <code>docs:test</code> cover Guide and Map modes in <code>docs/site/index.html</code>.</p>
 <h2 id="license">License</h2>
 <p><strong>Business Source License 1.1 (BUSL-1.1).</strong> Copying, modification,
 redistribution, and non-production use are permitted under the <a href="license.html">license</a>.

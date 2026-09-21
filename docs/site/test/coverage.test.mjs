@@ -6,7 +6,7 @@ import { REQUIRED } from "./required-anchors.mjs";
 
 test("every old anchor resolves, every moment has one summary paragraph, no tile overflows", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => IvyMap.mounted);
     const missing = await page.evaluate((ids) => ids.filter((id) => !IvyMap.resolveHash("#" + id)), REQUIRED);

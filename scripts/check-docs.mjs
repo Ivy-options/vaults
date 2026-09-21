@@ -7,10 +7,11 @@ import { buildDocs } from "./build-docs.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pagePath = resolve(root, "docs/site/index.html");
+const guidePagePath = resolve(root, "docs/site/guide.html");
 const v2PagePath = resolve(root, "docs/site/v2/index.html");
 const site = dirname(pagePath);
 const generated = buildDocs({ check: true });
-// The map (docs/site/v2/index.html) aliases old deep links to a node id at
+// The map (docs/site/index.html?view=map) aliases old deep links to a node id at
 // runtime (IvyMap.ALIASES in assets/map.js) rather than exposing them as DOM
 // ids, so parse the keys out of that object literal for the anchor check below.
 const mapJs = readFileSync(resolve(site, "assets/map.js"), "utf8");
@@ -23,7 +24,7 @@ const mapAliasKeys = new Set(
 );
 
 // Reference pages are hand-maintained HTML; check every page in the site,
-// including the experimental map under v2/ (readdirSync below is not
+// including the legacy redirect under v2/ (readdirSync below is not
 // recursive, so it is listed explicitly).
 const pages = [
   ...new Set([
@@ -53,7 +54,8 @@ for (const path of pages) {
   for (const [, url] of content.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
     assert.ok(!/^(?:https?:)?\/\//.test(url), `Page must work offline: ${url}`);
     assert.ok(!/\.md(?:$|#|\?)/i.test(url), `Markdown link: ${path}: ${url}`);
-    const [target, anchor] = url.split("#");
+    const [address, anchor] = url.split("#");
+    const target = address.split("?")[0];
     const destination = target
       ? resolve(dirname(path), decodeURIComponent(target))
       : path;
@@ -65,11 +67,12 @@ for (const path of pages) {
     if (anchor) {
       const decodedAnchor = decodeURIComponent(anchor);
       // A deep link into the map resolves at runtime through IvyMap.ALIASES
-      // (assets/map.js), not through a DOM id, so an anchor on v2/index.html
-      // is valid if it is either a real id or a key of that alias table.
+      // (assets/map.js). The index also hosts Guide anchors in its frame;
+      // both sets of anchors are valid public destinations.
       const ok =
         pageIds.get(destination)?.includes(decodedAnchor) ||
-        (destination === v2PagePath && mapAliasKeys.has(decodedAnchor));
+        ([pagePath, v2PagePath].includes(destination) &&
+          (mapAliasKeys.has(decodedAnchor) || pageIds.get(guidePagePath).includes(decodedAnchor)));
       assert.ok(ok, `Missing anchor: ${path}: ${url}`);
     }
   }
@@ -179,7 +182,7 @@ function verifyPayoffCalculator(elements, update) {
 // The classic guide: docs.js reads inputs through document.getElementById
 // and writes results back the same way.
 {
-  const ids = pageIds.get(pagePath);
+  const ids = pageIds.get(guidePagePath);
   const elements = makeElements(ids);
   const inputCallbacks = {};
   for (const id of CALC_INPUT_IDS) {
@@ -213,12 +216,14 @@ function verifyPayoffCalculator(elements, update) {
   });
 }
 
-// The experimental map: labs.js reads inputs through a scoped querySelector
+// Reusable labs: the payoff widget lives in the labs fixture, not the curated map.
+// labs.js reads inputs through a scoped querySelector
 // (IvyLabs.mountAll normally scopes it to one lab card) and window is
 // self-referential, as in a real browser, so its closing `window.IvyLabs =
 // {...}` also defines the bare `IvyLabs` global used below.
 {
-  const ids = pageIds.get(v2PagePath);
+  const fixture = readFileSync(resolve(site, "test/fixtures/labs.html"), "utf8");
+  const ids = [...fixture.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
   const elements = makeElements(ids);
   const inputCallbacks = {};
   for (const id of CALC_INPUT_IDS) {

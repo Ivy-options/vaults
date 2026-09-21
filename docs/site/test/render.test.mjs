@@ -23,7 +23,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
     }));
     assert.equal(counts.cards, 13);
     assert.ok(counts.lines > 5);
-    assert.deepEqual(counts.actionTiers, ["0", "1", "2", "3"]);
+    assert.deepEqual(counts.actionTiers, ["0", "1", "2"]);
     assert.deepEqual(counts.tileTiers, ["0", "2", "3"]);
     assert.equal(counts.badge, "LP");
     assert.ok(counts.watermark, "portrait is a watermark");
@@ -32,8 +32,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
     assert.match(counts.headerVar, /^\d+px$/);
     assert.ok(counts.dim);
     assert.ok(counts.lab, "lab content moved into the card");
-    // A card must never show the same text at two consecutive tiers: tier 3 must drop
-    // information rather than merely resize tier 2's text.
+    // Layers reveal new information; zooming closer keeps an explanation readable.
     const tierPairs = await page.evaluate(() =>
       [...document.querySelectorAll("#world .card")].map((card) => {
         const t2 = card.querySelector(':scope > [data-tier="2"]');
@@ -78,7 +77,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
 
 test("a lab card is sized to its mounted widget and fits every actor route", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => IvyMap.mounted);
     for (const lod of [2, 3]) {

@@ -4,7 +4,7 @@ Smart contracts for single-use covered-call and cash-secured-put vaults.
 
 ## Read the guide
 
-Start with the [HTML protocol guide](docs/site/index.html) for how vaults work and interactive examples. For deployment and transaction commands, see the [operator runbook](docs/site/operations.html). There is also an experimental [protocol map](docs/site/v2/index.html), a single zoomable page covering the same lifecycle — linked from the guide, still finding its footing alongside it.
+Start with the [HTML protocol guide](docs/site/index.html) for how vaults work and interactive examples. The documentation opens in Guide view; use the Guide / Map toggle to explore the lifecycle spatially.
 
 Open `docs/site/index.html` directly in your browser. To serve the docs locally, run this from the repository root:
 
@@ -65,7 +65,7 @@ npm run docs:check
 npm run docs:test
 ```
 
-`docs:check` and `docs:test` cover both the guide and the experimental map in `docs/site/v2/`.
+`docs:check` and `docs:test` cover Guide and Map modes in `docs/site/index.html`.
 
 ## License
 

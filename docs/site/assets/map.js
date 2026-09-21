@@ -16,7 +16,7 @@
       // A <section> that never got a data-kind is invisible to the
       // ":scope > section[data-kind]" walk below, so without this check its
       // whole subtree would silently vanish from the map while staying
-      // visible in the reading view — the same class of authoring mistake as
+      // visible in the fallback document — the same class of authoring mistake as
       // an unknown kind or a missing id, so it gets the same treatment.
       if (kind === undefined) throw new Error(`Section without data-kind under ${parent?.id ?? "root"}`);
       if (!KINDS.includes(kind)) throw new Error(`Unknown data-kind on #${el.id}`);
@@ -89,8 +89,8 @@
         if (custody) Object.assign(custody, { x: st.x + G.station[0] + G.gap, y: y0, w: G.custody[0], h: G.custody[1] });
         let colBottom = y0 + G.station[1];
         moments.forEach((m, j) => {
-          Object.assign(m, { x: rowX + j * (G.moment[0] + G.gap), y: y0 + G.momentY, w: G.moment[0], h: G.moment[1] });
-          let ay = y0 + G.actionY;
+          Object.assign(m, { x: rowX + j * (G.moment[0] + G.gap), y: y0 + G.momentY, w: G.moment[0], h: Math.max(G.moment[1], measure(m)) });
+          let ay = Math.max(y0 + G.actionY, m.y + m.h + G.gap);
           m.children.filter((c) => c.kind === "action").forEach((a) => {
             const headerH = Math.max(96, measure(a));
             Object.assign(a, { x: m.x, y: ay, w: G.action[0], headerH });
@@ -172,8 +172,7 @@
   const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
   /* ---------- Tier layers per kind ----------
-     A card must never show the same text at two consecutive tiers: each tier
-     adds or removes information rather than just resizing it. */
+     Zoom reveals explanations and details, then keeps them readable. */
   function layersFor(n) {
     const t = esc(n.label), when = n.when ? `<span class="when">${esc(n.when)}</span>` : "";
     switch (n.kind) {
@@ -181,15 +180,14 @@
         return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p class="tagline">${esc(n.tagline)}</p><div class="body">${n.bodyHtml}</div>` };
       case "station": {
         const count = n.children.filter((c) => c.kind === "moment").length;
-        return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p>${esc(n.tagline)}</p><small>${count} ${n.band === "shelf" ? "topics" : "moments"} · zoom in</small>`, 3: `<h2 class="compact">${t}</h2>` };
+        return { 0: `<h2>${t}</h2>`, 1: `<h2>${t}</h2><p>${esc(n.tagline)}</p><small>${count} ${n.band === "shelf" ? "topics" : "moments"} · zoom in</small>` };
       }
       case "moment":
-        return { 0: `<h3>${t}</h3>`, 2: `${when}<h3>${t}</h3><p>${esc(n.summary)}</p>`, 3: `${when}<h3>${t}</h3>` };
+        return { 0: `<h3>${t}</h3>`, 2: `${when}<h3>${t}</h3><p>${esc(n.summary)}</p>` };
       case "action": {
         const head = n.actor ? badge(n) : "";
         const more = n.children.length ? `<small>${n.children.length} details · zoom in</small>` : "";
-        const layers = { 0: head || `<h4>${t}</h4>`, 1: `${head}<h4>${t}</h4>`, 2: `${head}<h4>${t}</h4><p>${esc(n.summary)}</p>${more}` };
-        if (n.children.length) layers[3] = `${head}<h4>${t}</h4>`; // the parent recedes to a badge + title only while its tiles are being read
+        const layers = { 0: head || `<h4>${t}</h4>`, 1: `${head}<h4>${t}</h4>`, 2: `${head}<h4>${t}</h4><div class="action-body">${n.bodyHtml}</div>${more}` };
         return layers;
       }
       case "tile": {
@@ -230,14 +228,18 @@
       worldEl.append(el);
     });
   }
-  let currentLod = -1;
+  let currentLod = -1, shownTarget = null;
   function setLod(lod, worldEl = $("#world")) {
-    if (lod === currentLod) return;
+    const target = M?.revealed?.id || null;
+    if (lod === currentLod && target === shownTarget) return;
     currentLod = lod;
+    shownTarget = target;
     worldEl.dataset.lod = lod;
     $$(".card", worldEl).forEach((el) => {
       const tiers = el.dataset.tiers.split(",").map(Number);
-      el.dataset.show = String(Math.max(-1, ...tiers.filter((t) => t <= lod)));
+      const selectedTier = { root: 1, station: 1, moment: 2, action: 2, lab: 2, custody: 2, tile: 3 };
+      const detail = el.dataset.id === target ? Math.max(lod, selectedTier[el.dataset.kind]) : lod;
+      el.dataset.show = String(Math.max(-1, ...tiers.filter((t) => t <= detail)));
     });
   }
 
@@ -258,13 +260,14 @@
       return h;
     };
     return (n) => {
+      if (n.kind === "moment") return heightOf(n, 2, G.moment[0]);
       if (n.kind === "action") return Math.max(heightOf(n, 2, G.action[0]), heightOf(n, 3, G.action[0]));
       return heightOf(n, n.kind === "lab" ? 2 : 3, spanW(n.kind === "lab" ? 2 : n.span));
     };
   }
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const MAX = 3.2;
+  const MAX = 16, DETAIL_SCALE = 3.2, ZOOM_STEP = 1.2;
   let M = null; // mounted state: { tree, world, worldEl, mapEl, cam, W, H }
 
   function mount() {
@@ -281,10 +284,10 @@
     // Labs live in the cards now; the document keeps a placeholder so it still reads without JS.
     tree.nodes.filter((n) => n.kind === "lab").forEach((n) => { n.source.querySelectorAll(":scope > *:not(h5)").forEach((c) => c.remove()); });
     if (window.IvyLabs?.mountAll) window.IvyLabs.mountAll(worldEl);
-    M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height, atHome: true };
+    M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height, atHome: true, target: null, revealed: null };
     wireInput();
     wireSearch(); wireKeys(); wireTouch(); wireChrome();
-    followHash(false);
+    document.body.dataset.mode === "guide" ? home(false) : followHash(false);
     addEventListener("hashchange", () => followHash(true));
     return M;
   }
@@ -302,7 +305,6 @@
     const { cam, worldEl } = M;
     worldEl.style.transition = animate && !reduced() ? "" : "none";
     worldEl.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.s})`;
-    if (!(animate && !reduced())) requestAnimationFrame(() => (worldEl.style.transition = ""));
     setLod(lodOf(cam.s), worldEl);
     // Recorded now, with the viewport size as it is at this exact moment,
     // because a "resize" event fires only after the browser has already
@@ -318,7 +320,7 @@
   // Frame a world rect. minS forces at least that zoom so the next tier is readable.
   function fly(x, y, w, h, minS = 0, pad = 40, animate = true) {
     const both = Math.min(vw() / (w + pad * 2), vh() / (h + pad * 2));
-    const s = clamp(Math.max(both, minS), homeScale(), MAX);
+    const s = clamp(Math.max(both, minS), homeScale(), DETAIL_SCALE);
     const fits = (h + pad * 2) * s <= vh();
     M.cam = { s, x: vw() / 2 - (x + w / 2) * s, y: fits ? vh() / 2 - (y + h / 2) * s : (pad - y + 40) * s };
     clampCam();
@@ -330,19 +332,25 @@
   // width-bound map, so a scale computed via fly() never exactly equals
   // homeScale() and here()'s "am I at the fit view" gate never fires.
   function home(animate = true) {
+    M.target = null;
+    M.revealed = null;
     const s = homeScale();
     M.cam = { s, x: (vw() - M.W * s) / 2, y: (vh() - M.H * s) / 2 };
     clampCam();
     apply(animate);
   }
   function flyToNode(n, animate = true) {
+    M.target = n;
+    M.revealed = n;
+    focused = n;
+    const readableScale = (desired) => Math.min(desired, (vw() - 24) / n.w);
     if (n.kind === "root") return fly(n.x, n.y, n.w, n.h, 0.6, 40, animate);
     if (n.kind === "station") return fly(n.column.x, n.y - 60, n.column.w, n.column.h + 60, 0.62, 40, animate);
-    if (n.kind === "moment") return fly(n.x, n.y - 40, n.w, (n.bottom ?? n.y + n.h) - n.y + 40, 1.2, 40, animate);
-    if (n.kind === "action") return fly(n.x, n.y, n.w, n.h, n.children.length ? 2.5 : 1.3, 40, animate);
+    if (n.kind === "moment") return fly(n.x, n.y - 40, n.w, (n.bottom ?? n.y + n.h) - n.y + 40, readableScale(1.2), 12, animate);
+    if (n.kind === "action") return fly(n.x, n.y, n.w, n.h, readableScale(n.children.length ? 2.5 : 1.3), 12, animate);
     if (n.kind === "custody") return fly(n.x, n.y, n.w, n.h, 1.3, 40, animate);
-    if (n.kind === "lab") return fly(n.x, n.y, n.w, n.h, 1.2, 40, animate);
-    return fly(n.x, n.y, n.w, n.h, MAX, 40, animate);
+    if (n.kind === "lab") return fly(n.x, n.y, n.w, n.h, readableScale(1.2), 12, animate);
+    return fly(n.x, n.y, n.w, n.h, readableScale(DETAIL_SCALE), 12, animate);
   }
   const flyTo = (id, animate = true) => { const n = M.tree.byId.get(id); if (n) flyToNode(n, animate); return !!n; };
 
@@ -359,6 +367,12 @@
     // so a fixed 1e-6 absolute margin is meaningless noise either way, but a
     // relative margin scales with whatever the fit scale actually is.
     if (cam.s <= homeScale() * (1 + 1e-6)) return path;
+    // Explicit navigation names the selected card, even if a narrow viewport
+    // frames its header above the centre. Gestures release this selection.
+    if (M.target) {
+      for (let node = M.target; node; node = node.parent) path.unshift(node);
+      return path;
+    }
     const station = tree.nodes.find((n) => n.kind === "station" && cx >= n.column.x && cx < n.column.x + n.column.w && cy >= n.y - 80 && cy <= n.y + n.column.h + 80);
     if (!station) {
       // Not over any station: the root (the apex above the whole timeline) is
@@ -412,8 +426,12 @@
       if (i === items.length - 1) btn.setAttribute("aria-current", "location");
       else btn.removeAttribute("aria-current");
     });
-    const level = $("#zoom-level");
-    if (level) level.textContent = `${Math.round(M.cam.s * 100)}%`;
+    paintZoom();
+  }
+  function paintZoom() {
+    if (document.body.dataset.mode === "guide") return;
+    const level = $("#zoom-level"), scale = M.cam.s;
+    if (level) level[level.tagName === "INPUT" ? "value" : "textContent"] = `${Math.round(scale * 100)}%`;
   }
   function zoomOut() {
     const path = here();
@@ -429,14 +447,30 @@
     }
     flyToNode(path[path.length - 2]);
   }
-  function zoomBy(f) {
+  // A gesture takes over the picture currently on screen, not the stored
+  // destination of a CSS camera flight that may still be in progress.
+  function interruptMotion() {
+    if (!M.worldEl.getAnimations().some((animation) => animation.transitionProperty === "transform" && animation.playState === "running")) return;
+    const matrix = new DOMMatrix(getComputedStyle(M.worldEl).transform);
+    M.cam = { x: matrix.e, y: matrix.f, s: matrix.a };
+    M.worldEl.style.transition = "none";
+    M.worldEl.style.transform = `translate(${matrix.e}px, ${matrix.f}px) scale(${matrix.a})`;
+  }
+  function zoomTo(scale) {
+    if (!Number.isFinite(scale) || scale <= 0) return paintZoom();
+    interruptMotion();
+    M.target = null;
     const { cam } = M, px = vw() / 2, py = vh() / 2;
-    const ns = clamp(cam.s * f, homeScale(), MAX);
+    const ns = clamp(scale, homeScale(), MAX);
     cam.x = px - (px - cam.x) * (ns / cam.s);
     cam.y = py - (py - cam.y) * (ns / cam.s);
     cam.s = ns;
     clampCam();
-    apply(true);
+    apply(false);
+  }
+  function zoomBy(f) {
+    interruptMotion();
+    zoomTo(M.cam.s * f);
   }
 
   /* ---------- Input ---------- */
@@ -450,9 +484,21 @@
     const { mapEl } = M;
     mapEl.addEventListener("wheel", (e) => {
       e.preventDefault();
+      interruptMotion();
+      M.target = null;
       const r = mapEl.getBoundingClientRect(), { cam } = M;
       const px = e.clientX - r.left, py = e.clientY - r.top;
-      const ns = clamp(cam.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), homeScale(), MAX);
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? vh() : 1;
+      if (!e.ctrlKey && !e.metaKey) {
+        cam.x -= e.deltaX * unit;
+        cam.y -= e.deltaY * unit;
+        clampCam();
+        apply(false);
+        return;
+      }
+      // Keep fine input gentle and cap coarse mouse-wheel notches.
+      const zoomDelta = clamp(-e.deltaY * unit * 0.002, -0.1, 0.1);
+      const ns = clamp(cam.s * Math.exp(zoomDelta), homeScale(), MAX);
       cam.x = px - (px - cam.x) * (ns / cam.s);
       cam.y = py - (py - cam.y) * (ns / cam.s);
       cam.s = ns;
@@ -462,6 +508,7 @@
     }, { passive: false });
     let drag = null, swallowClick = false;
     mapEl.addEventListener("pointerdown", (e) => {
+      interruptMotion();
       if (e.pointerType === "touch") {
         touchPts.set(e.pointerId, e);
         // A second finger starts a pinch, not a drag: drop any drag in
@@ -478,6 +525,7 @@
       if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
       if (!drag.moved) mapEl.setPointerCapture(drag.id); // capture only once it is really a drag, so plain clicks keep their target
       drag.moved = true;
+      M.target = null;
       mapEl.classList.add("dragging");
       M.cam.x = drag.cx + dx; M.cam.y = drag.cy + dy;
       clampCam();
@@ -503,11 +551,21 @@
       document.body.classList.add("touched");
     });
     document.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-fly], [data-home], [data-zoom]");
+      if (document.body.dataset.mode === "guide") return;
+      const b = e.target.closest("[data-fly], [data-home], [data-zoom], [data-reset-zoom]");
       if (!b) return;
       if (b.dataset.home !== undefined) home();
       else if (b.dataset.fly !== undefined) flyTo(b.dataset.fly);
-      else zoomBy(b.dataset.zoom === "+" ? 1.5 : 1 / 1.5);
+      else if (b.dataset.resetZoom !== undefined) zoomTo(1);
+      else zoomBy(b.dataset.zoom === "+" ? ZOOM_STEP : 1 / ZOOM_STEP);
+    });
+    const level = $("#zoom-level");
+    level?.addEventListener("change", () => {
+      if (document.body.dataset.mode !== "guide") zoomTo(Number(level.value.trim().replace(/%$/, "")) / 100);
+    });
+    level?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); level.blur(); }
+      if (e.key === "Escape" && document.body.dataset.mode !== "guide") { paintZoom(); level.blur(); }
     });
     document.addEventListener("keydown", (e) => {
       // The app shell (shell.js) marks body[data-mode="guide"] while the
@@ -515,11 +573,19 @@
       // clicks and keydowns targeted at it, but this listener is on
       // document, so a key pressed while focus sits on shell chrome (e.g.
       // the mode toggle itself) would otherwise still reach the camera.
-      if (document.body.dataset.mode === "guide") return;
+      if (document.body.dataset.mode === "guide" || e.altKey) return;
+      if (e.metaKey || e.ctrlKey) {
+        if (["+", "=", "-", "0"].includes(e.key)) {
+          e.preventDefault(); // One zoom owner: never scale the browser and map together.
+          if (e.key === "0") zoomTo(1);
+          else zoomBy(e.key === "-" ? 1 / ZOOM_STEP : ZOOM_STEP);
+        }
+        return;
+      }
       if (e.target.closest("input, textarea, select")) return;
       if (e.key === "Escape") zoomOut();
-      if (e.key === "+" || e.key === "=") zoomBy(1.5);
-      if (e.key === "-") zoomBy(1 / 1.5);
+      if (e.key === "+" || e.key === "=") zoomBy(ZOOM_STEP);
+      if (e.key === "-") zoomBy(1 / ZOOM_STEP);
       if (e.key === "0") home();
     });
     // R9: at the whole-map view, resizing re-fits; otherwise it clamps and
@@ -537,22 +603,236 @@
   }
 
   /* ---------- Hash and aliases ---------- */
-  const ALIASES = { // old anchor id → node id. Filled by content tasks.
-    overview: "before-the-vault", participants: "who-is-around-a-vault", "execution-permissions": "who-may-act-for-the-buyer", "admission-pause": "what-a-pause-means",
-    lifecycle: "open", "token-roles-and-collateral": "token-roles", "admission-pause-and-stalled-auctions": "how-to-pause",
-    makers: "market-makers-sign-bids-off-chain", "prepare-fund-and-activate": "sign-a-bid",
-    "platform-fees": "buyer-has-paid-the-premium", "premium-treatment": "earned-payments", "platform-fee-and-share-transfer-administration": "claim-premium",
-    outcomes: "outcomes-lab", "exercise-and-expiration": "buyer-may-now-exercise", "exercise-windows": "when-it-is-allowed",
-    "cash-settlement": "cash-the-vault-needs-a-price", "cash-availability": "enable-cash", "expiry-price": "publish-a-price", "cash-exercise-windows": "cash-windows",
-    "cash-missing-reports": "missing-report", "reports-exercise-and-expiration": "publish-a-price", "enable-cash-after-physical-launch": "enable-procedure",
-    "early-exit": "ending-early-by-agreement", "unwind-recovery": "recover-after-execution", "prepare-and-execute-a-unanimous-unwind": "agreed-unwind", "worked-unwind-scenarios": "worked-scenarios",
-    "cash-outcomes": "cash-outcomes", "premium-treatment-and-emergency-boundaries": "premium-and-fees-are-kept",
-    terms: "owner-fixes-what-bids-may-propose",
-    "authoritative-cash-settlement-pricing": "cash-settlement-interface-and-governance",
+  // Compatibility with the former reference-heavy map and classic Guide anchors.
+  const ALIASES = {
+    "overview": "before-the-vault",
+    "participants": "who-is-around-a-vault",
+    "execution-permissions": "executor-and-recipient",
+    "admission-pause": "admission-pause-action",
+    "lifecycle": "open",
+    "token-roles-and-collateral": "token-roles",
+    "admission-pause-and-stalled-auctions": "admission-pause-action",
+    "makers": "market-makers-sign-bids-off-chain",
+    "prepare-fund-and-activate": "sign-a-bid",
+    "platform-fees": "buyer-has-paid-the-premium",
+    "premium-treatment": "claim-premium",
+    "platform-fee-and-share-transfer-administration": "claim-premium",
+    "outcomes": "exercise",
+    "exercise-and-expiration": "buyer-may-now-exercise",
+    "exercise-windows": "exercise",
+    "cash-settlement": "cash-the-vault-needs-a-price",
+    "cash-availability": "cash-the-vault-needs-a-price",
+    "expiry-price": "cash-the-vault-needs-a-price",
+    "cash-exercise-windows": "cash-the-vault-needs-a-price",
+    "cash-missing-reports": "missing-report",
+    "reports-exercise-and-expiration": "cash-the-vault-needs-a-price",
+    "enable-cash-after-physical-launch": "cash-the-vault-needs-a-price",
+    "early-exit": "agreed-unwind",
+    "unwind-recovery": "agreed-unwind",
+    "prepare-and-execute-a-unanimous-unwind": "agreed-unwind",
+    "worked-unwind-scenarios": "agreed-unwind",
+    "cash-outcomes": "claim-payout",
+    "premium-treatment-and-emergency-boundaries": "settled",
+    "terms": "set-the-terms",
+    "authoritative-cash-settlement-pricing": "cash-the-vault-needs-a-price",
+    "owner-sets-the-terms": "who-is-around-a-vault",
+    "lp-supplies-collateral": "who-is-around-a-vault",
+    "market-maker-buys-the-option": "who-is-around-a-vault",
+    "bid-master-selects": "who-is-around-a-vault",
+    "protocol-administrator": "who-is-around-a-vault",
+    "hub-holds-nothing": "hub-and-vaults",
+    "approvals-target-the-vault": "hub-and-vaults",
+    "pull-and-push": "hub-and-vaults",
+    "deposit-routes": "hub-and-vaults",
+    "who-may-act-for-the-buyer": "executor-and-recipient",
+    "executor": "executor-and-recipient",
+    "recipient": "executor-and-recipient",
+    "only-the-buyer-changes-them": "executor-and-recipient",
+    "swap-adapter-not-implemented": "executor-and-recipient",
+    "what-a-pause-means": "admission-pause-action",
+    "what-a-pause-blocks": "admission-pause-action",
+    "what-a-pause-never-stops": "admission-pause-action",
+    "deadlines-do-not-move": "admission-pause-action",
+    "how-to-pause": "admission-pause-action",
+    "open-custody": "hub-and-vaults",
+    "calls-and-puts-pairs": "set-the-terms",
+    "settlement-choice": "set-the-terms",
+    "every-term": "set-the-terms",
+    "owner-fixes-what-bids-may-propose": "set-the-terms",
+    "price-limits": "set-the-terms",
+    "strike-limit": "set-the-terms",
+    "min-premium": "set-the-terms",
+    "price-feed-and-max-in-the-money": "set-the-terms",
+    "max-price-age": "set-the-terms",
+    "max-settlement-price-age": "set-the-terms",
+    "timing-and-exercise-rules": "set-the-terms",
+    "min-collateral": "set-the-terms",
+    "expiry": "set-the-terms",
+    "allowed-exercise": "set-the-terms",
+    "partial-exercise": "set-the-terms",
+    "auction-starts-at": "set-the-terms",
+    "tokens-and-pairs": "set-the-terms",
+    "vault-token-choices": "set-the-terms",
+    "allowed-settlement": "set-the-terms",
+    "public-deposits-underlying-collateral": "set-the-terms",
+    "who-may-deposit": "add-funds",
+    "shares": "add-funds",
+    "approve-then-deposit": "add-funds",
+    "owner-may-tighten-the-terms": "set-the-terms",
+    "tighten-terms": "set-the-terms",
+    "hand-over-ownership": "set-the-terms",
+    "opening-conditions": "open-or-schedule",
+    "anyone-may-open-on-schedule": "open-or-schedule",
+    "auction-custody": "lp-waits",
+    "auction-opens-and-terms-lock": "lp-waits",
+    "eip-712-domain": "sign-a-bid",
+    "fields-auction-and-buyer": "sign-a-bid",
+    "fields-tokens-and-price": "sign-a-bid",
+    "fields-timing-and-rules": "sign-a-bid",
+    "fields-use-and-execution": "sign-a-bid",
+    "approve-the-premium": "sign-a-bid",
+    "market-maker-role": "sign-a-bid",
+    "cancel-a-bid": "sign-a-bid",
+    "activation-checks-pass": "activate",
+    "activation-checks-fail": "activate",
+    "indicative-price-check": "activate",
+    "inspect-then-activate": "activate",
+    "cancel-after-timeout": "if-cancelled-back-to-open",
+    "the-auction-timeout": "if-cancelled-back-to-open",
+    "after-cancellation": "if-cancelled-back-to-open",
+    "live-custody": "claim-premium",
+    "worked-fee-example": "claim-premium",
+    "earned-payments": "claim-premium",
+    "fee-formula": "claim-premium",
+    "rate-authority": "claim-premium",
+    "treasury-authority": "claim-premium",
+    "transfers-carry-unpaid-premium": "claim-premium",
+    "fee-lab": "claim-premium",
+    "nothing-to-do": "buyer-has-paid-the-premium",
+    "done": "buyer-has-paid-the-premium",
+    "when-it-is-allowed": "exercise",
+    "who-may-call": "exercise",
+    "what-changes-hands": "exercise",
+    "call-or-put": "exercise",
+    "part-or-all": "exercise",
+    "partial-then-full": "exercise",
+    "cash-settled": "exercise",
+    "outcomes-lab": "exercise",
+    "how-to-read-yield": "exercise",
+    "exercise-assumption": "exercise",
+    "rounding": "exercise",
+    "income-is-not-total-return": "exercise",
+    "agreed-unwind-pointer": "buyer-may-now-exercise",
+    "enable-cash": "cash-the-vault-needs-a-price",
+    "two-separate-controls": "cash-the-vault-needs-a-price",
+    "when-disabled": "cash-the-vault-needs-a-price",
+    "existing-obligations": "cash-the-vault-needs-a-price",
+    "enable-procedure": "cash-the-vault-needs-a-price",
+    "physical-only-launch-and-later-cash-activation": "cash-the-vault-needs-a-price",
+    "publish-a-price": "cash-the-vault-needs-a-price",
+    "exercise-observation": "cash-the-vault-needs-a-price",
+    "final-expiry-price": "cash-the-vault-needs-a-price",
+    "one-vault-per-report": "cash-the-vault-needs-a-price",
+    "units-and-authority": "cash-the-vault-needs-a-price",
+    "irreversible": "cash-the-vault-needs-a-price",
+    "payment-authority-and-routing": "cash-the-vault-needs-a-price",
+    "cash-exercise": "cash-the-vault-needs-a-price",
+    "cash-windows": "cash-the-vault-needs-a-price",
+    "zero-payout-rejected": "cash-the-vault-needs-a-price",
+    "paid-from-collateral": "cash-the-vault-needs-a-price",
+    "what-is-blocked": "missing-report",
+    "still-available": "missing-report",
+    "how-recovery-works": "missing-report",
+    "failure-and-incident-procedure": "missing-report",
+    "cash-settlement-interface-and-governance": "cash-the-vault-needs-a-price",
+    "public-interface": "cash-the-vault-needs-a-price",
+    "settlement-interface-code": "cash-the-vault-needs-a-price",
+    "rejected-callers": "cash-the-vault-needs-a-price",
+    "each-vault-stands-alone": "cash-the-vault-needs-a-price",
+    "interchangeable-publishers": "cash-the-vault-needs-a-price",
+    "hub-never-reads-the-helper": "cash-the-vault-needs-a-price",
+    "an-example-helper-ships": "cash-the-vault-needs-a-price",
+    "exercise-observations": "cash-the-vault-needs-a-price",
+    "equal-timestamp-different-price": "cash-the-vault-needs-a-price",
+    "exercise-consumption-check": "cash-the-vault-needs-a-price",
+    "no-other-vaults-report-counts": "cash-the-vault-needs-a-price",
+    "affects-only-later-exercises": "cash-the-vault-needs-a-price",
+    "exact-expiry-and-finality": "cash-the-vault-needs-a-price",
+    "final-prices-stay-readable": "cash-the-vault-needs-a-price",
+    "late-publication-is-allowed": "cash-the-vault-needs-a-price",
+    "never-substitute-a-price": "cash-the-vault-needs-a-price",
+    "price-methodology-and-operational-approval": "cash-the-vault-needs-a-price",
+    "contracts-attest-not-verify": "cash-the-vault-needs-a-price",
+    "record-before-enabling-production": "cash-the-vault-needs-a-price",
+    "physical-needs-none-of-it": "cash-the-vault-needs-a-price",
+    "what-production-still-needs": "cash-the-vault-needs-a-price",
+    "governance-rotation-and-trust": "cash-the-vault-needs-a-price",
+    "no-outstanding-signatures": "cash-the-vault-needs-a-price",
+    "stored-data-survives-revocation": "cash-the-vault-needs-a-price",
+    "trust-for-the-life-of-the-position": "cash-the-vault-needs-a-price",
+    "losing-admin-vs-publisher-keys": "cash-the-vault-needs-a-price",
+    "deployment-and-tooling-notes": "cash-the-vault-needs-a-price",
+    "manifest-v6-only": "cash-the-vault-needs-a-price",
+    "a-default-deployment-is-empty": "cash-the-vault-needs-a-price",
+    "distinct-request-shapes": "cash-the-vault-needs-a-price",
+    "expiry-date-arrives": "expire-the-vault",
+    "keep-exercising": "expire-the-vault",
+    "publish-the-final-price": "expire-the-vault",
+    "the-exact-second": "expire-the-vault",
+    "grace-window-closes": "expire-the-vault",
+    "who-may-expire": "expire-the-vault",
+    "physical-expiration": "expire-the-vault",
+    "cash-expiration": "expire-the-vault",
+    "expiration-result": "expire-the-vault",
+    "no-grace-for-cash": "expire-the-vault",
+    "too-late": "expire-the-vault",
+    "ending-early-by-agreement": "agreed-unwind",
+    "four-steps": "agreed-unwind",
+    "what-the-proposal-records": "agreed-unwind",
+    "consent-changes": "agreed-unwind",
+    "new-agreement": "agreed-unwind",
+    "while-pending": "agreed-unwind",
+    "funding": "agreed-unwind",
+    "recover-before-execution": "agreed-unwind",
+    "original-funder": "agreed-unwind",
+    "recover-after-execution": "agreed-unwind",
+    "execute-unwind": "agreed-unwind",
+    "worked-scenarios": "agreed-unwind",
+    "consent-lab": "agreed-unwind",
+    "settled-custody": "claim",
+    "the-option-is-over": "settled",
+    "nothing-moves-by-itself": "settled",
+    "claims-require-transactions": "settled",
+    "a-different-token-mix": "settled",
+    "premium-and-fees-are-kept": "settled",
+    "the-only-emergency-control": "settled",
+    "custody-lab": "settled",
+    "proportional-claims": "claim",
+    "reserves-are-excluded": "claim",
+    "shares-are-burned": "claim",
+    "reconciliation-getters": "claim",
+    "cash-expiry-payout": "claim-payout",
+    "unwind-refund-claim": "claim-payout",
+    "physical-already-paid": "claim-payout",
+    "pendingPayout-scope": "claim-payout",
+    "what-each-side-ends-up-with": "claim",
+    "outcomes-table": "claim",
+    "expired-covered-call": "claim",
+    "expired-cash-secured-put": "claim",
+    "physical-covered-call": "claim",
+    "physical-cash-secured-put": "claim",
+    "worked-full-exercise": "claim",
+    "cash-lab": "claim-payout",
+    "call-payout-formula": "claim-payout",
+    "put-payout-formula": "claim-payout",
+    "worked-put-at-2700": "claim-payout",
+    "historical-binding": "claim-payout",
+    "payouts-round-down": "claim-payout"
   };
   const resolveHash = (hash) => { const id = decodeURIComponent((hash || "").replace(/^#/, "")); if (!id) return null; return M.tree.byId.get(id) || M.tree.byId.get(ALIASES[id]) || null; };
   let settingHash = false;
   function syncHash() {
+    if (document.body.dataset.mode === "guide") return;
     const path = here();
     const id = path.length ? path[path.length - 1].id : "";
     if (location.hash.replace(/^#/, "") === id) return;
@@ -561,7 +841,7 @@
     settingHash = false;
   }
   function followHash(animate) {
-    if (settingHash) return;
+    if (settingHash || document.body.dataset.mode === "guide") return;
     const n = resolveHash(location.hash);
     if (n) return flyToNode(n, animate);
     // A hash that names real page chrome (e.g. the "#map" the skip link
@@ -581,7 +861,7 @@
   }
 
   /* ---------- Search ---------- */
-  const textOf = (n) => `${n.label} ${n.when} ${n.tagline} ${n.summary} ${n.source.textContent}`.replace(/\s+/g, " ").toLowerCase();
+  const textOf = (n) => `${n.label} ${n.when} ${n.tagline} ${n.summary} ${[...n.source.children].filter((el) => el.tagName !== "SECTION").map((el) => el.textContent).join(" ")}`.replace(/\s+/g, " ").toLowerCase();
   function search(query) {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
@@ -615,8 +895,14 @@
   function focusCard(n) { focused = n; n.el.focus({ preventScroll: true }); }
   function wireKeys() {
     const mapEl = M.mapEl;
+    let pointerDown = false;
+    mapEl.addEventListener("pointerdown", () => { pointerDown = true; }, true);
+    const releasePointer = () => { pointerDown = false; };
+    addEventListener("pointerup", releasePointer, true);
+    addEventListener("pointercancel", releasePointer, true);
+    addEventListener("blur", releasePointer);
     mapEl.addEventListener("keydown", (e) => {
-      if (e.target.closest("input, select, textarea")) return;
+      if (e.target.closest("input, select, textarea, button, a")) return;
       const path = here();
       const current = focused && M.tree.byId.get(focused.id) ? focused : path[path.length - 1] || null;
       const siblings = (n) => (n.parent ? n.parent.children : M.tree.nodes.filter((s) => s.kind === "station" && s.band === n.band));
@@ -634,7 +920,16 @@
       flyToNode(next);
       focusCard(next);
     });
-    mapEl.addEventListener("focusin", (e) => { const card = e.target.closest(".card"); if (card) focused = M.tree.byId.get(card.dataset.id); });
+    mapEl.addEventListener("focusin", (e) => {
+      const card = e.target.closest(".card");
+      if (!card) return;
+      const node = M.tree.byId.get(card.dataset.id);
+      focused = node;
+      // Tabbing to a card's native controls must use the camera, not an
+      // independent scroll offset in the overflow-hidden canvas.
+      mapEl.scrollTo(0, 0);
+      if (!pointerDown && M.target !== node) flyToNode(node, false);
+    });
   }
 
   /* ---------- Touch: one finger pans (via wireInput's pointer handlers), two fingers pinch ---------- */
@@ -652,6 +947,7 @@
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       if (!pinch) { pinch = { dist, s: M.cam.s }; return; }
       const { cam } = M;
+      M.target = null;
       const ns = clamp(pinch.s * (dist / pinch.dist), homeScale(), MAX);
       cam.x = mid.x - (mid.x - cam.x) * (ns / cam.s);
       cam.y = mid.y - (mid.y - cam.y) * (ns / cam.s);
@@ -664,15 +960,8 @@
     mapEl.addEventListener("pointercancel", lift);
   }
 
-  /* ---------- Reading view and theme ---------- */
+  /* ---------- Theme ---------- */
   function wireChrome() {
-    const toggle = $("#reading-toggle");
-    if (toggle) toggle.addEventListener("click", () => {
-      const on = document.body.classList.toggle("reading");
-      toggle.setAttribute("aria-pressed", String(on));
-      if (on) { const n = here().at(-1); if (n) n.source.scrollIntoView({ block: "start" }); }
-    });
-    if (new URLSearchParams(location.search).get("view") === "text") { document.body.classList.add("reading"); toggle?.setAttribute("aria-pressed", "true"); }
     const theme = $("#themeToggle"), root = document.documentElement;
     if (theme) {
       const label = () => (theme.textContent = `Theme · ${root.dataset.theme}`);
@@ -689,5 +978,5 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 
-  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G, state, flyTo, home, zoomOut, zoomBy, here, _cam: () => ({ ...M.cam }), ALIASES, search, resolveHash };
+  window.IvyMap = { readDocument, layoutWorld, render, setLod, lodOf, GEOMETRY: G, state, flyTo, home, zoomOut, zoomBy, zoomTo, paintZoom, here, _cam: () => ({ ...M.cam }), ALIASES, search, resolveHash };
 })();

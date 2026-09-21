@@ -17,7 +17,9 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     const box = await page.locator('.card[data-id="open"]').boundingBox();
     const cx = box.x + box.width / 2, cy = box.y + 20;
     await page.mouse.move(cx, cy);
+    await page.keyboard.down("Control");
     for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -120); await page.waitForTimeout(20); }
+    await page.keyboard.up("Control");
     await settle(page, 300);
     const after = await page.locator('.card[data-id="open"]').boundingBox();
     assert.ok(Math.abs(after.x + after.width / 2 - cx) < 8, "anchor x drift");
@@ -33,8 +35,8 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     await page.mouse.move(map.x + map.width / 2 + 120, map.y + map.height / 2 + 80, { steps: 6 }); await page.mouse.up();
     await settle(page, 200);
     const afterDrag = await page.evaluate(() => IvyMap._cam());
-    assert.equal(afterDrag.x - before.x, 120, "camera x moved by drag delta");
-    assert.equal(afterDrag.y - before.y, 80, "camera y moved by drag delta");
+    assert.ok(Math.abs(afterDrag.x - before.x - 120) < 1e-9, "camera x moved by drag delta");
+    assert.ok(Math.abs(afterDrag.y - before.y - 80) < 1e-9, "camera y moved by drag delta");
     assert.equal(afterDrag.s, before.s, "drag does not change scale");
     // Home, then click through three levels.
     await page.evaluate(() => IvyMap.home(false));
@@ -59,7 +61,9 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     // The reader cannot zoom out past "whole world fits": the wheel handler and
     // zoomBy both clamp their floor to homeScale() (not homeScale() * 0.8).
     await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
+    await page.keyboard.down("Control");
     for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(20); }
+    await page.keyboard.up("Control");
     await settle(page, 200);
     await page.evaluate(() => IvyMap.zoomBy(1 / 1.5));
     await settle(page, 200);

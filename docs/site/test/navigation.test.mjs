@@ -5,7 +5,7 @@ import { openPage, settle } from "./_browser.mjs";
 
 const state = (page) => page.evaluate(() => IvyMap.state());
 
-test("hash, aliases, search, keyboard and reading view", async () => {
+test("hash, aliases, search and keyboard", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html#add-funds");
   try {
@@ -35,12 +35,6 @@ test("hash, aliases, search, keyboard and reading view", async () => {
     await page.keyboard.press("Enter"); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "owner-opens-the-auction"]);
     assert.equal(await page.evaluate(() => document.activeElement?.dataset.id), "owner-opens-the-auction");
-    // Reading view shows the document and hides the map.
-    await page.click("#reading-toggle");
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#map")).display), "none");
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#document")).display), "block");
-    await page.click("#reading-toggle");
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#document")).display), "none");
     assert.deepEqual(errors, []);
   } finally {
     await close();

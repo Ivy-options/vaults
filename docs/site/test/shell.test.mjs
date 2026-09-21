@@ -7,7 +7,7 @@ const waitGuideLoaded = (page) => page.waitForFunction(() => window.IvyShell && 
 
 test("switching Map ↔ Guide preserves the map's exact camera and the guide's scroll offset, with no re-fit and no re-mount", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -59,7 +59,7 @@ test("switching Map ↔ Guide preserves the map's exact camera and the guide's s
 
 test("the guide iframe loads lazily, only once Guide is first shown", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -69,8 +69,8 @@ test("the guide iframe loads lazily, only once Guide is first shown", async () =
     assert.equal(await page.evaluate(() => document.querySelectorAll("#panel-guide iframe").length), 1);
     assert.equal(
       await page.evaluate(() => new URL(document.querySelector("#panel-guide iframe").src).pathname),
-      "/index.html",
-      "the guide iframe points at the untouched classic guide"
+      "/guide.html",
+      "the guide uses the internal document in the shared shell"
     );
     assert.deepEqual(errors, []);
   } finally {
@@ -79,39 +79,35 @@ test("the guide iframe loads lazily, only once Guide is first shown", async () =
   }
 });
 
-test("?view=guide restores Guide mode on load, and switching modes round-trips the URL without disturbing the map's own #hash handling", async () => {
+test("Guide section links and Map locations survive mode changes independently", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html?view=guide#open");
+  const { page, errors, close } = await openPage(server.url + "index.html#terms");
   try {
-    await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
-    await settle(page, 300);
-    assert.equal(await page.evaluate(() => IvyShell.state().mode), "guide", "?view=guide restores Guide mode on load");
-    assert.equal(await page.evaluate(() => document.querySelector("#mode-tab-guide").getAttribute("aria-selected")), "true");
-    assert.equal(await page.evaluate(() => location.hash), "#open", "the map's own #hash is untouched by the shell");
-
+    await page.waitForFunction(() => window.IvyMap?.mounted && window.IvyShell);
     await waitGuideLoaded(page);
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), "guide");
+    assert.equal(await page.evaluate(() => location.hash), "#terms");
+    assert.ok(await page.frameLocator('#panel-guide iframe').locator('#terms').isVisible());
+    assert.equal(await page.locator('#back-to-map').isVisible(), false);
     await page.click("#mode-tab-map");
-    await settle(page, 300);
-    assert.equal(await page.evaluate(() => location.search), "", "switching to Map drops ?view from the URL");
-    assert.equal(await page.evaluate(() => location.hash), "#open", "the hash survives the mode switch");
-    // The map still frames the #open node it loaded with, even though it
-    // spent the whole boot hidden behind the guide panel.
-    assert.deepEqual(await page.evaluate(() => IvyMap.here().map((n) => n.id)), ["open"]);
-
+    assert.equal(await page.evaluate(() => location.search), "?view=map");
+    assert.equal(await page.evaluate(() => location.hash), "");
+    await page.evaluate(() => IvyMap.flyTo('open', false));
+    await page.click('#mode-tab-map');
+    assert.equal(await page.evaluate(() => location.hash), '#open', 'clicking the active tab keeps the current map link');
     await page.click("#mode-tab-guide");
-    await settle(page, 300);
-    assert.equal(await page.evaluate(() => location.search), "?view=guide", "switching to Guide sets ?view=guide");
-    assert.equal(await page.evaluate(() => location.hash), "#open", "the hash still survives");
+    assert.equal(await page.evaluate(() => location.search), "");
+    assert.equal(await page.evaluate(() => location.hash), "#terms");
+    await page.click("#back-to-map");
+    assert.equal(await page.evaluate(() => location.hash), "#open");
+    assert.deepEqual(await page.evaluate(() => IvyMap.here().map(n => n.id)), ["open"]);
     assert.deepEqual(errors, []);
-  } finally {
-    await close();
-    await server.close();
-  }
+  } finally { await close(); await server.close(); }
 });
 
 test("the mode toggle is a keyboard-operable tablist with correct ARIA state and a roving tab stop", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -167,9 +163,9 @@ test("the mode toggle is a keyboard-operable tablist with correct ARIA state and
   }
 });
 
-test("the inactive panel is inert and the map's toolbar hides while the guide is showing", async () => {
+test("the inactive panel is inert while shared zoom stays available in Guide", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -177,8 +173,10 @@ test("the inactive panel is inert and the map's toolbar hides while the guide is
     await waitGuideLoaded(page);
     assert.equal(await page.evaluate(() => document.querySelector("#panel-map").hasAttribute("inert")), true);
     assert.equal(await page.evaluate(() => document.querySelector("#panel-guide").hasAttribute("inert")), false);
-    assert.equal(await page.evaluate(() => document.querySelector("#toolbar").hasAttribute("inert")), true);
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#toolbar")).display), "none", "the map's toolbar hides, not just dims, so the guide panel claims the full area under the top bar");
+    assert.equal(await page.evaluate(() => document.querySelector("#toolbar").hasAttribute("inert")), false);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#toolbar")).display), "flex", "zoom remains available in Guide");
+    assert.equal(await page.locator("#search").isVisible(), false, "map search stays out of Guide");
+    assert.equal(await page.locator(".zoom [data-home]").isVisible(), false, "Fit only applies to the map");
     await page.click("#mode-tab-map");
     await settle(page, 100);
     assert.equal(await page.evaluate(() => document.querySelector("#panel-map").hasAttribute("inert")), false);
@@ -194,7 +192,7 @@ test("the inactive panel is inert and the map's toolbar hides while the guide is
 
 test("prefers-reduced-motion switches views instantly instead of crossfading", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
@@ -218,57 +216,69 @@ test("prefers-reduced-motion switches views instantly instead of crossfading", a
   }
 });
 
-test("a bare visit remembers the last mode from localStorage, but an explicit ?view always wins over it", async () => {
+test("plain index visits always open Guide, even after a previous Map session", async () => {
   const server = await startServer();
-  {
-    // No ?view at all, and a prior visit left it in Guide: bare visit opens in Guide.
-    const { page, errors, close } = await openPage(server.url + "v2/index.html", {
-      beforeNavigate: () => localStorage.setItem("ivy-view", "guide"),
-    });
-    try {
-      await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
-      await settle(page, 300);
-      assert.equal(await page.evaluate(() => IvyShell.state().mode), "guide", "bare visit falls back to the remembered mode");
-      assert.equal(await page.evaluate(() => location.search), "", "the remembered mode does not itself force a ?view into the URL");
-      assert.deepEqual(errors, []);
-    } finally {
-      await close();
-    }
-  }
-  {
-    // Same remembered "guide", but this load has an explicit ?view=map: the URL wins.
-    const { page, errors, close } = await openPage(server.url + "v2/index.html?view=map", {
-      beforeNavigate: () => localStorage.setItem("ivy-view", "guide"),
-    });
-    try {
-      await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
-      await settle(page, 300);
-      assert.equal(await page.evaluate(() => IvyShell.state().mode), "map", "an explicit ?view overrides the remembered mode");
-      assert.deepEqual(errors, []);
-    } finally {
-      await close();
-    }
-  }
-  {
-    // Switching modes by hand updates what's remembered for the next bare visit.
-    const { page, errors, close } = await openPage(server.url + "v2/index.html");
-    try {
-      await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
-      await settle(page, 300);
-      await page.click("#mode-tab-guide");
-      await waitGuideLoaded(page);
-      assert.equal(await page.evaluate(() => localStorage.getItem("ivy-view")), "guide");
-      assert.deepEqual(errors, []);
-    } finally {
-      await close();
-    }
-  }
-  await server.close();
+  const { page, errors, close } = await openPage(server.url + "index.html", {
+    beforeNavigate: () => localStorage.setItem("ivy-view", "map"),
+  });
+  try {
+    await waitGuideLoaded(page);
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), "guide");
+    await page.click('#mode-tab-map');
+    assert.equal(await page.evaluate(() => location.search), '?view=map');
+    await page.goto(server.url + 'index.html');
+    await waitGuideLoaded(page);
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), "guide");
+    await page.goto(server.url + 'index.html?view=map#open');
+    await page.waitForFunction(() => window.IvyMap?.mounted && window.IvyShell);
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), "map");
+    assert.equal(await page.evaluate(() => IvyMap.here()[0]?.id), "open");
+    assert.deepEqual(errors, []);
+  } finally { await close(); await server.close(); }
+});
+
+test("old Map and direct Guide URLs redirect into the single index", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "v2/index.html#open");
+  try {
+    await page.waitForFunction(() => window.IvyMap?.mounted && window.IvyShell);
+    assert.equal(new URL(page.url()).pathname, '/index.html');
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), 'map');
+    assert.equal(await page.evaluate(() => IvyMap.here()[0]?.id), 'open');
+    await page.goto(server.url + 'guide.html#terms');
+    await waitGuideLoaded(page);
+    assert.equal(new URL(page.url()).pathname, '/index.html');
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), 'guide');
+    assert.equal(new URL(page.url()).hash, '#terms');
+    await page.goto(server.url + 'v2/index.html?view=text#terms');
+    await waitGuideLoaded(page);
+    assert.equal(new URL(page.url()).pathname, '/index.html');
+    assert.equal(await page.evaluate(() => IvyShell.state().mode), 'guide');
+    assert.equal(new URL(page.url()).hash, '#terms');
+    assert.deepEqual(errors, []);
+  } finally { await close(); await server.close(); }
+});
+
+test("retired runbook bookmarks open the matching Guide section without nesting a shell", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + 'operations.html#prepare-and-execute-a-unanimous-unwind');
+  try {
+    await page.waitForFunction(() => window.IvyShell?.state().guideLoaded);
+    assert.equal(new URL(page.url()).pathname, '/index.html');
+    assert.equal(new URL(page.url()).hash, '#early-exit');
+    await page.goto(server.url + 'index.html?doc=operations.html#publisher-rotation-and-incidents');
+    await page.waitForFunction(() => window.IvyShell?.state().guideLoaded && location.hash === '#cash-missing-reports' && !location.search);
+    const frame = page.frames().find(f => f.parentFrame());
+    assert.ok(frame.url().endsWith('guide.html#cash-missing-reports'));
+    assert.equal(page.frames().length, 2);
+    assert.equal(await frame.locator('#modeToggle').count(), 0);
+    assert.deepEqual(errors, []);
+  } finally { await close(); await server.close(); }
 });
 
 test("while Guide view is active, the map's document-level shortcuts (Escape, +, -, 0) do nothing", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -299,7 +309,7 @@ test("while Guide view is active, the map's document-level shortcuts (Escape, +,
 
 test("the guide iframe's own top bar is hidden once embedded in the shell", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -323,7 +333,7 @@ test("the guide iframe's own top bar is hidden once embedded in the shell", asyn
 
 test("theme sync: the shell's theme toggle drives the guide, and the guide's own toggle drives the shell back", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "v2/index.html");
+  const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
     await page.waitForFunction(() => window.IvyMap && IvyMap.mounted && window.IvyShell);
     await settle(page, 300);
@@ -361,4 +371,23 @@ test("theme sync: the shell's theme toggle drives the guide, and the guide's own
     await close();
     await server.close();
   }
+});
+
+test("the first return to Guide preserves scroll after zooming", async () => {
+  const server = await startServer();
+  const {page, errors, close} = await openPage(server.url + 'index.html#terms');
+  try {
+    await page.waitForFunction(() => window.IvyMap?.mounted && window.IvyShell?.state().guideLoaded);
+    const frame = page.frames().find(f => f.parentFrame());
+    await frame.evaluate(() => document.fonts.ready);
+    await page.click('[data-zoom="+"]');
+    await settle(page, 150);
+    const before = await frame.evaluate(() => ({y: scrollY, h: innerHeight}));
+    await page.click('#mode-tab-map');
+    await page.click('#mode-tab-guide');
+    await settle(page, 150);
+    const after = await frame.evaluate(() => ({y: scrollY, h: innerHeight}));
+    assert.deepEqual(after, before);
+    assert.deepEqual(errors, []);
+  } finally {await close(); await server.close();}
 });
