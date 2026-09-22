@@ -441,47 +441,109 @@
     </section>
     </section>
     <section data-kind="moment" id="cash-settlement-path" data-when="only for a cash-settled trade"><h3>Cash uses a reported price</h3>
-    <p>Cash settlement pays <strong>intrinsic value in the collateral token</strong>, using a price reported for this vault.</p>
+    <p>Cash settlement pays the option’s <strong class="key-term">intrinsic value</strong>: the value of a favorable difference between the reported market price and the agreed strike.</p>
+    <p>An <strong class="key-term">authorized price publisher</strong> records the price for this vault. The contract uses that report to calculate the payout.</p>
+    <p><strong class="key-term">Example:</strong> a put on 1 WETH with a 3,000 USDC strike and a reported price of 2,700 USDC pays <strong class="role-buyer">300 USDC</strong>.</p>
+    <p>Payment uses the <strong class="key-term">collateral token</strong>: WETH for a WETH-backed call, USDC for a USDC-backed put. “Cash” does not always mean a stablecoin.</p>
     <p><a href="#cash-settlement-choice">Check whether cash is enabled →</a></p>
-    <section data-kind="action" id="cash-the-vault-needs-a-price" data-actor="publisher"><h4>Use the price for this moment</h4>
-    <p>The required report changes <strong class="key-term">at option expiry</strong>: a current observation beforehand, a final expiry price afterward.</p>
-    <p>Cash has <strong>no physical grace-window cutoff</strong>. It can be exercised until settlement.</p>
-    <p><a href="#expire-the-vault">Expire instead of exercising →</a></p>
-    <section data-kind="tile" id="cash-live-observation"><h5>Which observation is fresh?</h5>
-    <p><strong class="key-term">Before expiry</strong>, American cash exercise uses an authorized publisher’s observation for this Live vault. Both checks must pass:</p>
-    <ul class="reading-list" role="list">
-      <li><strong class="key-term">Observation age</strong> must be within <code>maxSettlementPriceAge</code>.</li>
-      <li><strong class="key-term">Report deadline</strong> <code>validUntil</code> must not have passed.</li>
-    </ul>
+    <section data-kind="action" id="cash-the-vault-needs-a-price" data-actor="buyer"><h4>Exercise: request payment</h4>
+    <p>To <strong class="key-term">exercise a cash option</strong> is to request its payout from the vault.</p>
+    <p><strong class="key-term">Example:</strong> a cash put on 1 WETH has an agreed price, or <strong class="key-term">strike</strong>, of 3,000 USDC.</p>
+    <ol class="reading-steps">
+      <li>A protocol-authorized account, the <strong class="key-term">price publisher</strong>, reports <strong>1 WETH = 2,700 USDC</strong>.</li>
+      <li>The <strong class="role-buyer">buyer</strong> or executor submits the <strong class="key-term">exercise transaction</strong>.</li>
+      <li>The <strong class="key-term">contract</strong> pays 3,000 − 2,700 = <strong class="role-buyer">300 USDC</strong> from the vault to the buyer’s chosen recipient.</li>
+    </ol>
+    <p>The buyer or executor <strong class="key-term">does not send WETH</strong> to receive this cash payout.</p>
+    <section data-kind="tile" id="cash-price-publisher"><h5>Who supplies the market price?</h5>
+    <p>A <strong class="key-term">price publisher</strong> is an account or contract with permission to submit prices to the Hub. The protocol’s administrator grants that permission.</p>
+    <p>The publisher records a <strong class="key-term">price report for this vault</strong>. For example, “1 WETH = 2,700 USDC.”</p>
+    <p>The vault reads that stored report. It <strong class="key-term">does not fetch a price from an exchange</strong> when the buyer exercises, and the buyer’s exercise request cannot set the price.</p>
+    <p>The publisher supplies the market price; the contract calculates the payout from that price and the option’s agreed terms.</p>
     </section>
-    <section data-kind="tile" id="cash-final-expiry-price"><h5>One final expiry price</h5>
-    <p><strong class="key-term">At or after expiry</strong>, the authorized publisher fixes a price for this vault’s original expiry.</p>
-    <p>Once finalized, that price <strong class="key-term">cannot be replaced</strong>.</p>
-    <p>A pre-expiry observation cannot substitute for it.</p>
+    <section data-kind="tile" id="cash-exercise-price-selection"><h5>Which report supplies that price?</h5>
+    <p>The option’s <strong class="key-term">expiry time</strong> determines which report the contract reads:</p>
+    <ul class="reading-list" role="list">
+      <li><strong class="key-term">Before expiry:</strong> a recent market-price report. Only American options can exercise this early.</li>
+      <li><strong class="key-term">At or after expiry:</strong> the final price reported for the expiry time. This applies to American and European options.</li>
+    </ul>
+    <p><strong class="key-term">Example:</strong> expiry is 16:00 and its final price is 2,700 USDC per WETH. Exercising at 16:10 still uses <strong>2,700</strong>, even if the market has since moved to 2,500.</p>
+    <section data-kind="tile" id="cash-live-observation"><h5>How recent must the report be?</h5>
+    <p>Before expiry, an American cash option uses the latest report stored for this vault. The report must pass <strong class="key-term">two checks</strong> when exercise executes:</p>
+    <ul class="reading-list" role="list">
+      <li>The price was observed recently enough: within the vault’s <code>maxSettlementPriceAge</code>.</li>
+      <li>The report’s own deadline, <code>validUntil</code>, has not passed.</li>
+    </ul>
+    <p><strong class="key-term">Example:</strong> the price was observed at 12:00, the maximum age is 5 minutes, and the report expires at 12:03.</p>
+    <p>Exercise at <strong class="key-term">12:02</strong> can use it. At <strong class="key-term">12:04</strong>, its deadline has passed, so a new valid report is needed.</p>
+    </section>
+    <section data-kind="tile" id="cash-final-expiry-price"><h5>Why doesn’t the price keep changing?</h5>
+    <p>The <strong class="key-term">final expiry price</strong> fixes the market price used to value the option at its agreed expiry time.</p>
+    <p><strong class="key-term">Example:</strong> for the put on 1 WETH with a 3,000 USDC strike, a final price of <strong>2,700</strong> gives a <strong class="role-buyer">300 USDC payout</strong>.</p>
+    <p>If the market falls to 2,500 later, the payout remains <strong class="role-buyer">300 USDC</strong>. Waiting does not turn it into 500 USDC.</p>
+    <p>The authorized publisher can record this final price only at or after expiry. Once recorded, it cannot be replaced. Until it is available, cash exercise after expiry must wait.</p>
+    </section>
+    <section data-kind="tile" id="cash-exercise-after-expiry"><h5>Why can exercise happen after expiry?</h5>
+    <p>For a cash option, <strong class="key-term">expiry fixes the time used to value the option</strong>. It does not automatically pay anyone or close the vault.</p>
+    <p>The buyer or executor can still exercise while the vault is <strong class="key-term">Live</strong>, using the final expiry price.</p>
+    <p>Alternatively, <strong class="key-term">anyone can submit expiration</strong>. That transaction settles the remaining position and reserves any buyer payout for a separate claim.</p>
+    <p>Once the vault is <strong class="key-term">Settled</strong>, the buyer claims its reserved payout instead of exercising.</p>
+    <p><a href="#expire-the-vault">How expiration closes the vault →</a></p>
+    </section>
+    </section>
     </section>
 
-    </section><section data-kind="action" id="cash-outcomes"><h4>See who keeps the collateral</h4>
-    <p>With no earlier exercise, a <strong>cash call</strong> backed by 10 WETH, strike 3,000 USDC and final price 3,300 USDC leaves:</p>
+    <section data-kind="action" id="cash-outcomes"><h4>How the collateral is divided</h4>
+    <p>The <strong class="role-buyer">buyer’s payoff</strong> comes out of the vault’s collateral. The <strong class="role-lp">LPs</strong> share what remains when the vault settles.</p>
     <ul class="reading-list" role="list">
-      <li><strong class="role-buyer">Buyer reserve:</strong> 10 × (3,300 − 3,000) / 3,300 ≈ <strong>0.9091 WETH.</strong></li>
-      <li><strong class="role-lp">LP remainder:</strong> about <strong>9.0909 WETH.</strong></li>
+      <li>A <strong class="key-term">call</strong> has a payoff when the reported price is above the strike.</li>
+      <li>A <strong class="key-term">put</strong> has a payoff when the reported price is below the strike.</li>
     </ul>
-    <p>With no earlier exercise, a <strong>cash put</strong> on 10 WETH at a 3,000 USDC strike, with a final price of 2,700 USDC, leaves:</p>
+    <p><strong class="key-term">Exercise</strong> transfers the payoff to the buyer’s recipient immediately. <strong class="key-term">Expiration</strong> sets it aside in the vault for a separate claim.</p>
+    <p>The examples below assume <strong class="key-term">no earlier exercise</strong>. Premium is a separate payment and is not subtracted from these payoff amounts.</p>
+    <section data-kind="tile" id="cash-call-example"><h5>Call example: a payout in WETH</h5>
+    <p>With no earlier exercise, the vault holds <strong class="key-term">10 WETH</strong>. The strike is 3,000 USDC per WETH; the final price is 3,300.</p>
     <ul class="reading-list" role="list">
-      <li><strong class="role-buyer">Buyer payoff:</strong> <strong>3,000 USDC</strong> from its 30,000 USDC backing.</li>
-      <li><strong class="role-lp">LP remainder:</strong> <strong>27,000 USDC.</strong></li>
+      <li>The favorable price difference is <strong class="key-term">300 USDC per WETH</strong>.</li>
+      <li>For 10 WETH, that gives <strong class="key-term">3,000 USDC of value</strong>.</li>
+      <li>The vault pays in WETH: 3,000 ÷ 3,300 ≈ <strong class="role-buyer">0.9091 WETH</strong>.</li>
     </ul>
-    <p>An <strong>out-of-the-money option</strong> has zero payoff. Premium stays earned.</p>
-    </section>    <section data-kind="action" id="missing-report"><h4>If the cash price is missing</h4>
-    <p>A missing required price leaves the <strong class="key-term">collateral committed</strong>. The recovery route depends on whether the option has reached expiry.</p>
-    <p class="reference"><a href="index.html#cash-missing-reports" data-guide>Missing prices and recovery ↗</a></p>
-    <section data-kind="tile" id="missing-before-expiry"><h5>Missing before expiry</h5>
-    <p>American cash exercise needs a valid current observation. A stale, missing or expired observation blocks that exercise until a valid report is available.</p>
+    <p>After expiration, about <strong class="role-buyer">0.9091 WETH is reserved for the buyer</strong> and <strong class="role-lp">9.0909 WETH remains for LPs</strong>. Both stay in the vault until claimed.</p>
+    <p>These figures are rounded for display. The contract rounds the buyer’s payout down to the token’s smallest unit.</p>
     </section>
-    <section data-kind="tile" id="missing-after-expiry"><h5>Missing at or after expiry</h5>
-    <p>The <strong class="key-term">final expiry price</strong> is required for cash exercise and expiration.</p>
-    <p>Waiting through a physical grace window <strong class="key-term">does not unlock</strong> a cash vault.</p>
-    <p>Publication must recover or a valid unwind must execute.</p>
+    <section data-kind="tile" id="cash-put-example"><h5>Put example: a payout in USDC</h5>
+    <p>A put covers <strong class="key-term">10 WETH</strong> at a 3,000 USDC strike. With no earlier exercise, the vault holds <strong class="key-term">30,000 USDC</strong> of collateral.</p>
+    <p>If the final price is <strong class="key-term">2,700 USDC per WETH</strong>, the favorable difference is 300 USDC per WETH.</p>
+    <ul class="reading-list" role="list">
+      <li><strong class="role-buyer">Buyer reserve:</strong> 10 × 300 = <strong>3,000 USDC</strong>.</li>
+      <li><strong class="role-lp">LP remainder:</strong> 30,000 − 3,000 = <strong>27,000 USDC</strong>.</li>
+    </ul>
+    <p>Expiration sets aside the buyer’s reserve. The buyer or executor claims it for the recipient; LPs claim the remainder according to their shares.</p>
+    </section>
+    <section data-kind="tile" id="cash-zero-payoff"><h5>When the buyer’s payoff is zero</h5>
+    <p>A <strong class="key-term">call</strong> pays zero at or below its strike. A <strong class="key-term">put</strong> pays zero at or above its strike.</p>
+    <p><strong class="key-term">Example:</strong> a call backed by 10 WETH has a 3,000 USDC strike. If the final price is 2,800, expiration reserves nothing for the buyer. All <strong class="role-lp">10 WETH remains for LP claims</strong>, assuming no earlier exercise.</p>
+    <p>The premium remains earned. A zero-payoff exercise is rejected, so an <strong class="key-term">expiration transaction</strong> closes the vault instead.</p>
+    </section>
+    </section>
+
+    <section data-kind="action" id="missing-report"><h4>If the cash price is missing</h4>
+    <p>The contract needs a valid price to calculate what the buyer is owed. A <strong class="key-term">missing price is not a zero payoff</strong>.</p>
+    <p>If the required report is unavailable, the transaction is rejected and the vault’s <strong class="key-term">collateral stays committed</strong>. Time passing alone does not release it.</p>
+    <p><strong class="key-term">Example:</strong> a vault still holds 10 WETH when it expires. Without a final expiry price, it cannot tell how much belongs to the buyer and how much remains for LPs.</p>
+    <p>The recovery steps differ before and after expiry.</p>
+    <p class="reference"><a href="index.html#cash-missing-reports" data-guide>Missing prices and recovery ↗</a></p>
+    <section data-kind="tile" id="missing-before-expiry"><h5>A missing price before expiry</h5>
+    <p>American cash exercise needs a <strong class="key-term">fresh observation</strong>. A missing, too-old or expired report blocks that exercise.</p>
+    <p><strong class="key-term">Example:</strong> the maximum observation age is 5 minutes. At 12:06, a price observed at 12:00 is too old, even if its report deadline has not passed.</p>
+    <p>An <strong class="key-term">authorized publisher</strong> can record a newer valid observation. The buyer or executor can then retry exercise while it is still before expiry.</p>
+    <p>Once expiry arrives, the vault needs the <strong class="key-term">final expiry price</strong> instead. European cash options cannot exercise before expiry at all.</p>
+    </section>
+    <section data-kind="tile" id="missing-after-expiry"><h5>A missing price after expiry</h5>
+    <p>At or after expiry, both <strong class="key-term">cash exercise and expiration</strong> need the final expiry price. A recent pre-expiry observation is not enough.</p>
+    <p><strong class="key-term">Example:</strong> expiry is 16:00, but no final price exists at 16:10. Expiration still fails. If the publisher records it at 16:12, anyone can retry expiration to reserve the buyer’s payoff and open LP claims.</p>
+    <p>Waiting through a <strong class="key-term">physical grace window does not unlock a cash vault</strong>.</p>
+    <p>If publication cannot recover, the buyer and every current shareholder can use the <a href="#agreed-unwind">agreed unwind route</a>, subject to its approvals and funding requirements.</p>
     </section>
     </section></section>
     <section data-kind="moment" id="ending-the-live-option" data-when="Live → Settled"><h3>Close the remaining position</h3>
