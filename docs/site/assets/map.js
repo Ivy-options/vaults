@@ -163,6 +163,9 @@
   const GLYPHS = { anyone: "?", publisher: "$", admin: "A", guardian: "G", all: "∀" };
   let clipSeq = 0;
   function portrait(key) {
+    if (key === "bid") {
+      return `<span class="portrait"><svg viewBox="0 0 1219 1290" aria-hidden="true" focusable="false"><image href="${ASSET_BASE}roman-bid-master.png" width="1219" height="1290"/></svg></span>`;
+    }
     if (!CROPS[key]) return `<span class="portrait generic" aria-hidden="true"><i>${GLYPHS[key] || "?"}</i></span>`;
     const [x, y, w, h] = CROPS[key].split(" ");
     const id = `map-clip-${clipSeq++}`;

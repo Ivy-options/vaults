@@ -7,9 +7,11 @@
     }</div>${contents}</div>`;
   }
 
-  // Crop the approved artwork without altering it or repeating its printed labels.
-  // Preserve the original Owner/LP; use the approved revision for Buyer/Bid master.
+  // Use the revised Bid master portrait; crop the other actors from the shared sheet.
   function romanOperator(index) {
+    if (index === 3) {
+      return '<svg class="roman-operator" viewBox="0 0 1219 1290" aria-hidden="true" focusable="false"><image href="assets/roman-bid-master.png" width="1219" height="1290" /></svg>';
+    }
     const crops = [
       "24 76 477 580", // Owner with a wax tablet.
       "504 76 425 580", // LP with coins.
