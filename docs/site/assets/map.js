@@ -238,12 +238,6 @@
     worldEl.style.width = `${world.width}px`;
     worldEl.style.height = `${world.height}px`;
     worldEl.replaceChildren(lines);
-    mapEl.querySelector(".grove-index")?.remove();
-    const index = document.createElement("nav");
-    index.className = "grove-index";
-    index.setAttribute("aria-label", "Explore lifecycle branches");
-    index.innerHTML = `<p>Explore the grove</p>${tree.nodes.filter(n => n.kind === "station").map(n => `<button type="button" data-fly="${n.id}">${esc(n.label)} <span aria-hidden="true">↗</span></button>`).join("")}`;
-    mapEl.append(index);
     tree.nodes.forEach((n) => {
       const el = document.createElement("div");
       el.className = `card ${n.kind}${n.actor ? " " + n.actor : ""}${n.dim ? " dim" : ""}${n.children.length && n.kind === "action" ? " has-details" : ""}`;
