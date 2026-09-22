@@ -119,7 +119,7 @@ test("a selected action fits a narrow viewport and remains the navigation target
   assert.equal(await page.evaluate(() => location.hash), '#claim-premium');
   assert.equal(await page.evaluate(() => IvyMap.here().at(-1).id), 'claim-premium');
   await card.focus();
-  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowLeft');
   assert.equal(await page.evaluate(() => IvyMap.here().at(-1).id), 'buyer-has-paid-the-premium');
 }));
 

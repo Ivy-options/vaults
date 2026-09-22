@@ -30,8 +30,8 @@ test("hash, aliases, search and keyboard", async () => {
     await page.focus("#map");
     await page.keyboard.press("Home"); await settle(page);
     assert.deepEqual((await state(page)).path, ["open"]);
-    await page.keyboard.press("ArrowDown"); // into the first moment
-    await page.keyboard.press("ArrowRight"); // next moment
+    await page.keyboard.press("ArrowRight"); // into the first moment
+    await page.keyboard.press("ArrowDown"); // next moment
     await page.keyboard.press("Enter"); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "owner-opens-the-auction"]);
     assert.equal(await page.evaluate(() => document.activeElement?.dataset.id), "owner-opens-the-auction");

@@ -16,7 +16,7 @@ test('detail branches start folded; independent siblings and nested leaves retai
   assert.equal(await page.locator('.card.tile:not([hidden]), .card.lab:not([hidden])').count(),0);
   await page.evaluate(()=>IvyMap.flyTo('exercise-windows',false));
   await row(page,'physical-american-start').click();
-  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Escape');
   await row(page,'physical-window-duration').click();
   assert.equal(await row(page,'physical-window-duration').getAttribute('aria-expanded'),'true');
   await page.waitForTimeout(750);

@@ -427,8 +427,16 @@
     <p><strong class="key-term">Only the buyer</strong> may change the executor or recipient.</p>
     <p>Delegation does not transfer ownership of the option.</p>
     </section>
-    <section data-kind="tile" id="buyer-recipient-destination"><h5>Recipient is where assets go</h5>
-    <p>The configured recipient receives exercise proceeds and reserved payouts. For physical exercise, the caller still supplies the input tokens and approves the individual vault.</p>
+    <section data-kind="tile" id="buyer-recipient-destination"><h5>Where the buyer receives assets</h5>
+    <p>The <strong class="role-buyer">buyer</strong> names a <strong class="key-term">recipient</strong> in its signed offer: its own wallet or another address. Only the buyer can change this destination.</p>
+    <p><strong class="key-term">What goes to that address?</strong></p>
+    <ul class="reading-list" role="list">
+      <li><strong class="key-term">Physical exercise:</strong> underlying tokens for a call; quote tokens for a put.</li>
+      <li><strong class="key-term">Cash exercise:</strong> the payout in the collateral token.</li>
+      <li><strong class="key-term">After settlement:</strong> any reserved cash payout or agreed unwind refund, once the buyer or executor claims it.</li>
+    </ul>
+    <p><strong class="key-term">Who supplies the tokens?</strong> The buyer or executor submitting a physical exercise must hold the input tokens and approve this vault to spend them.</p>
+    <p><strong class="key-term">Example:</strong> an executor pays USDC from its wallet; the physical call sends WETH to the chosen recipient.</p>
     </section>
     </section>
     </section>

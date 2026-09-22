@@ -386,7 +386,6 @@
     if (changed) reflow(false);
     M.target = n;
     M.revealed = n;
-    focused = n;
     const readableScale = (desired) => Math.min(desired, (vw() - 24) / n.w);
     if (n.kind === "root") return fly(n.x, n.y, n.w, n.h, 0.6, 40, animate);
     if (n.kind === "station") return fly(n.x, n.y, n.w, n.h, readableScale(1), 12, animate);
@@ -787,7 +786,13 @@
     M.worldEl.style.transform = `translate(${M.cam.x}px, ${M.cam.y}px) scale(${M.cam.s})`;
     if (animate && !reduced()) M.worldEl.getBoundingClientRect();
     const target = opening ? n : parent;
-    M.target = target; M.revealed = target; focused = target;
+    centerNode(target, animate, !opening);
+    if (opening) focusCard(target);
+  }
+
+  // Tree navigation pans at the reader's current zoom, including tall cards.
+  function centerNode(target, animate = true, keepControl = false) {
+    M.target = target; M.revealed = target;
     const {s} = M.cam;
     M.cam.x = vw() / 2 - (target.x + target.w / 2) * s;
     // Center the card at the reader's zoom. Tall cards start at their heading.
@@ -795,7 +800,7 @@
       ? vh() / 2 - (target.y + target.h / 2) * s
       : 12 - target.y * s;
     const control = document.activeElement;
-    if (!opening && control !== target.el && target.el.contains(control)) {
+    if (keepControl && control !== target.el && target.el.contains(control)) {
       let top = 0;
       for (let el = control; el && el !== target.el; el = el.offsetParent) top += el.offsetTop;
       const screenTop = M.cam.y + (target.y + top) * s;
@@ -804,7 +809,6 @@
       else if (screenTop < 12) M.cam.y += 12 - screenTop;
     }
     clampCam(); apply(animate);
-    if (opening) target.el.focus({preventScroll: true});
   }
 
   /* ---------- Hash and aliases ---------- */
@@ -1100,8 +1104,13 @@
   }
 
   /* ---------- Keyboard navigation between cards ---------- */
-  let focused = null;
-  function focusCard(n) { focused = n; n.el.focus({ preventScroll: true }); }
+  function focusCard(n) { n.el.focus({ preventScroll: true }); }
+  function visitBranch(n) {
+    if (n.parent && !M.expanded.has(n.id)) return toggleBranch(n);
+    interruptMotion();
+    centerNode(n);
+    focusCard(n);
+  }
   function wireKeys() {
     const mapEl = M.mapEl;
     let pointerDown = false;
@@ -1111,29 +1120,53 @@
     addEventListener("pointercancel", releasePointer, true);
     addEventListener("blur", releasePointer);
     mapEl.addEventListener("keydown", (e) => {
-      if (e.target.closest("input, select, textarea, button, a")) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const branchControl = e.target.closest("[data-expand], [data-fold]");
+      if (e.target.closest("input, select, textarea, [contenteditable=true], a") ||
+          (e.target.closest("button") && !branchControl)) return;
+      // Selection is authoritative: a previous DOM focus may belong to a card
+      // left behind by a pointer, breadcrumb, or camera gesture.
       const path = here();
-      const current = focused && M.tree.byId.get(focused.id) ? focused : path[path.length - 1] || null;
-      const siblings = (n) => (n.parent ? n.parent.children : M.tree.nodes.filter((s) => s.kind === "station" && s.band === n.band));
+      const current = M.target || path.at(-1);
+      const stations = M.tree.nodes.filter(n => n.kind === "station");
+      const siblings = n => n.parent ? n.parent.children : stations;
       let next = null;
-      if (e.key === "Home") next = M.tree.nodes.find((s) => s.kind === "station");
-      else if (!current) { if (e.key.startsWith("Arrow")) next = M.tree.nodes.find((s) => s.kind === "station"); }
-      else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        const list = siblings(current), i = list.indexOf(current);
-        next = list[(i + (e.key === "ArrowRight" ? 1 : list.length - 1)) % list.length];
-      } else if (e.key === "ArrowDown") next = current.children.find((c) => c.kind !== "custody") || current.children[0] || null;
-      else if (e.key === "ArrowUp") next = current.parent;
-      else if (e.key === "Enter" && current) { e.preventDefault(); flyToNode(current); focusCard(current); return; }
-      if (!next) return;
+      if (e.key === "Home") next = stations[0];
+      else if (e.key === "Enter" && !branchControl && current) {
+        e.preventDefault(); flyToNode(current); focusCard(current); return;
+      } else if (!e.key.startsWith("Arrow")) return;
+      else if (!current) {
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") next = stations[0];
+      } else if (e.key === "ArrowRight") {
+        next = branchControl?.closest(".card")?.dataset.id === current.id && branchControl.dataset.expand
+          ? M.tree.byId.get(branchControl.dataset.expand)
+          : current.children.find(c => c.kind !== "custody") || current.children[0];
+        if (current.kind === "root") next = stations[0];
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (current.parent) {
+          toggleBranch(current);
+          // Arrow navigation returns to the parent tile. Native disclosure
+          // buttons still restore focus to their trigger when activated.
+          centerNode(current.parent);
+          focusCard(current.parent);
+        }
+        return;
+      } else {
+        const list = siblings(current), index = list.indexOf(current);
+        if (index >= 0) next = list[index + (e.key === "ArrowDown" ? 1 : -1)];
+      }
+      // Consume boundary arrows too: never wrap, scroll, or change levels.
       e.preventDefault();
-      flyToNode(next);
-      focusCard(next);
+      if (next) {
+        if (!current) { flyToNode(next); focusCard(next); }
+        else visitBranch(next);
+      }
     });
     mapEl.addEventListener("focusin", (e) => {
       const card = e.target.closest(".card");
       if (!card) return;
       const node = M.tree.byId.get(card.dataset.id);
-      focused = node;
       // Tabbing to a card's native controls must use the camera, not an
       // independent scroll offset in the overflow-hidden canvas.
       mapEl.scrollTo(0, 0);
