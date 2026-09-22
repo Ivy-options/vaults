@@ -22,7 +22,9 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
       lab: !!document.querySelector('.card[data-id="fee-lab"] #fee-rate'),
     }));
     assert.equal(counts.cards, 13);
-    assert.ok(counts.lines > 5);
+    assert.equal(counts.lines, 0, "this rootless fixture starts with independent, folded stages");
+    await page.evaluate(() => IvyMap.flyTo("who-may-deposit", false));
+    assert.ok(await page.locator("#world .tree-branches path").count() > 0, "revealing a nested target draws its ancestors");
     assert.deepEqual(counts.actionTiers, ["0", "1", "2"]);
     assert.deepEqual(counts.tileTiers, ["0", "2"]);
     assert.equal(counts.badge, "LP");

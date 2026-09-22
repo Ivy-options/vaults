@@ -54,27 +54,44 @@
   }
 
   const G = {
-    station: [360, 200], moment: [300, 170], action: [300, 150], custody: [260, 170], root: [640, 340],
-    gap: 64, tile: 300, tileGap: 20, columnPad: 60, bandGap: 180, rootGap: 160,
+    station: [480, 200], moment: [460, 170], action: [500, 150], custody: [360, 170], root: [720, 340],
+    lab: [420, 100], gap: 100, tile: 460, tileGap: 32, columnPad: 100, bandGap: 180, rootGap: 180,
   };
-  const spanW = () => G.tile;
+  // Wider reading surfaces on desktop; reflow the text rather than shrink it on phones.
+  const verticalBranches = () => innerWidth < 1120;
+  const widthOf = (n) => Math.min(Array.isArray(G[n.kind]) ? G[n.kind][0] : G.tile, Math.max(296, innerWidth - 24));
 
   // Each stage is a tree. Siblings share a stem, never a false action-to-action
   // chain. Recursive subtree bounds allow any number of children at any depth.
-  function layoutWorld(nodes, measure) {
-    const lines = [];
+  function layoutWorld(nodes, measure, expanded = null) {
+    const lines = [], vertical = expanded !== null && verticalBranches();
+    for (const n of nodes) {
+      n.visible = (!n.parent || n.parent.visible) && (!expanded || !n.parent || expanded.has(n.id));
+      n.x ??= 0; n.y ??= 0;
+    }
+    const childrenOf = n => n.children.filter(c => c.visible);
     const root = nodes.find((n) => n.kind === "root");
     const rootHeight = root ? Math.max(G.root[1], measure(root)) : 0;
     const size = (n) => {
       const preset = Array.isArray(G[n.kind]) ? G[n.kind] : null;
-      n.w = preset ? preset[0] : G.tile;
+      n.w = widthOf(n);
       n.h = Math.max(preset ? preset[1] : 100, measure(n));
       if (n.kind === "action") n.headerH = n.h;
       n.children.forEach(size);
-      n.treeW = n.w + (n.children.length ? G.gap + Math.max(...n.children.map(c => c.treeW)) : 0);
-      n.treeH = Math.max(n.h, n.children.reduce((h, c) => h + c.treeH, 0) + Math.max(0, n.children.length - 1) * G.tileGap);
+      const children = childrenOf(n);
+      const childW = Math.max(0, ...children.map(c => c.treeW));
+      const childH = children.reduce((h, c) => h + c.treeH, 0) + Math.max(0, children.length - 1) * G.tileGap;
+      n.treeW = vertical ? Math.max(n.w, childW) : n.w + (children.length ? G.gap + childW : 0);
+      n.treeH = vertical ? n.h + (children.length ? G.gap + childH : 0) : Math.max(n.h, childH);
     };
     const branch = (parent, child, stemX) => {
+      if (vertical) {
+        const x = parent.x + parent.w / 2, y = parent.y + parent.h, sy = child.y + child.h / 2;
+        lines.push({kind: "branch", from: parent.id, to: child.id,
+          d: `M ${x} ${y} C ${x} ${y + 42}, ${parent.x - 24} ${y + 18}, ${parent.x - 24} ${y + 60} L ${parent.x - 24} ${sy - 24} Q ${parent.x - 24} ${sy} ${child.x} ${sy}`,
+          leafX: child.x - 8, leafY: sy, depth: child.depth});
+        return;
+      }
       const x = parent.x + parent.w, y = parent.y + parent.h / 2;
       const endY = child.y + child.h / 2;
       lines.push({ kind: "branch", from: parent.id, to: child.id,
@@ -83,9 +100,9 @@
     };
     const place = (n, x, y) => {
       Object.assign(n, { x, y });
-      let cursor = y;
-      n.children.forEach(c => {
-        place(c, x + n.w + G.gap, cursor);
+      let cursor = vertical ? y + n.h + G.gap : y;
+      childrenOf(n).forEach(c => {
+        place(c, vertical ? x : x + n.w + G.gap, cursor);
         branch(n, c, x + n.w + G.gap / 2);
         cursor += c.treeH + G.tileGap;
       });
@@ -95,10 +112,11 @@
       let x = G.columnPad, bottom = y;
       nodes.filter(n => n.kind === "station" && n.band === band).forEach(st => {
         st.children.forEach(size);
-        const w = Math.max(G.station[0], ...st.children.map(c => c.treeW));
-        Object.assign(st, { x: x + (w - G.station[0]) / 2, y, w: G.station[0], h: Math.max(G.station[1], measure(st)) });
+        const stationWidth = widthOf(st);
+        const w = Math.max(stationWidth, ...childrenOf(st).map(c => c.treeW));
+        Object.assign(st, { x: x + (w - stationWidth) / 2, y, w: stationWidth, h: Math.max(G.station[1], measure(st)) });
         let cursor = y + st.h + G.gap;
-        st.children.forEach(c => {
+        childrenOf(st).forEach(c => {
           place(c, x + 36, cursor);
           const stemX = x + 12, sy = st.y + st.h;
           lines.push({ kind: "bough", from: st.id, to: c.id,
@@ -116,7 +134,7 @@
     const shelf = layoutBand("shelf", life.bottom + G.bandGap);
     const width = Math.max(life.width, shelf.width);
     if (root) {
-      Object.assign(root, { x: life.width / 2 - G.root[0] / 2, y: 0, w: G.root[0], h: rootHeight });
+      Object.assign(root, { x: life.width / 2 - widthOf(root) / 2, y: 0, w: widthOf(root), h: rootHeight });
       nodes.filter(n => n.kind === "station").forEach(st => {
         const sx = root.x + root.w / 2, sy = root.h, tx = st.x + st.w / 2;
         lines.push({ kind: "trunk", from: root.id, to: st.id,
@@ -149,7 +167,11 @@
     const layers = contentLayers(n);
     if (n.children.length && n.kind !== "root") {
       const tier = Math.max(...Object.keys(layers).map(Number));
-      layers[tier] += `<nav class="branch-links" aria-label="Branches of ${esc(n.label)}">${n.children.map(c => `<a href="#${c.id}">${esc(c.label)}<span aria-hidden="true">↗</span></a>`).join("")}</nav>`;
+      layers[tier] += `<nav class="branch-links" aria-label="Branches of ${esc(n.label)}">${n.children.map(c => `<button type="button" data-expand="${c.id}" aria-expanded="false" aria-controls="map-card-${c.id}"><span>${esc(c.label)}</span><span class="branch-mark" aria-hidden="true">+</span></button>`).join("")}</nav>`;
+    }
+    if (n.parent) {
+      const tier = Math.max(...Object.keys(layers).map(Number));
+      layers[tier] += `<button type="button" class="fold-branch" data-fold="${n.id}" aria-label="Fold ${esc(n.label)} branch" title="Fold this branch">−</button>`;
     }
     return layers;
   }
@@ -189,13 +211,30 @@
     return `<svg class="card-relief${crown ? " canopy" : ""}" viewBox="0 0 300 42" aria-hidden="true" focusable="false"><path class="relief-rule" d="M 18 24 H 84 M 216 24 H 282 M 18 20 V 28 M 282 20 V 28"/>${sprig}<g transform="translate(300 0) scale(-1 1)">${sprig}</g>${crown ? `<path class="relief-stem" d="M 150 38 V 11 M 150 25 Q 143 18 140 14 M 150 25 Q 157 18 160 14"/><path class="relief-leaf" d="M 150 17 Q 140 7 150 1 Q 160 7 150 17"/>` : `<path class="relief-seed" d="M 150 24 L 154 29 L 150 34 L 146 29 Z"/>`}</svg>`;
   }
 
-  function render(tree, world, worldEl, mapEl) {
+  function branchDrawing(world) {
     const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     lines.setAttribute("class", "tree-branches");
     lines.setAttribute("width", world.width);
     lines.setAttribute("height", world.height);
     lines.setAttribute("aria-hidden", "true");
-    lines.innerHTML = world.lines.map(l => `<path class="${l.kind}" d="${l.d}"/>${l.leafX ? `<path class="olive-leaf" d="M ${l.leafX} ${l.leafY} q -17 -25 -28 -16 q 1 18 28 16 M ${l.leafX - 8} ${l.leafY - 3} q 8 -26 22 -23 q 0 17 -22 23"/>` : ""}`).join("");
+    world.lines.forEach(l => lines.append(edgeElement(l)));
+    return lines;
+  }
+
+  function edgeElement(l) {
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.dataset.edge = l.to;
+    g.innerHTML = `<path class="stem ${l.kind}" pathLength="1" d="${l.d}"/>${l.leafX !== undefined ? `<g class="branch-foliage" transform="translate(${l.leafX} ${l.leafY})"><path class="olive-leaf" d="M 0 0 Q -17 -25 -28 -16 Q -27 2 0 0"/><path class="olive-leaf" d="M 0 0 Q 8 -26 22 -23 Q 22 -6 0 0"/></g>` : ""}`;
+    positionFoliage(g);
+    return g;
+  }
+
+  function positionCard(n) {
+    n.el.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px${n.headerH ? `;--header:${n.headerH}px` : ""}`;
+  }
+
+  function render(tree, world, worldEl, mapEl) {
+    const lines = branchDrawing(world);
     worldEl.style.width = `${world.width}px`;
     worldEl.style.height = `${world.height}px`;
     worldEl.replaceChildren(lines);
@@ -208,6 +247,9 @@
     tree.nodes.forEach((n) => {
       const el = document.createElement("div");
       el.className = `card ${n.kind}${n.actor ? " " + n.actor : ""}${n.dim ? " dim" : ""}${n.children.length && n.kind === "action" ? " has-details" : ""}`;
+      el.id = `map-card-${n.id}`;
+      el.hidden = n.visible === false;
+      el.inert = n.visible === false;
       el.dataset.id = n.id;
       el.dataset.kind = n.kind;
       el.tabIndex = -1;
@@ -217,8 +259,8 @@
         : n.kind === "moment" && n.illustration ? `<div class="watermark painting" aria-hidden="true"><img src="${ASSET_BASE}${esc(n.illustration)}" alt="" loading="lazy" decoding="async"></div>` : "";
       el.innerHTML = reliefFor(n) + watermark + Object.entries(layers).map(([tier, html]) => `<div data-tier="${tier}"${tier === "3" && n.kind !== "tile" ? ' class="compact"' : ""}>${html}</div>`).join("");
       el.dataset.tiers = Object.keys(layers).join(",");
-      el.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px${n.headerH ? `;--header:${n.headerH}px` : ""}`;
       n.el = el;
+      positionCard(n);
       worldEl.append(el);
     });
   }
@@ -232,7 +274,8 @@
     $$(".card", worldEl).forEach((el) => {
       const tiers = el.dataset.tiers.split(",").map(Number);
       const selectedTier = { root: 1, station: 1, moment: 2, action: 2, lab: 2, custody: 2, tile: 2 };
-      const detail = el.dataset.id === target ? Math.max(lod, selectedTier[el.dataset.kind]) : lod;
+      const openedDetail = M?.expanded?.has(el.dataset.id) && lod >= 1;
+      const detail = el.dataset.id === target || openedDetail ? Math.max(lod, selectedTier[el.dataset.kind]) : lod;
       el.dataset.show = String(Math.max(-1, ...tiers.filter((t) => t <= detail)));
     });
   }
@@ -254,12 +297,8 @@
       return h;
     };
     return (n) => {
-      if (n.kind === "root") return heightOf(n, 1, G.root[0]);
-      if (n.kind === "station") return heightOf(n, 1, G.station[0]);
-      if (n.kind === "custody") return heightOf(n, 2, G.custody[0]);
-      if (n.kind === "moment") return heightOf(n, 2, G.moment[0]);
-      if (n.kind === "action") return Math.max(heightOf(n, 2, G.action[0]), heightOf(n, 3, G.action[0]));
-      return heightOf(n, 2, spanW(n.kind === "lab" ? 2 : n.span));
+      const tier = n.kind === "root" || n.kind === "station" ? 1 : 2;
+      return heightOf(n, tier, widthOf(n));
     };
   }
 
@@ -275,13 +314,14 @@
     const doc = $("#document"), worldEl = $("#world"), mapEl = $("#map");
     if (!doc || !worldEl) return null;
     const tree = readDocument(doc);
-    const world = layoutWorld(tree.nodes, makeMeasurer(worldEl));
+    const expanded = new Set();
+    const world = layoutWorld(tree.nodes, makeMeasurer(worldEl), expanded);
     render(tree, world, worldEl, mapEl);
     $(".probe", worldEl)?.remove();
     // Labs live in the cards now; the document keeps a placeholder so it still reads without JS.
     tree.nodes.filter((n) => n.kind === "lab").forEach((n) => { n.source.querySelectorAll(":scope > *:not(h5)").forEach((c) => c.remove()); });
     if (window.IvyLabs?.mountAll) window.IvyLabs.mountAll(worldEl);
-    M = { tree, world, worldEl, mapEl, cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height, atHome: true, target: null, revealed: null };
+    M = { tree, world, worldEl, mapEl, expanded, vertical: verticalBranches(), cam: { x: 0, y: 0, s: 1 }, W: world.width, H: world.height, atHome: true, target: null, revealed: null };
     wireInput();
     wireSearch(); wireKeys(); wireTouch(); wireChrome();
     document.body.dataset.mode === "guide" ? home(false) : followHash(false);
@@ -302,7 +342,8 @@
     const { cam, worldEl } = M;
     worldEl.style.transition = animate && !reduced() ? "" : "none";
     worldEl.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.s})`;
-    setLod(lodOf(cam.s), worldEl);
+    // A compact folded tree still uses overview labels when fitted to the window.
+    setLod(cam.s <= homeScale() * (1 + 1e-6) ? 0 : lodOf(cam.s), worldEl);
     // Recorded now, with the viewport size as it is at this exact moment,
     // because a "resize" event fires only after the browser has already
     // resized #map — by then vw()/vh() (and so homeScale()) already reflect
@@ -338,6 +379,11 @@
     apply(animate);
   }
   function flyToNode(n, animate = true) {
+    let changed = false;
+    for (let at = n; at; at = at.parent) {
+      if (at.parent && !M.expanded.has(at.id)) { M.expanded.add(at.id); changed = true; }
+    }
+    if (changed) reflow(false);
     M.target = n;
     M.revealed = n;
     focused = n;
@@ -381,7 +427,7 @@
       return path;
     }
     path.push(station);
-    const target = [...tree.nodes].reverse().find(n => hit(n));
+    const target = [...tree.nodes].reverse().find(n => n.visible && hit(n));
     if (target) {
       path.length = 0;
       for (let node = target; node; node = node.parent) path.unshift(node);
@@ -422,7 +468,8 @@
       else btn.removeAttribute("aria-current");
     });
     const currentKey = items.at(-1).key;
-    if (crumbs.dataset.current !== currentKey) {
+    if (crumbs.dataset.current !== currentKey || Number(crumbs.dataset.width) !== crumbs.clientWidth) {
+      crumbs.dataset.width = crumbs.clientWidth;
       crumbs.dataset.current = currentKey;
       crumbs.scrollLeft = crumbs.scrollWidth;
     }
@@ -550,6 +597,12 @@
       flyToNode(node);
       document.body.classList.add("touched");
     });
+    mapEl.addEventListener("click", e => {
+      const button = e.target.closest("[data-expand], [data-fold]");
+      if (!button) return;
+      e.preventDefault();
+      toggleBranch(M.tree.byId.get(button.dataset.expand || button.dataset.fold), e.detail !== 0);
+    });
     document.addEventListener("click", (e) => {
       if (document.body.dataset.mode === "guide") return;
       const b = e.target.closest("[data-fly], [data-home], [data-zoom], [data-reset-zoom]");
@@ -588,23 +641,179 @@
       if (e.key === "-") zoomBy(1 / ZOOM_STEP);
       if (e.key === "0") home();
     });
-    // R9: at the whole-map view, resizing re-fits; otherwise it clamps and
-    // keeps the camera in place rather than moving the reader's viewpoint.
-    // Uses M.atHome (set by the last apply(), before the viewport changed)
-    // rather than recomputing here() here: by the time this handler runs the
-    // browser has already resized #map, so a live here() would compare the
-    // OLD cam.s against the NEW homeScale() and wrongly conclude we had
-    // navigated away from home.
     addEventListener("resize", () => {
-      if (M.atHome) return home(false);
+      const wasHome = M.atHome;
+      if (M.tree.nodes.some(n => n.w !== widthOf(n)) || M.vertical !== verticalBranches()) {
+        reflow(false);
+        M.vertical = verticalBranches();
+        if (!wasHome && M.target) return flyToNode(M.target, false);
+      }
+      if (wasHome) return home(false);
       clampCam();
       apply(false);
     });
   }
 
+  // Keep both leaf petioles on the actual rendered curve, including during morphs.
+  function positionFoliage(g) {
+    const foliage = $(".branch-foliage", g);
+    if (!foliage) return;
+    const stem = $(".stem", g), length = stem.getTotalLength();
+    const at = Math.max(0, length - 30), p = stem.getPointAtLength(at);
+    const next = stem.getPointAtLength(Math.min(length, at + 1));
+    const angle = Math.atan2(next.y - p.y, next.x - p.x) * 180 / Math.PI;
+    foliage.setAttribute("transform", `translate(${p.x} ${p.y}) rotate(${angle})`);
+    const remaining = parseFloat(getComputedStyle(stem).strokeDashoffset) || 0;
+    foliage.style.visibility = remaining <= 30 / Math.max(1, length) ? "visible" : "hidden";
+  }
+  let foliageFrame = 0;
+  function trackFoliage() {
+    cancelAnimationFrame(foliageFrame);
+    const tick = () => {
+      let moving = false;
+      $$("[data-edge]", M.worldEl).forEach(g => {
+        if (g.style.display === "none") return;
+        positionFoliage(g);
+        moving ||= $(".stem", g).getAnimations().some(a => a.playState === "running");
+      });
+      foliageFrame = moving ? requestAnimationFrame(tick) : 0;
+    };
+    tick();
+  }
+  function shiftedPath(path, dx, dy) {
+    let i = 0;
+    return path.replace(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi, value => String(Number(value) + (i++ % 2 ? dy : dx)));
+  }
+
+  /* ---------- Independently growing detail branches ---------- */
+  const motions = new WeakMap();
+  function motion(el, slot, from, to, duration, delay = 0, done) {
+    let slots = motions.get(el);
+    if (!slots) { slots = new Map(); motions.set(el, slots); }
+    slots.get(slot)?.cancel();
+    Object.assign(el.style, to);
+    if (!duration || reduced()) { slots.delete(slot); done?.(); return; }
+    const a = el.animate([from, to], {duration, delay, fill: "both", easing: "cubic-bezier(.22,.8,.22,1)"});
+    slots.set(slot, a);
+    a.onfinish = () => {
+      if (slots.get(slot) !== a) return;
+      slots.delete(slot); a.cancel(); done?.();
+    };
+  }
+  function reflow(animate = false) {
+    interruptMotion();
+    const duration = animate && !reduced() ? 440 : 0;
+    const anchor = M.target || M.revealed;
+    const oldCards = new Map(M.tree.nodes.map(n => {
+      const css = getComputedStyle(n.el), transform = new DOMMatrix(css.transform);
+      return [n.id, {visible: !n.el.hidden, x: n.x + transform.e, y: n.y + transform.f, transform: css.transform, opacity: css.opacity}];
+    }));
+    const oldAnchor = anchor && oldCards.get(anchor.id);
+    const world = layoutWorld(M.tree.nodes, makeMeasurer(M.worldEl), M.expanded);
+    const dx = anchor ? anchor.x - oldAnchor.x : 0, dy = anchor ? anchor.y - oldAnchor.y : 0;
+    $(".probe", M.worldEl)?.remove();
+    M.world = world; M.W = world.width; M.H = world.height;
+    M.worldEl.style.width = `${world.width}px`; M.worldEl.style.height = `${world.height}px`;
+    M.tree.nodes.forEach(n => {
+      const before = oldCards.get(n.id), el = n.el;
+      positionCard(n);
+      el.inert = !n.visible;
+      if (n.visible) {
+        el.hidden = false;
+        const matrix = new DOMMatrix(before.transform);
+        const from = before.visible ? `translate(${before.x + dx - n.x}px, ${before.y + dy - n.y}px) scale(${matrix.a}, ${matrix.d})` : `translate(${verticalBranches() ? 0 : -24}px, ${verticalBranches() ? -24 : 0}px) scale(.94)`;
+        motion(el, "position", {transform: from, opacity: before.visible ? before.opacity : "0"}, {transform: "none", opacity: "1"}, before.visible ? duration : duration ? 440 : 0, !before.visible && duration ? 230 : 0);
+      } else if (before.visible) {
+        motion(el, "position", {transform: before.transform, opacity: before.opacity}, {transform: "translateX(-18px) scale(.96)", opacity: "0"}, duration ? 220 : 0, 0, () => { if (!n.visible) el.hidden = true; });
+      }
+    });
+    const svg = $(".tree-branches", M.worldEl), active = new Set(world.lines.map(l => l.to));
+    svg.setAttribute("width", world.width); svg.setAttribute("height", world.height);
+    const existing = new Map($$("[data-edge]", svg).map(g => [g.dataset.edge, g]));
+    world.lines.forEach(l => {
+      let g = existing.get(l.to);
+      const fresh = !g;
+      const entering = fresh || g.dataset.closed === "true";
+      if (!g) { g = edgeElement(l); svg.append(g); }
+      g.style.display = ""; g.dataset.closed = "false";
+      const stem = $(".stem", g), shape = fresh ? getComputedStyle(stem).d : shiftedPath(getComputedStyle(stem).d, dx, dy);
+      const dash = entering ? g.dataset.drawn ? getComputedStyle(stem).strokeDashoffset : "1" : getComputedStyle(stem).strokeDashoffset;
+      stem.setAttribute("d", l.d); stem.style.strokeDasharray = "1";
+      motion(stem, "shape", {d: shape}, {d: `path("${l.d}")`}, duration);
+      motion(stem, "draw", {strokeDashoffset: dash}, {strokeDashoffset: "0"}, entering && duration ? 520 : duration);
+      g.dataset.drawn = "true";
+      const foliage = $(".branch-foliage", g);
+      if (foliage) {
+        $$(".olive-leaf", foliage).forEach((leaf, i) => {
+          const css = getComputedStyle(leaf);
+          motion(leaf, "unfurl", {transform: fresh ? "scale(.12) rotate(" + (i ? 30 : -30) + "deg)" : css.transform, opacity: fresh ? "0" : css.opacity}, {transform: "none", opacity: ".8"}, duration ? 380 : 0, entering && duration ? 200 + i * 55 : 0);
+        });
+      }
+    });
+    existing.forEach((g, id) => {
+      if (active.has(id)) return;
+      g.dataset.closed = "true";
+      const stem = $(".stem", g);
+      motion(stem, "draw", {strokeDashoffset: getComputedStyle(stem).strokeDashoffset}, {strokeDashoffset: "1"}, duration ? 320 : 0, 0, () => { if (g.dataset.closed === "true") g.style.display = "none"; });
+      $$(".olive-leaf", g).forEach(leaf => motion(leaf, "unfurl", {transform: getComputedStyle(leaf).transform, opacity: getComputedStyle(leaf).opacity}, {transform: "scale(.12)", opacity: "0"}, duration ? 200 : 0));
+    });
+    $$("[data-expand]", M.worldEl).forEach(button => {
+      const open = M.expanded.has(button.dataset.expand);
+      button.setAttribute("aria-expanded", String(open));
+      $(".branch-mark", button).textContent = open ? "−" : "+";
+    });
+    if (anchor) {
+      M.cam.x += (oldAnchor.x - anchor.x) * M.cam.s;
+      M.cam.y += (oldAnchor.y - anchor.y) * M.cam.s;
+    }
+    trackFoliage();
+    currentLod = -1;
+  }
+  function toggleBranch(n, animate = true) {
+    if (!n?.parent) return;
+    const parent = n.parent, opening = !M.expanded.has(n.id);
+    interruptMotion();
+    M.target = parent; M.revealed = parent;
+    const foldingFromLeaf = !opening && n.el.contains(document.activeElement);
+    if (foldingFromLeaf) {
+      M.branchFocus = true;
+      parent.el.querySelector(`[data-expand="${n.id}"]`)?.focus({preventScroll: true});
+      M.branchFocus = false;
+    }
+    if (opening) M.expanded.add(n.id); else M.expanded.delete(n.id);
+    reflow(animate);
+    // Commit the layout compensation before starting the pan to the new target.
+    M.worldEl.style.transition = "none";
+    M.worldEl.style.transform = `translate(${M.cam.x}px, ${M.cam.y}px) scale(${M.cam.s})`;
+    if (animate && !reduced()) M.worldEl.getBoundingClientRect();
+    const target = opening ? n : parent;
+    M.target = target; M.revealed = target; focused = target;
+    const {s} = M.cam;
+    M.cam.x = vw() / 2 - (target.x + target.w / 2) * s;
+    // Center the card at the reader's zoom. Tall cards start at their heading.
+    M.cam.y = target.h * s <= vh() - 24
+      ? vh() / 2 - (target.y + target.h / 2) * s
+      : 12 - target.y * s;
+    const control = document.activeElement;
+    if (!opening && control !== target.el && target.el.contains(control)) {
+      let top = 0;
+      for (let el = control; el && el !== target.el; el = el.offsetParent) top += el.offsetTop;
+      const screenTop = M.cam.y + (target.y + top) * s;
+      const screenBottom = screenTop + control.offsetHeight * s;
+      if (screenBottom > vh() - 12) M.cam.y -= screenBottom - vh() + 12;
+      else if (screenTop < 12) M.cam.y += 12 - screenTop;
+    }
+    clampCam(); apply(animate);
+    if (opening) target.el.focus({preventScroll: true});
+  }
+
   /* ---------- Hash and aliases ---------- */
   // Compatibility with the former reference-heavy map and classic Guide anchors.
   const ALIASES = {
+    "deposit-token-approval": "hub-and-vaults",
+    "cash-expiration-reserve": "expire-the-vault",
+    "buyer-reserve-sources": "buyer-claims-any-payout",
+    "buyer-claim-recipient": "claim-payout",
     "overview": "before-the-vault",
     "participants": "who-is-around-a-vault",
     "execution-permissions": "executor-and-recipient",
@@ -928,7 +1137,16 @@
       // Tabbing to a card's native controls must use the camera, not an
       // independent scroll offset in the overflow-hidden canvas.
       mapEl.scrollTo(0, 0);
-      if (!pointerDown && M.target !== node) flyToNode(node, false);
+      if (!pointerDown && !M.branchFocus) {
+        if (M.target !== node) flyToNode(node, false);
+        // A newly grown sibling may have moved the camera below this control.
+        // Keep keyboard focus visible even when its card is taller than the view.
+        const control = e.target.getBoundingClientRect(), view = mapEl.getBoundingClientRect();
+        if (e.target !== card && (control.top < view.top + 12 || control.bottom > view.bottom - 12)) {
+          M.cam.y += control.top < view.top + 12 ? view.top + 12 - control.top : view.bottom - 12 - control.bottom;
+          clampCam(); apply(false);
+        }
+      }
     });
   }
 
@@ -970,7 +1188,7 @@
     }
   }
 
-  const state = () => ({ scale: M.cam.s, lod: currentLod, path: here().map((n) => n.id) });
+  const state = () => ({ scale: M.cam.s, lod: currentLod, path: here().map((n) => n.id), expanded: [...M.expanded] });
 
   function boot() {
     document.fonts.ready.then(() => { window.IvyMap.mounted = mount(); });

@@ -123,21 +123,20 @@ test("a selected action fits a narrow viewport and remains the navigation target
   assert.equal(await page.evaluate(() => IvyMap.here().at(-1).id), 'buyer-has-paid-the-premium');
 }));
 
-test("keyboard branch links descend without native canvas scrolling", () => withMap(async page => {
+test("keyboard branch toggles reveal details and return focus when a leaf is folded", () => withMap(async page => {
   await page.evaluate(() => IvyMap.flyTo('cancel-any-time', false));
-  const branch = page.locator('.card[data-id="cancel-any-time"] a[href="#auction-cancellation-clock"]');
-  await branch.focus();
-  await page.keyboard.press('Enter');
-  await settle(page, 400);
+  const branch = page.locator('.card[data-id="cancel-any-time"] [data-expand="auction-cancellation-clock"]');
+  await branch.focus(); await page.keyboard.press('Enter');
+  assert.equal(await branch.getAttribute('aria-expanded'), 'true');
   assert.equal(await page.evaluate(() => IvyMap.here().at(-1)?.id), 'auction-cancellation-clock');
-  const detail = page.locator('.card[data-id="auction-cancellation-clock"] a[href="#auction-timeout-setting"]');
-  await detail.focus();
-  await page.keyboard.press('Enter');
-  await settle(page, 400);
-  assert.deepEqual(await page.evaluate(() => ({target:IvyMap.here().at(-1)?.id,top:document.querySelector('#map').scrollTop,left:document.querySelector('#map').scrollLeft})), {target:'auction-timeout-setting',top:0,left:0});
-  await page.locator('.card[data-id="auction-timeout-setting"]').focus();
-  await page.keyboard.press('ArrowUp');
-  assert.equal(await page.evaluate(() => IvyMap.here().at(-1)?.id), 'auction-cancellation-clock');
+  const detail = page.locator('.card[data-id="auction-cancellation-clock"] [data-expand="auction-timeout-setting"]');
+  await detail.focus(); await page.keyboard.press('Enter');
+  assert.equal(await detail.getAttribute('aria-expanded'), 'true');
+  const fold = page.locator('.card[data-id="auction-timeout-setting"] [data-fold]');
+  await fold.focus(); await page.keyboard.press('Enter');
+  assert.equal(await detail.getAttribute('aria-expanded'), 'false');
+  assert.equal(await detail.evaluate(el => el === document.activeElement), true);
+  assert.deepEqual(await page.evaluate(() => ({top:document.querySelector('#map').scrollTop,left:document.querySelector('#map').scrollLeft})), {top:0,left:0});
 }));
 
 test("the role widget accepts Enter and fits when focused on mobile", () => withMap(async page => {
@@ -272,4 +271,42 @@ test("mobile breadcrumbs reveal the current leaf and allow scrolling to ancestor
   assert.equal(result.visible,true);
   assert.ok(result.scroll > 0);
   assert.equal(result.overflow,'auto');
+}));
+
+test("wide cards reflow on resize without losing the selected topic, focus or lab state", () => withMap(async page => {
+  await page.evaluate(() => IvyMap.flyTo('actor-routes-lab', false));
+  const card = page.locator('.card[data-id="actor-routes-lab"]');
+  const choice = card.locator('[data-route="1"]');
+  await choice.click();
+  await choice.focus();
+  for (const width of [320, 1920, 390, 1440]) {
+    await page.setViewportSize({width, height:900});
+    await page.waitForFunction(width => document.querySelector('.card[data-id="actor-routes-lab"]').offsetWidth === Math.min(420, width-24), width);
+    assert.equal(await choice.getAttribute('aria-pressed'), 'true');
+    assert.equal(await choice.evaluate(el => document.activeElement === el), true);
+    assert.equal(await page.evaluate(() => IvyMap.here().at(-1)?.id), 'actor-routes-lab');
+    const box = await card.boundingBox();
+    assert.ok(box.x >= -1 && box.x + box.width <= width+1, JSON.stringify(box));
+    const problems = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('#world .card:not([hidden])')];
+      return cards.flatMap((a,i) => cards.slice(i+1).filter(b => a.offsetLeft < b.offsetLeft+b.offsetWidth && a.offsetLeft+a.offsetWidth > b.offsetLeft && a.offsetTop < b.offsetTop+b.offsetHeight && a.offsetTop+a.offsetHeight > b.offsetTop).map(b => `${a.dataset.id} overlaps ${b.dataset.id}`));
+    });
+    assert.deepEqual(problems, []);
+  }
+  await page.evaluate(() => IvyMap.flyTo('bid-validity-deadline', false));
+  assert.ok(await page.locator('.card[data-id="bid-validity-deadline"]').evaluate(el => el.offsetWidth >= 450));
+}));
+
+test("bookmarks to merged explanations resolve to their surviving topic", () => withMap(async page => {
+  for (const [old, current] of [
+    ['deposit-token-approval', 'hub-and-vaults'],
+    ['cash-expiration-reserve', 'expire-the-vault'],
+    ['buyer-reserve-sources', 'buyer-claims-any-payout'],
+    ['buyer-claim-recipient', 'claim-payout'],
+  ]) {
+    await page.evaluate(id => { location.hash = id; }, old);
+    await page.waitForFunction(id => IvyMap.here().at(-1)?.id === id, current);
+    assert.equal(await page.locator(`#document #${old}`).count(), 0);
+    assert.equal(await page.locator(`.card[data-id="${current}"]`).isVisible(), true);
+  }
 }));

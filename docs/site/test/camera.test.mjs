@@ -42,9 +42,15 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     await page.evaluate(() => IvyMap.home(false));
     await page.click('.card[data-id="open"]'); await settle(page);
     assert.deepEqual((await state(page)).path, ["open"]);
-    await page.click('.card[data-id="open"] .branch-links a[href="#lps-deposit-collateral"]'); await settle(page);
+    const stationScale = (await state(page)).scale;
+    await page.click('.card[data-id="open"] [data-expand="lps-deposit-collateral"]'); await settle(page);
+    assert.equal((await state(page)).scale, stationScale, "expanding a topic preserves zoom");
+    await page.locator('.card[data-id="open"]').focus();
+    await page.keyboard.press("ArrowDown"); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "lps-deposit-collateral"]);
-    await page.click('.card[data-id="lps-deposit-collateral"] .branch-links a[href="#add-funds"]'); await settle(page);
+    await page.click('.card[data-id="lps-deposit-collateral"] [data-expand="add-funds"]'); await settle(page);
+    await page.locator('.card[data-id="lps-deposit-collateral"]').focus();
+    await page.keyboard.press("ArrowDown"); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "lps-deposit-collateral", "add-funds"]);
     assert.ok((await state(page)).lod >= 2);
     assert.equal(await page.textContent("#crumbs"), "Whole map›Open›LPs deposit collateral›LP: Add funds");
@@ -53,11 +59,13 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     await page.keyboard.press("Escape"); await settle(page);
     await page.keyboard.press("Escape"); await settle(page);
     assert.deepEqual((await state(page)).path, []);
+    // Fit now reflects the expanded tree, not the initial folded bounds.
+    const expandedFit = await independentFitScale(page);
     // Toolbar zoom buttons and Fit.
     await page.click('[data-zoom="+"]'); await settle(page);
-    assert.ok((await state(page)).scale > home.scale);
+    assert.ok((await state(page)).scale > expandedFit);
     await page.click("[data-home]"); await settle(page);
-    assert.equal((await state(page)).scale, home.scale);
+    assert.equal((await state(page)).scale, expandedFit);
     // The reader cannot zoom out past "whole world fits": the wheel handler and
     // zoomBy both clamp their floor to homeScale() (not homeScale() * 0.8).
     await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
@@ -67,7 +75,7 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     await settle(page, 200);
     await page.evaluate(() => IvyMap.zoomBy(1 / 1.5));
     await settle(page, 200);
-    assert.equal((await state(page)).scale, home.scale, "cannot zoom out past the home/fit scale");
+    assert.equal((await state(page)).scale, expandedFit, "cannot zoom out past the home/fit scale");
     assert.deepEqual(errors, []);
   } finally {
     await close();

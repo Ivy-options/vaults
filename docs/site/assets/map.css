@@ -63,7 +63,7 @@ body.map-ready #document { display: none; }
    station card has become a smudge; once the reader is close enough the
    reading tier adds the tagline and the opening vocabulary paragraphs. */
 .card.root { border-color: var(--accent); box-shadow: 0 32px 90px rgba(0, 0, 0, 0.35); background: color-mix(in oklab, var(--accent) 6%, var(--panel)); }
-.card.root h2 { margin: 0; font: 600 88px/1.05 var(--roman-font, Georgia, serif); letter-spacing: -0.02em; text-wrap: balance; }
+.card.root h2 { margin: 0; font: 600 clamp(36px, 6.1vw, 88px)/1.05 var(--roman-font, Georgia, serif); letter-spacing: -0.02em; text-wrap: balance; }
 .card.root [data-tier="0"] { align-items: center; justify-content: center; text-align: center; }
 .card.root [data-tier="1"] { padding: 66px 34px 26px; gap: 8px; overflow: hidden; }
 .card.root [data-tier="1"] h2 { font-size: 32px; }
@@ -168,9 +168,9 @@ body.map-ready #document { display: none; }
 .card.tile code { font-size: 0.85em; white-space: normal; overflow-wrap: anywhere; }
 .card.tile .body a { color: var(--accent); }
 .branch-links { display: flex; flex-direction: column; gap: 0; margin-top: 16px; padding-top: 6px; border-top: 1px solid var(--line); width: 100%; }
-.branch-links a { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; font: 13px/1.4 var(--body); color: var(--accent); text-decoration: none; }
-.branch-links a:hover { text-decoration: underline; }
-.branch-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.branch-links a, .branch-links button { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; font: 13px/1.4 var(--body); color: var(--accent); text-decoration: none; }
+.branch-links a:hover, .branch-links button:hover { text-decoration: underline; }
+.branch-links a:focus-visible, .branch-links button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .branch-links a span { color: var(--olive-branch); }
 .card.action > [data-tier="2"] .branch-links { flex-basis: 100%; }
 .card.station { border-radius: 58px 58px 6px 6px; border-top: 2px solid var(--olive-branch); }
@@ -235,3 +235,20 @@ body.map-ready #document { display: none; }
 .grove-index button span { color: var(--olive-branch); }
 @media (max-width: 760px) { .grove-index { left: 12px; top: 12px; width: 185px; padding: 12px; } }
 @media print { .grove-index { display: none !important; } }
+
+/* Detail branches stay in the semantic document; only requested leaves grow on the map. */
+.card[hidden] { display: none; }
+.card { transform-origin: left center; }
+.branch-links button { width: 100%; align-items: center; min-height: 38px; text-align: left; background: none; border: 0; cursor: pointer; }
+.branch-links button > span:first-child { color: var(--accent); }
+.branch-links button .branch-mark { display: grid; place-items: center; flex: 0 0 23px; width: 23px; height: 23px; border: 1px solid color-mix(in srgb, var(--olive-branch) 50%, transparent); border-radius: 50%; font: 18px/1 var(--body); transition: background .18s, color .18s; }
+.branch-links button[aria-expanded="true"] .branch-mark { background: color-mix(in srgb, var(--olive-branch) 18%, transparent); color: var(--ink); }
+.branch-foliage .olive-leaf { transform-origin: 0 0; }
+.branch-foliage .olive-leaf + .olive-leaf { transform-origin: 0 0; }
+@media (max-width: 1119px) { .card { transform-origin: top center; } }
+@media (max-width: 759px) { .branch-links button { min-height: 44px; } }
+
+.fold-branch { position: absolute; right: 16px; top: 12px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; background: var(--panel); border: 1px solid var(--olive-branch); border-radius: 50%; color: var(--olive-branch); font: 20px/1 var(--body); cursor: pointer; }
+.fold-branch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 759px) { .fold-branch { width: 36px; height: 36px; top: 9px; right: 12px; } }
+@media (prefers-reduced-motion: reduce) { .branch-mark { transition: none !important; } }
