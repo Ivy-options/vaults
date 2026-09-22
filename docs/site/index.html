@@ -441,7 +441,11 @@
     </ul>
     <p><strong class="key-term">Who supplies the tokens?</strong> The buyer or executor submitting a physical exercise must hold the input tokens and approve this vault to spend them.</p>
     <p><strong class="key-term">Example:</strong> an executor pays USDC from its wallet; the physical call sends WETH to the chosen recipient.</p>
-    <p><strong class="key-term">Contract recipients:</strong> after each payout the contract calls <code>onIvyPayout(vaultId, token, amount)</code> on the recipient if it is a contract. The tokens are already delivered when the call runs, and the vault is already settled if that payout completed it. A recipient without that method, or one that reverts, never blocks the payout. Only a recipient that runs out of gas reverts the transaction, so gas estimates stay honest.</p>
+    </section>
+    <section data-kind="tile" id="buyer-recipient-hook"><h5>A contract recipient is told it was paid</h5>
+    <p>After each payout, the contract calls <code>onIvyPayout(vaultId, token, amount)</code> on the <strong class="key-term">recipient</strong> if it is a contract.</p>
+    <p>The tokens are already delivered when the call runs, and the vault is already settled if that payout completed it.</p>
+    <p>A recipient without that method, or one that reverts, <strong class="key-term">never blocks the payout</strong>. Only a recipient that runs out of gas reverts the transaction, so gas estimates stay honest.</p>
     <p><strong class="key-term">Example:</strong> a recipient contract receives WETH from a cash exercise and swaps it to USDC in the same transaction, or posts an order for a solver to fill later.</p>
     </section>
     </section>
