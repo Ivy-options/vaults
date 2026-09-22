@@ -117,7 +117,7 @@ test("zoom controls remain reachable at 320px", () => withMap(async (page) => {
 }));
 
 test("a drag begins on a card without a focus-triggered camera jump", () => withMap(async page => {
-  await page.evaluate(() => IvyMap.flyTo('open', false));
+  await page.evaluate(() => IvyMap.flyTo('add-funds', false));
   await settle(page, 350);
   const box = await page.locator('.card[data-id="add-funds"]').boundingBox();
   const x = box.x + box.width / 2, y = box.y + 20;

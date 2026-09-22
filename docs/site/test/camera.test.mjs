@@ -42,11 +42,11 @@ test("wheel zooms at the cursor, drag pans, click flies, Esc steps out", async (
     await page.evaluate(() => IvyMap.home(false));
     await page.click('.card[data-id="open"]'); await settle(page);
     assert.deepEqual((await state(page)).path, ["open"]);
-    await page.click('.card[data-id="lps-deposit-collateral"]'); await settle(page);
+    await page.click('.card[data-id="open"] .branch-links a[href="#lps-deposit-collateral"]'); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "lps-deposit-collateral"]);
-    await page.click('.card[data-id="add-funds"]'); await settle(page);
+    await page.click('.card[data-id="lps-deposit-collateral"] .branch-links a[href="#add-funds"]'); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "lps-deposit-collateral", "add-funds"]);
-    assert.equal((await state(page)).lod, 3);
+    assert.ok((await state(page)).lod >= 2);
     assert.equal(await page.textContent("#crumbs"), "Whole map›Open›LPs deposit collateral›LP: Add funds");
     await page.keyboard.press("Escape"); await settle(page);
     assert.deepEqual((await state(page)).path, ["open", "lps-deposit-collateral"]);

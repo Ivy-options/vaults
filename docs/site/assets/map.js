@@ -54,105 +54,74 @@
   }
 
   const G = {
-    station: [360, 200], moment: [300, 170], action: [300, 150], custody: [220, 170], root: [640, 340],
-    gap: 40, momentY: 320, actionY: 560, actionGap: 20, tile: 132, tileGap: 12,
-    columnPad: 80, bandGap: 260, minTile: 40, rootGap: 120,
+    station: [360, 200], moment: [300, 170], action: [300, 150], custody: [260, 170], root: [640, 340],
+    gap: 64, tile: 300, tileGap: 20, columnPad: 60, bandGap: 180, rootGap: 160,
   };
-  const spanW = (span) => (span >= 2 ? 2 * G.tile + G.tileGap : G.tile);
+  const spanW = () => G.tile;
 
-  // Places every node. Stations left to right per band; moments in a centred row; actions stacked; tiles in a two-column grid.
-  // A root card (the apex, above every station) is optional: fixtures and tests
-  // that omit it keep the exact geometry this had before roots existed.
+  // Each stage is a tree. Siblings share a stem, never a false action-to-action
+  // chain. Recursive subtree bounds allow any number of children at any depth.
   function layoutWorld(nodes, measure) {
     const lines = [];
-    const line = (x, y, w, h, kind) => lines.push({ x, y, w, h, kind });
     const root = nodes.find((n) => n.kind === "root");
-    // With a root, the life band's main line drops from G.rootGap below the
-    // root card instead of sitting a fixed 40px above y0=0; rootOffset shifts
-    // the whole life band down by exactly that much so the root, in turn,
-    // sits at y=0. Without a root this is 0 and every coordinate below is
-    // identical to the pre-root layout.
-    const rootOffset = root ? G.root[1] + G.rootGap + 40 : 0;
-    const layoutBand = (band, y0) => {
-      let cursor = 0, bottom = y0;
-      nodes.filter((n) => n.kind === "station" && n.band === band).forEach((st) => {
-        const moments = st.children.filter((c) => c.kind === "moment");
-        const custody = st.children.find((c) => c.kind === "custody");
-        const rowW = moments.length ? moments.length * G.moment[0] + (moments.length - 1) * G.gap : 0;
-        const colW = Math.max(rowW, G.station[0] + 2 * (G.gap + G.custody[0])) + 2 * G.columnPad;
-        const rowX = cursor + (colW - rowW) / 2;
-        const stX = cursor + (colW - G.station[0]) / 2;
-        Object.assign(st, {
-          x: moments.length ? rowX + rowW / 2 - G.station[0] / 2 : stX,
-          y: y0, w: G.station[0], h: G.station[1], column: { x: cursor, w: colW },
-        });
-        if (custody) Object.assign(custody, { x: st.x + G.station[0] + G.gap, y: y0, w: G.custody[0], h: G.custody[1] });
-        let colBottom = y0 + G.station[1];
-        moments.forEach((m, j) => {
-          Object.assign(m, { x: rowX + j * (G.moment[0] + G.gap), y: y0 + G.momentY, w: G.moment[0], h: Math.max(G.moment[1], measure(m)) });
-          let ay = Math.max(y0 + G.actionY, m.y + m.h + G.gap);
-          m.children.filter((c) => c.kind === "action").forEach((a) => {
-            const headerH = Math.max(96, measure(a));
-            Object.assign(a, { x: m.x, y: ay, w: G.action[0], headerH });
-            let cursorY = headerH;
-            const tiles = a.children.filter((c) => c.kind === "tile" || c.kind === "lab");
-            for (let i = 0; i < tiles.length; ) {
-              const row = [];
-              let used = 0;
-              while (i < tiles.length && used + (tiles[i].kind === "lab" ? 2 : tiles[i].span) <= 2) { used += tiles[i].kind === "lab" ? 2 : tiles[i].span; row.push(tiles[i++]); }
-              if (!row.length) { row.push(tiles[i++]); }
-              const rowH = Math.max(G.minTile, ...row.map(measure));
-              let x = a.x + G.tileGap;
-              row.forEach((t) => {
-                const w = spanW(t.kind === "lab" ? 2 : t.span);
-                Object.assign(t, { x, y: ay + cursorY + G.tileGap, w, h: rowH });
-                x += w + G.tileGap;
-              });
-              cursorY += G.tileGap + rowH;
-            }
-            a.h = tiles.length ? cursorY + G.tileGap : headerH;
-            ay += a.h + G.actionGap;
-          });
-          m.bottom = m.children.some((c) => c.kind === "action") ? ay - G.actionGap : m.y + m.h;
-          colBottom = Math.max(colBottom, m.bottom);
-        });
-        st.column.h = colBottom - y0;
-        bottom = Math.max(bottom, colBottom);
-        cursor += colW;
-      });
-      return { width: cursor, bottom };
+    const rootHeight = root ? Math.max(G.root[1], measure(root)) : 0;
+    const size = (n) => {
+      const preset = Array.isArray(G[n.kind]) ? G[n.kind] : null;
+      n.w = preset ? preset[0] : G.tile;
+      n.h = Math.max(preset ? preset[1] : 100, measure(n));
+      if (n.kind === "action") n.headerH = n.h;
+      n.children.forEach(size);
+      n.treeW = n.w + (n.children.length ? G.gap + Math.max(...n.children.map(c => c.treeW)) : 0);
+      n.treeH = Math.max(n.h, n.children.reduce((h, c) => h + c.treeH, 0) + Math.max(0, n.children.length - 1) * G.tileGap);
     };
-    const life = layoutBand("life", rootOffset);
-    const shelfY = life.bottom + G.bandGap;
-    const shelf = layoutBand("shelf", shelfY);
-    let width = Math.max(life.width, shelf.width);
-    const cx = (n) => n.x + n.w / 2;
-    // The life band's main line and its per-station pins: 40px above y0, same
-    // as always — y0 is just rootOffset instead of 0 when a root exists.
-    const mainY = rootOffset - 40;
-    if (root) {
-      Object.assign(root, { x: life.width / 2 - G.root[0] / 2, y: 0, w: G.root[0], h: G.root[1] });
-      width = Math.max(width, root.x + root.w);
-    }
-    // Connectors: root drop, main line, shelf rule, drops, rows, gaps, pins. Drawn only where no card sits.
-    line(0, mainY, life.width, 2, "main");
-    if (shelf.width) { line(0, shelfY - 60, shelf.width, 1, "rule"); }
-    nodes.filter((n) => n.kind === "station").forEach((st) => {
-      const moments = st.children.filter((c) => c.kind === "moment");
-      if (st.band === "life") line(cx(st), mainY, 0, 0, "pin-main");
-      if (!moments.length) return;
-      const rowLineY = st.y + G.momentY - 30;
-      line(cx(st) - 1, st.y + st.h, 2, rowLineY - (st.y + st.h), "drop");
-      line(cx(moments[0]), rowLineY - 1, cx(moments[moments.length - 1]) - cx(moments[0]), 2, "row");
-      moments.forEach((m) => {
-        line(cx(m), rowLineY, 0, 0, "pin");
-        let prev = m.y + m.h;
-        m.children.filter((c) => c.kind === "action").forEach((a) => { line(cx(m) - 1, prev, 2, a.y - prev, "gap"); prev = a.y + a.h; });
+    const branch = (parent, child, stemX) => {
+      const x = parent.x + parent.w, y = parent.y + parent.h / 2;
+      const endY = child.y + child.h / 2;
+      lines.push({ kind: "branch", from: parent.id, to: child.id,
+        d: `M ${x} ${y} C ${stemX} ${y}, ${stemX} ${endY}, ${child.x} ${endY}`,
+        leafX: child.x - 18, leafY: endY, depth: child.depth });
+    };
+    const place = (n, x, y) => {
+      Object.assign(n, { x, y });
+      let cursor = y;
+      n.children.forEach(c => {
+        place(c, x + n.w + G.gap, cursor);
+        branch(n, c, x + n.w + G.gap / 2);
+        cursor += c.treeH + G.tileGap;
       });
-    });
+      n.bottom = y + n.treeH;
+    };
+    const layoutBand = (band, y) => {
+      let x = G.columnPad, bottom = y;
+      nodes.filter(n => n.kind === "station" && n.band === band).forEach(st => {
+        st.children.forEach(size);
+        const w = Math.max(G.station[0], ...st.children.map(c => c.treeW));
+        Object.assign(st, { x: x + (w - G.station[0]) / 2, y, w: G.station[0], h: Math.max(G.station[1], measure(st)) });
+        let cursor = y + st.h + G.gap;
+        st.children.forEach(c => {
+          place(c, x + 36, cursor);
+          const stemX = x + 12, sy = st.y + st.h;
+          lines.push({ kind: "bough", from: st.id, to: c.id,
+            d: `M ${st.x + st.w / 2} ${sy} C ${st.x + st.w / 2} ${sy + 32}, ${stemX} ${sy + 24}, ${stemX} ${sy + 64} L ${stemX} ${c.y + c.h / 2 - 24} Q ${stemX} ${c.y + c.h / 2} ${c.x} ${c.y + c.h / 2}` });
+          cursor += c.treeH + G.gap;
+        });
+        st.column = { x, w: w + 72, h: Math.max(st.h, cursor - y - G.gap) };
+        st.bottom = y + st.column.h;
+        bottom = Math.max(bottom, st.bottom);
+        x += st.column.w + G.columnPad;
+      });
+      return { width: x, bottom };
+    };
+    const life = layoutBand("life", root ? rootHeight + G.rootGap : 0);
+    const shelf = layoutBand("shelf", life.bottom + G.bandGap);
+    const width = Math.max(life.width, shelf.width);
     if (root) {
-      line(cx(root) - 1, root.y + root.h, 2, mainY - (root.y + root.h), "drop");
-      line(cx(root), mainY, 0, 0, "pin-main");
+      Object.assign(root, { x: life.width / 2 - G.root[0] / 2, y: 0, w: G.root[0], h: rootHeight });
+      nodes.filter(n => n.kind === "station").forEach(st => {
+        const sx = root.x + root.w / 2, sy = root.h, tx = st.x + st.w / 2;
+        lines.push({ kind: "trunk", from: root.id, to: st.id,
+          d: `M ${sx} ${sy} C ${sx} ${sy + 100}, ${tx} ${st.y - 100}, ${tx} ${st.y}` });
+      });
     }
     return { width, height: Math.max(life.bottom, shelf.bottom) + 80, lines };
   }
@@ -177,6 +146,14 @@
   /* ---------- Tier layers per kind ----------
      Zoom reveals explanations and details, then keeps them readable. */
   function layersFor(n) {
+    const layers = contentLayers(n);
+    if (n.children.length && n.kind !== "root") {
+      const tier = Math.max(...Object.keys(layers).map(Number));
+      layers[tier] += `<nav class="branch-links" aria-label="Branches of ${esc(n.label)}">${n.children.map(c => `<a href="#${c.id}">${esc(c.label)}<span aria-hidden="true">↗</span></a>`).join("")}</nav>`;
+    }
+    return layers;
+  }
+  function contentLayers(n) {
     const t = esc(n.label), when = n.when ? `<span class="when">${esc(n.when)}</span>` : "";
     switch (n.kind) {
       case "root":
@@ -189,13 +166,13 @@
         return { 0: `<h3>${t}</h3>`, 2: `${when}<h3>${t}</h3><div class="moment-body">${n.bodyHtml}</div>` };
       case "action": {
         const head = n.actor ? badge(n) : "";
-        const more = n.children.length ? `<small>${n.children.length} details · zoom in</small>` : "";
+        const more = "";
         const layers = { 0: head || `<h4>${t}</h4>`, 1: `${head}<h4>${t}</h4>`, 2: `${head}<h4>${t}</h4><div class="action-body">${n.bodyHtml}</div>${more}` };
         return layers;
       }
       case "tile": {
         const th = n.titleHtml; // trusted markup from the authored heading, e.g. <code>strikeLimit</code>
-        return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${th}</h5>`, 3: `<h5>${th}</h5><div class="body">${n.bodyHtml}</div>` };
+        return { 0: `<h5>${th}</h5>`, 2: `<h5>${th}</h5><div class="body">${n.bodyHtml}</div>` };
       }
       case "lab":
         return { 0: `<i class="more" aria-hidden="true"></i>`, 2: `<h5>${t}</h5><div class="lab-host">${n.bodyHtml}</div>` };
@@ -205,15 +182,29 @@
   }
   const lodOf = (s) => (s < 0.55 ? 0 : s < 1.1 ? 1 : s < 2.4 ? 2 : 3);
 
+  // Roman olive reliefs sit in a reserved header band, clear of reading text.
+  function reliefFor(n) {
+    const sprig = `<path class="relief-stem" d="M 150 34 Q 128 32 106 12"/><path class="relief-leaf" d="M 137 30 Q 121 30 120 20 Q 132 18 137 30 M 127 24 Q 129 10 139 9 Q 141 20 127 24 M 118 18 Q 104 21 100 11 Q 110 7 118 18 M 111 14 Q 111 2 120 2 Q 123 10 111 14"/>`;
+    const crown = n.kind === "root" || n.kind === "station";
+    return `<svg class="card-relief${crown ? " canopy" : ""}" viewBox="0 0 300 42" aria-hidden="true" focusable="false"><path class="relief-rule" d="M 18 24 H 84 M 216 24 H 282 M 18 20 V 28 M 282 20 V 28"/>${sprig}<g transform="translate(300 0) scale(-1 1)">${sprig}</g>${crown ? `<path class="relief-stem" d="M 150 38 V 11 M 150 25 Q 143 18 140 14 M 150 25 Q 157 18 160 14"/><path class="relief-leaf" d="M 150 17 Q 140 7 150 1 Q 160 7 150 17"/>` : `<path class="relief-seed" d="M 150 24 L 154 29 L 150 34 L 146 29 Z"/>`}</svg>`;
+  }
+
   function render(tree, world, worldEl, mapEl) {
-    const lines = document.createElement("div");
-    lines.className = "lines";
-    lines.innerHTML = world.lines.map((l) => l.kind.startsWith("pin")
-      ? `<i class="pin ${l.kind}" style="left:${l.x}px;top:${l.y}px"></i>`
-      : `<i class="line ${l.kind}" style="left:${l.x}px;top:${l.y}px;width:${l.w}px;height:${l.h}px"></i>`).join("");
+    const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    lines.setAttribute("class", "tree-branches");
+    lines.setAttribute("width", world.width);
+    lines.setAttribute("height", world.height);
+    lines.setAttribute("aria-hidden", "true");
+    lines.innerHTML = world.lines.map(l => `<path class="${l.kind}" d="${l.d}"/>${l.leafX ? `<path class="olive-leaf" d="M ${l.leafX} ${l.leafY} q -17 -25 -28 -16 q 1 18 28 16 M ${l.leafX - 8} ${l.leafY - 3} q 8 -26 22 -23 q 0 17 -22 23"/>` : ""}`).join("");
     worldEl.style.width = `${world.width}px`;
     worldEl.style.height = `${world.height}px`;
     worldEl.replaceChildren(lines);
+    mapEl.querySelector(".grove-index")?.remove();
+    const index = document.createElement("nav");
+    index.className = "grove-index";
+    index.setAttribute("aria-label", "Explore lifecycle branches");
+    index.innerHTML = `<p>Explore the grove</p>${tree.nodes.filter(n => n.kind === "station").map(n => `<button type="button" data-fly="${n.id}">${esc(n.label)} <span aria-hidden="true">↗</span></button>`).join("")}`;
+    mapEl.append(index);
     tree.nodes.forEach((n) => {
       const el = document.createElement("div");
       el.className = `card ${n.kind}${n.actor ? " " + n.actor : ""}${n.dim ? " dim" : ""}${n.children.length && n.kind === "action" ? " has-details" : ""}`;
@@ -224,7 +215,7 @@
       const layers = layersFor(n);
       const watermark = n.kind === "action" && n.actor ? `<div class="watermark" aria-hidden="true">${portrait(n.actor)}</div>`
         : n.kind === "moment" && n.illustration ? `<div class="watermark painting" aria-hidden="true"><img src="${ASSET_BASE}${esc(n.illustration)}" alt="" loading="lazy" decoding="async"></div>` : "";
-      el.innerHTML = watermark + Object.entries(layers).map(([tier, html]) => `<div data-tier="${tier}"${tier === "3" && n.kind !== "tile" ? ' class="compact"' : ""}>${html}</div>`).join("");
+      el.innerHTML = reliefFor(n) + watermark + Object.entries(layers).map(([tier, html]) => `<div data-tier="${tier}"${tier === "3" && n.kind !== "tile" ? ' class="compact"' : ""}>${html}</div>`).join("");
       el.dataset.tiers = Object.keys(layers).join(",");
       el.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px${n.headerH ? `;--header:${n.headerH}px` : ""}`;
       n.el = el;
@@ -240,7 +231,7 @@
     worldEl.dataset.lod = lod;
     $$(".card", worldEl).forEach((el) => {
       const tiers = el.dataset.tiers.split(",").map(Number);
-      const selectedTier = { root: 1, station: 1, moment: 2, action: 2, lab: 2, custody: 2, tile: 3 };
+      const selectedTier = { root: 1, station: 1, moment: 2, action: 2, lab: 2, custody: 2, tile: 2 };
       const detail = el.dataset.id === target ? Math.max(lod, selectedTier[el.dataset.kind]) : lod;
       el.dataset.show = String(Math.max(-1, ...tiers.filter((t) => t <= detail)));
     });
@@ -263,9 +254,12 @@
       return h;
     };
     return (n) => {
+      if (n.kind === "root") return heightOf(n, 1, G.root[0]);
+      if (n.kind === "station") return heightOf(n, 1, G.station[0]);
+      if (n.kind === "custody") return heightOf(n, 2, G.custody[0]);
       if (n.kind === "moment") return heightOf(n, 2, G.moment[0]);
       if (n.kind === "action") return Math.max(heightOf(n, 2, G.action[0]), heightOf(n, 3, G.action[0]));
-      return heightOf(n, n.kind === "lab" ? 2 : 3, spanW(n.kind === "lab" ? 2 : n.span));
+      return heightOf(n, 2, spanW(n.kind === "lab" ? 2 : n.span));
     };
   }
 
@@ -316,6 +310,7 @@
     // them live in the resize handler produces false negatives. The resize
     // handler instead trusts this pre-resize snapshot (R9).
     M.atHome = here().length === 0;
+    M.mapEl.classList.toggle("at-home", M.atHome);
     paintPath();
     syncHash();
     M.mapEl.dispatchEvent(new CustomEvent("map:moved"));
@@ -325,7 +320,7 @@
     const both = Math.min(vw() / (w + pad * 2), vh() / (h + pad * 2));
     const s = clamp(Math.max(both, minS), homeScale(), DETAIL_SCALE);
     const fits = (h + pad * 2) * s <= vh();
-    M.cam = { s, x: vw() / 2 - (x + w / 2) * s, y: fits ? vh() / 2 - (y + h / 2) * s : (pad - y + 40) * s };
+    M.cam = { s, x: vw() / 2 - (x + w / 2) * s, y: fits ? vh() / 2 - (y + h / 2) * s : (pad - y) * s };
     clampCam();
     apply(animate);
   }
@@ -348,12 +343,12 @@
     focused = n;
     const readableScale = (desired) => Math.min(desired, (vw() - 24) / n.w);
     if (n.kind === "root") return fly(n.x, n.y, n.w, n.h, 0.6, 40, animate);
-    if (n.kind === "station") return fly(n.column.x, n.y - 60, n.column.w, n.column.h + 60, 0.62, 40, animate);
-    if (n.kind === "moment") return fly(n.x, n.y - 40, n.w, (n.bottom ?? n.y + n.h) - n.y + 40, readableScale(1.2), 12, animate);
-    if (n.kind === "action") return fly(n.x, n.y, n.w, n.h, readableScale(n.children.length ? 2.5 : 1.3), 12, animate);
+    if (n.kind === "station") return fly(n.x, n.y, n.w, n.h, readableScale(1), 12, animate);
+    if (n.kind === "moment") return fly(n.x, n.y, n.w, n.h, readableScale(1.2), 12, animate);
+    if (n.kind === "action") return fly(n.x, n.y, n.w, n.h, readableScale(1.3), 12, animate);
     if (n.kind === "custody") return fly(n.x, n.y, n.w, n.h, 1.3, 40, animate);
     if (n.kind === "lab") return fly(n.x, n.y, n.w, n.h, readableScale(1.2), 12, animate);
-    return fly(n.x, n.y, n.w, n.h, readableScale(DETAIL_SCALE), 12, animate);
+    return fly(n.x, n.y, n.w, n.h, readableScale(1.3), 12, animate);
   }
   const flyTo = (id, animate = true) => { const n = M.tree.byId.get(id); if (n) flyToNode(n, animate); return !!n; };
 
@@ -386,14 +381,11 @@
       return path;
     }
     path.push(station);
-    const moment = station.children.find((n) => n.kind === "moment" && cx >= n.x - G.gap / 2 && cx < n.x + n.w + G.gap / 2 && cy >= n.y - 60);
-    if (!moment || cam.s < 0.9) return path;
-    path.push(moment);
-    const action = moment.children.find((n) => n.kind === "action" && hit(n));
-    if (!action || cam.s < 1.6) return path;
-    path.push(action);
-    const tile = action.children.find((n) => hit(n));
-    if (tile && cam.s >= 2.6) path.push(tile);
+    const target = [...tree.nodes].reverse().find(n => hit(n));
+    if (target) {
+      path.length = 0;
+      for (let node = target; node; node = node.parent) path.unshift(node);
+    }
     return path;
   }
   const crumbLabel = (n) => (n.kind === "action" && n.actor ? `${ACTOR_NAMES[n.actor]}: ${n.label}` : n.label);
@@ -429,6 +421,11 @@
       if (i === items.length - 1) btn.setAttribute("aria-current", "location");
       else btn.removeAttribute("aria-current");
     });
+    const currentKey = items.at(-1).key;
+    if (crumbs.dataset.current !== currentKey) {
+      crumbs.dataset.current = currentKey;
+      crumbs.scrollLeft = crumbs.scrollWidth;
+    }
     paintZoom();
   }
   function paintZoom() {

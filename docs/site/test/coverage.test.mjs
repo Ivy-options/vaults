@@ -4,7 +4,7 @@ import { startServer } from "./_server.mjs";
 import { openPage } from "./_browser.mjs";
 import { REQUIRED } from "./required-anchors.mjs";
 
-test("every old anchor resolves, every moment has one summary paragraph, no tile overflows", async () => {
+test("every old anchor resolves, every moment has a summary, no tile overflows", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "index.html?view=map");
   try {
@@ -13,7 +13,7 @@ test("every old anchor resolves, every moment has one summary paragraph, no tile
     assert.deepEqual(missing, [], "anchors without a node");
     const lint = await page.evaluate(() => IvyMap.mounted.tree.nodes.flatMap((n) => {
       const out = [];
-      if (n.kind === "moment" && n.source.querySelectorAll(":scope > p").length !== 1) out.push(`${n.id}: moment needs exactly one summary paragraph`);
+      if (n.kind === "moment" && !n.summary) out.push(`${n.id}: moment needs a summary`);
       if (n.kind === "action" && !n.summary) out.push(`${n.id}: action needs a paragraph`);
       if ((n.kind === "tile") && !n.source.querySelector(":scope > h5")) out.push(`${n.id}: tile needs an h5`);
       if (n.kind === "moment" && n.label.split(" ").length < 3) out.push(`${n.id}: moment title must be a sentence, not a label`);

@@ -10,7 +10,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
     await page.waitForFunction(() => document.querySelectorAll("#world .card").length > 0);
     const counts = await page.evaluate(() => ({
       cards: document.querySelectorAll("#world .card").length,
-      lines: document.querySelectorAll("#world .line, #world .pin").length,
+      lines: document.querySelectorAll("#world .tree-branches path").length,
       actionTiers: [...document.querySelector('.card[data-id="add-funds"]').querySelectorAll(":scope > [data-tier]")].map((l) => l.dataset.tier),
       tileTiers: [...document.querySelector('.card[data-id="who-may-deposit"]').querySelectorAll(":scope > [data-tier]")].map((l) => l.dataset.tier),
       badge: document.querySelector('.card[data-id="add-funds"] .badge').textContent,
@@ -24,7 +24,7 @@ test("cards render one layer per tier, no repeated tiers, and none overflows its
     assert.equal(counts.cards, 13);
     assert.ok(counts.lines > 5);
     assert.deepEqual(counts.actionTiers, ["0", "1", "2"]);
-    assert.deepEqual(counts.tileTiers, ["0", "2", "3"]);
+    assert.deepEqual(counts.tileTiers, ["0", "2"]);
     assert.equal(counts.badge, "LP");
     assert.ok(counts.watermark, "portrait is a watermark");
     assert.equal(counts.foregroundPortraits, 0);

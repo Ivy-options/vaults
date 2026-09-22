@@ -3,84 +3,46 @@ import assert from "node:assert/strict";
 import { startServer } from "./_server.mjs";
 import { openPage } from "./_browser.mjs";
 
-test("layoutWorld centres stations over rows, stacks actions and sizes tiles", async () => {
+test("recursive branches give every node space and connect siblings to their actual parent", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html");
   try {
     const out = await page.evaluate(() => {
-      const { nodes } = IvyMap.readDocument(document.querySelector("#document"));
-      const world = IvyMap.layoutWorld(nodes, (n) => (n.kind === "action" ? 110 : n.id === "approvals" ? 40 : 60));
-      const g = (id) => { const n = nodes.find((n) => n.id === id); return { x: n.x, y: n.y, w: n.w, h: n.h, column: n.column, bottom: n.bottom }; };
-      return { world: { width: world.width, height: world.height, lines: world.lines }, open: g("open"), custody: g("open-custody"), m1: g("lps-deposit-collateral"), m2: g("owner-opens-the-auction"), a1: g("add-funds"), a2: g("waits"), t1: g("who-may-deposit"), t2: g("approvals"), terms: g("terms"), lab: g("fee-lab") };
+      const doc = document.querySelector('#document');
+      const branch = document.createElement('section');
+      branch.dataset.kind = 'tile'; branch.id = 'deep-branch';
+      branch.innerHTML = '<h5>Nested detail</h5><p>A definition.</p><section data-kind="tile" id="deeper"><h5>Example</h5><p>A worked example.</p></section>';
+      doc.querySelector('#who-may-deposit').append(branch);
+      const { nodes } = IvyMap.readDocument(doc);
+      const world = IvyMap.layoutWorld(nodes, n => n.id === 'deep-branch' ? 440 : 180);
+      return { world, nodes: nodes.map(n => ({id:n.id, parent:n.parent?.id, x:n.x,y:n.y,w:n.w,h:n.h,depth:n.depth})) };
     });
-    const G = { station: [360, 200], moment: [300, 170], action: [300, 150], gap: 40, momentY: 320, actionY: 560, actionGap: 20, tile: 132, tileGap: 12, custody: [220, 170] };
-    // Two moments: row width 640. Station centred over the row.
-    const rowW = 2 * G.moment[0] + G.gap;
-    assert.equal(out.m2.x - out.m1.x, G.moment[0] + G.gap);
-    assert.equal(out.open.x + out.open.w / 2, out.m1.x + rowW / 2);
-    assert.equal(out.m1.y, G.momentY);
-    // Custody tile sits right of the station card.
-    assert.equal(out.custody.x, out.open.x + out.open.w + G.gap);
-    assert.equal(out.custody.y, 0);
-    // Actions stack under the moment; headers are measured (110 here); the first has two tile rows (one single, one spanning).
-    assert.equal(out.a1.y, G.actionY);
-    assert.equal(out.a1.h, 110 + G.tileGap + (60 + G.tileGap) + (40 + G.tileGap));
-    assert.equal(out.a2.h, 110);
-    assert.equal(out.a2.y, out.a1.y + out.a1.h + G.actionGap);
-    assert.equal(out.t1.x - out.a1.x, G.tileGap);
-    assert.equal(out.t1.w, G.tile);
-    assert.equal(out.t2.w, 2 * G.tile + G.tileGap);
-    assert.equal(out.t2.y, out.t1.y + 60 + G.tileGap);
-    assert.equal(out.m1.bottom, out.a2.y + out.a2.h);
-    // Lab spans the card width and takes its measured height.
-    assert.equal(out.lab.w, 2 * G.tile + G.tileGap);
-    assert.equal(out.lab.h, 60);
-    // The shelf band starts below the life band, and its station has a column.
-    assert.ok(out.terms.y > out.m1.bottom, "shelf below life band");
-    assert.ok(out.terms.column.w >= 300 + 2 * G.gap);
-    assert.ok(out.world.lines.some((l) => l.kind === "main"));
-    assert.ok(out.world.lines.some((l) => l.kind === "rule"));
-    // Gap connectors never overlap a card: each ends where the next card starts.
-    const gaps = out.world.lines.filter((l) => l.kind === "gap");
-    assert.ok(gaps.some((l) => l.y === out.m1.y + out.m1.h && l.h === out.a1.y - (out.m1.y + out.m1.h)));
+    assert.ok(Number.isFinite(out.world.width) && Number.isFinite(out.world.height));
+    for (const node of out.nodes) {
+      assert.ok([node.x,node.y,node.w,node.h].every(Number.isFinite), node.id);
+      assert.ok(node.x >= 0 && node.y >= 0 && node.x + node.w <= out.world.width && node.y + node.h <= out.world.height, node.id);
+      if (node.parent) assert.equal(out.world.lines.filter(l => l.from === node.parent && l.to === node.id).length, 1, node.id);
+      for (const other of out.nodes) {
+        if (node.id === other.id) continue;
+        assert.ok(node.x + node.w <= other.x || other.x + other.w <= node.x || node.y + node.h <= other.y || other.y + other.h <= node.y, `${node.id} overlaps ${other.id}`);
+      }
+    }
+    assert.equal(out.nodes.find(n => n.id === 'deeper').depth, 5);
     assert.deepEqual(errors, []);
-  } finally {
-    await close();
-    await server.close();
-  }
+  } finally { await close(); await server.close(); }
 });
 
-test("layoutWorld centres a moment-less station in its column without overlapping its neighbour", async () => {
+test("empty stages and multiple top-level stages retain finite, disjoint bounds", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + "test/fixtures/tree.html");
+  const { page, close } = await openPage(server.url + "test/fixtures/tree.html");
   try {
-    const out = await page.evaluate(() => {
-      const root = document.createElement("div");
-      root.innerHTML = `
-        <article>
-          <section data-kind="station" id="s-empty">
-            <h2>Empty station</h2>
-            <section data-kind="custody" id="s-empty-custody"><h3>Custody</h3></section>
-          </section>
-          <section data-kind="station" id="s-with-moment">
-            <h2>Station with a moment</h2>
-            <section data-kind="moment" id="s-with-moment-m1"><h3>Moment</h3></section>
-          </section>
-        </article>`;
-      const { nodes } = IvyMap.readDocument(root);
-      const world = IvyMap.layoutWorld(nodes, () => 60);
-      const g = (id) => { const n = nodes.find((n) => n.id === id); return { x: n.x, y: n.y, w: n.w, h: n.h, column: n.column }; };
-      return { G: IvyMap.GEOMETRY, lines: world.lines, empty: g("s-empty"), custody: g("s-empty-custody"), withMoment: g("s-with-moment") };
+    const nodes = await page.evaluate(() => {
+      const root = document.createElement('div');
+      root.innerHTML = '<section data-kind="station" id="empty"><h2>Empty</h2></section><section data-kind="station" id="next"><h2>Next</h2><section data-kind="moment" id="topic"><h3>Topic</h3></section></section>';
+      const {nodes} = IvyMap.readDocument(root); IvyMap.layoutWorld(nodes, () => 180);
+      return nodes.map(n => ({id:n.id,x:n.x,y:n.y,w:n.w,h:n.h,column:n.column}));
     });
-    const { G } = out;
-    assert.equal(out.empty.column.w, G.station[0] + 2 * (G.gap + G.custody[0]) + 2 * G.columnPad);
-    assert.equal(out.empty.x + out.empty.w / 2, out.empty.column.x + out.empty.column.w / 2);
-    assert.equal(out.custody.x, out.empty.x + out.empty.w + G.gap);
-    assert.ok(out.lines.every((l) => l.w >= 0 && l.h >= 0), "no line has negative width or height");
-    assert.equal(out.withMoment.column.x, out.empty.column.x + out.empty.column.w);
-    assert.deepEqual(errors, []);
-  } finally {
-    await close();
-    await server.close();
-  }
+    assert.ok(nodes.every(n => [n.x,n.y,n.w,n.h].every(Number.isFinite)));
+    assert.ok(nodes[0].column.x + nodes[0].column.w <= nodes[1].column.x);
+  } finally { await close(); await server.close(); }
 });

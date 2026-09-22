@@ -123,22 +123,21 @@ test("a selected action fits a narrow viewport and remains the navigation target
   assert.equal(await page.evaluate(() => IvyMap.here().at(-1).id), 'buyer-has-paid-the-premium');
 }));
 
-test("Tab between map references follows the camera without native canvas scrolling", () => withMap(async page => {
-  await page.evaluate(() => IvyMap.flyTo('exercise', false));
-  const next = page.locator('.card[data-id="exercise"] a[href="#settled"]');
-  await next.waitFor({ state: 'visible' });
-  await next.focus();
-  await page.keyboard.press('Tab');
-  const result = await page.evaluate(() => ({
-    active: document.activeElement.closest('.card')?.dataset.id,
-    target: IvyMap.here().at(-1)?.id,
-    top: document.querySelector('#map').scrollTop,
-    left: document.querySelector('#map').scrollLeft,
-  }));
-  assert.deepEqual(result, { active: 'missing-report', target: 'missing-report', top: 0, left: 0 });
+test("keyboard branch links descend without native canvas scrolling", () => withMap(async page => {
+  await page.evaluate(() => IvyMap.flyTo('cancel-any-time', false));
+  const branch = page.locator('.card[data-id="cancel-any-time"] a[href="#auction-cancellation-clock"]');
+  await branch.focus();
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => IvyShell.state().guideLoaded);
-  assert.equal(await page.evaluate(() => IvyShell.state().mode), 'guide');
+  await settle(page, 400);
+  assert.equal(await page.evaluate(() => IvyMap.here().at(-1)?.id), 'auction-cancellation-clock');
+  const detail = page.locator('.card[data-id="auction-cancellation-clock"] a[href="#auction-timeout-setting"]');
+  await detail.focus();
+  await page.keyboard.press('Enter');
+  await settle(page, 400);
+  assert.deepEqual(await page.evaluate(() => ({target:IvyMap.here().at(-1)?.id,top:document.querySelector('#map').scrollTop,left:document.querySelector('#map').scrollLeft})), {target:'auction-timeout-setting',top:0,left:0});
+  await page.locator('.card[data-id="auction-timeout-setting"]').focus();
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(() => IvyMap.here().at(-1)?.id), 'auction-cancellation-clock');
 }));
 
 test("the role widget accepts Enter and fits when focused on mobile", () => withMap(async page => {
@@ -244,4 +243,33 @@ test('every Map explanation opens a section of the main Guide', () => withMap(as
   const frame = page.frames().find(f => f.parentFrame());
   const detours = await frame.locator('main a[href]').evaluateAll(links => links.filter(link => new URL(link.href).pathname !== location.pathname).map(link => link.href));
   assert.deepEqual(detours, [], 'Guide explanations stay in the Guide');
+}));
+
+
+test("every leaf fits at mobile reading zoom and nested explanations remain searchable", () => withMap(async page => {
+  await page.setViewportSize({width:320,height:740});
+  const leaves = await page.locator('#document [data-kind="tile"]').evaluateAll(nodes => nodes.map(n => n.id));
+  assert.ok(leaves.length > 40);
+  for (const id of leaves) {
+    await page.evaluate(id => IvyMap.flyTo(id,false), id);
+    const card = page.locator(`.card[data-id="${id}"]`);
+    const box = await card.boundingBox();
+    assert.ok(box.x >= -1 && box.x + box.width <= 321, `${id} exceeds mobile width`);
+    assert.equal(await card.evaluate(c => {const t=c.querySelector('[data-tier="2"]');return t.scrollHeight > t.clientHeight+1 || t.scrollWidth > t.clientWidth+1;}), false, id);
+  }
+  assert.ok((await page.evaluate(() => IvyMap.search('auctionTimeout').map(h => h.node.id))).includes('auction-timeout-setting'));
+  assert.ok((await page.evaluate(() => IvyMap.search('maxSettlementPriceAge').map(h => h.node.id))).includes('cash-live-observation'));
+}));
+
+test("mobile breadcrumbs reveal the current leaf and allow scrolling to ancestors", () => withMap(async page => {
+  await page.setViewportSize({width:320,height:740});
+  await page.evaluate(() => IvyMap.flyTo('auction-timeout-setting',false));
+  const result = await page.locator('#crumbs').evaluate(crumbs => {
+    const current = crumbs.querySelector('[aria-current]');
+    const a = crumbs.getBoundingClientRect(), b = current.getBoundingClientRect();
+    return {scroll:crumbs.scrollLeft,visible:b.left >= a.left-1 && b.right <= a.right+1,overflow:getComputedStyle(crumbs).overflowX};
+  });
+  assert.equal(result.visible,true);
+  assert.ok(result.scroll > 0);
+  assert.equal(result.overflow,'auto');
 }));
