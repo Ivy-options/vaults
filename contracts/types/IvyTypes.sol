@@ -187,6 +187,7 @@ error PairDisabled(address quoteToken);
 error PairMustBeEnabled();
 error PairUnknown(address quoteToken);
 error PartialExerciseNotAllowed();
+error PayoutHookOutOfGas();
 error PremiumTooLow();
 error PutPairMustBeCollateral();
 error PutRequiresSinglePair();

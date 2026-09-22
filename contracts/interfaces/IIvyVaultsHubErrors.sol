@@ -17,11 +17,14 @@ interface IIvyVaultsHubErrors {
     error InvalidStrikeLimit();
     error LoosensTerms();
     error NoPairs();
+    error NotExecutor();
+    error NothingToClaim();
     error NothingToExercise();
     error PairDisabled(address quoteToken);
     error PairMustBeEnabled();
     error PairUnknown(address quoteToken);
     error PartialExerciseNotAllowed();
+    error PayoutHookOutOfGas();
     error PremiumTooLow();
     error PutPairMustBeCollateral();
     error PutRequiresSinglePair();

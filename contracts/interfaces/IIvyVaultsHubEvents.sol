@@ -46,6 +46,9 @@ interface IIvyVaultsHubEvents {
     );
     event PairTermsTightened(uint256 indexed vaultId, address indexed quoteToken);
     event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 amount);
+    event PayoutNotified(
+        uint256 indexed vaultId, address indexed recipient, address token, uint256 amount, bool acknowledged
+    );
     event SettingsUpdated(uint64 exerciseWindow, uint64 auctionTimeout);
     event Settled(uint256 indexed vaultId, uint256 exercisedNotional, uint256 totalNotional, uint256 pendingPayout);
     event Unwound(uint256 indexed vaultId, uint256 nonce, uint256 refund);

@@ -480,12 +480,13 @@ contract IvyVaultsHub is
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
-        (uint256 paid, uint256 got) =
-            IvyOptionSettlement.exercise(s, _terms[vaultId], _settlementPrices[vaultId], amount);
+        VaultTerms storage t = _terms[vaultId];
+        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, t, _settlementPrices[vaultId], amount);
         emit Exercised(vaultId, amount, paid, got);
         if (s.exercisedNotional == s.totalNotional) {
             _finalize(vaultId, s);
         }
+        IvyOptionSettlement.notifyPayout(s, vaultId, t.collateral, got);
     }
 
     // Settlement and payouts
@@ -503,24 +504,10 @@ contract IvyVaultsHub is
     }
 
     /// @notice Buyer or executor collects a reserved cash payout or unwind refund for the configured recipient. A failing transfer
-    ///         can never block `expire`.
+    ///         can never block `expire`. A contract recipient is notified through `IIvyPayoutReceiver` afterwards.
     function claimPayout(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Settled);
-        VaultState storage s = _state[vaultId];
-        if (msg.sender != s.marketMaker && msg.sender != s.executor) {
-            revert NotExecutor();
-        }
-        IIvyVault vault = IIvyVault(s.vault);
-        address collateral = _terms[vaultId].collateral;
-        uint256 amount = vault.payBuyer(collateral, s.recipient);
-        if (s.premiumToken != collateral) {
-            amount += vault.payBuyer(s.premiumToken, s.recipient);
-        }
-        if (amount == 0) {
-            revert NothingToClaim();
-        }
-        s.pendingPayout = 0;
-        emit PayoutClaimed(vaultId, s.marketMaker, amount);
+        IvyOptionSettlement.claimPayout(_state[vaultId], _terms[vaultId], vaultId);
     }
 
     function claimPremium(uint256 vaultId) external nonReentrant {

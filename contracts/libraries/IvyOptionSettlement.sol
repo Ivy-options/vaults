@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
+import {IIvyPayoutReceiver} from "../interfaces/IIvyPayoutReceiver.sol";
 import {IIvyShares} from "../interfaces/IIvyShares.sol";
 import {IIvyVault} from "../interfaces/IIvyVault.sol";
 import {IIvyVaultsHubEvents} from "../interfaces/IIvyVaultsHubEvents.sol";
@@ -114,6 +115,33 @@ library IvyOptionSettlement {
         }
     }
 
+    /// @dev Hub checks the Settled phase. Pays the reserved cash payout and unwind refund to the recipient, then
+    ///      notifies it once per token delivered.
+    function claimPayout(VaultState storage s, VaultTerms storage t, uint256 vaultId) external {
+        if (msg.sender != s.marketMaker && msg.sender != s.executor) {
+            revert NotExecutor();
+        }
+        IIvyVault vault = IIvyVault(s.vault);
+        address recipient = s.recipient;
+        address collateral = t.collateral;
+        address premiumToken = s.premiumToken;
+        uint256 collateralAmount = vault.payBuyer(collateral, recipient);
+        uint256 premiumAmount = premiumToken == collateral ? 0 : vault.payBuyer(premiumToken, recipient);
+        uint256 amount = collateralAmount + premiumAmount;
+        if (amount == 0) {
+            revert NothingToClaim();
+        }
+        s.pendingPayout = 0;
+        emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, s.marketMaker, amount);
+        _notifyRecipient(vaultId, recipient, collateral, collateralAmount);
+        _notifyRecipient(vaultId, recipient, premiumToken, premiumAmount);
+    }
+
+    /// @dev Hub calls this after `exercise` has emitted and finalized, so the hook observes settled state.
+    function notifyPayout(VaultState storage s, uint256 vaultId, address token, uint256 amount) external {
+        _notifyRecipient(vaultId, s.recipient, token, amount);
+    }
+
     function claim(VaultState storage s, VaultTerms storage t, IIvyShares shareToken, uint256 vaultId, uint256 shares)
         external
     {
@@ -143,6 +171,31 @@ library IvyOptionSettlement {
                 vault.push(tokens[i], msg.sender, amounts[i]);
             }
         }
+    }
+
+    /// @dev Best-effort recipient hook. A missing method or an ordinary revert never blocks the payout; only a hook
+    ///      that exhausts its gas reverts, so gas estimation cannot settle on a limit that silently starves it. The
+    ///      recipient is the market maker's own choice and only the market maker or executor reach this path, so a
+    ///      misbehaving hook affects nobody else. Acknowledged means the call returned the hook selector.
+    function _notifyRecipient(uint256 vaultId, address recipient, address token, uint256 amount) private {
+        if (amount == 0 || recipient.code.length == 0) {
+            return;
+        }
+        bytes memory data = abi.encodeCall(IIvyPayoutReceiver.onIvyPayout, (vaultId, token, amount));
+        bytes4 expected = IIvyPayoutReceiver.onIvyPayout.selector;
+        uint256 gasBefore = gasleft();
+        bool ok;
+        bool acknowledged;
+        // Copies at most one word of return data so a recipient cannot inflate the caller's memory.
+        assembly ("memory-safe") {
+            mstore(0, 0)
+            ok := call(gas(), recipient, 0, add(data, 0x20), mload(data), 0, 0x20)
+            acknowledged := and(ok, and(eq(returndatasize(), 0x20), eq(mload(0), expected)))
+        }
+        if (!ok && gasleft() < gasBefore / 64) {
+            revert PayoutHookOutOfGas();
+        }
+        emit IIvyVaultsHubEvents.PayoutNotified(vaultId, recipient, token, amount, acknowledged);
     }
 
     function _validateReport(uint256 price, uint64 validUntil) private view {
