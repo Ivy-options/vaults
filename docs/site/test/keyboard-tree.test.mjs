@@ -50,8 +50,8 @@ for(const width of [1440,390]) test(`tree arrows expand, fold and stay among sib
   await page.keyboard.press('ArrowLeft');
   await selected(page,'exercise-windows',scale);
   assert.equal(await page.locator('[data-expand="physical-window-duration"]').getAttribute('aria-expanded'),'false');
-  assert.equal(await page.locator('[data-expand="physical-american-start"]').getAttribute('aria-expanded'),'true');
-  await page.keyboard.press('ArrowRight'); // enter an already open branch without closing it
+  assert.equal(await page.locator('[data-expand="physical-american-start"]').getAttribute('aria-expanded'),'false');
+  await page.keyboard.press('ArrowRight'); // reopen the first child after folding this level
   await selected(page,'physical-american-start',scale);
   const box=await card(page,'physical-american-start').boundingBox(),view=await page.locator('#map').boundingBox();
   assert.ok(Math.abs(box.x+box.width/2-view.x-view.width/2)<1);
@@ -104,6 +104,45 @@ test('rapid arrow navigation during growth preserves the final focus and zoom',(
   for(const key of ['ArrowRight','ArrowDown','ArrowDown','ArrowRight','ArrowLeft','ArrowLeft','ArrowRight']) await page.keyboard.press(key);
   await page.waitForTimeout(850);
   await selected(page,'physical-american-start',scale);
-  assert.equal(await card(page,'physical-window-example').evaluate(el=>el.inert),true);
+  for(const id of ['physical-european-start','physical-window-duration','physical-window-example']) {
+    assert.equal(await card(page,id).evaluate(el=>el.inert),true,id);
+    assert.equal(await card(page,id).isVisible(),false,id);
+  }
   assert.equal(await page.locator('#world').evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a.playState==='running').length),0);
 },1440,false));
+
+for(const width of [1440,390]) test(`Left folds the whole sibling level and keeps unrelated branches open at ${width}px`,()=>withMap(async page=>{
+  await select(page,'physical-american-start'); // unrelated branch stays open
+  await select(page,'cash-the-vault-needs-a-price');
+  await page.keyboard.press('ArrowRight'); // publisher
+  await page.keyboard.press('ArrowDown'); // report selection
+  await page.keyboard.press('ArrowRight'); // freshness
+  await page.keyboard.press('ArrowDown'); // final price
+  const scale=await page.evaluate(()=>IvyMap.state().scale);
+  await page.keyboard.press('ArrowLeft');
+  await selected(page,'cash-exercise-price-selection',scale);
+  for(const id of ['cash-live-observation','cash-final-expiry-price']) {
+    assert.equal(await card(page,id).isVisible(),false,id);
+    assert.equal(await page.locator(`[data-expand="${id}"]`).getAttribute('aria-expanded'),'false',id);
+  }
+  assert.equal(await card(page,'cash-price-publisher').isVisible(),true);
+  // Open a descendant again, then return to its parent without folding it.
+  await page.keyboard.press('ArrowRight');
+  await select(page,'cash-exercise-price-selection');
+  const parentScale=await page.evaluate(()=>IvyMap.state().scale);
+  await page.keyboard.press('ArrowLeft');
+  await selected(page,'cash-the-vault-needs-a-price',parentScale);
+  for(const id of ['cash-price-publisher','cash-exercise-price-selection','cash-live-observation']) {
+    assert.equal(await card(page,id).isVisible(),false,id);
+    assert.equal(await card(page,id).evaluate(el=>el.inert),true,id);
+  }
+  for(const id of ['cash-price-publisher','cash-exercise-price-selection']) {
+    assert.equal(await page.locator(`[data-expand="${id}"]`).getAttribute('aria-expanded'),'false',id);
+  }
+  assert.equal(await card(page,'physical-american-start').isVisible(),true);
+  const box=await card(page,'cash-the-vault-needs-a-price').boundingBox(),view=await page.locator('#map').boundingBox();
+  assert.ok(Math.abs(box.x+box.width/2-view.x-view.width/2)<1);
+  await page.keyboard.press('ArrowRight');
+  await selected(page,'cash-price-publisher',parentScale);
+  assert.equal(await card(page,'cash-exercise-price-selection').isVisible(),false);
+},width));

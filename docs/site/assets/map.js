@@ -1145,6 +1145,11 @@
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (current.parent) {
+          // Leaving this level folds every sibling in the same layout update.
+          // Keep the current branch open until toggleBranch closes it.
+          for (const sibling of current.parent.children) {
+            if (sibling !== current) M.expanded.delete(sibling.id);
+          }
           toggleBranch(current);
           // Arrow navigation returns to the parent tile. Native disclosure
           // buttons still restore focus to their trigger when activated.
