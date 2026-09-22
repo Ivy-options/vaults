@@ -50,6 +50,39 @@ test("map search returns the relevant card without repeating ancestor chapters",
   assert.deepEqual(hits, ['hub-and-vaults']);
 }));
 
+test("top controls expand and collapse every branch and fit the resulting tree", () => withMap(async page => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [1440, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => IvyMap.flyTo('cash-expiration-timeline', false));
+    const expand = page.getByRole('button', { name: 'Expand all', exact: true });
+    const collapse = page.getByRole('button', { name: 'Collapse all', exact: true });
+    await expand.focus();
+    await page.keyboard.press('Enter');
+    const expandedCamera = await page.evaluate(() => IvyMap._cam());
+    await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    assert.deepEqual(await page.evaluate(() => IvyMap._cam()), expandedCamera);
+    assert.deepEqual(await page.evaluate(() => IvyMap.here()), []);
+    assert.equal(await page.locator('#world .card[hidden], #world .card[inert]').count(), 0);
+    assert.equal(await page.locator('#world [data-expand][aria-expanded="false"]').count(), 0);
+    await collapse.click();
+    const collapsedCamera = await page.evaluate(() => IvyMap._cam());
+    await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    assert.deepEqual(await page.evaluate(() => IvyMap._cam()), collapsedCamera);
+    assert.ok(collapsedCamera.s > expandedCamera.s);
+    assert.deepEqual(await page.evaluate(() => IvyMap.state().expanded), []);
+    assert.deepEqual(await page.evaluate(() => IvyMap.here()), []);
+    assert.equal(await page.locator('#world .card:not([hidden])').count(), await page.locator('#document article > section[data-kind]').count());
+    assert.equal(await page.locator('#world [data-expand][aria-expanded="true"]').count(), 0);
+    for (const control of [expand, collapse]) {
+      const box = await control.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0, JSON.stringify(box));
+    }
+  }
+  await page.locator('#mode-tab-guide').click();
+  assert.equal(await page.locator('.tree-controls').isVisible(), false);
+}));
+
 test("all explanation cards preserve authored structure and fit mobile at reading zoom", () => withMap(async page => {
   await page.setViewportSize({ width: 320, height: 740 });
   const ids = await page.locator('#document [data-kind="moment"], #document [data-kind="action"]').evaluateAll(cards => cards.map(card => card.id));

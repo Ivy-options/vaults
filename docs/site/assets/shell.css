@@ -26,6 +26,7 @@
 #guide-zoom-label { display: none; }
 body[data-mode="guide"] #crumbs,
 body[data-mode="guide"] #search,
+body[data-mode="guide"] .tree-controls,
 body[data-mode="guide"] [data-home] { display: none; }
 body[data-mode="guide"] #guide-zoom-label { display: flex; align-items: center; min-height: 36px; width: 134px; color: var(--muted); }
 body[data-mode="guide"][data-map-visited] #guide-zoom-label { display: none; }

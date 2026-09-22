@@ -598,9 +598,11 @@
     });
     document.addEventListener("click", (e) => {
       if (document.body.dataset.mode === "guide") return;
-      const b = e.target.closest("[data-fly], [data-home], [data-zoom], [data-reset-zoom]");
+      const b = e.target.closest("[data-fly], [data-home], [data-zoom], [data-reset-zoom], [data-tree-expand], [data-tree-collapse]");
       if (!b) return;
-      if (b.dataset.home !== undefined) home();
+      if (b.dataset.treeExpand !== undefined) setAllBranches(true);
+      else if (b.dataset.treeCollapse !== undefined) setAllBranches(false);
+      else if (b.dataset.home !== undefined) home();
       else if (b.dataset.fly !== undefined) flyTo(b.dataset.fly);
       else if (b.dataset.resetZoom !== undefined) zoomTo(1);
       else zoomBy(b.dataset.zoom === "+" ? ZOOM_STEP : 1 / ZOOM_STEP);
@@ -761,6 +763,19 @@
     }
     trackFoliage();
     currentLod = -1;
+  }
+  function setAllBranches(opening) {
+    let target = M.target || here().at(-1) || M.tree.nodes.find(n => n.kind === "root");
+    if (!opening) while (target.parent) target = target.parent;
+    M.target = target; M.revealed = target;
+    M.expanded.clear();
+    if (opening) M.tree.nodes.forEach(n => { if (n.parent) M.expanded.add(n.id); });
+    reflow(true);
+    // Frame the resulting tree after a global expand or collapse.
+    M.worldEl.style.transition = "none";
+    M.worldEl.style.transform = `translate(${M.cam.x}px, ${M.cam.y}px) scale(${M.cam.s})`;
+    if (!reduced()) M.worldEl.getBoundingClientRect();
+    home(true);
   }
   function toggleBranch(n, animate = true) {
     if (!n?.parent) return;

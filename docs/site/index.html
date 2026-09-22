@@ -25,6 +25,10 @@
     <button type="button" id="back-to-map">← Back to map</button>
     <span id="guide-zoom-label">Guide zoom</span>
     <form id="search" role="search"><input type="search" id="search-input" placeholder="Search the map" aria-label="Search the map" autocomplete="off"><ul id="search-results" hidden></ul></form>
+    <div class="tree-controls" role="group" aria-label="All map branches">
+      <button type="button" data-tree-expand="all">Expand all</button>
+      <button type="button" data-tree-collapse="all">Collapse all</button>
+    </div>
     <div class="zoom">
       <button type="button" data-zoom="-" aria-label="Zoom out">−</button>
       <input id="zoom-level" type="text" inputmode="decimal" aria-label="Zoom percentage" value="100%" autocomplete="off" spellcheck="false">
@@ -562,53 +566,48 @@
     <p>Cash expiration reserves any remaining intrinsic payoff for the <strong class="role-buyer">buyer’s separate claim</strong>. The unreserved remainder opens to <strong class="role-lp">LP claims</strong>.</p>
     <p><strong>Time passing alone never settles a vault.</strong></p>
     <p class="map-next"><a href="#settled">See settlement and claims →</a></p>
-    <section data-kind="tile" id="exercise-expiration-timeline"><h5>Physical timeline: expiry + grace window</h5>
-    <p>Example: <strong class="key-term">expiry at 12:00</strong>, with a saved <strong class="key-term">one-hour exercise window</strong>.</p>
+    <section data-kind="tile" id="exercise-expiration-timeline"><h5>Physical: when exercise closes</h5>
+    <p>The saved <code>exerciseWindow</code> is the <strong class="key-term">extra time after option expiry</strong>. This example uses one hour.</p>
     <figure class="deadline-timeline" aria-label="Physical exercise and expiration timeline">
-      <figcaption>Time moves from left to right →</figcaption>
-      <div class="deadline-axis" aria-hidden="true"><span>Before<br>12:00</span><span>12:00<br>to 13:00</span><span>From<br>13:00</span></div>
+      <figcaption>Example times · time moves right →</figcaption>
+      <div class="deadline-axis">
+        <span class="deadline-marker deadline-expiry-point"><strong>12:00</strong><span>Option expiry</span></span>
+        <span class="deadline-marker deadline-close-point"><strong>13:00</strong><span>Exercise closes</span></span>
+      </div>
+      <div class="deadline-window"><span><code>exerciseWindow</code><br>1 hour after expiry</span></div>
       <div class="deadline-group">
-
         <div class="deadline-lane">
-          <p>American · starts at activation</p>
+          <p>American · exercise from activation</p>
           <div class="deadline-track" role="img" aria-label="American physical exercise: from activation until strictly before 13:00."><span class="deadline-bar exercise-bar" style="grid-column:1 / 3">Exercise</span><span class="deadline-closed" style="grid-column:3">Closed</span></div>
         </div>
         <div class="deadline-lane">
-          <p>European option</p>
+          <p>European · exercise from expiry</p>
           <div class="deadline-track" role="img" aria-label="European physical exercise: from 12:00 inclusive until strictly before 13:00."><span class="deadline-closed" style="grid-column:1">Wait</span><span class="deadline-bar exercise-bar" style="grid-column:2">Exercise</span><span class="deadline-closed" style="grid-column:3">Closed</span></div>
         </div>
         <div class="deadline-lane">
-          <p>Anyone may submit expiration</p>
-          <div class="deadline-track" role="img" aria-label="Physical expiration: anyone may submit it from 13:00 inclusive."><span class="deadline-closed" style="grid-column:1 / 3">Wait for exercise to close</span><span class="deadline-bar expire-bar" style="grid-column:3">Expire →</span></div>
+          <p>Anyone · submit expiration</p>
+          <div class="deadline-track" role="img" aria-label="Physical expiration: anyone may submit it from 13:00 inclusive."><span class="deadline-closed" style="grid-column:1 / 3">Wait until 13:00</span><span class="deadline-bar expire-bar" style="grid-column:3">Expire →</span></div>
         </div>
       </div>
     </figure>
-    <p>At <strong class="key-term">13:00 exactly</strong>, exercise closes and anyone can submit expiration. The deadline does not run that transaction automatically.</p>
-    <p>These lanes require a <strong class="key-term">Live</strong> vault. Full exercise can settle it earlier.</p>
+    <p>Exercise must execute <strong class="key-term">strictly before 13:00</strong>. Expiration is allowed from 13:00 exactly.</p>
+    <p>The vault must still be <strong class="key-term">Live</strong>. Full exercise can settle it earlier; time passing alone does not settle it.</p>
     </section>
-    <section data-kind="tile" id="cash-expiration-timeline"><h5>Cash timeline: expiry + final price</h5>
-    <p>Expiry is <strong class="key-term">12:00</strong>. From then, <strong class="key-term">exercise and expiration need the final expiry price</strong>. Cash has no 13:00 cutoff.</p>
-    <figure class="deadline-timeline" aria-label="Cash exercise and expiration timeline, subject to price availability">
-      <figcaption>Time moves from left to right →</figcaption>
-      <div class="deadline-axis" aria-hidden="true"><span>Before<br>12:00</span><span>12:00<br>to 13:00</span><span>From<br>13:00</span></div>
-      <div class="deadline-group">
-
-        <div class="deadline-lane">
-          <p>American · starts at activation</p>
-          <div class="deadline-track" role="img" aria-label="American cash exercise: from activation while Live. Before 12:00 it requires a fresh observation; from 12:00 it requires the final expiry price."><span class="deadline-bar exercise-bar continues" style="grid-column:1 / 4">Exercise while Live →</span></div>
-        </div>
-        <div class="deadline-lane">
-          <p>European option</p>
-          <div class="deadline-track" role="img" aria-label="European cash exercise: from 12:00 inclusive while Live, once the final expiry price is available."><span class="deadline-closed" style="grid-column:1">Wait</span><span class="deadline-bar exercise-bar continues" style="grid-column:2 / 4">Exercise while Live →</span></div>
-        </div>
-        <div class="deadline-lane">
-          <p>Anyone may submit expiration</p>
-          <div class="deadline-track" role="img" aria-label="Cash expiration: anyone may submit it from 12:00 inclusive once the final expiry price is available, while the vault is Live."><span class="deadline-closed" style="grid-column:1">Wait</span><span class="deadline-bar expire-bar continues" style="grid-column:2 / 4">Expire with final price →</span></div>
-        </div>
+    <section data-kind="tile" id="cash-expiration-timeline"><h5>Cash: wait for the final price</h5>
+    <p>For <strong class="key-term">American and European</strong> cash options, exercise and expiration after expiry both wait for the <strong class="key-term">final expiry price</strong>.</p>
+    <figure class="cash-price-timeline" aria-label="Cash settlement example: expiry at noon, blocked until the final expiry price is published at 12:20. Publication time is illustrative, not a deadline.">
+      <figcaption>Example sequence · read down ↓</figcaption>
+      <ol>
+        <li class="cash-expiry-event"><strong>12:00 · Option expiry</strong><p>The final expiry price can now be published.</p></li>
+        <li class="cash-wait-event"><strong>Final price missing · wait</strong><p>The holder cannot exercise. No one can submit expiration. This wait has <strong>no fixed duration</strong>.</p></li>
+        <li class="cash-ready-event"><strong>12:20 · Publisher supplies the price</strong><p>12:20 is just an example. The report gives the price <strong>for the 12:00 expiry</strong>.</p></li>
+      </ol>
+      <div class="cash-ready-actions">
+        <p><strong class="role-buyer">Holder or executor</strong> can exercise for payment.</p>
+        <p><strong class="key-term">Anyone</strong> can submit expiration, reserving the holder’s payout for a separate claim.</p>
       </div>
     </figure>
-    <p>Before 12:00, American exercise needs a <strong class="key-term">fresh price observation</strong>.</p>
-    <p>A <strong class="key-term">full exercise or expiration transaction</strong> changes Live to Settled and ends these lanes.</p>
+    <p>The vault must still be <strong class="key-term">Live</strong>. Publishing the price <strong>does not settle it</strong>; full exercise or expiration does.</p>
     </section>
     <section data-kind="tile" id="timeline-lp-withdrawal"><h5>When can you claim as an LP?</h5>
     <p><strong class="key-term">Physical:</strong> if the option has not been fully exercised, wait until 13:00 in this example. You or anyone else can then submit expiration.</p>
