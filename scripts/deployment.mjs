@@ -1,6 +1,6 @@
 import { Contract, ContractFactory, getCreateAddress, getAddress, keccak256, toUtf8Bytes } from 'ethers';
 export const LIBRARIES = ['IvyVaultRules', 'IvyOptionSettlement'];
-export const CONTRACTS = [...LIBRARIES, 'IvyVault', 'IvyVaultsHub', 'IvyShares', 'IvyPremiums', 'IvyUnwind', 'IvyPriceFeed'];
+export const CONTRACTS = [...LIBRARIES, 'IvyVault', 'IvyVaultsHub', 'IvyShares', 'IvyPremiums', 'IvyUnwind', 'IvyPriceFeed', 'IvyBidRules'];
 export const artifactPath = name => `../artifacts/contracts/${LIBRARIES.includes(name) ? 'libraries/' : ''}${name}.sol/${name}.json`;
 
 /** Resolve every compiler-provided link reference; never guess placeholder positions. */
@@ -39,7 +39,7 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
   const addresses = Object.fromEntries(CONTRACTS.map((name, i) => [name, getCreateAddress({from:deployer,nonce:startNonce+i})]));
   const a = addresses;
   const args = [[], [], [], [admin,a.IvyVault,a.IvyShares,a.IvyPremiums,a.IvyUnwind,exerciseWindow,auctionTimeout,expiryPricePublicationWindow],
-    [a.IvyVaultsHub,a.IvyPremiums,a.IvyUnwind,uri], [a.IvyVaultsHub,a.IvyShares], [a.IvyVaultsHub,a.IvyShares], [reportSigner]];
+    [a.IvyVaultsHub,a.IvyPremiums,a.IvyUnwind,uri], [a.IvyVaultsHub,a.IvyShares], [a.IvyVaultsHub,a.IvyShares], [reportSigner], []];
   const steps = [];
   for (let i = 0; i < CONTRACTS.length; ++i) {
     const name = CONTRACTS[i], artifact = artifacts[name];
@@ -93,6 +93,7 @@ export async function verifyBindings(provider, plan, { requireInitialAdmin = tru
   for (const name of LIBRARIES) {
     if (await currentCode(provider, a[name]) === '0x') throw new Error(`Library code missing: ${name}`);
   }
+  if (await currentCode(provider, a.IvyBidRules) === '0x') throw new Error('Validator code missing: IvyBidRules');
   for (const step of plan.steps) {
     if (!step.libraryLinks.length) continue;
     const code = await currentCode(provider, step.address);

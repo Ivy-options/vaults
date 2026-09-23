@@ -5,11 +5,13 @@ import { AbiCoder, Contract, Interface, JsonRpcProvider, VoidSigner, ZeroAddress
 import { CONTRACTS, artifactPath, buildDeploymentPlan, resumeDeployment, json } from './deployment.mjs';
 import { buildRegistryDeploymentPlan, resumeRegistryDeployment } from './registry-deployment.mjs';
 import { REGISTRY_ABI, RELEASE_FORMAT, verifyRelease, resolveRelease } from './releases.mjs';
-export const BID_TYPES = {Bid:[['vaultId','uint256'],['marketMaker','address'],['quoteToken','address'],['strike','uint256'],['premium','uint256'],['style','uint8'],['settlement','uint8'],['expiry','uint64'],['validUntil','uint64'],['nonce','uint256'],['auctionId','uint256'],['collateralAmount','uint256'],['pairHash','bytes32'],['executor','address'],['recipient','address']].map(([name,type])=>({name,type}))};
+export const BID_TYPES = {Bid:[['vaultId','uint256'],['marketMaker','address'],['quoteToken','address'],['strike','uint256'],['premium','uint256'],['style','uint8'],['settlement','uint8'],['expiry','uint64'],['validUntil','uint64'],['nonce','uint256'],['auctionId','uint256'],['collateralAmount','uint256'],['termsHash','bytes32'],['executor','address'],['recipient','address']].map(([name,type])=>({name,type}))};
 export const UNWIND_TYPES = {UnwindAgreement:[['vaultId','uint256'],['nonce','uint256'],['deadline','uint64'],['exercisedNotional','uint256'],['supply','uint256'],['refund','uint256']].map(([name,type])=>({name,type}))};
 export const REPORT_TYPES = {
   SpotReport:[['underlying','address'],['quote','address'],['price','uint256'],['observedAt','uint64'],['validUntil','uint64']].map(([name,type])=>({name,type})),
 };
+const RULE_KIND = { PairLimits: id('PairLimits').slice(0, 10), SpotBand: id('SpotBand').slice(0, 10) };
+const coder = AbiCoder.defaultAbiCoder();
 export async function loadArtifacts() {
   return Object.fromEntries(await Promise.all(CONTRACTS.map(async name=>[name,JSON.parse(await readFile(new URL(artifactPath(name),import.meta.url),'utf8'))])));
 }
@@ -48,7 +50,7 @@ async function inspectSettlement(provider, hub, request) {
 }
 
 /** Read-only preflight. USD values use six decimals; token quantities use raw token units. */
-export async function prepareVault(provider, request) {
+export async function prepareVault(provider, request, release) {
   const r=request, t={...required(r,'terms'),publicDeposits:r.terms.publicDeposits??false};
   required(t,'maxSettlementPriceAge');
   if (Number(t.allowedSettlement) !== 0) {
@@ -56,9 +58,9 @@ export async function prepareVault(provider, request) {
     if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
   }
   if(typeof required(t,'allowPartialExercise')!=='boolean') throw new Error('allowPartialExercise must be boolean');
-  const pairs=required(r,'pairs').map(p=>({quoteToken:p.quoteToken,terms:{...p.terms}}));
+  const pairs=required(r,'pairs').map(p=>({quoteToken:required(p,'quoteToken'),premiumToken:required(p,'premiumToken')}));
   const allowed=new Set(required(r,'supportedTokens').map(a=>a.toLowerCase()));
-  for(const token of [t.underlying,t.collateral,...pairs.flatMap(p=>[p.quoteToken,p.terms.premiumToken])]) if(!allowed.has(token.toLowerCase())) throw new Error(`Unsupported token ${token}`);
+  for(const token of [t.underlying,t.collateral,...pairs.flatMap(p=>[p.quoteToken,p.premiumToken])]) if(!allowed.has(token.toLowerCase())) throw new Error(`Unsupported token ${token}`);
   const token=new Contract(t.collateral,['function decimals() view returns(uint8)','function balanceOf(address) view returns(uint256)'],provider);
   const amount=BigInt(required(r,'collateralAmount'));
   const usdPrice=BigInt(required(r,'collateralPriceUsdE6'));
@@ -69,15 +71,22 @@ export async function prepareVault(provider, request) {
   if(valueUsdE6<minimum) throw new Error('Below launch USD minimum');
   if(await token.balanceOf(required(r,'sender'))<amount) throw new Error('Insufficient wallet balance');
   t.minCollateral=amount;
-  for(const pair of pairs) {
-    const market=required(r,'marketQuotes')[pair.quoteToken.toLowerCase()];
+  const validator=r.bidRules??release?.addresses?.IvyBidRules;
+  if(!validator) throw new Error('Missing bidRules validator address');
+  const call=t.collateral.toLowerCase()===t.underlying.toLowerCase();
+  const limits=r.pairs.map(p=>{
+    const market=required(r,'marketQuotes')[p.quoteToken.toLowerCase()];
     if(!market) throw new Error('Missing market quote for pair');
     const spot=BigInt(required(market,'spot')), bps=BigInt(required(market,'outOfTheMoneyBps'));
-    const call=t.collateral.toLowerCase()===t.underlying.toLowerCase();
     if(spot<=0n||bps<0n||(!call&&bps>=10000n)) throw new Error('Invalid strike inputs');
-    pair.terms.strikeLimit=call?(spot*(10000n+bps)+9999n)/10000n:spot*(10000n-bps)/10000n;
+    return [p.quoteToken, call?(spot*(10000n+bps)+9999n)/10000n:spot*(10000n-bps)/10000n, BigInt(p.minPremium??0)];
+  });
+  const rules=[{validator,kind:RULE_KIND.PairLimits,data:coder.encode(['tuple(address,uint256,uint256)[]'],[limits])}];
+  if(r.spotBand) {
+    const b=r.spotBand;
+    rules.push({validator,kind:RULE_KIND.SpotBand,data:coder.encode(['tuple(address,uint32,uint16)'],[[required(b,'priceFeed'),required(b,'maxPriceAge'),required(b,'maxInTheMoneyBps')]])});
   }
-  return {terms:t,pairs,valueUsdE6,settlementMethodology:r.settlementMethodology};
+  return {terms:t,pairs,rules,valueUsdE6,settlementMethodology:r.settlementMethodology};
 }
 
 /** @returns {Promise<any>} Prepared calldata or typed data; never sends a transaction. */
@@ -97,9 +106,9 @@ export async function prepareOperation(provider, artifacts, command, r) {
     return {pricingAuthority:'indicative activation only; does not supply cash vault settlement prices',domain:domain('IvyPriceFeed','1',required(r,'feed')),types:REPORT_TYPES,value:fields(REPORT_TYPES.SpotReport,r.report)};
   }
   if(command==='typed-bid') {
-    const s=await hub.stateOf(r.vaultId), p=await hub.pairTermsOf(r.vaultId,r.bid.quoteToken);
-    const value={...r.bid,vaultId:r.vaultId,expiry:s.expiry,auctionId:s.auctionId,collateralAmount:await hub.totalShares(r.vaultId),pairHash:keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,uint256,uint256,bool)'],[Array.from(p)])),executor:r.bid.executor??ZeroAddress,recipient:r.bid.recipient??r.bid.marketMaker};
-    return {domain:domain('IvyVaultsHub','2',r.hub),types:BID_TYPES,value:fields(BID_TYPES.Bid,value),
+    const s=await hub.stateOf(r.vaultId);
+    const value={...r.bid,vaultId:r.vaultId,expiry:s.expiry,auctionId:s.auctionId,collateralAmount:await hub.totalShares(r.vaultId),termsHash:await hub.termsHashOf(r.vaultId),executor:r.bid.executor??ZeroAddress,recipient:r.bid.recipient??r.bid.marketMaker};
+    return {domain:domain('IvyVaultsHub','3',r.hub),types:BID_TYPES,value:fields(BID_TYPES.Bid,value),
       ...(Number(r.bid.settlement)===1?{fallbackTerms:fallbackTerms(s.expiry,s.expiryPricePublicationWindow,s.exerciseWindow)}:{})};
   }
   if(command==='typed-unwind') {
@@ -121,7 +130,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
       detail={hub:verified.hub,manifestHash:verified.manifestHash,releaseId:r.releaseId};
     } else { method='setRecommendedVersion';args=[required(r,'releaseId')];detail={hub:await target.hubOf(r.releaseId),releaseId:r.releaseId}; }
   } else if(command==='prepare-vault') {
-    detail=await prepareVault(provider,r); method='createVault';args=[detail.terms,detail.pairs];
+    detail=await prepareVault(provider,r,release); method='createVault';args=[detail.terms,detail.pairs,detail.rules];
     if(Number(detail.terms.allowedSettlement)!==0) detail.fallbackTerms=fallbackTerms(detail.terms.expiry,await hub.expiryPricePublicationWindow(),await hub.exerciseWindow());
   } else if(command==='inspect-bid'||command==='activate') {
     method='activate';args=[r.vaultId,r.bid,r.signature];

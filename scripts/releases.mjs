@@ -9,7 +9,7 @@ export const REGISTRY_ABI = [
   'function setRecommendedVersion(uint256)',
   'function hasRole(bytes32,address) view returns(bool)',
 ];
-export const RELEASE_FORMAT = 'ivy-vaults-v3';
+export const RELEASE_FORMAT = 'ivy-vaults-v4';
 
 /** JSON bundle commitment includes preserved interfaces, constructor evidence and runtime hashes. */
 export const releaseHash = bundle => planHash(bundle);
@@ -18,6 +18,7 @@ export const releaseHash = bundle => planHash(bundle);
 export async function verifyRelease(provider, bundle, supportedArtifacts) {
   if (bundle.format !== 1 || bundle.interfaceFormat !== RELEASE_FORMAT || bundle.manifest?.version !== 7) throw new Error('Unsupported release format; historical releases require their preserved operator build');
   const { manifest, journal, artifacts } = bundle;
+  if (!manifest.addresses?.IvyBidRules || !manifest.steps?.some(s => s.name === 'IvyBidRules')) throw new Error('Release manifest lacks IvyBidRules');
   if (String((await provider.getNetwork()).chainId) !== manifest.chainId || (await provider.getBlock(0)).hash !== manifest.genesisHash) throw new Error('Wrong chain');
   for (const name of CONTRACTS) {
     if (!artifacts?.[name] || !supportedArtifacts?.[name] || json(artifacts[name].abi) !== json(supportedArtifacts[name].abi)) throw new Error(`Unsupported release interface: ${name}`);
@@ -34,13 +35,13 @@ export async function verifyRelease(provider, bundle, supportedArtifacts) {
     if (keccak256(historical) !== hash || entry.runtimeHash !== hash) throw new Error(`Runtime history mismatch: ${step.name}`);
   }
   await verifyBindings(provider, manifest, { requireInitialAdmin: false });
-  for (const [contractName, name, version] of [['IvyVaultsHub','IvyVaultsHub','2'],['IvyUnwind','IvyUnwind','1'],['IvyPriceFeed','IvyPriceFeed','1']]) {
+  for (const [contractName, name, version] of [['IvyVaultsHub','IvyVaultsHub','3'],['IvyUnwind','IvyUnwind','1'],['IvyPriceFeed','IvyPriceFeed','1']]) {
     const address=manifest.addresses[contractName];
     const contract=new Contract(address,['function eip712Domain() view returns(bytes1,string,string,uint256,address,bytes32,uint256[])'],provider);
     const domain=await contract.eip712Domain();
     if(domain[0]!=='0x0f'||domain[1]!==name||domain[2]!==version||String(domain[3])!==manifest.chainId||getAddress(domain[4])!==getAddress(address)||domain[6].length!==0) throw new Error(`Unsupported signing domain: ${contractName}`);
   }
-  return { hub: getAddress(manifest.addresses.IvyVaultsHub), chainId: manifest.chainId, artifacts, manifestHash: releaseHash(bundle) };
+  return { hub: getAddress(manifest.addresses.IvyVaultsHub), addresses: manifest.addresses, chainId: manifest.chainId, artifacts, manifestHash: releaseHash(bundle) };
 }
 
 /** Resolve once. Existing-position callers must pass releaseId, never a moving recommendation. */

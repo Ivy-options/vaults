@@ -1,7 +1,7 @@
 import { rejects } from "node:assert/strict";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { ZeroAddress } from "ethers";
+import { AbiCoder, id } from "ethers";
 import { loadArtifacts, REPORT_TYPES, prepareOperation, prepareVault } from "../scripts/operator.mjs";
 import { buildDeploymentPlan, resumeDeployment, verifyBindings, CONTRACTS } from "../scripts/deployment.mjs";
 import { deployIvy, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
@@ -111,7 +111,7 @@ describe("journaled immutable deployment and manual tooling",function(){
   it("requires explicit USD minimum, computes a call floor, and prepares only simulated calldata",async()=>{
     const c=await deployIvy(connection), artifacts=await loadArtifacts();
     await c.weth.mint(c.alice.address,10n*W);
-    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{allowPartialExercise:false,underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,priceFeed:ZeroAddress,maxSettlementPriceAge:0,maxInTheMoneyBps:0,maxPriceAge:0},pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,strikeLimit:0,minPremium:0,enabled:true}}]};
+    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{allowPartialExercise:false,underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,maxSettlementPriceAge:0},pairs:[{quoteToken:c.usdcAddress,premiumToken:c.usdcAddress,minPremium:0}],bidRules:c.bidRulesAddress};
     const cash={...request,terms:{...request.terms,allowedSettlement:1,maxSettlementPriceAge:3600}};
     await rejects(prepareVault(c.admin.provider,{...cash,terms:{...cash.terms,maxSettlementPriceAge:0}}), /positive maxSettlementPriceAge/);
     await rejects(prepareVault(c.admin.provider,cash), /Missing settlementMethodology/);
@@ -119,7 +119,9 @@ describe("journaled immutable deployment and manual tooling",function(){
     expect(prepared.terms.allowPartialExercise).eq(false);
     await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:undefined}}), /Missing allowPartialExercise/);
     await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:"false"}}), /must be boolean/);
-    expect(prepared.terms.publicDeposits).eq(false);expect(prepared.pairs[0].terms.strikeLimit).eq(3600n*U);
+    expect(prepared.terms.publicDeposits).eq(false);
+    expect(prepared.rules[0].kind).eq(id('PairLimits').slice(0,10));
+    expect(AbiCoder.defaultAbiCoder().decode(['tuple(address,uint256,uint256)[]'],prepared.rules[0].data)[0][0][1]).eq(3600n*U);
     const tx=await prepareOperation(c.admin.provider,artifacts,'prepare-vault',request);
     expect(tx.method).eq('createVault');expect(await c.hub.vaultCount()).eq(0n);
     const missing={...request};delete missing.minTradeUsdE6;

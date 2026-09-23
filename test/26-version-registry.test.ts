@@ -32,7 +32,7 @@ describe("Immutable release registry", function () {
 
 import { buildDeploymentPlan, resumeDeployment } from "../scripts/deployment.mjs";
 import { loadArtifacts, prepareOperation } from "../scripts/operator.mjs";
-import { releaseHash, resolveRelease, verifyRelease } from "../scripts/releases.mjs";
+import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease } from "../scripts/releases.mjs";
 
 async function releaseFixture() {
   const c = await network.create();
@@ -41,7 +41,7 @@ async function releaseFixture() {
   const artifacts = await loadArtifacts();
   const manifest = await buildDeploymentPlan({ artifacts, chainId: (await ethers.provider.getNetwork()).chainId, genesisHash: (await ethers.provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(), admin: admin.address, reportSigner: outsider.address, exerciseWindow:3600, expiryPricePublicationWindow:3600 });
   const journal = await resumeDeployment(admin, manifest);
-  const bundle = { format: 1, interfaceFormat: 'ivy-vaults-v3', manifest, journal, artifacts };
+  const bundle = { format: 1, interfaceFormat: RELEASE_FORMAT, manifest, journal, artifacts };
   const registry = await (await ethers.getContractFactory("IvyVaultsRegistry")).deploy(admin.address);
   return { ...c, admin, outsider, artifacts, bundle, registry };
 }
@@ -54,6 +54,10 @@ describe("Verified release resolution", function () {
     await registry.registerVersion(7, bundle.manifest.addresses.IvyVaultsHub, releaseHash(bundle));
     const resolved = await resolveRelease(ethers.provider, request, artifacts);
     expect(resolved.hub).equal(bundle.manifest.addresses.IvyVaultsHub);
+    expect(bundle.manifest.addresses.IvyBidRules).to.match(/^0x[0-9a-fA-F]{40}$/);
+    expect(resolved.addresses.IvyBidRules).equal(bundle.manifest.addresses.IvyBidRules);
+    const noValidator = structuredClone(bundle); delete noValidator.manifest.addresses.IvyBidRules; noValidator.manifest.steps = noValidator.manifest.steps.filter((s: any) => s.name !== 'IvyBidRules');
+    await expect(verifyRelease(ethers.provider, noValidator, artifacts)).rejectedWith('lacks IvyBidRules');
     const prepared = await prepareOperation(ethers.provider, artifacts, 'set-platform-fee', request);
     expect(prepared.to).equal(resolved.hub);
     await registry.setRecommendedVersion(7);
@@ -75,6 +79,47 @@ describe("Verified release resolution", function () {
     await hub.grantRole(ethers.ZeroHash,c.outsider.address);
     await hub.renounceRole(ethers.ZeroHash,admin.address);
     expect((await resolveRelease(ethers.provider,request,artifacts)).hub).equal(resolved.hub);
+  });
+});
+
+describe("Release-resolved vault creation", function () {
+  it("creates a vault with the manifest's validator, signs with termsHash and activates", async function () {
+    const c = await releaseFixture();
+    const { ethers, registry, bundle, artifacts, admin } = c;
+    await registry.registerVersion(1, bundle.manifest.addresses.IvyVaultsHub, releaseHash(bundle));
+    const resolved = await resolveRelease(ethers.provider, { registry: await registry.getAddress(), releaseBundle: bundle, releaseId: 1 }, artifacts);
+    const hub = await ethers.getContractAt('IvyVaultsHub', resolved.hub);
+    const weth = await ethers.deployContract('MockERC20', ['Wrapped Ether', 'WETH', 18]);
+    const usdc = await ethers.deployContract('MockERC20', ['USD Coin', 'USDC', 6]);
+    const [w, u] = [await weth.getAddress(), await usdc.getAddress()];
+    await hub.grantRole(await hub.BID_MASTER_ROLE(), admin.address);
+    await hub.grantRole(await hub.MARKET_MAKER_ROLE(), admin.address);
+    const expiry = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 7200n;
+    await weth.mint(admin.address, 10n ** 18n);
+    const prepared = await prepareOperation(ethers.provider, artifacts, 'prepare-vault', {
+      sender: admin.address, hub: resolved.hub, bidRules: resolved.addresses.IvyBidRules,
+      terms: { allowPartialExercise: true, underlying: w, collateral: w, allowedExercise: 2, allowedSettlement: 0, expiry, auctionStartsAt: 0, maxSettlementPriceAge: 0 },
+      pairs: [{ quoteToken: u, premiumToken: u, minPremium: 100n * 10n ** 6n }],
+      collateralAmount: 10n ** 18n, collateralPriceUsdE6: 3000n * 10n ** 6n, minTradeUsdE6: 1000n * 10n ** 6n, supportedTokens: [w, u],
+      marketQuotes: { [u.toLowerCase()]: { spot: 3000n * 10n ** 6n, outOfTheMoneyBps: 0 } },
+    });
+    expect(prepared.method).equal('createVault');
+    expect(prepared.detail.rules[0].validator).equal(resolved.addresses.IvyBidRules);
+    await admin.sendTransaction({ to: prepared.to, data: prepared.data });
+    const vaultId = await hub.vaultCount();
+    const vault = await hub.vaultOf(vaultId);
+    await weth.approve(vault, 10n ** 18n);
+    await hub.deposit(vaultId, 10n ** 18n);
+    await hub.openAuction(vaultId);
+    const typed = await prepareOperation(ethers.provider, artifacts, 'typed-bid', { sender: admin.address, hub: resolved.hub, vaultId,
+      bid: { marketMaker: admin.address, quoteToken: u, strike: 3000n * 10n ** 6n, premium: 100n * 10n ** 6n, style: 1, settlement: 0, validUntil: expiry, nonce: 1, executor: ethers.ZeroAddress, recipient: admin.address } });
+    expect(typed.domain.version).equal('3');
+    expect(typed.value.termsHash).equal(await hub.termsHashOf(vaultId));
+    const signature = await admin.signTypedData(typed.domain, typed.types, typed.value);
+    await usdc.mint(admin.address, 100n * 10n ** 6n);
+    await usdc.approve(vault, 100n * 10n ** 6n);
+    await hub.activate(vaultId, typed.value, signature);
+    expect((await hub.stateOf(vaultId)).phase).equal(2);
   });
 });
 
@@ -165,7 +210,7 @@ describe('Deployment through a caching RPC provider', function () {
       })).rejectedWith('lost library hash');
       delete hubJournal.steps.IvyVaultRules.hash;
       expect((await resumeDeployment(signer,hubPlan,hubJournal)).complete).equal(true);
-      expect(Number(BigInt(await provider.send('eth_getTransactionCount',[deployer,'latest'])))).equal(9);
+      expect(Number(BigInt(await provider.send('eth_getTransactionCount',[deployer,'latest'])))).equal(10);
     } finally { provider.destroy(); }
   });
 });

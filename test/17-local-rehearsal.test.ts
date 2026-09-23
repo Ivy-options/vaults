@@ -78,7 +78,7 @@ describe('local operator rehearsal', function () {
       genesisHash: (await provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(),
       admin: admin.address, reportSigner: admin.address, exerciseWindow:3600, expiryPricePublicationWindow:3600 });
     expect(plan.version).eq(7);
-    expect(plan.steps).length(8);
+    expect(plan.steps).length(9);
     expect(plan.addresses).not.have.property('IvySettlementPriceFeed');
     expect((await resumeDeployment(admin, plan)).complete).eq(true);
     const hub: any = new Contract(plan.addresses.IvyVaultsHub, artifacts.IvyVaultsHub.abi, provider);
@@ -123,9 +123,10 @@ describe('local operator rehearsal', function () {
       await op('prepare-vault', owner, {
         ...(cash ? { settlementMethodology: methodology } : {}),
         terms: { allowPartialExercise: false, underlying: w, collateral: isCall ? w : u, ...(isCall ? {} : { publicDeposits: true }),
-          allowedExercise: cash ? 0 : 1, allowedSettlement: cash ? 1 : 0, expiry, auctionStartsAt: 0, priceFeed: cash ? plan.addresses.IvyPriceFeed : ZeroAddress,
-          maxSettlementPriceAge: cash ? 3600 : 0, maxInTheMoneyBps: cash ? 1000 : 0, maxPriceAge: cash ? 3600 : 0 },
-        pairs: [{ quoteToken: u, terms: { premiumToken: u, minPremium: 100n * U, enabled: true } }],
+          allowedExercise: cash ? 0 : 1, allowedSettlement: cash ? 1 : 0, expiry, auctionStartsAt: 0, maxSettlementPriceAge: cash ? 3600 : 0 },
+        pairs: [{ quoteToken: u, premiumToken: u, minPremium: 100n * U }],
+        bidRules: plan.addresses.IvyBidRules,
+        ...(cash ? { spotBand: { priceFeed: plan.addresses.IvyPriceFeed, maxPriceAge: 3600, maxInTheMoneyBps: 1000 } } : {}),
         collateralAmount: isCall ? 10n * W : 18000n * U, collateralPriceUsdE6: isCall ? 3000n * U : U,
         minTradeUsdE6: 10000n * U, supportedTokens: [w, u], marketQuotes: { [u.toLowerCase()]: { spot: 3000n * U, outOfTheMoneyBps: 0 } }
       });
