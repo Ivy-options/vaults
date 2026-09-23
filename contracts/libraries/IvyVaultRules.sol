@@ -47,11 +47,14 @@ library IvyVaultRules {
         }
     }
 
-    /// @dev Every rule's validator must have code and accept its own data before any deposit can arrive.
-    function validateRules(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules)
-        external
-        view
-    {
+    /// @dev Validates, stores and commits the creator's rules in one call. Every validator must have code and
+    ///      accept its own data before any deposit can arrive. Returns the termsHash bids must carry.
+    function adoptRules(
+        BidRule[] storage stored,
+        VaultTerms calldata t,
+        PairConfig[] calldata pairs,
+        BidRule[] calldata rules
+    ) external returns (bytes32) {
         for (uint256 i = 0; i < rules.length; ++i) {
             BidRule calldata r = rules[i];
             if (r.validator == address(0) || r.validator.code.length == 0) {
@@ -61,7 +64,12 @@ library IvyVaultRules {
             if (ok != IIvyBidValidator.validateConfig.selector) {
                 revert InvalidValidator();
             }
+            BidRule storage slot = stored.push();
+            slot.validator = r.validator;
+            slot.kind = r.kind;
+            slot.data = r.data;
         }
+        return _termsHash(t, pairs, rules);
     }
 
     /// @dev Mandatory checks. Bid signature and caller authorization are enforced by the hub before this runs.
@@ -132,8 +140,8 @@ library IvyVaultRules {
     }
 
     /// @dev Commitment to the creator-supplied inputs of createVault. auctionStartsAt is operational and excluded.
-    function termsHash(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules)
-        external
+    function _termsHash(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules)
+        private
         pure
         returns (bytes32)
     {

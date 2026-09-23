@@ -74,8 +74,10 @@ contract IvyVaultsHub is
     uint256 public vaultCount;
     mapping(uint256 vaultId => VaultTerms) internal _terms;
     mapping(uint256 vaultId => VaultState) internal _state;
-    mapping(uint256 vaultId => mapping(address quoteToken => PairTerms)) internal _pairTerms;
+    mapping(uint256 vaultId => mapping(address quoteToken => address premiumToken)) internal _premiumTokens;
     mapping(uint256 vaultId => address[]) internal _quoteTokens;
+    mapping(uint256 vaultId => BidRule[]) internal _rules;
+    mapping(uint256 vaultId => bytes32) internal _termsHash;
     mapping(address marketMaker => mapping(uint256 nonce => bool)) public usedBidNonces;
 
     /// @notice Premium fee rate fixed at vault creation, including a zero rate.
@@ -113,7 +115,7 @@ contract IvyVaultsHub is
         uint64 window_,
         uint64 timeout_,
         uint64 publicationWindow_
-    ) EIP712("IvyVaultsHub", "2") {
+    ) EIP712("IvyVaultsHub", "3") {
         if (
             admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0)
                 || unwind_ == address(0)
@@ -200,7 +202,8 @@ contract IvyVaultsHub is
     // Vault creation (spec 4.2)
 
     /// @notice Create a vault. Kind is derived: `collateral == underlying` is a covered call, anything else a put.
-    function createVault(VaultTerms calldata terms, PairInput[] calldata pairs)
+    ///         Rules are the creator's bid acceptance conditions; they are frozen with the terms and pairs.
+    function createVault(VaultTerms calldata terms, PairConfig[] calldata pairs, BidRule[] calldata rules)
         external
         nonReentrant
         returns (uint256 vaultId, address vault)
@@ -240,9 +243,10 @@ contract IvyVaultsHub is
         s.underlyingUnit = 10 ** IERC20Metadata(terms.underlying).decimals();
 
         for (uint256 i = 0; i < pairs.length; ++i) {
-            _pairTerms[vaultId][pairs[i].quoteToken] = pairs[i].terms;
+            _premiumTokens[vaultId][pairs[i].quoteToken] = pairs[i].premiumToken;
             _quoteTokens[vaultId].push(pairs[i].quoteToken);
         }
+        _termsHash[vaultId] = IvyVaultRules.adoptRules(_rules[vaultId], terms, pairs, rules);
 
         emit VaultCreated(
             vaultId,
@@ -287,23 +291,6 @@ contract IvyVaultsHub is
     }
 
     // Owner controls (spec 8)
-
-    /// @notice Tighten vault-level terms. Every field must be equal or more LP-favourable than today.
-    function tightenVaultTerms(uint256 vaultId, TightenableTerms calldata n) external onlyVaultOwner(vaultId) {
-        _requirePhase(vaultId, Phase.Open);
-        IvyVaultRules.tightenVaultTerms(_terms[vaultId], n);
-        emit VaultTermsTightened(vaultId);
-    }
-
-    /// @notice Tighten one quote token's terms. Premium token is fixed; a disabled pair stays disabled.
-    function tightenPairTerms(uint256 vaultId, address quoteToken, PairTerms calldata n)
-        external
-        onlyVaultOwner(vaultId)
-    {
-        _requirePhase(vaultId, Phase.Open);
-        IvyVaultRules.tightenPairTerms(_pairTerms[vaultId][quoteToken], _state[vaultId].isCall, quoteToken, n);
-        emit PairTermsTightened(vaultId, quoteToken);
-    }
 
     /// @notice Set or clear the time from which anyone may open the auction. Operational, not economic.
     function scheduleAuction(uint256 vaultId, uint64 auctionStartsAt) external onlyVaultOwner(vaultId) {
@@ -404,21 +391,17 @@ contract IvyVaultsHub is
 
         VaultState storage s = _state[vaultId];
         VaultTerms storage t = _terms[vaultId];
-        PairTerms storage p = _pairTerms[vaultId][bid.quoteToken];
+        address premiumToken = _premiumTokens[vaultId][bid.quoteToken];
         uint256 supply = shareToken.totalSupply(vaultId);
-        IvyVaultRules.validateBid(s, t, p, bid, supply);
-
-        uint256 totalNotional = IvyMath.notionalOf(s.isCall, supply, s.underlyingUnit, bid.strike);
-        if (totalNotional == 0) {
-            revert EmptyNotional();
-        }
+        uint256 totalNotional = IvyVaultRules.checkBid(s, t, premiumToken, _termsHash[vaultId], bid, supply);
+        IvyVaultRules.runRules(s, t, _rules[vaultId], premiumToken, bid, supply, totalNotional);
         uint256 totalPremium = IvyMath.premiumTotal(bid.premium, totalNotional, s.underlyingUnit);
 
         s.marketMaker = bid.marketMaker;
         s.executor = bid.executor;
         s.recipient = bid.recipient;
         s.quoteToken = bid.quoteToken;
-        s.premiumToken = p.premiumToken;
+        s.premiumToken = premiumToken;
         s.strike = bid.strike;
         s.premium = bid.premium;
         s.style = bid.style;
@@ -432,14 +415,14 @@ contract IvyVaultsHub is
         uint256 fee = Math.mulDiv(totalPremium, feeRate, 10_000);
         platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);
         premiums.activate(vaultId, s.vault, totalPremium - fee, supply);
-        IIvyVault(s.vault).collectPremium(p.premiumToken, bid.marketMaker, totalPremium, fee, treasury);
+        IIvyVault(s.vault).collectPremium(premiumToken, bid.marketMaker, totalPremium, fee, treasury);
         emit PlatformFeeAllocated(vaultId, treasury, feeRate, fee);
 
         emit Activated(
             vaultId,
             bid.marketMaker,
             bid.quoteToken,
-            p.premiumToken,
+            premiumToken,
             bid.strike,
             bid.premium,
             bid.style,
@@ -659,9 +642,19 @@ contract IvyVaultsHub is
         return _state[vaultId];
     }
 
-    function pairTermsOf(uint256 vaultId, address quoteToken) external view returns (PairTerms memory) {
+    function pairOf(uint256 vaultId, address quoteToken) external view returns (address premiumToken) {
         _requireExists(vaultId);
-        return _pairTerms[vaultId][quoteToken];
+        return _premiumTokens[vaultId][quoteToken];
+    }
+
+    function rulesOf(uint256 vaultId) external view returns (BidRule[] memory) {
+        _requireExists(vaultId);
+        return _rules[vaultId];
+    }
+
+    function termsHashOf(uint256 vaultId) external view returns (bytes32) {
+        _requireExists(vaultId);
+        return _termsHash[vaultId];
     }
 
     function quoteTokensOf(uint256 vaultId) external view returns (address[] memory) {
@@ -682,7 +675,7 @@ contract IvyVaultsHub is
     // Version
 
     function version() external pure returns (string memory) {
-        return "2";
+        return "3";
     }
 
     // Public views
