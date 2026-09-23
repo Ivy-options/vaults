@@ -1,10 +1,9 @@
 import { rejects } from "node:assert/strict";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { AbiCoder, ZeroAddress, id } from "ethers";
-import { loadArtifacts, REPORT_TYPES, prepareOperation, prepareVault } from "../scripts/operator.mjs";
-import { buildDeploymentPlan, resumeDeployment, verifyBindings, CONTRACTS } from "../scripts/deployment.mjs";
-import { deployIvy, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
+import { REPORT_TYPES } from "../scripts/encoding.mjs";
+import { buildDeploymentPlan, resumeDeployment, verifyBindings, loadArtifacts, CONTRACTS } from "../scripts/deployment.mjs";
+import { deployIvy, USDC_UNIT as U } from "./helpers/setup.js";
 const spotArgs = (r: any) => [r.underlying,r.quote,r.price,r.observedAt,r.validUntil] as const;
 const connection=await network.create();
 const {ethers,networkHelpers}=connection;
@@ -14,23 +13,17 @@ describe("signed activation spot reports",function(){
   async function signed(c:any, feed:any, value:any, signer=c.admin) {
     return signer.signTypedData({name:'IvyPriceFeed',version:'1',chainId:(await signer.provider.getNetwork()).chainId,verifyingContract:await feed.getAddress()},REPORT_TYPES,value);
   }
-  it("prepares signed spot reports for any relayer and stores newer observations",async()=>{
-    const c=await networkHelpers.loadFixture(fixture), f=c.realFeed, artifacts=await loadArtifacts();
+  it("accepts signed spot reports from any relayer and stores newer observations",async()=>{
+    const c=await networkHelpers.loadFixture(fixture), f=c.realFeed;
     const now=BigInt(await networkHelpers.time.latest());
     const report={underlying:c.wethAddress,quote:c.usdcAddress,price:3300n*U,observedAt:now,validUntil:now+3600n};
-    const request={sender:c.bob.address,feed:await f.getAddress(),kind:'spot',report};
-    const typed=await prepareOperation(c.admin.provider,artifacts,'typed-report',request);
-    const signature=await c.admin.signTypedData(typed.domain,typed.types,typed.value);
-    const prepared=await prepareOperation(c.admin.provider,artifacts,'publish-spot',{...request,signature});
     expect(await f.spot(c.wethAddress,c.usdcAddress)).deep.equal([0n,0n]);
-    await c.bob.sendTransaction({to:prepared.to,data:prepared.data});
+    await f.connect(c.bob).publishSpot(...spotArgs(report),await signed(c,f,report));
     expect(await f.spot(c.wethAddress,c.usdcAddress)).deep.equal([report.price,now]);
     await networkHelpers.time.increase(10);
     const newer={...report,price:3500n*U,observedAt:BigInt(await networkHelpers.time.latest())};
     await f.publishSpot(...spotArgs(newer),await signed(c,f,newer));
     expect(await f.spot(c.wethAddress,c.usdcAddress)).deep.equal([newer.price,newer.observedAt]);
-    await rejects(prepareOperation(c.admin.provider,artifacts,'typed-report',{...request,kind:'expiry'}), /Report kind must be spot/);
-    await rejects(prepareOperation(c.admin.provider,artifacts,'publish-expiry',request), /Unknown command publish-expiry/);
   });
   it("rejects bad signatures, wrong feed domains, invalid prices and expired submissions",async()=>{
     const c=await networkHelpers.loadFixture(fixture), f=c.realFeed;
@@ -56,7 +49,7 @@ describe("signed activation spot reports",function(){
   });
 });
 
-describe("journaled immutable deployment and manual tooling",function(){
+describe("journaled immutable deployment",function(){
   it("requires an explicit positive expiry price publication window before planning deployment",async()=>{
     const [admin]=await ethers.getSigners(), artifacts=await loadArtifacts();
     const input={artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address,exerciseWindow:3600};
@@ -107,27 +100,5 @@ describe("journaled immutable deployment and manual tooling",function(){
     await rejects(resumeDeployment(admin,{...plan,version:6},{}), /Unsupported deployment plan version/);
     await rejects(resumeDeployment(admin,{...plan,chainId:'1'},{}), new RegExp('Wrong chain'));
     await rejects(resumeDeployment(admin,plan,{planHash:'wrong'}), new RegExp('another plan'));
-  });
-  it("requires explicit USD minimum, computes a call floor, and prepares only simulated calldata",async()=>{
-    const c=await deployIvy(connection), artifacts=await loadArtifacts();
-    await c.weth.mint(c.alice.address,10n*W);
-    const request:any={sender:c.alice.address,hub:c.hubAddress,collateralAmount:(10n*W).toString(),collateralPriceUsdE6:(3000n*U).toString(),minTradeUsdE6:(10000n*U).toString(),supportedTokens:[c.wethAddress,c.usdcAddress],marketQuotes:{[c.usdcAddress.toLowerCase()]:{spot:(3000n*U).toString(),outOfTheMoneyBps:2000}},terms:{allowPartialExercise:false,underlying:c.wethAddress,collateral:c.wethAddress,allowedExercise:1,allowedSettlement:0,expiry:c.defaultExpiry,auctionStartsAt:0,minCollateral:0,maxSettlementPriceAge:0},pairs:[{quoteToken:c.usdcAddress,premiumToken:c.usdcAddress,minPremium:0}],bidRules:c.bidRulesAddress};
-    const cash={...request,terms:{...request.terms,allowedSettlement:1,maxSettlementPriceAge:3600}};
-    await rejects(prepareVault(c.admin.provider,{...cash,terms:{...cash.terms,maxSettlementPriceAge:0}}), /positive maxSettlementPriceAge/);
-    await rejects(prepareVault(c.admin.provider,cash), /Missing settlementMethodology/);
-    const prepared=await prepareVault(c.admin.provider,request);
-    expect(prepared.terms.allowPartialExercise).eq(false);
-    await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:undefined}}), /Missing allowPartialExercise/);
-    await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:"false"}}), /must be boolean/);
-    expect(prepared.terms.publicDeposits).eq(false);
-    await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,priceFeed:ZeroAddress,maxPriceAge:0,maxInTheMoneyBps:0}}), /spotBand/);
-    await rejects(prepareVault(c.admin.provider,{...request,pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,minPremium:0}}]}), /minPremium/);
-    expect(prepared.rules[0].kind).eq(id('PairLimits').slice(0,10));
-    expect(AbiCoder.defaultAbiCoder().decode(['tuple(address,uint256,uint256)[]'],prepared.rules[0].data)[0][0][1]).eq(3600n*U);
-    const tx=await prepareOperation(c.admin.provider,artifacts,'prepare-vault',request);
-    expect(tx.method).eq('createVault');expect(await c.hub.vaultCount()).eq(0n);
-    const missing={...request};delete missing.minTradeUsdE6;
-    await rejects(prepareVault(c.admin.provider,missing), new RegExp('Missing minTradeUsdE6'));
-    await rejects(prepareVault(c.admin.provider,{...request,minTradeUsdE6:(40000n*U).toString()}), new RegExp('Below launch USD minimum'));
   });
 });

@@ -29,10 +29,10 @@ npm test -- --no-compile
 
 Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.
 
-To run one test file, for example the deployment and settlement rehearsal:
+To run one test file, for example the physical fallback tests:
 
 ```sh
-npm test -- test/17-local-rehearsal.test.ts
+npm test -- test/34-physical-fallback.test.ts
 ```
 
 ## Solidity style
@@ -57,7 +57,7 @@ Formatting is configured in `foundry.toml`. Declaration ordering and control-flo
 
 ## Edit the docs
 
-Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README; `operator-examples.html` is generated from `examples/operator/README.md`. The frontend integration page is generated from `docs/frontend-integration.md`; the license page is generated from `LICENSE.md`.
+Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README. The frontend integration page is generated from `docs/frontend-integration.md`; the license page is generated from `LICENSE.md`.
 
 After changing docs or request templates, rebuild, check, and test:
 

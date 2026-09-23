@@ -1,6 +1,0 @@
-{
-  "rpc": "http://127.0.0.1:8545",
-  "sender": "HUB_ADMIN_ADDRESS",
-  "account": "PUBLISHER_ADDRESS",
-  "hub": "HUB_ADDRESS"
-}

@@ -2,8 +2,7 @@ import { rejects, throws } from 'node:assert/strict';
 import { expect } from 'chai';
 import { network } from 'hardhat';
 import { AbiCoder, id } from 'ethers';
-import { loadArtifacts } from '../scripts/operator.mjs';
-import { buildDeploymentPlan, resumeDeployment, verifyBindings, linkBytecode, LIBRARIES } from '../scripts/deployment.mjs';
+import { buildDeploymentPlan, resumeDeployment, verifyBindings, linkBytecode, loadArtifacts, LIBRARIES } from '../scripts/deployment.mjs';
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;

@@ -1,7 +1,11 @@
+import { readFile } from 'node:fs/promises';
 import { Contract, ContractFactory, getCreateAddress, getAddress, keccak256, toUtf8Bytes } from 'ethers';
 export const LIBRARIES = ['IvyVaultRules', 'IvyOptionSettlement'];
 export const CONTRACTS = [...LIBRARIES, 'IvyVault', 'IvyVaultsHub', 'IvyShares', 'IvyPremiums', 'IvyUnwind', 'IvyPriceFeed', 'IvyBidRules'];
 export const artifactPath = name => `../artifacts/contracts/${LIBRARIES.includes(name) ? 'libraries/' : ''}${name}.sol/${name}.json`;
+export async function loadArtifacts() {
+  return Object.fromEntries(await Promise.all(CONTRACTS.map(async name=>[name,JSON.parse(await readFile(new URL(artifactPath(name),import.meta.url),'utf8'))])));
+}
 
 /** Resolve every compiler-provided link reference; never guess placeholder positions. */
 export function linkBytecode(artifact, addresses) {

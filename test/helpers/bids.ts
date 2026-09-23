@@ -1,5 +1,5 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
-import { BID_TYPES } from "../../scripts/operator.mjs";
+import { BID_TYPES } from "../../scripts/encoding.mjs";
 
 export { BID_TYPES };
 

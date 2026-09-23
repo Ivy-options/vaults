@@ -1,9 +1,0 @@
-{
-  "rpc": "http://127.0.0.1:8545",
-  "sender": "POSITION_OWNER_ADDRESS",
-  "registry": "REGISTRY_ADDRESS",
-  "releaseId": "1",
-  "releaseBundleFile": "release-1.json",
-  "vaultId": "1",
-  "amount": "POSITION_SHARE_AMOUNT"
-}

@@ -1,6 +1,5 @@
 import {
   readFileSync,
-  readdirSync,
   mkdirSync,
   writeFileSync,
   existsSync,
@@ -15,17 +14,11 @@ const pages = [
   { source: "docs/frontend-integration.md", output: "frontend-integration.html", title: "Frontend integration" },
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
   { source: "README.md", output: "project-setup.html", title: "Project setup" },
-  {
-    source: "examples/operator/README.md",
-    output: "operator-examples.html",
-    title: "Operator request examples",
-  },
 ];
 const destinations = new Map(
   pages.map((page) => [resolve(root, page.source), page.output])
 );
 destinations.set(resolve(root, "docs/site/index.html"), "index.html");
-destinations.set(resolve(root, "examples/operator"), "operator-examples.html");
 const escape = (text) =>
   String(text).replace(
     /[&<>"']/g,
@@ -45,14 +38,6 @@ const slug = (text) =>
 
 export function buildDocs({ check = false } = {}) {
   const outputs = new Map();
-  const requests = readdirSync(resolve(root, "examples/operator"))
-    .filter((name) => name.endsWith(".json"))
-    .sort();
-  for (const name of requests)
-    outputs.set(
-      `assets/requests/${name}`,
-      readFileSync(resolve(root, "examples/operator", name), "utf8")
-    );
   const rawSources = [
     "contracts/examples/ExampleSettlementPublisher.sol",
     "contracts/interfaces/IIvySettlementPricePublication.sol",
@@ -109,12 +94,6 @@ export function buildDocs({ check = false } = {}) {
       return `<div class="tablewrap" tabindex="0" role="region" aria-label="${escape(
         page.title
       )} reference table">${defaultTable.call(this, token)}</div>\n`;
-    };
-    renderer.codespan = function ({ text }) {
-      const code = `<code>${escape(text)}</code>`;
-      return requests.includes(text)
-        ? `<a href="assets/requests/${escape(text)}" download>${code}</a>`
-        : code;
     };
     const body = new Marked({ renderer, gfm: true }).parse(source);
     const navigation = headings

@@ -40,8 +40,8 @@ npm run typecheck
 npm test -- --no-compile
 </code></pre>
 <p>Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.</p>
-<p>To run one test file, for example the deployment and settlement rehearsal:</p>
-<pre><code class="language-sh">npm test -- test/17-local-rehearsal.test.ts
+<p>To run one test file, for example the physical fallback tests:</p>
+<pre><code class="language-sh">npm test -- test/34-physical-fallback.test.ts
 </code></pre>
 <h2 id="solidity-style">Solidity style</h2>
 <p>The contracts follow the Solidity style guide (<code>https://docs.soliditylang.org/en/latest/style-guide.html</code>).</p>
@@ -59,7 +59,7 @@ npm run format:solidity:check
 </code></pre>
 <p>Formatting is configured in <code>foundry.toml</code>. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
 <h2 id="edit-the-docs">Edit the docs</h2>
-<p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README; <code>operator-examples.html</code> is generated from <code>examples/operator/README.md</code>. The frontend integration page is generated from <code>docs/frontend-integration.md</code>; the license page is generated from <code>LICENSE.md</code>.</p>
+<p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README. The frontend integration page is generated from <code>docs/frontend-integration.md</code>; the license page is generated from <code>LICENSE.md</code>.</p>
 <p>After changing docs or request templates, rebuild, check, and test:</p>
 <pre><code class="language-sh">npm run docs:build
 npm run docs:check

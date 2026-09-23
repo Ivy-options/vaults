@@ -3,7 +3,6 @@ import { network } from "hardhat";
 import { ZeroAddress } from "ethers";
 import { deployIvy, callTerms, callPairs, createVaultAs, fund, Phase, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
 import { signBid } from "./helpers/bids.js";
-import { loadArtifacts, prepareOperation } from "../scripts/operator.mjs";
 import { proposeUnwind } from "./helpers/unwind.js";
 import { goLive, openVault, activate, makeBid, at } from "./helpers/scenarios.js";
 const connection = await network.create();
@@ -108,19 +107,7 @@ describe("platform fees and transferable unpaid premium", function () {
     expect(await v.vault.platformFeeRemaining()).eq(20n*U);
     expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(980n*U);
   });
-  it("preflight reports a zero-strike put as the hub's EmptyNotional, not a local division error", async function () {
-    const c = await networkHelpers.loadFixture(fixture);
-    const v = await openVault(c, { isCall: false });
-    const bid = await makeBid(c, v.vaultId, { strike: 0n });
-    const signature = await signBid(c.marketMaker, c.hubAddress, bid);
-    const error: any = await prepareOperation(c.admin.provider, await loadArtifacts(), "inspect-bid", {
-      sender: c.bidMaster.address, hub: c.hubAddress, vaultId: v.vaultId, bid, signature,
-      minTradeUsdE6: 10000n * U, collateralPriceUsdE6: U,
-    }).catch(e => e);
-    expect(error).to.be.instanceOf(Error);
-    expect(error.data).eq(c.hub.interface.getError("EmptyNotional")!.selector);
-  });
-  it("preflights and submits the fixed vault fee despite later global rate changes", async function () {
+  it("charges the fixed vault fee despite later global rate changes", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     await c.hub.setPlatformFeeBps(200);
     const v = await openVault(c);
@@ -130,22 +117,15 @@ describe("platform fees and transferable unpaid premium", function () {
     await c.usdc.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
     await c.hub.setPlatformFeeBps(500);
     await c.hub.setPlatformTreasury(c.carol.address);
-    const prepared = await prepareOperation(c.admin.provider,await loadArtifacts(),"inspect-bid",{
-      sender:c.bidMaster.address,hub:c.hubAddress,vaultId:v.vaultId,bid,signature,
-      minTradeUsdE6:10000n*U,collateralPriceUsdE6:3000n*U,
-    });
-    expect(prepared.detail.platformFeeBps).eq(200n);
-    expect(prepared.detail.platformFee).eq(20n*U);
-    expect(prepared.detail.lpPremium).eq(980n*U);
     expect(await v.vault.premiumCollected()).eq(false);
     await c.hub.setPlatformFeeBps(0);
     await c.hub.setPlatformTreasury(c.bob.address);
-    await c.bidMaster.sendTransaction({to:prepared.to,data:prepared.data});
+    await c.hub.connect(c.bidMaster).activate(v.vaultId,bid,signature);
     const allocated = await c.hub.platformFees(v.vaultId);
     expect(allocated.rateBps).eq(200);
     expect(allocated.recipient).eq(c.bob.address);
-    expect(await v.vault.platformFeeRemaining()).eq(prepared.detail.platformFee);
-    expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(prepared.detail.lpPremium);
+    expect(await v.vault.platformFeeRemaining()).eq(20n*U);
+    expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(980n*U);
   });
   it("segregates fees from overlapping collateral and net LP premium, and snapshots the recipient", async function () {
     const c = await networkHelpers.loadFixture(fixture);

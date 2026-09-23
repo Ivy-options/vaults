@@ -30,8 +30,9 @@ describe("Immutable release registry", function () {
   });
 });
 
-import { buildDeploymentPlan, resumeDeployment } from "../scripts/deployment.mjs";
-import { loadArtifacts, prepareOperation } from "../scripts/operator.mjs";
+import { buildDeploymentPlan, resumeDeployment, loadArtifacts } from "../scripts/deployment.mjs";
+import { RULE_KIND, encodePairLimits } from "../scripts/encoding.mjs";
+import { signBid } from "./helpers/bids.js";
 import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease } from "../scripts/releases.mjs";
 
 async function releaseFixture() {
@@ -47,7 +48,7 @@ async function releaseFixture() {
 }
 
 describe("Verified release resolution", function () {
-  it("pins operator transactions to an explicit release and checks provenance before encoding", async function () {
+  it("resolves an explicit release and checks its provenance", async function () {
     const c = await releaseFixture();
     const { ethers, registry, bundle, artifacts, admin } = c;
     const request = { registry: await registry.getAddress(), releaseBundle: bundle, releaseId: 7, sender: admin.address, rateBps: 10 };
@@ -58,14 +59,13 @@ describe("Verified release resolution", function () {
     expect(resolved.addresses.IvyBidRules).equal(bundle.manifest.addresses.IvyBidRules);
     const noValidator = structuredClone(bundle); delete noValidator.manifest.addresses.IvyBidRules; noValidator.manifest.steps = noValidator.manifest.steps.filter((s: any) => s.name !== 'IvyBidRules');
     await expect(verifyRelease(ethers.provider, noValidator, artifacts)).rejectedWith('lacks IvyBidRules');
-    const prepared = await prepareOperation(ethers.provider, artifacts, 'set-platform-fee', request);
-    expect(prepared.to).equal(resolved.hub);
+    await expect(resolveRelease(ethers.provider, { ...request, releaseId: undefined }, artifacts, { allowRecommended: true })).rejectedWith('No recommended release');
     await registry.setRecommendedVersion(7);
-    expect(prepared.to).equal(resolved.hub);
+    expect((await resolveRelease(ethers.provider, { ...request, releaseId: undefined }, artifacts, { allowRecommended: true })).hub).equal(resolved.hub);
     await expect(resolveRelease(ethers.provider, { ...request, releaseId: undefined }, artifacts)).rejectedWith('Explicit releaseId');
     await expect(resolveRelease(ethers.provider, { ...request, hub: admin.address }, artifacts)).rejectedWith('Hub and release mismatch');
     await expect(verifyRelease(ethers.provider, { ...bundle, interfaceFormat: 'unknown' }, artifacts)).rejectedWith('Unsupported release format');
-    await expect(verifyRelease(ethers.provider, { ...bundle, interfaceFormat: 'ivy-vaults-v2', manifest:{...bundle.manifest,version:6} }, artifacts)).rejectedWith('historical releases require their preserved operator build');
+    await expect(verifyRelease(ethers.provider, { ...bundle, interfaceFormat: 'ivy-vaults-v2', manifest:{...bundle.manifest,version:6} }, artifacts)).rejectedWith('historical releases require their preserved build');
     await expect(verifyRelease(ethers.provider, { ...bundle, manifest: { ...bundle.manifest, chainId: '1' } }, artifacts)).rejectedWith('Wrong chain');
     const corrupt = structuredClone(bundle); corrupt.manifest.steps[0].data = '0x00';
     await expect(verifyRelease(ethers.provider, corrupt, artifacts)).rejectedWith('does not match saved artifacts');
@@ -73,8 +73,6 @@ describe("Verified release resolution", function () {
     await expect(verifyRelease(ethers.provider, corruptAbi, artifacts)).rejectedWith('Unsupported release interface');
     const corruptReceipt = structuredClone(bundle); corruptReceipt.journal.steps!.IvyVaultsHub.hash = ethers.ZeroHash;
     await expect(verifyRelease(ethers.provider, corruptReceipt, artifacts)).rejectedWith('Creation evidence mismatch');
-    const explicit = await prepareOperation(ethers.provider, artifacts, 'set-platform-fee', { hub: resolved.hub, sender: admin.address, rateBps: 10 });
-    expect(explicit.data).equal(prepared.data);
     const hub=await ethers.getContractAt('IvyVaultsHub',resolved.hub);
     await hub.grantRole(ethers.ZeroHash,c.outsider.address);
     await hub.renounceRole(ethers.ZeroHash,admin.address);
@@ -96,29 +94,21 @@ describe("Release-resolved vault creation", function () {
     await hub.grantRole(await hub.MARKET_MAKER_ROLE(), admin.address);
     const expiry = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 7200n;
     await weth.mint(admin.address, 10n ** 18n);
-    const prepared = await prepareOperation(ethers.provider, artifacts, 'prepare-vault', {
-      sender: admin.address, hub: resolved.hub, bidRules: resolved.addresses.IvyBidRules,
-      terms: { allowPartialExercise: true, underlying: w, collateral: w, allowedExercise: 2, allowedSettlement: 0, expiry, auctionStartsAt: 0, maxSettlementPriceAge: 0 },
-      pairs: [{ quoteToken: u, premiumToken: u, minPremium: 100n * 10n ** 6n }],
-      collateralAmount: 10n ** 18n, collateralPriceUsdE6: 3000n * 10n ** 6n, minTradeUsdE6: 1000n * 10n ** 6n, supportedTokens: [w, u],
-      marketQuotes: { [u.toLowerCase()]: { spot: 3000n * 10n ** 6n, outOfTheMoneyBps: 0 } },
-    });
-    expect(prepared.method).equal('createVault');
-    expect(prepared.detail.rules[0].validator).equal(resolved.addresses.IvyBidRules);
-    await admin.sendTransaction({ to: prepared.to, data: prepared.data });
+    const terms = { underlying: w, collateral: w, allowPartialExercise: true, publicDeposits: false, allowedExercise: 2, allowedSettlement: 0, expiry, auctionStartsAt: 0, minCollateral: 0, maxSettlementPriceAge: 0 };
+    const rules = [{ validator: resolved.addresses.IvyBidRules, kind: RULE_KIND.PairLimits, data: encodePairLimits([[u, 3000n * 10n ** 6n, 100n * 10n ** 6n]]) }];
+    await hub.createVault(terms, [{ quoteToken: u, premiumToken: u }], rules);
     const vaultId = await hub.vaultCount();
     const vault = await hub.vaultOf(vaultId);
     await weth.approve(vault, 10n ** 18n);
     await hub.deposit(vaultId, 10n ** 18n);
     await hub.openAuction(vaultId);
-    const typed = await prepareOperation(ethers.provider, artifacts, 'typed-bid', { sender: admin.address, hub: resolved.hub, vaultId,
-      bid: { marketMaker: admin.address, quoteToken: u, strike: 3000n * 10n ** 6n, premium: 100n * 10n ** 6n, style: 1, settlement: 0, validUntil: expiry, nonce: 1, executor: ethers.ZeroAddress, recipient: admin.address } });
-    expect(typed.domain.version).equal('3');
-    expect(typed.value.termsHash).equal(await hub.termsHashOf(vaultId));
-    const signature = await admin.signTypedData(typed.domain, typed.types, typed.value);
+    const state = await hub.stateOf(vaultId);
+    const bid = { vaultId, marketMaker: admin.address, quoteToken: u, strike: 3000n * 10n ** 6n, premium: 100n * 10n ** 6n, style: 1, settlement: 0, expiry,
+      validUntil: expiry, nonce: 1n, auctionId: state.auctionId, collateralAmount: await hub.totalShares(vaultId), termsHash: await hub.termsHashOf(vaultId),
+      executor: ethers.ZeroAddress, recipient: admin.address };
     await usdc.mint(admin.address, 100n * 10n ** 6n);
     await usdc.approve(vault, 100n * 10n ** 6n);
-    await hub.activate(vaultId, typed.value, signature);
+    await hub.activate(vaultId, bid, await signBid(admin, resolved.hub, bid));
     expect((await hub.stateOf(vaultId)).phase).equal(2);
   });
 });
@@ -144,40 +134,6 @@ describe('Separate registry deployment', function () {
     expect(await (await ethers.getContractAt('IvyVaultsRegistry', plan.address)).recommendedVersion()).equal(0n);
     await expect(resumeRegistryDeployment(admin, { ...plan, version: 99 }, artifact)).rejectedWith('Unsupported registry plan');
     await expect(resumeRegistryDeployment(admin, { ...plan, admin: ethers.ZeroAddress }, artifact)).rejectedWith('does not match');
-  });
-});
-
-import { deployIvy, callTerms, callPairs, WETH_UNIT as W, USDC_UNIT as U } from './helpers/setup.js';
-
-describe('Release selection at operator boundaries', function () {
-  it('binds creation, signatures and approvals to the chosen Hub when recommendation moves', async function () {
-    const c=await releaseFixture();
-    const ctx=await deployIvy(c);
-    const { ethers, registry, artifacts, admin, bundle }=c;
-    const hub=await ethers.getContractAt('IvyVaultsHub',bundle.manifest.addresses.IvyVaultsHub);
-    const req:any={registry:await registry.getAddress(),releaseBundle:bundle,sender:admin.address,collateralAmount:String(W),collateralPriceUsdE6:String(3000n*U),minTradeUsdE6:String(U),supportedTokens:[ctx.wethAddress,ctx.usdcAddress],marketQuotes:{[ctx.usdcAddress.toLowerCase()]:{spot:String(3000n*U),outOfTheMoneyBps:0}},terms:callTerms(ctx),pairs:callPairs(ctx)};
-    await ctx.weth.mint(admin.address,W);
-    await expect(resolveRelease(ethers.provider,req,artifacts,{allowRecommended:true})).rejectedWith('No recommended release');
-    const registration=await prepareOperation(ethers.provider,artifacts,'register-version',{...req,releaseId:1});
-    await admin.sendTransaction(registration);
-    const recommendation=await prepareOperation(ethers.provider,artifacts,'recommend-version',{...req,releaseId:1});
-    await admin.sendTransaction(recommendation);
-    const creation=await prepareOperation(ethers.provider,artifacts,'prepare-vault',req);
-    await admin.sendTransaction(creation);
-    const bidRequest={...req,releaseId:1,vaultId:1,bid:{marketMaker:admin.address,quoteToken:ctx.usdcAddress,strike:3000n*U,premium:U,style:0,settlement:0,validUntil:ctx.defaultExpiry,nonce:0}};
-    const typed=await prepareOperation(ethers.provider,artifacts,'typed-bid',bidRequest);
-    const signature=await admin.signTypedData(typed.domain,typed.types,typed.value);
-    const approval=await prepareOperation(ethers.provider,artifacts,'approve-token',{...bidRequest,token:ctx.wethAddress,amount:W});
-    expect(ctx.weth.interface.decodeFunctionData('approve',approval.data)[0]).equal(await hub.vaultOf(1));
-    await registry.registerVersion(2,ctx.hubAddress,ethers.id('separate release'));
-    await registry.setRecommendedVersion(2);
-    expect(creation.to).equal(await hub.getAddress());
-    expect(typed.domain.verifyingContract).equal(await hub.getAddress());
-    expect(ethers.verifyTypedData(typed.domain,typed.types,typed.value,signature)).equal(admin.address);
-    expect((await prepareOperation(ethers.provider,artifacts,'typed-bid',bidRequest)).domain).deep.equal(typed.domain);
-    await expect(prepareOperation(ethers.provider,artifacts,'prepare-vault',req)).rejectedWith('Registered manifest hash mismatch');
-    expect(await hub.vaultCount()).equal(1n);
-    expect(await ctx.hub.vaultCount()).equal(0n);
   });
 });
 

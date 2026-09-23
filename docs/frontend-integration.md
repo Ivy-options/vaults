@@ -250,7 +250,7 @@ Use `settlementStatus(vaultId)` to read `(route, publicationDeadline, fallbackDe
 
 The same fallback applies to American and European cash options. It requires no separate activation transaction and never resets the deadlines. Ordinary `exercise` cannot turn into physical delivery while pending. Before explicit fallback, display the full payment: calls deliver quote at the strike (rounded up); puts deliver underlying and receive quote at the strike (rounded down). The exerciser approves the clone as spender. Inspect balance, allowance, authorized caller, recipient, remaining notional and the partial-exercise policy. Physical delivery does not require an oracle or an in-the-money check, and the buyer may decline it. LP recovery at `F` does not depend on buyer funding, a callback or publisher recovery.
 
-Track `PhysicalFallbackExercised` and `PhysicalFallbackExpired` alongside normal exercise/settlement events. The expiration event reports lapsed notional; it must not be displayed as an exercised amount. Cash reserves already earned remain excluded from LP claims. The CLI exposes these reads with `inspect-settlement` and explicit submission with `exercise-fallback`; an unavailable `physicalExercisePreview` is a quote of delivery terms, not a cash exercise funding requirement.
+Track `PhysicalFallbackExercised` and `PhysicalFallbackExpired` alongside normal exercise/settlement events. The expiration event reports lapsed notional; it must not be displayed as an exercised amount. Cash reserves already earned remain excluded from LP claims. Read `settlementStatus` for the route and deadlines before offering `exercisePhysicalFallback`.
 
 This build uses interface format `ivy-vaults-v4` and deployment manifest 7. Relative to `ivy-vaults-v3`: `createVault` takes `(VaultTerms, PairConfig[], BidRule[])`, `VaultTerms` loses its price-feed fields, `pairTermsOf` becomes `pairOf`, `rulesOf` and `termsHashOf` are new, the signed `Bid` carries `termsHash` instead of `pairHash`, the EIP-712 domain version is `3`, every release deploys `IvyBidRules`, and owner tightening and pair disabling are removed. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fallback is provided.
 
@@ -290,4 +290,4 @@ Handle these cases explicitly:
 - Fail closed on missing bundles, mismatched hashes and unsupported interfaces.
 - Show the selected release ID and Hub before the wallet signs.
 
-See the [release deployment and registration guide](site/releases.html), [protocol Guide](site/index.html#execution-permissions), and [operator request examples](../examples/operator/README.md) for the administrative and transaction-preparation workflows.
+See the [release deployment and registration guide](site/releases.html) and the [protocol Guide](site/index.html#execution-permissions) for the administrative workflows.

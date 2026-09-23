@@ -1,5 +1,0 @@
-{
-  "rpc": "http://127.0.0.1:8545",
-  "planFile": "registry-plan.json",
-  "journalFile": "registry-journal.json"
-}

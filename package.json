@@ -10,7 +10,6 @@
     "test": "hardhat test",
     "typecheck": "tsc --noEmit",
     "check:size": "node scripts/check-size.mjs",
-    "operator": "node scripts/operator.mjs",
     "postcompile": "node scripts/check-size.mjs",
     "docs:check": "node scripts/check-docs.mjs",
     "docs:build": "node scripts/build-docs.mjs",

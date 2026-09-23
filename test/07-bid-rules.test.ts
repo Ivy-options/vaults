@@ -7,7 +7,7 @@ import {
 } from "./helpers/setup.js";
 import { signBid } from "./helpers/bids.js";
 import { CALL_DEPOSIT, STRIKE, activate, makeBid, openVault, setSpot } from "./helpers/scenarios.js";
-import { encodePairLimits as pairLimits, encodePremiumFloor as premiumFloor, encodeSpotBand as spotBand } from "../scripts/operator.mjs";
+import { encodePairLimits as pairLimits, encodePremiumFloor as premiumFloor, encodeSpotBand as spotBand } from "../scripts/encoding.mjs";
 
 const connection = await network.create();
 const { ethers } = connection;

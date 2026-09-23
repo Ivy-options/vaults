@@ -1,5 +1,5 @@
 import type { IvyContext } from "./setup.js";
-import { UNWIND_TYPES } from "../../scripts/operator.mjs";
+import { UNWIND_TYPES } from "../../scripts/encoding.mjs";
 
 export async function signUnwindProposal(c: IvyContext, vaultId: bigint, deadline: bigint, refund: bigint) {
   const [a, digest] = await c.hub.previewUnwind(vaultId, deadline, refund);

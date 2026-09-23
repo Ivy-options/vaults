@@ -1,6 +1,0 @@
-{
-  "rpc": "http://127.0.0.1:8545", "sender": "BID_MASTER_ADDRESS", "hub": "HUB_ADDRESS", "vaultId": "1",
-  "collateralPriceUsdE6": "3000000000", "minTradeUsdE6": "10000000000",
-  "bid": "REPLACE_WITH_COMPLETE_TYPED_BID_VALUE_OBJECT",
-  "signature": "BUYER_EIP712_SIGNATURE"
-}
