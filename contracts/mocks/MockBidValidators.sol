@@ -68,6 +68,11 @@ contract ConfigRevertValidator is IIvyBidValidator {
 contract StateWritingValidator {
     uint256 public calls;
 
+    function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external returns (bytes4) {
+        ++calls;
+        return IIvyBidValidator.validateBid.selector;
+    }
+
     function validateConfig(bytes4, VaultTerms calldata, PairConfig[] calldata, bytes calldata)
         external
         pure
@@ -75,21 +80,16 @@ contract StateWritingValidator {
     {
         return IIvyBidValidator.validateConfig.selector;
     }
-
-    function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external returns (bytes4) {
-        ++calls;
-        return IIvyBidValidator.validateBid.selector;
-    }
 }
 
 /// @dev Pins the context the hub builds and doubles as a "no bids in the first N seconds" rule.
 contract ContextAssertingValidator is IIvyBidValidator {
-    error ContextMismatch();
-    error TooEarly();
-
     address public immutable expectedPremiumToken;
     uint256 public immutable expectedTotalNotional;
     uint64 public immutable minAuctionAge;
+
+    error ContextMismatch();
+    error TooEarly();
 
     constructor(address premiumToken_, uint256 totalNotional_, uint64 minAuctionAge_) {
         expectedPremiumToken = premiumToken_;

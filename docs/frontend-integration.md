@@ -116,6 +116,7 @@ export async function createVault(
   resolvedRelease: any,
   terms: any,
   pairs: any[],
+  rules: any[],
 ): Promise<IvyVaultReference> {
   const hub = new Contract(
     resolvedRelease.hub,
@@ -124,9 +125,9 @@ export async function createVault(
   );
 
   // Surface validation errors before opening the wallet confirmation.
-  await hub.createVault.staticCall(terms, pairs);
+  await hub.createVault.staticCall(terms, pairs, rules);
 
-  const transaction = await hub.createVault(terms, pairs);
+  const transaction = await hub.createVault(terms, pairs, rules);
   const receipt = await transaction.wait();
 
   let created: any;
@@ -198,7 +199,7 @@ A vault stores a list of bid rules chosen by its creator and frozen at creation.
 - Any other validator address is custom. Show it as such and do not attempt to decode its data.
 - An empty list means every bid that passes the Hub's own checks is acceptable. Show that plainly.
 
-Bids commit to `termsHashOf(vaultId)`, the hash of the creator's terms, pairs and rules. Fill `termsHash` from that view when building a bid to sign. Protocol settings snapshotted at creation (`exerciseWindow`, `auctionTimeout`, `expiryPricePublicationWindow`, `vaultPlatformFeeBps`) are not in the hash; read them from `stateOf` before quoting.
+Bids commit to `termsHashOf(vaultId)`, the hash of the creator's terms, pairs and rules. Fill `termsHash` from that view when building a bid to sign. Protocol settings snapshotted at creation are not in the hash: read `exerciseWindow`, `auctionTimeout` and `expiryPricePublicationWindow` from `stateOf(vaultId)`, and the fee rate from `vaultPlatformFeeBps(vaultId)`, before quoting.
 
 ## Discover every historical vault
 
@@ -228,7 +229,7 @@ Every wallet transaction must display and target the concrete contract that will
 
 Typed signatures also bind to the concrete immutable deployment:
 
-- Bid domain: `name = IvyVaultsHub`, `version = 2`, connected `chainId`, `verifyingContract = hubAddress`.
+- Bid domain: `name = IvyVaultsHub`, `version = 3` for this release (`2` for `ivy-vaults-v3` Hubs), connected `chainId`, `verifyingContract = hubAddress`.
 - Unwind domain: `name = IvyUnwind`, `version = 1`, connected `chainId`, `verifyingContract =` that Hub release's unwind-module address.
 
 A registry release ID is not an EIP-712 version. Never rebuild an existing bid or unwind signature against the current recommendation.

@@ -109,7 +109,7 @@ describe("bid rules at activation", function () {
     await fund(ctx, ctx.weth, ctx.alice, vaultAddress, CALL_DEPOSIT);
     await ctx.hub.connect(ctx.alice).deposit(vaultId, CALL_DEPOSIT);
     await ctx.hub.connect(ctx.alice).openAuction(vaultId);
-    await activate(ctx, vaultId, vaultAddress, { strike: 1n, premium: 0n });
+    await activate(ctx, vaultId, vaultAddress, { strike: 0n, premium: 0n });
     const put = await createVaultAs(ctx, ctx.alice, putTerms(ctx), putPairs(ctx), []);
     await fund(ctx, ctx.usdc, ctx.alice, put.vaultAddress, 30_000n * USDC_UNIT);
     await ctx.hub.connect(ctx.alice).deposit(put.vaultId, 30_000n * USDC_UNIT);

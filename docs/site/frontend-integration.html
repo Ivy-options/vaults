@@ -120,6 +120,7 @@ export async function createVault(
   resolvedRelease: any,
   terms: any,
   pairs: any[],
+  rules: any[],
 ): Promise&lt;IvyVaultReference&gt; {
   const hub = new Contract(
     resolvedRelease.hub,
@@ -128,9 +129,9 @@ export async function createVault(
   );
 
   // Surface validation errors before opening the wallet confirmation.
-  await hub.createVault.staticCall(terms, pairs);
+  await hub.createVault.staticCall(terms, pairs, rules);
 
-  const transaction = await hub.createVault(terms, pairs);
+  const transaction = await hub.createVault(terms, pairs, rules);
   const receipt = await transaction.wait();
 
   let created: any;
@@ -193,7 +194,7 @@ await (await hub.openAuction(reference.vaultId)).wait();
 <li>Any other validator address is custom. Show it as such and do not attempt to decode its data.</li>
 <li>An empty list means every bid that passes the Hub&#39;s own checks is acceptable. Show that plainly.</li>
 </ul>
-<p>Bids commit to <code>termsHashOf(vaultId)</code>, the hash of the creator&#39;s terms, pairs and rules. Fill <code>termsHash</code> from that view when building a bid to sign. Protocol settings snapshotted at creation (<code>exerciseWindow</code>, <code>auctionTimeout</code>, <code>expiryPricePublicationWindow</code>, <code>vaultPlatformFeeBps</code>) are not in the hash; read them from <code>stateOf</code> before quoting.</p>
+<p>Bids commit to <code>termsHashOf(vaultId)</code>, the hash of the creator&#39;s terms, pairs and rules. Fill <code>termsHash</code> from that view when building a bid to sign. Protocol settings snapshotted at creation are not in the hash: read <code>exerciseWindow</code>, <code>auctionTimeout</code> and <code>expiryPricePublicationWindow</code> from <code>stateOf(vaultId)</code>, and the fee rate from <code>vaultPlatformFeeBps(vaultId)</code>, before quoting.</p>
 <h2 id="discover-every-historical-vault">Discover every historical vault</h2>
 <p>The registry does not expose an array of releases. Index its events instead:</p>
 <ol>
@@ -238,7 +239,7 @@ await (await hub.openAuction(reference.vaultId)).wait();
 </div>
 <p>Typed signatures also bind to the concrete immutable deployment:</p>
 <ul>
-<li>Bid domain: <code>name = IvyVaultsHub</code>, <code>version = 2</code>, connected <code>chainId</code>, <code>verifyingContract = hubAddress</code>.</li>
+<li>Bid domain: <code>name = IvyVaultsHub</code>, <code>version = 3</code> for this release (<code>2</code> for <code>ivy-vaults-v3</code> Hubs), connected <code>chainId</code>, <code>verifyingContract = hubAddress</code>.</li>
 <li>Unwind domain: <code>name = IvyUnwind</code>, <code>version = 1</code>, connected <code>chainId</code>, <code>verifyingContract =</code> that Hub release&#39;s unwind-module address.</li>
 </ul>
 <p>A registry release ID is not an EIP-712 version. Never rebuild an existing bid or unwind signature against the current recommendation.</p>
