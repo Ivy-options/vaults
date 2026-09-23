@@ -76,7 +76,7 @@
     <p><strong>Each vault</strong> holds its own collateral and reserves.</p>
     <p><strong>The shared Hub</strong> coordinates the trade without holding the tokens.</p>
     <section data-kind="action" id="hub-and-vaults"><h4>Approve the vault</h4>
-    <p>Token approvals target <strong>the individual vault, never the Hub.</strong></p>
+    <p>Every deposit and payment is pulled from your wallet by the vault that holds the trade. Token approvals therefore target <strong>the individual vault, never the Hub.</strong></p>
     <p>To deposit, approve the vault for its collateral token, then submit the deposit through the Hub.</p>
     </section>
     <section data-kind="action" id="admission-pause-action" data-actor="guardian"><h4>Pause new commitments</h4>
@@ -121,6 +121,7 @@
     <p>A <strong class="role-buyer">buyer’s</strong> offer must use the same expiry.</p>
     </section>
     <section data-kind="tile" id="strike-and-premium-limits"><h5>Strike and premium limits</h5>
+    <p>Limits protect LPs from a bad bid: no offer can win below the price they signed up for.</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">Call:</strong> may require a minimum strike.</li>
       <li><strong class="key-term">Put:</strong> requires a nonzero maximum strike.</li>
@@ -128,7 +129,7 @@
     <p>Both may require a <strong class="key-term">minimum premium per whole underlying token</strong>, paid in the pair’s premium token.</p>
     </section>
     <section data-kind="tile" id="tighten-open-terms"><h5>Which limits may tighten?</h5>
-    <p>While <strong class="key-term">Open</strong>, the owner may:</p>
+    <p>LPs deposited under the terms they saw. So while <strong class="key-term">Open</strong>, the owner may only move them in the LPs’ favour:</p>
     <ul class="reading-list" role="list">
       <li>Raise the <strong class="key-term">premium floor</strong>.</li>
       <li>Raise a <strong class="key-term">call’s strike floor</strong>.</li>
@@ -137,7 +138,7 @@
     </ul>
     <p>Either policies may narrow to one method. Disabled quote pairs <strong class="key-term">cannot be re-enabled</strong>.</p>
     <section data-kind="tile" id="activation-price-guard"><h5>Optional activation price check</h5>
-    <p>If the <strong class="role-owner">owner</strong> configured a price feed, activation also checks:</p>
+    <p>A strike far into the money sells the option too cheaply. If the <strong class="role-owner">owner</strong> configured a price feed, activation also checks the strike against spot:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term"><code>maxInTheMoneyBps</code></strong> limits the strike’s deviation into the money from spot.</li>
       <li><strong class="key-term"><code>maxPriceAge</code></strong> limits the age of that spot price.</li>
@@ -147,7 +148,7 @@
     </section>
     </section>
     <section data-kind="action" id="token-roles"><h4>Choose the backing</h4>
-    <p>In a WETH/USDC option:</p>
+    <p>Every option involves two tokens: the asset being optioned and the token that states its price. In a WETH/USDC option:</p>
     <ul class="reading-list" role="list">
       <li><strong>WETH</strong> is the underlying asset.</li>
       <li><strong>USDC</strong> is the quote token used to state the strike price.</li>
@@ -157,6 +158,7 @@
     <p>Premium is accounted for <strong>separately from the backing.</strong></p>
     </section>
     <section data-kind="action" id="choose-settlement" data-actor="owner"><h4>Fix how the option settles</h4>
+    <p>Settlement is how the buyer gets value when it uses the option: by trading tokens at the strike, or by receiving the difference in value out of the collateral.</p>
     <p>The <strong class="role-owner">owner</strong> chooses a settlement policy:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">Physical</strong> or <strong class="key-term">Cash:</strong> fixes the method.</li>
@@ -213,7 +215,7 @@
     <p>The pool must be nonzero and meet the owner’s <code>minCollateral</code> threshold. The opening transaction must execute <strong>before the fixed option expiry.</strong></p>
     </section>
     <section data-kind="tile" id="scheduled-opening-transaction"><h5>A schedule needs a transaction</h5>
-    <p><strong class="key-term"><code>auctionStartsAt</code></strong> is the earliest scheduled opening time.</p>
+    <p>Scheduling only sets a time. <strong class="key-term"><code>auctionStartsAt</code></strong> is the earliest the opening transaction may run.</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">From that time:</strong> anyone may submit the opening transaction.</li>
       <li><strong class="key-term">Before that time:</strong> the <strong class="role-owner">owner</strong> may open sooner.</li>
@@ -243,7 +245,7 @@
     <p><strong>Signing alone does not sell the option.</strong> Payment readiness is checked when the offer is activated.</p>
     <p class="reference"><a href="index.html#makers" data-guide>Signed-bid format and validation ↗</a></p>
     <section data-kind="tile" id="bid-trade-terms"><h5>The proposed trade</h5>
-    <p>The signed offer specifies:</p>
+    <p>An offer is a complete trade, not just a price. The signed offer specifies:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">Price and payment:</strong> quote token, strike and premium.</li>
       <li><strong class="key-term">Exercise:</strong> American or European style.</li>
@@ -253,7 +255,7 @@
     <p>All must fit the <strong class="role-owner">owner’s</strong> terms.</p>
     </section>
     <section data-kind="tile" id="bid-auction-identity"><h5>The specific auction</h5>
-    <p>The signature binds:</p>
+    <p>An offer is for one auction and the pool as it stands, so it cannot be replayed elsewhere. The signature binds:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">Vault ID</strong></li>
       <li><strong class="key-term">Auction ID</strong></li>
@@ -263,9 +265,9 @@
     <p>Cancelling and reopening creates a <strong class="key-term">new auction ID</strong>. The old bid no longer matches.</p>
     </section>
     <section data-kind="tile" id="bid-validity-deadline"><h5>A separate signature deadline</h5>
-    <p><strong class="key-term"><code>validUntil</code></strong> is the last time the signed bid can be accepted.</p>
-    <p>This deadline is separate from the <strong class="key-term">option expiry</strong> and <strong class="key-term">auction cancellation timeout</strong>.</p>
-    <p>The <strong class="role-buyer">buyer</strong> can cancel its nonce to invalidate the bid. The nonce also prevents reuse.</p>
+    <p>Signing is free and off-chain, so a buyer needs a way to stop an old offer from being accepted later.</p>
+    <p><strong class="key-term"><code>validUntil</code></strong> is the last time the signed bid can be accepted. It is separate from the <strong class="key-term">option expiry</strong> and the <strong class="key-term">auction cancellation timeout</strong>.</p>
+    <p>The <strong class="role-buyer">buyer</strong> can also cancel its nonce to invalidate the bid at any time. The nonce also prevents reuse.</p>
     </section>
     <section data-kind="tile" id="bid-payment-readiness"><h5>Who pays the premium?</h5>
     <p>The signed market maker is the <strong class="role-buyer">option buyer</strong> and must have the required role.</p>
@@ -294,7 +296,7 @@
     <p class="map-next"><a href="#live">Follow the live option →</a></p>
 
     <section data-kind="tile" id="activation-checks"><h5>What must pass?</h5>
-    <p>Activation checks:</p>
+    <p>Activation is the one moment the offer is verified. Everything must line up, or the vault stays in Auction:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">Authorization:</strong> the buyer’s signature and nonce.</li>
       <li><strong class="key-term">Auction:</strong> identity and current share supply.</li>
@@ -320,7 +322,7 @@
     <p>The <strong class="role-bid">bid master</strong> can cancel any unsold auction. The <strong class="role-owner">owner</strong> can cancel once any one of the three conditions below is met.</p><p class="map-next"><a href="#open">Return to funding →</a></p>
 
     <section data-kind="tile" id="auction-cancellation-clock"><h5>After the auction timeout</h5>
-    <p>The <strong class="role-owner">owner</strong> can cancel once this deadline is reached:</p>
+    <p>The timeout keeps a pool from staying locked in an auction nobody wins. The <strong class="role-owner">owner</strong> can cancel once this deadline is reached:</p>
     <p><strong class="key-term"><code>auctionOpenedAt</code></strong><br>+ <strong class="key-term"><code>auctionTimeout</code></strong></p>
     <p>The clock starts when the <strong class="key-term">opening transaction succeeds</strong>, not when the auction is scheduled.</p>
     <section data-kind="tile" id="auction-timeout-setting"><h5>Which duration applies?</h5>
@@ -371,6 +373,7 @@
     <p>An LP with 20% of the shares receives 20% of the net premium. In the 980 USDC example, that is 196 USDC, separate from its later residual claim.</p>
     </section>
     <section data-kind="tile" id="premium-transfers-and-burns"><h5>After a transfer or burn</h5>
+    <p>Premium is credited to shares, not to wallets. So:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">Transferred shares:</strong> unclaimed premium entitlement follows them.</li>
       <li><strong class="key-term">Burned shares:</strong> unpaid premium credit is preserved.</li>
@@ -383,7 +386,8 @@
     <p>The <strong class="role-buyer">buyer</strong> decides whether to use its right to trade. It may act directly or delegate execution.</p>
     <p>The exercise style determines when that right can be used.</p>
     <section data-kind="action" id="exercise-windows" data-actor="buyer"><h4>Know the physical deadline</h4>
-    <p>Physical exercise must execute <strong>strictly before expiry + exerciseWindow.</strong> The vault’s saved grace period extends both physical styles beyond the option expiry.</p>
+    <p>A physical option does not close at the exact expiry. The vault gives the buyer a saved grace period, the <code>exerciseWindow</code>, to pay and take delivery after expiry.</p>
+    <p>Physical exercise must execute <strong>strictly before expiry + exerciseWindow.</strong> This applies to both American and European styles.</p>
 
     <section data-kind="tile" id="physical-american-start"><h5>American starts at activation</h5>
     <p>The buyer or executor may exercise from activation until just before the physical exercise deadline.</p>
@@ -404,6 +408,7 @@
     </section>
     </section>
     <section data-kind="action" id="exercise" data-actor="buyer"><h4>Exchange tokens physically</h4>
+    <p>Physical exercise is the buyer using the option: it trades at the agreed strike, whatever the market price is now.</p>
     <p>For <strong>10 WETH</strong> at a <strong>3,000 USDC strike,</strong> full physical exercise means:</p>
     <ul class="reading-list" role="list">
       <li><strong>Call:</strong> the buyer pays 30,000 USDC and receives 10 WETH.</li>
@@ -415,7 +420,7 @@
     <p class="map-next"><a href="#settled">After full exercise →</a></p>
 
     <section data-kind="tile" id="partial-exercise-policy"><h5>When is partial exercise allowed?</h5>
-    <p>The <strong class="role-owner">owner</strong> fixes <code>allowPartialExercise</code> at creation.</p>
+    <p>A buyer may want to use only part of the option. Whether that is allowed is fixed by the <strong class="role-owner">owner</strong> at creation, as <code>allowPartialExercise</code>:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">False:</strong> exercise must use all remaining notional.</li>
       <li><strong class="key-term">True:</strong> exercise may use part and leave the rest Live.</li>
@@ -443,7 +448,7 @@
     <p><strong class="key-term">Example:</strong> an executor pays USDC from its wallet; the physical call sends WETH to the chosen recipient.</p>
     </section>
     <section data-kind="tile" id="buyer-recipient-hook"><h5>A contract recipient is told it was paid</h5>
-    <p>After each payout, the contract calls <code>onIvyPayout(vaultId, token, amount)</code> on the <strong class="key-term">recipient</strong> if it is a contract.</p>
+    <p>A <strong class="key-term">recipient</strong> that is a contract, such as a swap adapter, needs to know it was paid. So after each payout the contract calls <code>onIvyPayout(vaultId, token, amount)</code> on any recipient with code.</p>
     <p>The tokens are already delivered when the call runs, and the vault is already settled if that payout completed it.</p>
     <p>A recipient without that method, or one that reverts, <strong class="key-term">never blocks the payout</strong>. Only a recipient that runs out of gas reverts the transaction, so gas estimates stay honest.</p>
     <p><strong class="key-term">Example:</strong> a recipient contract receives WETH from a cash exercise and swaps it to USDC in the same transaction, or posts an order for a solver to fill later.</p>
@@ -564,7 +569,8 @@
       <li><strong>An executed agreement</strong> between the buyer and every current shareholder.</li>
     </ul>
     <section data-kind="action" id="expire-the-vault" data-actor="anyone"><h4>Submit expiration</h4>
-    <p><strong class="key-term">Anyone</strong> may submit expiration when the relevant condition holds:</p>
+    <p>Expiration is the transaction that closes an option the buyer did not fully use.</p>
+    <p><strong class="key-term">Anyone</strong> may submit it once the relevant condition holds:</p>
     <ul class="reading-list" role="list">
       <li><strong>Physical option:</strong> its <a href="#exercise-windows">physical exercise window</a> has closed.</li>
       <li><strong>Cash option:</strong> expiry has arrived and the final expiry price is available.</li>
