@@ -1,4 +1,4 @@
-import { ZeroAddress, getCreateAddress } from "ethers";
+import { AbiCoder, ZeroAddress, getCreateAddress, id } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { artifacts, type network } from "hardhat";
 
@@ -29,23 +29,33 @@ export interface VaultTermsInput {
   expiry: bigint;
   auctionStartsAt: bigint;
   minCollateral: bigint;
-  priceFeed: string;
-  maxInTheMoneyBps: number;
-  maxPriceAge: number;
   maxSettlementPriceAge: number;
 }
 
-export interface PairTermsInput {
+export interface PairConfigInput {
+  quoteToken: string;
   premiumToken: string;
-  strikeLimit: bigint;
-  minPremium: bigint;
-  enabled: boolean;
 }
 
-export interface PairInput {
-  quoteToken: string;
-  terms: PairTermsInput;
+export interface BidRuleInput {
+  validator: string;
+  kind: string;
+  data: string;
 }
+
+export interface PairLimitInput {
+  quoteToken: string;
+  strikeLimit: bigint;
+  minPremium: bigint;
+}
+
+export const RuleKind = {
+  PairLimits: id("PairLimits").slice(0, 10),
+  SpotBand: id("SpotBand").slice(0, 10),
+  PremiumFloor: id("PremiumFloor").slice(0, 10),
+} as const;
+
+const coder = AbiCoder.defaultAbiCoder();
 
 /** Deploys peers and grants trading roles. Cash scenarios explicitly grant a publisher and enable admissions. */
 export async function deployIvy(connection: Connection, { enableCashSettlement = true } = {}) {
@@ -56,6 +66,7 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
   const usdc = await ethers.deployContract("MockERC20", ["USD Coin", "USDC", 6]);
   const dai = await ethers.deployContract("MockERC20", ["Dai", "DAI", 18]);
   const feed = await ethers.deployContract("MockPriceFeed");
+  const bidRules = await ethers.deployContract("IvyBidRules");
   const vaultImpl = await ethers.deployContract("IvyVault");
   const vaultImplAddress = await vaultImpl.getAddress();
   const rules = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyVaultRules")).bytecode, admin).deploy();
@@ -96,6 +107,8 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
     usdc,
     dai,
     feed,
+    bidRules,
+    bidRulesAddress: await bidRules.getAddress(),
     wethAddress: await weth.getAddress(),
     usdcAddress: await usdc.getAddress(),
     daiAddress: await dai.getAddress(),
@@ -123,10 +136,7 @@ export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Va
     expiry: ctx.defaultExpiry,
     auctionStartsAt: 0n,
     minCollateral: 0n,
-    priceFeed: ZeroAddress,
     maxSettlementPriceAge: 0,
-    maxInTheMoneyBps: 0,
-    maxPriceAge: 0,
     ...o,
   };
 }
@@ -136,31 +146,56 @@ export function putTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Vau
   return callTerms(ctx, { collateral: ctx.usdcAddress, ...o });
 }
 
-export function callPairs(ctx: IvyContext, o: Partial<PairTermsInput> = {}): PairInput[] {
-  return [
-    {
-      quoteToken: ctx.usdcAddress,
-      terms: { premiumToken: ctx.usdcAddress, strikeLimit: 0n, minPremium: 0n, enabled: true, ...o },
-    },
-  ];
+export function callPairs(ctx: IvyContext): PairConfigInput[] {
+  return [{ quoteToken: ctx.usdcAddress, premiumToken: ctx.usdcAddress }];
 }
 
-export function putPairs(ctx: IvyContext, o: Partial<PairTermsInput> = {}): PairInput[] {
-  return [
-    {
-      quoteToken: ctx.usdcAddress,
-      terms: { premiumToken: ctx.usdcAddress, strikeLimit: MAX_UINT, minPremium: 0n, enabled: true, ...o },
-    },
-  ];
+export function putPairs(ctx: IvyContext): PairConfigInput[] {
+  return [{ quoteToken: ctx.usdcAddress, premiumToken: ctx.usdcAddress }];
+}
+
+/** Today's call default: no strike floor and no premium floor. */
+export function callLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
+  return [{ quoteToken: ctx.usdcAddress, strikeLimit: 0n, minPremium: 0n, ...o }];
+}
+
+/** Today's put default: no ceiling (max uint) and no premium floor. */
+export function putLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
+  return [{ quoteToken: ctx.usdcAddress, strikeLimit: MAX_UINT, minPremium: 0n, ...o }];
+}
+
+export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRuleInput {
+  return {
+    validator: ctx.bidRulesAddress,
+    kind: RuleKind.PairLimits,
+    data: coder.encode(["tuple(address quoteToken,uint256 strikeLimit,uint256 minPremium)[]"], [limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremium])]),
+  };
+}
+
+export function spotBandRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number }): BidRuleInput {
+  return {
+    validator: ctx.bidRulesAddress,
+    kind: RuleKind.SpotBand,
+    data: coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)"], [[o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps]]),
+  };
+}
+
+export function premiumFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minPremiumBps: number }): BidRuleInput {
+  return {
+    validator: ctx.bidRulesAddress,
+    kind: RuleKind.PremiumFloor,
+    data: coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)"], [[o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minPremiumBps]]),
+  };
 }
 
 export async function createVaultAs(
   ctx: IvyContext,
   signer: HardhatEthersSigner,
   terms: VaultTermsInput,
-  pairs: PairInput[],
+  pairs: PairConfigInput[],
+  rules: BidRuleInput[] = [],
 ) {
-  await (await ctx.hub.connect(signer).createVault(terms, pairs)).wait();
+  await (await ctx.hub.connect(signer).createVault(terms, pairs, rules)).wait();
   const vaultId = await ctx.hub.vaultCount();
   const vaultAddress = await ctx.hub.vaultOf(vaultId);
   const vault = await ctx.ethers.getContractAt("IvyVault", vaultAddress);

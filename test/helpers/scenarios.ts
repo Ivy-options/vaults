@@ -1,9 +1,9 @@
-import { AbiCoder, keccak256, ZeroAddress } from "ethers";
+import { ZeroAddress } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import {
   ExerciseStyle, SettlementPolicy, SettlementType, USDC_UNIT, WETH_UNIT,
-  callPairs, callTerms, createVaultAs, fund, putPairs, putTerms,
-  type IvyContext, type PairTermsInput, type VaultTermsInput,
+  callLimits, callPairs, callTerms, createVaultAs, fund, pairLimitsRule, putLimits, putPairs, putTerms, spotBandRule,
+  type BidRuleInput, type IvyContext, type PairLimitInput, type VaultTermsInput,
 } from "./setup.js";
 import { signBid, type Bid } from "./bids.js";
 
@@ -49,19 +49,26 @@ export interface VaultOptions {
   deposit?: bigint;
   extraDeposits?: Array<{ signer: HardhatEthersSigner; amount: bigint }>;
   terms?: Partial<VaultTermsInput>;
-  pair?: Partial<PairTermsInput>;
+  /** Strike limit and premium floor for the USDC pair, as one PairLimits rule. Puts always get one. */
+  pair?: Partial<PairLimitInput>;
+  /** Extra rules appended after the generated ones. */
+  rules?: BidRuleInput[];
 }
 
 /** alice creates a vault, funds it (plus any extra depositors) and opens the auction. */
 export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
   const isCall = o.isCall ?? true;
   const feedTerms: Partial<VaultTermsInput> = o.withFeed
-    ? { priceFeed: ctx.feedAddress, maxPriceAge: 3600, maxSettlementPriceAge: 3600, maxInTheMoneyBps: 1000, allowedSettlement: SettlementPolicy.Either }
+    ? { maxSettlementPriceAge: 3600, allowedSettlement: SettlementPolicy.Either }
     : {};
   const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR;
   const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });
-  const pairs = isCall ? callPairs(ctx, o.pair) : putPairs(ctx, o.pair);
-  const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs);
+  const pairs = isCall ? callPairs(ctx) : putPairs(ctx);
+  const rules: BidRuleInput[] = [];
+  if (o.pair || !isCall) rules.push(pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair)));
+  if (o.withFeed) rules.push(spotBandRule(ctx, { maxPriceAge: 3600, maxInTheMoneyBps: 1000 }));
+  rules.push(...(o.rules ?? []));
+  const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs, rules);
 
   const collateral = isCall ? ctx.weth : ctx.usdc;
   const deposit = o.deposit ?? (isCall ? CALL_DEPOSIT : PUT_DEPOSIT);
@@ -96,7 +103,6 @@ export interface BidOptions {
 export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = {}): Promise<Bid> {
   const now = BigInt(await ctx.networkHelpers.time.latest());
   const state = await ctx.hub.stateOf(vaultId);
-  const pair = await ctx.hub.pairTermsOf(vaultId, o.quoteToken ?? ctx.usdcAddress);
   return {
     vaultId: o.vaultId ?? vaultId,
     marketMaker: o.marketMaker ?? ctx.marketMaker.address,
@@ -110,7 +116,7 @@ export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = 
     nonce: o.nonce ?? nonceCounter++,
     auctionId: state.auctionId,
     collateralAmount: await ctx.hub.totalShares(vaultId),
-    pairHash: keccak256(AbiCoder.defaultAbiCoder().encode(["tuple(address premiumToken,uint256 strikeLimit,uint256 minPremium,bool enabled)"], [Array.from(pair)])),
+    termsHash: await ctx.hub.termsHashOf(vaultId),
     executor: o.executor ?? ZeroAddress,
     recipient: o.recipient ?? ctx.marketMaker.address,
   };
