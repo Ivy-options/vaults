@@ -1,7 +1,7 @@
 import { rejects } from "node:assert/strict";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { AbiCoder, id } from "ethers";
+import { AbiCoder, ZeroAddress, id } from "ethers";
 import { loadArtifacts, REPORT_TYPES, prepareOperation, prepareVault } from "../scripts/operator.mjs";
 import { buildDeploymentPlan, resumeDeployment, verifyBindings, CONTRACTS } from "../scripts/deployment.mjs";
 import { deployIvy, WETH_UNIT as W, USDC_UNIT as U } from "./helpers/setup.js";
@@ -120,6 +120,8 @@ describe("journaled immutable deployment and manual tooling",function(){
     await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:undefined}}), /Missing allowPartialExercise/);
     await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,allowPartialExercise:"false"}}), /must be boolean/);
     expect(prepared.terms.publicDeposits).eq(false);
+    await rejects(prepareVault(c.admin.provider,{...request,terms:{...request.terms,priceFeed:ZeroAddress,maxPriceAge:0,maxInTheMoneyBps:0}}), /spotBand/);
+    await rejects(prepareVault(c.admin.provider,{...request,pairs:[{quoteToken:c.usdcAddress,terms:{premiumToken:c.usdcAddress,minPremium:0}}]}), /minPremium/);
     expect(prepared.rules[0].kind).eq(id('PairLimits').slice(0,10));
     expect(AbiCoder.defaultAbiCoder().decode(['tuple(address,uint256,uint256)[]'],prepared.rules[0].data)[0][0][1]).eq(3600n*U);
     const tx=await prepareOperation(c.admin.provider,artifacts,'prepare-vault',request);

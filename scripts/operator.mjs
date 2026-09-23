@@ -52,13 +52,14 @@ async function inspectSettlement(provider, hub, request) {
 /** Read-only preflight. USD values use six decimals; token quantities use raw token units. */
 export async function prepareVault(provider, request, release) {
   const r=request, t={...required(r,'terms'),publicDeposits:r.terms.publicDeposits??false};
+  for(const key of ['priceFeed','maxPriceAge','maxInTheMoneyBps']) if(t[key]!==undefined) throw new Error(`terms.${key} is no longer a vault term; add a spotBand block to request a SpotBand rule`);
   required(t,'maxSettlementPriceAge');
   if (Number(t.allowedSettlement) !== 0) {
     if (BigInt(t.maxSettlementPriceAge) <= 0n) throw new Error('Cash settlement requires positive maxSettlementPriceAge');
     if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
   }
   if(typeof required(t,'allowPartialExercise')!=='boolean') throw new Error('allowPartialExercise must be boolean');
-  const pairs=required(r,'pairs').map(p=>({quoteToken:required(p,'quoteToken'),premiumToken:required(p,'premiumToken')}));
+  const pairs=required(r,'pairs').map(p=>{if(p.terms!==undefined) throw new Error('pairs[].terms is no longer accepted; give pairs[].premiumToken and pairs[].minPremium'); return {quoteToken:required(p,'quoteToken'),premiumToken:required(p,'premiumToken')};});
   const allowed=new Set(required(r,'supportedTokens').map(a=>a.toLowerCase()));
   for(const token of [t.underlying,t.collateral,...pairs.flatMap(p=>[p.quoteToken,p.premiumToken])]) if(!allowed.has(token.toLowerCase())) throw new Error(`Unsupported token ${token}`);
   const token=new Contract(t.collateral,['function decimals() view returns(uint8)','function balanceOf(address) view returns(uint256)'],provider);

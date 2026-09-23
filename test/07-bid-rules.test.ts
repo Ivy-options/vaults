@@ -114,7 +114,7 @@ describe("bid rules at activation", function () {
     await fund(ctx, ctx.usdc, ctx.alice, put.vaultAddress, 30_000n * USDC_UNIT);
     await ctx.hub.connect(ctx.alice).deposit(put.vaultId, 30_000n * USDC_UNIT);
     await ctx.hub.connect(ctx.alice).openAuction(put.vaultId);
-    await expect(activate(ctx, put.vaultId, put.vaultAddress, { strike: 0n })).to.be.revert(ethers);
+    await expect(activate(ctx, put.vaultId, put.vaultAddress, { strike: 0n })).to.be.revertedWithCustomError(ctx.hub, "EmptyNotional");
   });
 
   it("every rule must approve, in order, and the same validator may appear twice", async function () {
@@ -124,10 +124,23 @@ describe("bid rules at activation", function () {
     const rule = (v: string) => ({ validator: v, kind: RuleKind.PairLimits, data: "0x" });
     const a = await openVault(ctx, { rules: [rule(await approve.getAddress()), rule(await reject.getAddress())] });
     await expect(activate(ctx, a.vaultId, a.vaultAddress)).to.be.revertedWithCustomError(reject, "Rejected");
-    const b = await openVault(ctx, { pair: { minPremium: 0n }, rules: [premiumFloorRule(ctx, { maxPriceAge: 3600, minPremiumBps: 500 })] });
+    const b = await openVault(ctx, { pair: { strikeLimit: 3100n * USDC_UNIT, minPremium: 0n }, rules: [premiumFloorRule(ctx, { maxPriceAge: 3600, minPremiumBps: 500 })] });
     await setSpot(ctx, STRIKE);
-    await expect(activate(ctx, b.vaultId, b.vaultAddress, { premium: 149n * USDC_UNIT })).to.be.revertedWithCustomError(ctx.hub, "PremiumTooLow");
-    await activate(ctx, b.vaultId, b.vaultAddress, { premium: 150n * USDC_UNIT });
+    expect((await ctx.hub.rulesOf(b.vaultId)).map((r: any) => r.validator)).to.deep.equal([ctx.bidRulesAddress, ctx.bidRulesAddress]);
+    await expect(activate(ctx, b.vaultId, b.vaultAddress, { premium: 150n * USDC_UNIT })).to.be.revertedWithCustomError(ctx.hub, "StrikeBelowLimit");
+    await expect(activate(ctx, b.vaultId, b.vaultAddress, { strike: 3100n * USDC_UNIT, premium: 149n * USDC_UNIT })).to.be.revertedWithCustomError(ctx.hub, "PremiumTooLow");
+    await activate(ctx, b.vaultId, b.vaultAddress, { strike: 3100n * USDC_UNIT, premium: 150n * USDC_UNIT });
+  });
+
+  it("a bid signed for one vault is rejected on a twin by vault id, never by termsHash", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const expiry = BigInt(await networkHelpers.time.latest()) + 7n * 24n * 3600n;
+    const a = await openVault(ctx, { terms: { expiry }, pair: { minPremium: 1n } });
+    const b = await openVault(ctx, { terms: { expiry, auctionStartsAt: 1_900_000_000n }, pair: { minPremium: 1n } });
+    expect(await ctx.hub.termsHashOf(a.vaultId)).to.equal(await ctx.hub.termsHashOf(b.vaultId));
+    const bid = await makeBid(ctx, a.vaultId);
+    await fund(ctx, ctx.usdc, ctx.marketMaker, b.vaultAddress, 1000n * USDC_UNIT);
+    await expect(ctx.hub.connect(ctx.bidMaster).activate(b.vaultId, bid, await signBid(ctx.marketMaker, ctx.hubAddress, bid))).to.be.revertedWithCustomError(ctx.hub, "BidVaultMismatch");
   });
 
   it("an approving validator cannot bypass the mandatory checks", async function () {

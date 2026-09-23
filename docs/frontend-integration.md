@@ -251,7 +251,7 @@ The same fallback applies to American and European cash options. It requires no 
 
 Track `PhysicalFallbackExercised` and `PhysicalFallbackExpired` alongside normal exercise/settlement events. The expiration event reports lapsed notional; it must not be displayed as an exercised amount. Cash reserves already earned remain excluded from LP claims. The CLI exposes these reads with `inspect-settlement` and explicit submission with `exercise-fallback`; an unavailable `physicalExercisePreview` is a quote of delivery terms, not a cash exercise funding requirement.
 
-This build uses interface format `ivy-vaults-v4` and deployment manifest 7. The constructor appends the publication-window argument, `setSettings` gains its third argument, and `VaultState` appends the saved publication window. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fallback is provided.
+This build uses interface format `ivy-vaults-v4` and deployment manifest 7. Relative to `ivy-vaults-v3`: `createVault` takes `(VaultTerms, PairConfig[], BidRule[])`, `VaultTerms` loses its price-feed fields, `pairTermsOf` becomes `pairOf`, `rulesOf` and `termsHashOf` are new, the signed `Bid` carries `termsHash` instead of `pairHash`, the EIP-712 domain version is `3`, every release deploys `IvyBidRules`, and owner tightening and pair disabling are removed. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fallback is provided.
 
 ## Recommendation changes
 

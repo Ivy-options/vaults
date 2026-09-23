@@ -103,6 +103,9 @@ library IvyVaultRules {
         if (bid.recipient == address(0)) {
             revert ZeroAddress();
         }
+        if (bid.strike == 0) {
+            revert EmptyNotional();
+        }
         totalNotional = IvyMath.notionalOf(s.isCall, supply, s.underlyingUnit, bid.strike);
         if (totalNotional == 0) {
             revert EmptyNotional();
