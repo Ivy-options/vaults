@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { AbiCoder, Contract, Interface, JsonRpcProvider, VoidSigner, ZeroAddress, id, keccak256 } from 'ethers';
 import { CONTRACTS, artifactPath, buildDeploymentPlan, resumeDeployment, json } from './deployment.mjs';
 import { buildRegistryDeploymentPlan, resumeRegistryDeployment } from './registry-deployment.mjs';
-import { REGISTRY_ABI, verifyRelease, resolveRelease } from './releases.mjs';
+import { REGISTRY_ABI, RELEASE_FORMAT, verifyRelease, resolveRelease } from './releases.mjs';
 export const BID_TYPES = {Bid:[['vaultId','uint256'],['marketMaker','address'],['quoteToken','address'],['strike','uint256'],['premium','uint256'],['style','uint8'],['settlement','uint8'],['expiry','uint64'],['validUntil','uint64'],['nonce','uint256'],['auctionId','uint256'],['collateralAmount','uint256'],['pairHash','bytes32'],['executor','address'],['recipient','address']].map(([name,type])=>({name,type}))};
 export const UNWIND_TYPES = {UnwindAgreement:[['vaultId','uint256'],['nonce','uint256'],['deadline','uint64'],['exercisedNotional','uint256'],['supply','uint256'],['refund','uint256']].map(([name,type])=>({name,type}))};
 export const REPORT_TYPES = {
@@ -15,6 +15,37 @@ export async function loadArtifacts() {
 }
 const required = (o,key) => {if(o[key]===undefined) throw new Error(`Missing ${key}`); return o[key];};
 const fields = (type,value) => Object.fromEntries(type.map(f=>[f.name,required(value,f.name)]));
+const fallbackTerms = (expiry, publicationWindow, exerciseWindow) => ({
+  expiryPricePublicationWindow:BigInt(publicationWindow),exerciseWindow:BigInt(exerciseWindow),
+  publicationDeadline:BigInt(expiry)+BigInt(publicationWindow),
+  fallbackDeadline:BigInt(expiry)+BigInt(publicationWindow)+BigInt(exerciseWindow),
+  boundaryRule:'Final price before publicationDeadline; explicit physical exercise from publicationDeadline until fallbackDeadline; permissionless expiration from fallbackDeadline if no final price.',
+});
+
+/** Preview through public views, including before any fallback transaction has occurred. */
+async function inspectSettlement(provider, hub, request) {
+  const vaultId=required(request,'vaultId');
+  const [state,terms,status,expirationTime,block]=await Promise.all([hub.stateOf(vaultId),hub.termsOf(vaultId),hub.settlementStatus(vaultId),hub.expirationTimeOf(vaultId),provider.getBlock('latest')]);
+  const remaining=state.totalNotional-state.exercisedNotional;
+  const amount=request.amount===undefined?remaining:BigInt(request.amount);
+  if(amount<0n||amount>remaining) throw new Error('Exercise amount exceeds remaining notional');
+  let payment;
+  if(state.quoteToken!==ZeroAddress) {
+    const tokenAddress=state.isCall?state.quoteToken:terms.underlying;
+    const token=new Contract(tokenAddress,['function balanceOf(address) view returns(uint256)','function allowance(address,address) view returns(uint256)'],provider);
+    const due=state.isCall?(amount*state.strike+state.underlyingUnit-1n)/state.underlyingUnit:amount;
+    const [balance,allowance]=await Promise.all([token.balanceOf(request.sender),token.allowance(request.sender,state.vault)]);
+    payment={token:tokenAddress,amount:due,payer:request.sender,spender:state.vault,balance,allowance,sufficientBalance:balance>=due,sufficientAllowance:allowance>=due};
+  }
+  const now=BigInt(block.timestamp), route=Number(status.route);
+  const physicalExerciseAvailable=route===3||(route===0&&now<BigInt(state.expiry)+state.exerciseWindow&&(Number(state.style)===1||now>=state.expiry));
+  return {vaultId,originalSettlement:Number(state.settlement)===1?'Cash':'Physical',
+    route:['Physical','Cash','AwaitingExpiryPrice','PhysicalFallback','FallbackExpired','Inactive'][Number(status.route)],
+    publicationDeadline:status.publicationDeadline,fallbackDeadline:status.fallbackDeadline,canExpire:status.canExpire,expirationTime,
+    remainingNotional:remaining,amount,allowPartialExercise:terms.allowPartialExercise,recipient:state.recipient,
+    authorizedExerciser:request.sender.toLowerCase()===state.marketMaker.toLowerCase()||request.sender.toLowerCase()===state.executor.toLowerCase(),
+    physicalExercisePreview:payment?{available:physicalExerciseAvailable,payment,delivery:{token:terms.collateral,amount:state.isCall?amount:amount*state.strike/state.underlyingUnit}}:undefined};
+}
 
 /** Read-only preflight. USD values use six decimals; token quantities use raw token units. */
 export async function prepareVault(provider, request) {
@@ -60,6 +91,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
   const runner=new VoidSigner(required(r,'sender'),provider);
   const hub=r.hub?new Contract(r.hub,artifacts.IvyVaultsHub.abi,runner):null;
   const domain=(name,version,address)=>({name,version,chainId,verifyingContract:address});
+  if(command==='inspect-settlement') return {chainId,...await inspectSettlement(provider,hub,r),...(release?{release:{registry:release.registry,releaseId:release.releaseId,hub:release.hub,manifestHash:release.manifestHash}}:{})};
   if(command==='typed-report') {
     if(r.kind!=='spot') throw new Error('Report kind must be spot');
     return {pricingAuthority:'indicative activation only; does not supply cash vault settlement prices',domain:domain('IvyPriceFeed','1',required(r,'feed')),types:REPORT_TYPES,value:fields(REPORT_TYPES.SpotReport,r.report)};
@@ -67,7 +99,8 @@ export async function prepareOperation(provider, artifacts, command, r) {
   if(command==='typed-bid') {
     const s=await hub.stateOf(r.vaultId), p=await hub.pairTermsOf(r.vaultId,r.bid.quoteToken);
     const value={...r.bid,vaultId:r.vaultId,expiry:s.expiry,auctionId:s.auctionId,collateralAmount:await hub.totalShares(r.vaultId),pairHash:keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,uint256,uint256,bool)'],[Array.from(p)])),executor:r.bid.executor??ZeroAddress,recipient:r.bid.recipient??r.bid.marketMaker};
-    return {domain:domain('IvyVaultsHub','2',r.hub),types:BID_TYPES,value:fields(BID_TYPES.Bid,value)};
+    return {domain:domain('IvyVaultsHub','2',r.hub),types:BID_TYPES,value:fields(BID_TYPES.Bid,value),
+      ...(Number(r.bid.settlement)===1?{fallbackTerms:fallbackTerms(s.expiry,s.expiryPricePublicationWindow,s.exerciseWindow)}:{})};
   }
   if(command==='typed-unwind') {
     const address=await hub.unwind(), module=new Contract(address,artifacts.IvyUnwind.abi,provider), a=await module.agreements(r.vaultId);
@@ -89,6 +122,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
     } else { method='setRecommendedVersion';args=[required(r,'releaseId')];detail={hub:await target.hubOf(r.releaseId),releaseId:r.releaseId}; }
   } else if(command==='prepare-vault') {
     detail=await prepareVault(provider,r); method='createVault';args=[detail.terms,detail.pairs];
+    if(Number(detail.terms.allowedSettlement)!==0) detail.fallbackTerms=fallbackTerms(detail.terms.expiry,await hub.expiryPricePublicationWindow(),await hub.exerciseWindow());
   } else if(command==='inspect-bid'||command==='activate') {
     method='activate';args=[r.vaultId,r.bid,r.signature];
     const s=await hub.stateOf(r.vaultId), t=await hub.termsOf(r.vaultId);
@@ -101,7 +135,16 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const totalPremium=BigInt(r.bid.premium)*notional/s.underlyingUnit;
     const platformFeeBps=await hub.vaultPlatformFeeBps(r.vaultId);
     const platformFee=totalPremium*platformFeeBps/10000n;
-    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,platformFee,lpPremium:totalPremium-platformFee};
+    detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,platformFee,lpPremium:totalPremium-platformFee,
+      ...(Number(r.bid.settlement)===1?{fallbackTerms:fallbackTerms(s.expiry,s.expiryPricePublicationWindow,s.exerciseWindow)}:{})};
+  } else if(command==='exercise-fallback') {
+    required(r,'amount');
+    detail=await inspectSettlement(provider,hub,r);
+    method='exercisePhysicalFallback';args=[r.vaultId,r.amount];
+  } else if(command==='expire') {
+    detail=await inspectSettlement(provider,hub,r);
+    detail.expirationOutcome=detail.route==='FallbackExpired'?'PhysicalFallbackExpired':detail.originalSettlement==='Cash'?'CashExpiry':'PhysicalExpiry';
+    method='expire';args=[r.vaultId];
   } else if(command==='publish-settlement-exercise'||command==='publish-settlement-expiry') {
     required(r,'hub'); target=hub;
     const vaultId=required(r,'vaultId');
@@ -164,7 +207,7 @@ async function main() {
   if(command==='prepare-release-bundle') {
     const manifest=JSON.parse(await readFile(r.planFile,'utf8'));
     const journal=JSON.parse(await readFile(r.journalFile,'utf8'));
-    const bundle={format:1,interfaceFormat:'ivy-vaults-v2',manifest,journal,artifacts};
+    const bundle={format:1,interfaceFormat:RELEASE_FORMAT,manifest,journal,artifacts};
     await verifyRelease(provider,bundle,artifacts);console.log(json(bundle));return;
   }
   if(command==='prepare-registry-deployment'||command==='deploy-registry') {

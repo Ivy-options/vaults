@@ -39,9 +39,9 @@ async function releaseFixture() {
   const { ethers } = c;
   const [admin, outsider] = await ethers.getSigners();
   const artifacts = await loadArtifacts();
-  const manifest = await buildDeploymentPlan({ artifacts, chainId: (await ethers.provider.getNetwork()).chainId, genesisHash: (await ethers.provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(), admin: admin.address, reportSigner: outsider.address });
+  const manifest = await buildDeploymentPlan({ artifacts, chainId: (await ethers.provider.getNetwork()).chainId, genesisHash: (await ethers.provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(), admin: admin.address, reportSigner: outsider.address, exerciseWindow:3600, expiryPricePublicationWindow:3600 });
   const journal = await resumeDeployment(admin, manifest);
-  const bundle = { format: 1, interfaceFormat: 'ivy-vaults-v2', manifest, journal, artifacts };
+  const bundle = { format: 1, interfaceFormat: 'ivy-vaults-v3', manifest, journal, artifacts };
   const registry = await (await ethers.getContractFactory("IvyVaultsRegistry")).deploy(admin.address);
   return { ...c, admin, outsider, artifacts, bundle, registry };
 }
@@ -61,6 +61,7 @@ describe("Verified release resolution", function () {
     await expect(resolveRelease(ethers.provider, { ...request, releaseId: undefined }, artifacts)).rejectedWith('Explicit releaseId');
     await expect(resolveRelease(ethers.provider, { ...request, hub: admin.address }, artifacts)).rejectedWith('Hub and release mismatch');
     await expect(verifyRelease(ethers.provider, { ...bundle, interfaceFormat: 'unknown' }, artifacts)).rejectedWith('Unsupported release format');
+    await expect(verifyRelease(ethers.provider, { ...bundle, interfaceFormat: 'ivy-vaults-v2', manifest:{...bundle.manifest,version:6} }, artifacts)).rejectedWith('historical releases require their preserved operator build');
     await expect(verifyRelease(ethers.provider, { ...bundle, manifest: { ...bundle.manifest, chainId: '1' } }, artifacts)).rejectedWith('Wrong chain');
     const corrupt = structuredClone(bundle); corrupt.manifest.steps[0].data = '0x00';
     await expect(verifyRelease(ethers.provider, corrupt, artifacts)).rejectedWith('does not match saved artifacts');
@@ -155,7 +156,7 @@ describe('Deployment through a caching RPC provider', function () {
       })).rejectedWith('lost registry hash');
       delete registryJournal.steps.IvyVaultsRegistry.hash;
       expect((await resumeRegistryDeployment(signer,registryPlan,registryArtifact,registryJournal)).complete).equal(true);
-      const hubPlan=await buildDeploymentPlan({...context,artifacts:await loadArtifacts(),reportSigner:deployer,startNonce:1});
+      const hubPlan=await buildDeploymentPlan({...context,artifacts:await loadArtifacts(),reportSigner:deployer,startNonce:1,exerciseWindow:3600,expiryPricePublicationWindow:3600});
       for(const step of hubPlan.steps) expect(await provider.getCode(step.address)).equal('0x');
       let hubJournal:any;
       await expect(resumeDeployment(signer,hubPlan,{},async journal=>{

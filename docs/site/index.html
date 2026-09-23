@@ -487,7 +487,7 @@
     <p>The <strong class="key-term">final expiry price</strong> fixes the market price used to value the option at its agreed expiry time.</p>
     <p><strong class="key-term">Example:</strong> for the put on 1 WETH with a 3,000 USDC strike, a final price of <strong>2,700</strong> gives a <strong class="role-buyer">300 USDC payout</strong>.</p>
     <p>If the market falls to 2,500 later, the payout remains <strong class="role-buyer">300 USDC</strong>. Waiting does not turn it into 500 USDC.</p>
-    <p>The authorized publisher can record this final price only at or after expiry. Once recorded, it cannot be replaced. Until it is available, cash exercise after expiry must wait.</p>
+    <p>The authorized publisher can record this price from expiry until strictly before <strong>expiry + expiryPricePublicationWindow</strong>. Once recorded, it cannot be replaced or expire. Without a timely price, the fixed physical fallback below applies.</p>
     </section>
     <section data-kind="tile" id="cash-exercise-after-expiry"><h5>Why can exercise happen after expiry?</h5>
     <p>For a cash option, <strong class="key-term">expiry fixes the time used to value the option</strong>. It does not automatically pay anyone or close the vault.</p>
@@ -535,8 +535,8 @@
 
     <section data-kind="action" id="missing-report"><h4>If the cash price is missing</h4>
     <p>The contract needs a valid price to calculate what the buyer is owed. A <strong class="key-term">missing price is not a zero payoff</strong>.</p>
-    <p>If the required report is unavailable, the transaction is rejected and the vault’s <strong class="key-term">collateral stays committed</strong>. Time passing alone does not release it.</p>
-    <p><strong class="key-term">Example:</strong> a vault still holds 10 WETH when it expires. Without a final expiry price, it cannot tell how much belongs to the buyer and how much remains for LPs.</p>
+    <p>Early cash exercise needs a valid report. At expiry, the vault waits through its fixed <strong class="key-term">expiry price publication window</strong>; without a price, a fixed physical exercise window follows.</p>
+    <p>Once both windows end, <strong class="key-term">anyone can expire the remaining position</strong> and LPs can claim. No buyer funding or publisher recovery is needed for that transaction.</p>
     <p>The recovery steps differ before and after expiry.</p>
     <p class="reference"><a href="index.html#cash-missing-reports" data-guide>Missing prices and recovery ↗</a></p>
     <section data-kind="tile" id="missing-before-expiry"><h5>A missing price before expiry</h5>
@@ -546,10 +546,10 @@
     <p>Once expiry arrives, the vault needs the <strong class="key-term">final expiry price</strong> instead. European cash options cannot exercise before expiry at all.</p>
     </section>
     <section data-kind="tile" id="missing-after-expiry"><h5>A missing price after expiry</h5>
-    <p>At or after expiry, both <strong class="key-term">cash exercise and expiration</strong> need the final expiry price. A recent pre-expiry observation is not enough.</p>
-    <p><strong class="key-term">Example:</strong> expiry is 16:00, but no final price exists at 16:10. Expiration still fails. If the publisher records it at 16:12, anyone can retry expiration to reserve the buyer’s payoff and open LP claims.</p>
-    <p>Waiting through a <strong class="key-term">physical grace window does not unlock a cash vault</strong>.</p>
-    <p>If publication cannot recover, the buyer and every current shareholder can use the <a href="#agreed-unwind">agreed unwind route</a>, subject to its approvals and funding requirements.</p>
+    <p>Define <strong>D = expiry + P</strong> and <strong>F = D + W</strong>. P is the saved expiry price publication window; W is the saved exercise window. A recent pre-expiry observation cannot replace a final price.</p>
+    <p>If a final price lands before D, normal cash settlement remains available even after F. Otherwise <strong>D ≤ now &lt; F</strong> permits explicit physical exercise of the remaining notional, for both American and European options.</p>
+    <p>Calls pay quote at the strike to receive underlying; puts deliver underlying to receive quote. The buyer or executor approves the clone and explicitly calls <code>exercisePhysicalFallback</code>. Ordinary cash exercise never pulls these assets.</p>
+    <p>At F, anyone can expire without a prior fallback transaction. Unexercised notional lapses, opening LP claims without a new cash reserve. Settings or publisher changes never extend either deadline.</p>
     </section>
     </section></section>
     <section data-kind="moment" id="ending-the-live-option" data-when="Live → Settled"><h3>Close the remaining position</h3>
@@ -563,7 +563,7 @@
     <p><strong class="key-term">Anyone</strong> may submit expiration when the relevant condition holds:</p>
     <ul class="reading-list" role="list">
       <li><strong>Physical option:</strong> its <a href="#exercise-windows">physical exercise window</a> has closed.</li>
-      <li><strong>Cash option:</strong> expiry has arrived and the final expiry price is available.</li>
+      <li><strong>Cash option:</strong> expiry has arrived with a timely final price, or the fixed fallback deadline has arrived without one.</li>
     </ul>
     <p>Cash expiration reserves any remaining intrinsic payoff for the <strong class="role-buyer">buyer’s separate claim</strong>. The unreserved remainder opens to <strong class="role-lp">LP claims</strong>.</p>
     <p><strong>Time passing alone never settles a vault.</strong></p>
@@ -595,25 +595,25 @@
     <p>Exercise must execute <strong class="key-term">strictly before 13:00</strong>. Expiration is allowed from 13:00 exactly.</p>
     <p>The vault must still be <strong class="key-term">Live</strong>. Full exercise can settle it earlier; time passing alone does not settle it.</p>
     </section>
-    <section data-kind="tile" id="cash-expiration-timeline"><h5>Cash: wait for the final price</h5>
-    <p>For <strong class="key-term">American and European</strong> cash options, exercise and expiration after expiry both wait for the <strong class="key-term">final expiry price</strong>.</p>
-    <figure class="cash-price-timeline" aria-label="Cash settlement example: expiry at noon, blocked until the final expiry price is published at 12:20. Publication time is illustrative, not a deadline.">
-      <figcaption>Example sequence · read down ↓</figcaption>
+    <section data-kind="tile" id="cash-expiration-timeline"><h5>Cash: publication, fallback, expiration</h5>
+    <p><strong class="key-term">American and European</strong> cash options use the same fixed deadlines. These one-hour windows are illustrative.</p>
+    <figure class="cash-price-timeline" aria-label="Illustrative missing-price sequence: expiry at noon, publication closes at 13:00, physical fallback closes at 14:00.">
+      <figcaption>Example · P = 1 hour, W = 1 hour ↓</figcaption>
       <ol>
         <li class="cash-expiry-event"><strong>12:00 · Option expiry</strong><p>The final expiry price can now be published.</p></li>
-        <li class="cash-wait-event"><strong>Final price missing · wait</strong><p>The holder cannot exercise. No one can submit expiration. This wait has <strong>no fixed duration</strong>.</p></li>
-        <li class="cash-ready-event"><strong>12:20 · Publisher supplies the price</strong><p>12:20 is just an example. The report gives the price <strong>for the 12:00 expiry</strong>.</p></li>
+        <li class="cash-wait-event"><strong>13:00 · Publication closes</strong><p>With no final price, explicit physical exercise opens. Late reports are rejected.</p></li>
+        <li class="cash-ready-event"><strong>14:00 · Physical exercise closes</strong><p>Anyone can expire the unexercised remainder and open LP claims.</p></li>
       </ol>
       <div class="cash-ready-actions">
-        <p><strong class="role-buyer">Holder or executor</strong> can exercise for payment.</p>
-        <p><strong class="key-term">Anyone</strong> can submit expiration, reserving the holder’s payout for a separate claim.</p>
+        <p><strong class="role-buyer">Buyer or executor</strong> funds physical delivery during the fallback window, if desired.</p>
+        <p>A <strong class="key-term">final price published before 13:00</strong> instead keeps normal cash settlement available, including after 14:00.</p>
       </div>
     </figure>
     <p>The vault must still be <strong class="key-term">Live</strong>. Publishing the price <strong>does not settle it</strong>; full exercise or expiration does.</p>
     </section>
     <section data-kind="tile" id="timeline-lp-withdrawal"><h5>When can you claim as an LP?</h5>
     <p><strong class="key-term">Physical:</strong> if the option has not been fully exercised, wait until 13:00 in this example. You or anyone else can then submit expiration.</p>
-    <p><strong class="key-term">Cash:</strong> from 12:00, once the final expiry price is available, you or anyone else can submit expiration. Any option-holder payout is reserved separately.</p>
+    <p><strong class="key-term">Cash:</strong> from expiry with a timely final price, or at the fallback deadline if none arrived. Anyone can expire; only the timely-price route creates a new cash payout reserve.</p>
     <p>After the vault becomes <strong class="key-term">Settled</strong>, you can claim your share of the unreserved assets. You do not need to wait for the option holder to claim its reserve.</p>
     </section>
     </section>

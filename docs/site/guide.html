@@ -362,7 +362,8 @@
                   the exercise transaction. Otherwise, anyone can call
                   <code>expire(vaultId)</code> once expiration is allowed.
                   Physical options must first finish their exercise window;
-                  cash options require their final expiry price.</p>
+                  cash options use a timely final expiry price or finish the
+                  fixed physical fallback window when that price is missing.</p>
                   <p>The parties can also end the option through an
                   <a href="#early-exit">unwind signed by the buyer and approved
                   by every current shareholder</a>.</p>
@@ -1309,8 +1310,9 @@
                 <h4>Write-once final price</h4>
                 <code>publishExpiry(vaultId, price, validUntil)</code>
                 <ul>
-                  <li>Publish at or after the option's fixed expiry, before
-                    the publication request's validity deadline has passed.</li>
+                  <li>Publish at or after expiry and strictly before
+                    <code>expiry + expiryPricePublicationWindow</code>, also
+                    no later than the request's <code>validUntil</code>.</li>
                   <li>
                     Even a fresh exercise observation is no longer enough.
                   </li>
@@ -1404,9 +1406,10 @@
               </div>
             </div>
             <p class="boundary-note">
-              Cash expiration needs an on-chain transaction and that vault's
-              final expiry price. There is no physical-delivery grace window;
-              remaining buyer value is reserved instead of lapsing.
+              With a timely final price, cash expiration reserves remaining
+              buyer value. Without one, the fixed physical fallback window
+              applies; anyone can expire its unexercised remainder afterward.
+              Both outcomes need an on-chain transaction.
             </p>
             <div
               class="tablewrap"
@@ -1428,7 +1431,7 @@
                   <tr>
                     <td class="k">American · Cash</td>
                     <td>Before, at or after expiry, while Live</td>
-                    <td><span class="mono">t ≥ expiry</span></td>
+                    <td>From expiry with final price; otherwise from fallback deadline</td>
                     <td>
                       Exercise observation before expiry; finalized expiry
                       price at/after expiry.
@@ -1437,7 +1440,7 @@
                   <tr>
                     <td class="k">European · Cash</td>
                     <td><span class="mono">t ≥ expiry</span>, while Live</td>
-                    <td><span class="mono">t ≥ expiry</span></td>
+                    <td>From expiry with final price; otherwise from fallback deadline</td>
                     <td>
                       Finalized expiry price.
                     </td>
@@ -1449,7 +1452,7 @@
 
           <div class="reading-block reading-flow" id="cash-outcomes">
             <h3>Collateral after cash expiration</h3>
-            <p class="prose">Expiration divides the backing assets between the buyer's reserved payoff and the shareholders' remaining pool. Change the option type or final price to see that allocation; both amounts stay in the collateral token until claimed.</p>
+            <p class="prose">With a timely final price, expiration divides backing assets between the buyer's reserved payoff and the shareholders' remaining pool. This calculator assumes an accepted final report; a missing report uses the fallback described below. Both calculated amounts stay in the collateral token until claimed.</p>
             <div class="cash-accounting interactive-example">
               <div class="cash-inputs">
                 <label for="cash-kind-demo">Cash vault example</label
@@ -1498,7 +1501,7 @@
                     <p><code>claim()</code><span>Collected in proportion to shares.</span></p>
                   </div>
                 </div>
-                <p id="cash-outcome-note">Both allocations stay in WETH until claimed.</p>
+                <p id="cash-outcome-note">With a timely final price, both allocations stay in WETH until claimed.</p>
                 <p id="cash-calculation">
                   10 × (3,300 − 3,000) / 3,300 ≈ 0.9091 WETH
                 </p>
@@ -1554,33 +1557,32 @@
           </div>
 
           <div class="reading-block reading-flow" id="cash-missing-reports">
-            <h3>Missing report: the obligation stays locked</h3>
-            <p class="prose">The contracts cannot calculate a cash payoff without a valid report. They keep the backing assets committed until publication recovers or the parties agree to unwind.</p>
+            <h3>Missing expiry report: fixed physical fallback</h3>
+            <p class="prose">Both American and European cash options use the same bounded recovery. Creation fixes the expiry price publication window P and the physical exercise window W. Publication closes at D = expiry + P; fallback closes at F = D + W. The buyer accepts publisher availability risk and must fund physical delivery if it chooses to exercise.</p>
             <div class="recovery-map">
               <div>
                 <span class="inscription">BLOCKED</span>
                 <h4>Price-dependent settlement</h4>
                 <p>
                   Missing, stale or expired observations block early cash
-                  exercise. A missing final report blocks exercise at/after
-                  expiry and expiration.
+                  exercise without enabling early fallback. A missing final
+                  report blocks cash settlement during the publication window.
                 </p>
               </div>
               <div>
                 <span class="inscription">STILL AVAILABLE</span>
-                <h4>Earned-premium claims</h4>
+                <h4>Fixed route to LP claims</h4>
                 <p>
-                  A missing price is never treated as zero. Buyer backing cannot
-                  be released to LPs.
+                  With no final price, explicit physical exercise is available
+                  from D inclusive to F exclusive. At F, anyone can expire and
+                  LPs can claim, even if the buyer has done nothing. Premium
+                  claims remain available throughout.
                 </p>
               </div>
             </div>
-            <p class="prose">To recover, the admin can rotate publishers and
-              disable new cash admissions while the replacement reconstructs
-              each missing report. The replacement must use the approved price
-              for the original expiry, not today's price. The buyer and
-              shareholders can also follow the
-              <a href="#early-exit">unwind procedure</a>.</p>
+            <p class="prose">Before D, an authorized replacement can publish the verified price for the original expiry. A timely final price remains valid after F and prevents fallback. At or after D, publication is rejected even without an earlier fallback transaction. Only the remaining notional enters fallback; completed exercises stay final.</p>
+            <p class="prose">The buyer or executor explicitly calls <code>exercisePhysicalFallback(vaultId, amount)</code>. For calls it delivers quote at the strike and receives underlying; for puts it delivers underlying and receives quote at the strike. Approve the vault clone for the required token first. An ordinary cash exercise never switches to these transfers. Full exercise settles immediately; partial exercise never extends F. At F the unexercised remainder lapses without a new buyer reserve. No publisher, buyer callback or prior fallback activation is needed for expiration.</p>
+            <p class="prose">The publication and fallback deadlines are visible through <code>settlementStatus</code> and the operator's <code>inspect-settlement</code> command. The original Cash type remains in history. P and W are disclosed before deposits and bidding and cannot be changed for an existing vault. The parties may also follow the <a href="#early-exit">unwind procedure</a>.</p>
             <p class="boundary-note">
               Recovery remains available under the
               <a href="#cash-availability">cash admission rules</a> and

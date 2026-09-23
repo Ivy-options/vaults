@@ -39,7 +39,7 @@ describe("Per-vault settlement prices", function () {
     await expect(c.hub.connect(c.marketMaker).exercise(second.vaultId, W)).changeTokenBalance(c.ethers, c.weth, c.marketMaker, W / 2n);
     await at(c, c.defaultExpiry);
     await c.hub.publishExpiry(first.vaultId, 6000n * U, c.defaultExpiry + 100n);
-    await expect(c.hub.expire(second.vaultId)).revertedWithCustomError(c.hub, "ReportUnavailable");
+    await expect(c.hub.expire(second.vaultId)).revertedWithCustomError(c.hub, "ExpirationNotReached");
     await c.hub.publishExpiry(second.vaultId, 4000n * U, c.defaultExpiry + 100n);
     await expect(c.hub.publishExpiry(first.vaultId, 7000n * U, c.defaultExpiry + 100n)).revertedWithCustomError(c.hub, "ReportFinalized");
     await c.hub.expire(first.vaultId);

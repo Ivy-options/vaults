@@ -33,10 +33,12 @@ export const json = value => JSON.stringify(value, (_, v) => typeof v === 'bigin
 export const planHash = plan => keccak256(toUtf8Bytes(json(plan)));
 
 /** Build all constructor addresses before sending anything. Artifacts come from the local build. */
-export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, deployer, startNonce, admin, reportSigner, settlementMethodology = /** @type {string | undefined} */ (undefined), exerciseWindow = 3600, auctionTimeout = 259200, uri = '' }) {
+export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, deployer, startNonce, admin, reportSigner, settlementMethodology = /** @type {string | undefined} */ (undefined), exerciseWindow = /** @type {number | string | undefined} */ (undefined), expiryPricePublicationWindow = /** @type {number | string | undefined} */ (undefined), auctionTimeout = 259200, uri = '' }) {
+  if (expiryPricePublicationWindow === undefined || BigInt(expiryPricePublicationWindow) <= 0n) throw new Error('Explicit positive expiryPricePublicationWindow required');
+  if (exerciseWindow === undefined || BigInt(exerciseWindow) < 0n) throw new Error('Explicit nonnegative exerciseWindow required; cash-capable vaults require a positive value');
   const addresses = Object.fromEntries(CONTRACTS.map((name, i) => [name, getCreateAddress({from:deployer,nonce:startNonce+i})]));
   const a = addresses;
-  const args = [[], [], [], [admin,a.IvyVault,a.IvyShares,a.IvyPremiums,a.IvyUnwind,exerciseWindow,auctionTimeout],
+  const args = [[], [], [], [admin,a.IvyVault,a.IvyShares,a.IvyPremiums,a.IvyUnwind,exerciseWindow,auctionTimeout,expiryPricePublicationWindow],
     [a.IvyVaultsHub,a.IvyPremiums,a.IvyUnwind,uri], [a.IvyVaultsHub,a.IvyShares], [a.IvyVaultsHub,a.IvyShares], [reportSigner]];
   const steps = [];
   for (let i = 0; i < CONTRACTS.length; ++i) {
@@ -48,7 +50,7 @@ export async function buildDeploymentPlan({ artifacts, chainId, genesisHash, dep
     const tx = await new ContractFactory(abi,linkBytecode(artifact,a)).getDeployTransaction(...args[i]);
     steps.push({ name, address:a[name], nonce:startNonce+i, data:tx.data, abi, deployedSize:size, libraryLinks:runtimeLinks(artifact,a) });
   }
-  return {version:6,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementMethodology,exerciseWindow:String(exerciseWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
+  return {version:7,chainId:String(chainId),genesisHash,deployer,startNonce,admin,reportSigner,settlementMethodology,exerciseWindow:String(exerciseWindow),expiryPricePublicationWindow:String(expiryPricePublicationWindow),auctionTimeout:String(auctionTimeout),uri,addresses,steps};
 }
 
 export async function findCreation(provider, plan, step, startBlock) {
@@ -107,7 +109,7 @@ export async function verifyBindings(provider, plan, { requireInitialAdmin = tru
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
 export async function resumeDeployment(signer, plan, journal = /** @type {{planHash?: string, startBlock?: number, steps?: Record<string, any>, complete?: boolean}} */ ({}), persist = async (_journal) => {}) {
-  if (plan.version !== 6) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
+  if (plan.version !== 7) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
   const provider = signer.provider;
   if(String((await provider.getNetwork()).chainId) !== plan.chainId || (await provider.getBlock(0)).hash !== plan.genesisHash) throw new Error('Wrong chain');
   if((await signer.getAddress()).toLowerCase() !== plan.deployer.toLowerCase()) throw new Error('Wrong deployer');

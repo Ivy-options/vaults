@@ -136,7 +136,7 @@ describe("Cash settlement opt-in", function () {
     expect(await c.hub.cashSettlementEnabled()).equal(false);
   });
 
-  it("keeps missing cash reports locked while disabled and recovers through regrant and historical publication", async function () {
+  it("keeps cash reports pending while disabled and recovers through regrant before the publication deadline", async function () {
     const c = await deployIvy(await network.create());
     const role = await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE();
     await c.hub.setPlatformFeeBps(200);
@@ -145,7 +145,7 @@ describe("Cash settlement opt-in", function () {
     await c.hub.revokeRole(role, c.admin.address);
     await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, W)).revertedWithCustomError(c.hub, "InvalidPrice");
     await at(c, v.bid.expiry);
-    await expect(c.hub.expire(v.vaultId)).revertedWithCustomError(c.hub, "ReportUnavailable");
+    await expect(c.hub.expire(v.vaultId)).revertedWithCustomError(c.hub, "ExpirationNotReached");
     await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, W)).revertedWithCustomError(c.hub, "ReportUnavailable");
     await expect(c.hub.connect(c.alice).claim(v.vaultId, 30_000n * U)).revertedWithCustomError(c.hub, "WrongPhase");
     expect(await c.hub.remainingNotional(v.vaultId)).equal(10n * W);
@@ -153,7 +153,7 @@ describe("Cash settlement opt-in", function () {
     await c.hub.connect(c.alice).claimPremium(v.vaultId);
     await v.vault.claimPlatformFee();
     expect(await c.usdc.balanceOf(v.vaultAddress)).equal(30_000n * U);
-    await c.networkHelpers.time.increase(10000);
+    await c.networkHelpers.time.increase(1000);
     await c.hub.grantRole(role, c.bob.address);
     const now = BigInt(await c.networkHelpers.time.latest());
     await c.hub.connect(c.bob).publishExpiry(v.vaultId, 2700n * U, now + 100n);

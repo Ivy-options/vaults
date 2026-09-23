@@ -57,7 +57,13 @@ describe("signed activation spot reports",function(){
 });
 
 describe("journaled immutable deployment and manual tooling",function(){
-  async function fixture(){const [admin]=await ethers.getSigners();const artifacts=await loadArtifacts();const plan=await buildDeploymentPlan({artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address});return {admin,artifacts,plan};}
+  it("requires an explicit positive expiry price publication window before planning deployment",async()=>{
+    const [admin]=await ethers.getSigners(), artifacts=await loadArtifacts();
+    const input={artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address,exerciseWindow:3600};
+    await rejects(buildDeploymentPlan(input), /expiryPricePublicationWindow/);
+    await rejects(buildDeploymentPlan({...input,expiryPricePublicationWindow:0}), /expiryPricePublicationWindow/);
+  });
+  async function fixture(){const [admin]=await ethers.getSigners();const artifacts=await loadArtifacts();const plan=await buildDeploymentPlan({artifacts,chainId:(await admin.provider!.getNetwork()).chainId,genesisHash:(await admin.provider!.getBlock(0))!.hash,deployer:admin.address,startNonce:await admin.getNonce(),admin:admin.address,reportSigner:admin.address,exerciseWindow:3600,expiryPricePublicationWindow:3600});return {admin,artifacts,plan};}
   it("keeps every production contract under EIP-170",async()=>{
     const {artifacts}=await fixture();for(const name of CONTRACTS) expect((artifacts[name].deployedBytecode.length-2)/2,name).at.most(24576);
   });
@@ -74,11 +80,12 @@ describe("journaled immutable deployment and manual tooling",function(){
   });
   it("deploys physical-only without cash configuration and verifies bindings after later opt-in",async()=>{
     const {admin,plan}=await networkHelpers.loadFixture(fixture);
-    expect(plan.version).eq(6);
+    expect(plan.version).eq(7);
     expect(plan).not.have.property('settlementPublisher');
     expect(plan.settlementMethodology).eq(undefined);
     const journal=await resumeDeployment(admin,plan);
     const hub=await ethers.getContractAt('IvyVaultsHub',plan.addresses.IvyVaultsHub);
+    expect(await hub.expiryPricePublicationWindow()).eq(3600n);
     expect(await hub.cashSettlementEnabled()).eq(false);
     const [,publisher]=await ethers.getSigners();
     await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(),publisher.address);
@@ -97,7 +104,7 @@ describe("journaled immutable deployment and manual tooling",function(){
   });
   it("rejects obsolete or cross-chain plans and journals from other plans",async()=>{
     const {admin,plan}=await networkHelpers.loadFixture(fixture);
-    await rejects(resumeDeployment(admin,{...plan,version:5},{}), /Unsupported deployment plan version/);
+    await rejects(resumeDeployment(admin,{...plan,version:6},{}), /Unsupported deployment plan version/);
     await rejects(resumeDeployment(admin,{...plan,chainId:'1'},{}), new RegExp('Wrong chain'));
     await rejects(resumeDeployment(admin,plan,{planHash:'wrong'}), new RegExp('another plan'));
   });

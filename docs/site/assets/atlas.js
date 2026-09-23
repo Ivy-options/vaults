@@ -68,8 +68,8 @@
     $("#cash-buyer-percent").textContent = `${fmt(buyer / deposit * 100, 2)}% of collateral`;
     $("#cash-pool-percent").textContent = `${fmt(pool / deposit * 100, 2)}% of collateral`;
     $("#cash-outcome-note").textContent = buyer === 0
-      ? `No buyer payout at this price. All ${fmt(deposit)} ${unit} remains for shareholder claims.`
-      : `Both allocations stay in ${unit} until claimed.`;
+      ? `Timely final price: no buyer payout. All ${fmt(deposit)} ${unit} remains for shareholder claims.`
+      : `With a timely final price, both allocations stay in ${unit} until claimed.`;
     $("#cash-buyer-bar").style.width = `${(buyer / deposit) * 100}%`;
     $(".cash-balance-bar").setAttribute(
       "aria-label",

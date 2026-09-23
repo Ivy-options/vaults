@@ -4,6 +4,7 @@
   "admin": "ADMIN_ADDRESS",
   "reportSigner": "IVY_SIGNER_OR_ERC1271_ADDRESS",
   "exerciseWindow": 3600,
+  "expiryPricePublicationWindow": 3600,
   "auctionTimeout": 259200,
   "uri": ""
 }

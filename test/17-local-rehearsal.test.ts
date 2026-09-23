@@ -4,12 +4,69 @@ import { network } from 'hardhat';
 import { Contract, ZeroAddress } from 'ethers';
 import { loadArtifacts, prepareOperation } from '../scripts/operator.mjs';
 import { buildDeploymentPlan, resumeDeployment } from '../scripts/deployment.mjs';
+import { deployIvy, SettlementType } from './helpers/setup.js';
+import { goLive } from './helpers/scenarios.js';
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;
 const W = 10n ** 18n, U = 10n ** 6n;
 
 describe('local operator rehearsal', function () {
+  it('shows fixed fallback terms in bids and inspects required payment before explicit physical exercise', async function () {
+    const c=await deployIvy(connection), artifacts=await loadArtifacts();
+    const live=await goLive(c,{withFeed:true},{settlement:SettlementType.Cash});
+    const request={hub:c.hubAddress,sender:c.marketMaker.address,vaultId:live.vaultId};
+    const typed=await prepareOperation(c.admin.provider,artifacts,'typed-bid',{...request,bid:live.bid});
+    expect(typed.fallbackTerms.publicationDeadline).eq(live.bid.expiry+3600n);
+    expect(typed.fallbackTerms.fallbackDeadline).eq(live.bid.expiry+7200n);
+    const status=await prepareOperation(c.admin.provider,artifacts,'inspect-settlement',request);
+    expect(status.originalSettlement).eq('Cash');
+    expect(status.route).eq('Cash');
+    expect(status.publicationDeadline).eq(live.bid.expiry+3600n);
+    expect(status.fallbackDeadline).eq(live.bid.expiry+7200n);
+    expect(status.physicalExercisePreview.available).eq(false);
+    expect(status.physicalExercisePreview.payment.token).eq(c.usdcAddress);
+    expect(status.physicalExercisePreview.payment.amount).eq(30000n*U);
+    expect(status.physicalExercisePreview.payment.spender).eq(live.vaultAddress);
+    expect(status.physicalExercisePreview.payment.sufficientAllowance).eq(true);
+    expect(status).not.have.property('to');
+    await networkHelpers.time.increaseTo(status.publicationDeadline);
+    const fallback=await prepareOperation(c.admin.provider,artifacts,'inspect-settlement',request);
+    expect(fallback.route).eq('PhysicalFallback');
+    expect(fallback.canExpire).eq(false);
+    expect(fallback.physicalExercisePreview.available).eq(true);
+    await rejects(prepareOperation(c.admin.provider,artifacts,'exercise',{...request,amount:10n*W}));
+    const exercise=await prepareOperation(c.admin.provider,artifacts,'exercise-fallback',{...request,amount:10n*W});
+    expect(exercise.method).eq('exercisePhysicalFallback');
+    expect(exercise.detail.physicalExercisePreview.payment.amount).eq(30000n*U);
+    await c.marketMaker.sendTransaction({to:exercise.to,data:exercise.data});
+    expect(await c.weth.balanceOf(c.marketMaker.address)).eq(10n*W);
+    expect((await c.hub.stateOf(live.vaultId)).settlement).eq(SettlementType.Cash);
+  });
+  it('reports unfunded put fallback and permits LP recovery on the first transaction after its deadline', async function () {
+    const c=await deployIvy(connection), artifacts=await loadArtifacts();
+    const live=await goLive(c,{isCall:false,withFeed:true},{settlement:SettlementType.Cash});
+    const request={hub:c.hubAddress,sender:c.marketMaker.address,vaultId:live.vaultId};
+    await networkHelpers.time.increaseTo(live.bid.expiry+3600n);
+    const status=await prepareOperation(c.admin.provider,artifacts,'inspect-settlement',request);
+    expect(status.route).eq('PhysicalFallback');
+    expect(status.physicalExercisePreview.payment.token).eq(c.wethAddress);
+    expect(status.physicalExercisePreview.payment.amount).eq(10n*W);
+    expect(status.physicalExercisePreview.payment.sufficientAllowance).eq(false);
+    expect(status.physicalExercisePreview.payment.sufficientBalance).eq(false);
+    expect(status.physicalExercisePreview.delivery).deep.eq({token:c.usdcAddress,amount:30000n*U});
+    await networkHelpers.time.increaseTo(status.fallbackDeadline+100n);
+    const expired=await prepareOperation(c.admin.provider,artifacts,'inspect-settlement',request);
+    expect(expired.route).eq('FallbackExpired');
+    expect(expired.canExpire).eq(true);
+    expect(expired.physicalExercisePreview.available).eq(false);
+    const expire=await prepareOperation(c.admin.provider,artifacts,'expire',{...request,sender:c.bob.address});
+    expect(expire.detail.expirationOutcome).eq('PhysicalFallbackExpired');
+    expect(expire.detail.remainingNotional).eq(10n*W);
+    await c.bob.sendTransaction({to:expire.to,data:expire.data});
+    await c.hub.connect(c.alice).claim(live.vaultId,30000n*U);
+    expect(await c.usdc.balanceOf(c.alice.address)).eq(30000n*U);
+  });
   it('settles physical options with cash disabled, then explicitly enables cash settlement and rehearses recovery', async function () {
     const [admin, owner, buyer, lp, sponsor] = await ethers.getSigners();
     const provider = admin.provider!;
@@ -19,8 +76,8 @@ describe('local operator rehearsal', function () {
     const artifacts = await loadArtifacts();
     const plan = await buildDeploymentPlan({ artifacts, chainId: (await provider.getNetwork()).chainId,
       genesisHash: (await provider.getBlock(0))!.hash, deployer: admin.address, startNonce: await admin.getNonce(),
-      admin: admin.address, reportSigner: admin.address });
-    expect(plan.version).eq(6);
+      admin: admin.address, reportSigner: admin.address, exerciseWindow:3600, expiryPricePublicationWindow:3600 });
+    expect(plan.version).eq(7);
     expect(plan.steps).length(8);
     expect(plan.addresses).not.have.property('IvySettlementPriceFeed');
     expect((await resumeDeployment(admin, plan)).complete).eq(true);
@@ -42,6 +99,10 @@ describe('local operator rehearsal', function () {
         expect(prepared.detail.underlying).eq(w);
         expect(prepared.detail.quote).eq(u);
         expect(prepared.detail.expiry).eq(expiry);
+      }
+      if(command==='prepare-vault'&&values.terms.allowedSettlement===1) {
+        expect(prepared.detail.fallbackTerms.publicationDeadline).eq(expiry+3600n);
+        expect(prepared.detail.fallbackTerms.fallbackDeadline).eq(expiry+7200n);
       }
       await (await signer.sendTransaction({ to: prepared.to, data: prepared.data })).wait();
     }
@@ -139,7 +200,7 @@ describe('local operator rehearsal', function () {
       await op('claim', signer, { vaultId: put, amount });
       await op('claim-premium', signer, { vaultId: put });
     }
-    await networkHelpers.time.increaseTo(expiry + 86400n);
+    await networkHelpers.time.increaseTo(expiry + 60n);
     const report = { price: 4000n * U, validUntil: expiry + 90000n };
     const before = await hub.stateOf(call);
     const callAddress = await hub.vaultOf(call);
@@ -154,6 +215,12 @@ describe('local operator rehearsal', function () {
     expect(await hub.cashSettlementEnabled()).eq(false);
     await rejects(op('publish-settlement-expiry', owner, settlementRequest));
     await op('publish-settlement-expiry', sponsor, settlementRequest);
+    await networkHelpers.time.increaseTo(expiry+7200n);
+    const timely=await prepareOperation(provider,artifacts,'inspect-settlement',{sender:buyer.address,hub:plan.addresses.IvyVaultsHub,vaultId:call});
+    expect(timely.route).eq('Cash');
+    expect(timely.canExpire).eq(true);
+    expect(timely.expirationTime).eq(expiry);
+    expect(timely.physicalExercisePreview.available).eq(false);
     await op('expire', sponsor, { vaultId: call });
     await op('claim', owner, { vaultId: call, amount: 10n * W });
     await op('claim-payout', buyer, { vaultId: call });

@@ -38,12 +38,16 @@ library IvyOptionSettlement {
         address underlying,
         address quote,
         uint64 expiry,
+        uint64 publicationWindow,
         uint256 price,
         uint64 validUntil
     ) external {
         _validateReport(price, validUntil);
         if (expiry == 0 || block.timestamp < expiry) {
             revert ExpirationNotReached();
+        }
+        if (block.timestamp >= uint256(expiry) + publicationWindow) {
+            revert ExpiryPricePublicationClosed();
         }
         if (prices.expiry != 0) {
             revert ReportFinalized();
@@ -52,10 +56,14 @@ library IvyOptionSettlement {
         emit IIvyVaultsHubEvents.ExpiryPublished(vaultId, underlying, quote, expiry, price, validUntil);
     }
 
-    function exercise(VaultState storage s, VaultTerms storage t, SettlementPrices storage prices, uint256 amount)
-        external
-        returns (uint256 paid, uint256 got)
-    {
+    function exercise(
+        VaultState storage s,
+        VaultTerms storage t,
+        SettlementPrices storage prices,
+        uint256 vaultId,
+        uint256 amount,
+        bool physicalFallback
+    ) external {
         if (msg.sender != s.marketMaker && msg.sender != s.executor) {
             revert NotExecutor();
         }
@@ -69,12 +77,24 @@ library IvyOptionSettlement {
         if (!t.allowPartialExercise && amount != remaining) {
             revert PartialExerciseNotAllowed();
         }
-        _checkExerciseWindow(s);
+        if (physicalFallback) {
+            uint256 deadline = uint256(s.expiry) + s.expiryPricePublicationWindow;
+            if (s.settlement != SettlementType.Cash || prices.expiry != 0 || block.timestamp < deadline) {
+                revert PhysicalFallbackUnavailable();
+            }
+            if (block.timestamp >= deadline + s.exerciseWindow) {
+                revert ExerciseWindowClosed();
+            }
+        } else {
+            _checkExerciseWindow(s);
+        }
 
         s.exercisedNotional += amount;
 
         IIvyVault vault = IIvyVault(s.vault);
-        if (s.settlement == SettlementType.Physical) {
+        uint256 paid;
+        uint256 got;
+        if (s.settlement == SettlementType.Physical || physicalFallback) {
             if (s.isCall) {
                 paid = IvyMath.quoteDueCeil(amount, s.strike, s.underlyingUnit);
                 uint256 received = vault.pull(s.quoteToken, msg.sender, paid);
@@ -100,11 +120,28 @@ library IvyOptionSettlement {
             }
         }
         vault.push(t.collateral, s.recipient, got);
+        emit IIvyVaultsHubEvents.Exercised(vaultId, amount, paid, got);
+        if (physicalFallback) {
+            emit IIvyVaultsHubEvents.PhysicalFallbackExercised(vaultId, amount, paid, got);
+        }
+        if (s.exercisedNotional == s.totalNotional) {
+            s.phase = Phase.Settled;
+            emit IIvyVaultsHubEvents.Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
+        }
+        _notifyRecipient(vaultId, s.recipient, t.collateral, got);
     }
 
-    function expire(VaultState storage s, VaultTerms storage t, SettlementPrices storage prices) external {
+    function expire(VaultState storage s, VaultTerms storage t, SettlementPrices storage prices, uint256 vaultId)
+        external
+    {
+        if (block.timestamp < expirationTime(s, prices)) {
+            revert ExpirationNotReached();
+        }
         uint256 remaining = s.totalNotional - s.exercisedNotional;
-        if (s.settlement == SettlementType.Cash && remaining > 0) {
+        if (s.settlement == SettlementType.Cash && prices.expiry == 0) {
+            emit IIvyVaultsHubEvents.PhysicalFallbackExpired(vaultId, remaining);
+        }
+        if (s.settlement == SettlementType.Cash && remaining > 0 && prices.expiry != 0) {
             uint256 spot = _readExpiryPrice(prices);
             uint256 payout = s.isCall
                 ? IvyMath.callIntrinsic(remaining, s.strike, spot)
@@ -113,6 +150,8 @@ library IvyOptionSettlement {
             IIvyVault(s.vault).reserveBuyer(t.collateral, payout);
             s.exercisedNotional = s.totalNotional;
         }
+        s.phase = Phase.Settled;
+        emit IIvyVaultsHubEvents.Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
     }
 
     /// @dev Hub checks the Settled phase. Pays the reserved cash payout and unwind refund to the recipient, then
@@ -135,11 +174,6 @@ library IvyOptionSettlement {
         emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, s.marketMaker, amount);
         _notifyRecipient(vaultId, recipient, collateral, collateralAmount);
         _notifyRecipient(vaultId, recipient, premiumToken, premiumAmount);
-    }
-
-    /// @dev Hub calls this after `exercise` has emitted and finalized, so the hook observes settled state.
-    function notifyPayout(VaultState storage s, uint256 vaultId, address token, uint256 amount) external {
-        _notifyRecipient(vaultId, s.recipient, token, amount);
     }
 
     function claim(VaultState storage s, VaultTerms storage t, IIvyShares shareToken, uint256 vaultId, uint256 shares)
@@ -171,6 +205,44 @@ library IvyOptionSettlement {
                 vault.push(tokens[i], msg.sender, amounts[i]);
             }
         }
+    }
+
+    /// @notice Availability is derived from immutable deadlines, even if no fallback transaction has occurred.
+    function settlementStatus(VaultState storage s, SettlementPrices storage prices)
+        external
+        view
+        returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canExpire)
+    {
+        publicationDeadline = uint256(s.expiry) + s.expiryPricePublicationWindow;
+        fallbackDeadline = publicationDeadline + s.exerciseWindow;
+        if (s.phase != Phase.Live) {
+            return (SettlementRoute.Inactive, publicationDeadline, fallbackDeadline, false);
+        }
+        if (s.settlement == SettlementType.Physical) {
+            return (
+                SettlementRoute.Physical,
+                publicationDeadline,
+                fallbackDeadline,
+                block.timestamp >= uint256(s.expiry) + s.exerciseWindow
+            );
+        }
+        if (prices.expiry != 0 || block.timestamp < s.expiry) {
+            return (SettlementRoute.Cash, publicationDeadline, fallbackDeadline, block.timestamp >= s.expiry);
+        }
+        if (block.timestamp < publicationDeadline) {
+            return (SettlementRoute.AwaitingExpiryPrice, publicationDeadline, fallbackDeadline, false);
+        }
+        canExpire = block.timestamp >= fallbackDeadline;
+        route = canExpire ? SettlementRoute.FallbackExpired : SettlementRoute.PhysicalFallback;
+    }
+
+    function expirationTime(VaultState storage s, SettlementPrices storage prices) public view returns (uint256) {
+        if (s.settlement == SettlementType.Cash) {
+            return prices.expiry != 0
+                ? uint256(s.expiry)
+                : uint256(s.expiry) + s.expiryPricePublicationWindow + s.exerciseWindow;
+        }
+        return uint256(s.expiry) + s.exerciseWindow;
     }
 
     /// @dev Best-effort recipient hook. A missing method or an ordinary revert never blocks the payout; only a hook

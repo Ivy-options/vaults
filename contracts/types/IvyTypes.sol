@@ -26,6 +26,16 @@ enum SettlementType {
     Cash
 }
 
+/// @notice Effective route for a live position; settlement in VaultState remains the original agreement.
+enum SettlementRoute {
+    Physical,
+    Cash,
+    AwaitingExpiryPrice,
+    PhysicalFallback,
+    FallbackExpired,
+    Inactive
+}
+
 /// Physical/Cash values line up with SettlementType so uint8 comparison works.
 enum SettlementPolicy {
     Physical,
@@ -130,6 +140,7 @@ struct VaultState {
     uint256 totalNotional; // underlying units
     uint256 exercisedNotional; // underlying units
     uint256 pendingPayout; // collateral units reserved for the market maker
+    uint64 expiryPricePublicationWindow; // fixed at creation; physical fallback uses exerciseWindow
 }
 
 struct UnwindAgreement {
@@ -166,10 +177,12 @@ error ExerciseNotOpenYet();
 error ExerciseWindowClosed();
 error ExpirationNotReached();
 error ExpiryInPast();
+error ExpiryPricePublicationClosed();
 error FeedNeedsMaxPriceAge();
 error InsufficientAvailable();
 error InsufficientShares();
 error InvalidPrice();
+error InvalidSettlementWindow();
 error InvalidStrikeLimit();
 error LoosensTerms();
 error NonceUsed();
@@ -188,6 +201,7 @@ error PairMustBeEnabled();
 error PairUnknown(address quoteToken);
 error PartialExerciseNotAllowed();
 error PayoutHookOutOfGas();
+error PhysicalFallbackUnavailable();
 error PremiumTooLow();
 error PutPairMustBeCollateral();
 error PutRequiresSinglePair();

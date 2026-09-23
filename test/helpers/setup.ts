@@ -6,7 +6,7 @@ export type Connection = Awaited<ReturnType<typeof network.create>>;
 
 export const EXERCISE_WINDOW = 3600n;
 export const AUCTION_TIMEOUT = 3n * 24n * 3600n;
-export const SETTLEMENT_GRACE = 7n * 24n * 3600n;
+export const EXPIRY_PRICE_PUBLICATION_WINDOW = 3600n;
 export const THIRTY_DAYS = 30n * 24n * 3600n;
 export const WETH_UNIT = 10n ** 18n;
 export const USDC_UNIT = 10n ** 6n;
@@ -63,7 +63,7 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
   const libraries = { IvyVaultRules: await rules.getAddress(), IvyOptionSettlement: await settlement.getAddress() };
   const nonce = await admin.getNonce();
   const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map(i => getCreateAddress({ from: admin.address, nonce: nonce + i }));
-  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT], { libraries });
+  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT, EXPIRY_PRICE_PUBLICATION_WINDOW], { libraries });
   const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, unwindAddress, "ipfs://ivy/{id}.json"]);
   const premiums = await ethers.deployContract("IvyPremiums", [hubAddress, sharesAddress]);
   const unwind = await ethers.deployContract("IvyUnwind", [hubAddress, sharesAddress]);

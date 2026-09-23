@@ -19,8 +19,8 @@ describe("immutable hub", function () {
   it("only admin changes defaults; existing vault timing stays fixed", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const a = await createVaultAs(c,c.alice,callTerms(c),callPairs(c));
-    await expect(c.hub.connect(c.alice).setSettings(1n,2n)).revertedWithCustomError(c.hub,"AccessControlUnauthorizedAccount");
-    await c.hub.setSettings(1n,2n);
+    await expect(c.hub.connect(c.alice).setSettings(1n,2n,3n)).revertedWithCustomError(c.hub,"AccessControlUnauthorizedAccount");
+    await c.hub.setSettings(1n,2n,3n);
     const b = await createVaultAs(c,c.alice,callTerms(c),callPairs(c));
     expect((await c.hub.stateOf(a.vaultId)).exerciseWindow).eq(EXERCISE_WINDOW);
     expect((await c.hub.stateOf(a.vaultId)).auctionTimeout).eq(AUCTION_TIMEOUT);
@@ -30,13 +30,19 @@ describe("immutable hub", function () {
   });
   it("rejects a hub referencing peers bound to another hub", async function () {
     const c = await networkHelpers.loadFixture(fixture);
-    const h = await ethers.deployContract("IvyVaultsHub",[c.admin.address,c.vaultImplAddress,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1], { libraries: c.libraries });
+    const h = await ethers.deployContract("IvyVaultsHub",[c.admin.address,c.vaultImplAddress,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1,1], { libraries: c.libraries });
     await expect(h.createVault(callTerms(c),callPairs(c))).revertedWithCustomError(h,"BindingMismatch");
   });
   it("rejects missing implementation and price-feed code", async function () {
     const c = await networkHelpers.loadFixture(fixture);
-    await expect(ethers.deployContract("IvyVaultsHub",[c.admin.address,c.alice.address,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1], { libraries: c.libraries })).revertedWithCustomError(c.hub,"BindingMismatch");
+    await expect(ethers.deployContract("IvyVaultsHub",[c.admin.address,c.alice.address,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1,1], { libraries: c.libraries })).revertedWithCustomError(c.hub,"BindingMismatch");
     await expect(c.hub.createVault({...callTerms(c),priceFeed:c.alice.address,maxPriceAge:100},callPairs(c))).revertedWithCustomError(c.hub,"BindingMismatch");
+  });
+  it("rejects a zero publication window at deployment", async function () {
+    const c = await networkHelpers.loadFixture(fixture);
+    await expect(ethers.deployContract("IvyVaultsHub", [c.admin.address, c.vaultImplAddress, c.sharesAddress,
+      await c.premiums.getAddress(), await c.unwind.getAddress(), 3600, 3600, 0], { libraries: c.libraries }))
+      .revertedWithCustomError(c.hub, "InvalidSettlementWindow");
   });
   it("protects minting, burning and module payment entrypoints", async function () {
     const c = await networkHelpers.loadFixture(fixture);

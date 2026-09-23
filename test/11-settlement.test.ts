@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import {
-  EXERCISE_WINDOW, ExerciseStyle, Phase, SETTLEMENT_GRACE, SettlementType, USDC_UNIT, WETH_UNIT,
+  EXERCISE_WINDOW, EXPIRY_PRICE_PUBLICATION_WINDOW, ExerciseStyle, Phase, SettlementType, USDC_UNIT, WETH_UNIT,
   callPairs, callTerms, createVaultAs, deployIvy, fund,
 } from "./helpers/setup.js";
 import { at, goLive, setSpot, setExercisePrice, publishExpiryPrice } from "./helpers/scenarios.js";
@@ -40,9 +40,10 @@ describe("expire", function () {
     const ctx = await networkHelpers.loadFixture(fixture);
     const { hub, weth, marketMaker, bob, alice } = ctx;
     const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
-    expect(await hub.expirationTimeOf(vaultId)).to.equal(bid.expiry);
+    expect(await hub.expirationTimeOf(vaultId)).to.equal(bid.expiry + EXPIRY_PRICE_PUBLICATION_WINDOW + EXERCISE_WINDOW);
     await networkHelpers.time.increaseTo(bid.expiry - 2n);
     await publishExpiryPrice(ctx, vaultId, 3300n * USDC_UNIT);
+    expect(await hub.expirationTimeOf(vaultId)).to.equal(bid.expiry);
     await expect(hub.connect(alice).expire(vaultId)).to.emit(hub, "Settled").withArgs(vaultId, 10n * WETH_UNIT, 10n * WETH_UNIT, CALL_PAYOUT_ALL);
     expect((await hub.stateOf(vaultId)).pendingPayout).to.equal(CALL_PAYOUT_ALL);
 
@@ -72,16 +73,14 @@ describe("expire", function () {
     await expect(ctx.hub.connect(ctx.marketMaker).claimPayout(vaultId)).to.be.revertedWithCustomError(ctx.hub, "NothingToClaim");
   });
 
-  it("cash: no expiry report remains pending even after the former grace period", async function () {
+  it("cash: a missing report allows permissionless recovery after the physical fallback window", async function () {
     const ctx = await networkHelpers.loadFixture(fixture);
     const { vaultId, bid } = await goLive(ctx, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European });
     await networkHelpers.time.increaseTo(bid.expiry + 30n * 86400n);
-    await expect(ctx.hub.expire(vaultId)).revertedWithCustomError(ctx.hub, "ReportUnavailable");
-    expect((await ctx.hub.stateOf(vaultId)).phase).eq(Phase.Live);
-    await publishExpiryPrice(ctx, vaultId, 3300n * USDC_UNIT);
-    await setSpot(ctx, 5000n * USDC_UNIT);
-    await ctx.hub.expire(vaultId);
-    expect((await ctx.hub.stateOf(vaultId)).pendingPayout).eq(CALL_PAYOUT_ALL);
+    await expect(publishExpiryPrice(ctx, vaultId, 3300n * USDC_UNIT)).revertedWithCustomError(ctx.hub, "ExpiryPricePublicationClosed");
+    await expect(ctx.hub.expire(vaultId)).emit(ctx.hub, "PhysicalFallbackExpired").withArgs(vaultId, 10n * WETH_UNIT);
+    expect((await ctx.hub.stateOf(vaultId)).phase).eq(Phase.Settled);
+    expect((await ctx.hub.stateOf(vaultId)).pendingPayout).eq(0n);
   });
 
   it("cash American: the unexercised remainder auto-settles at expiry", async function () {

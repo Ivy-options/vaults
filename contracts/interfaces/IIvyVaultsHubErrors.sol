@@ -11,6 +11,8 @@ interface IIvyVaultsHubErrors {
     error ExceedsRemaining(uint256 remaining);
     error ExerciseNotOpenYet();
     error ExerciseWindowClosed();
+    error ExpirationNotReached();
+    error ExpiryPricePublicationClosed();
     error FeedNeedsMaxPriceAge();
     error InsufficientShares();
     error InvalidPrice();
@@ -25,6 +27,7 @@ interface IIvyVaultsHubErrors {
     error PairUnknown(address quoteToken);
     error PartialExerciseNotAllowed();
     error PayoutHookOutOfGas();
+    error PhysicalFallbackUnavailable();
     error PremiumTooLow();
     error PutPairMustBeCollateral();
     error PutRequiresSinglePair();
@@ -32,6 +35,7 @@ interface IIvyVaultsHubErrors {
     error ReportFinalized();
     error ReportUnavailable();
     error SettlementNotAllowed();
+    error ShortReceived(uint256 expected, uint256 received);
     error StalePrice();
     error StrikeAboveLimit();
     error StrikeBelowLimit();

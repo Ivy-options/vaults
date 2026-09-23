@@ -192,7 +192,7 @@
         .classList.toggle("with-buyer-reserve", outcome !== "physical");
       reserve.querySelector("p").textContent =
         outcome === "cash"
-          ? "Any cash-expiry payoff still owed to the buyer."
+          ? "Any payoff from a timely final price still owed to the buyer. Missing-price fallback expiration creates no new cash reserve."
           : "The refund contributed separately by LPs and set aside for the buyer.";
     }
     choice.addEventListener("change", sync);

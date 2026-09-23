@@ -9,14 +9,14 @@ export const REGISTRY_ABI = [
   'function setRecommendedVersion(uint256)',
   'function hasRole(bytes32,address) view returns(bool)',
 ];
-export const RELEASE_FORMAT = 'ivy-vaults-v2';
+export const RELEASE_FORMAT = 'ivy-vaults-v3';
 
 /** JSON bundle commitment includes preserved interfaces, constructor evidence and runtime hashes. */
 export const releaseHash = bundle => planHash(bundle);
 
 /** Read-only verifier. The caller supplies its supported ABI adapter, never one asserted by a manifest. */
 export async function verifyRelease(provider, bundle, supportedArtifacts) {
-  if (bundle.format !== 1 || bundle.interfaceFormat !== RELEASE_FORMAT || bundle.manifest?.version !== 6) throw new Error('Unsupported release format');
+  if (bundle.format !== 1 || bundle.interfaceFormat !== RELEASE_FORMAT || bundle.manifest?.version !== 7) throw new Error('Unsupported release format; historical releases require their preserved operator build');
   const { manifest, journal, artifacts } = bundle;
   if (String((await provider.getNetwork()).chainId) !== manifest.chainId || (await provider.getBlock(0)).hash !== manifest.genesisHash) throw new Error('Wrong chain');
   for (const name of CONTRACTS) {

@@ -70,6 +70,7 @@ contract IvyVaultsHub is
     mapping(uint256 => bool) public vaultPaused;
     uint64 public exerciseWindow;
     uint64 public auctionTimeout;
+    uint64 public expiryPricePublicationWindow;
     uint256 public vaultCount;
     mapping(uint256 vaultId => VaultTerms) internal _terms;
     mapping(uint256 vaultId => VaultState) internal _state;
@@ -110,7 +111,8 @@ contract IvyVaultsHub is
         address premiums_,
         address unwind_,
         uint64 window_,
-        uint64 timeout_
+        uint64 timeout_,
+        uint64 publicationWindow_
     ) EIP712("IvyVaultsHub", "2") {
         if (
             admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0)
@@ -121,12 +123,16 @@ contract IvyVaultsHub is
         if (implementation.code.length == 0) {
             revert BindingMismatch();
         }
+        if (publicationWindow_ == 0) {
+            revert InvalidSettlementWindow();
+        }
         vaultImplementation = implementation;
         shareToken = IIvyShares(shares_);
         premiums = IvyPremiums(premiums_);
         unwind = IvyUnwind(unwind_);
         exerciseWindow = window_;
         auctionTimeout = timeout_;
+        expiryPricePublicationWindow = publicationWindow_;
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GUARDIAN_ROLE, admin);
         _grantRole(PLATFORM_FEE_MANAGER_ROLE, admin);
@@ -163,10 +169,17 @@ contract IvyVaultsHub is
         emit CashSettlementEnabledUpdated(enabled);
     }
 
-    function setSettings(uint64 window_, uint64 timeout_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSettings(uint64 window_, uint64 timeout_, uint64 publicationWindow_)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (publicationWindow_ == 0) {
+            revert InvalidSettlementWindow();
+        }
         exerciseWindow = window_;
         auctionTimeout = timeout_;
-        emit SettingsUpdated(window_, timeout_);
+        expiryPricePublicationWindow = publicationWindow_;
+        emit SettingsUpdated(window_, timeout_, publicationWindow_);
     }
 
     /// @param vaultId Zero pauses admission globally; other ids pause one vault.
@@ -195,6 +208,9 @@ contract IvyVaultsHub is
         _admission(0);
         if (terms.allowedSettlement != SettlementPolicy.Physical) {
             _requireCashSettlementEnabled();
+            if (exerciseWindow == 0) {
+                revert InvalidSettlementWindow();
+            }
         }
         if (
             shareToken.hub() != address(this) || premiums.hub() != address(this) || unwind.hub() != address(this)
@@ -218,6 +234,7 @@ contract IvyVaultsHub is
         s.expiry = terms.expiry;
         s.exerciseWindow = exerciseWindow;
         s.auctionTimeout = auctionTimeout;
+        s.expiryPricePublicationWindow = expiryPricePublicationWindow;
         s.isCall = isCall;
         s.phase = Phase.Open;
         s.underlyingUnit = 10 ** IERC20Metadata(terms.underlying).decimals();
@@ -461,7 +478,7 @@ contract IvyVaultsHub is
         );
     }
 
-    /// @notice Finalize one live cash vault at or after its expiry. Stored prices cannot be replaced.
+    /// @notice Finalize a cash price during its fixed publication window. Stored prices cannot be replaced.
     function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil)
         external
         onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
@@ -469,7 +486,14 @@ contract IvyVaultsHub is
         _requireCashPublication(vaultId);
         VaultState storage s = _state[vaultId];
         IvyOptionSettlement.publishExpiry(
-            _settlementPrices[vaultId], vaultId, _terms[vaultId].underlying, s.quoteToken, s.expiry, price, validUntil
+            _settlementPrices[vaultId],
+            vaultId,
+            _terms[vaultId].underlying,
+            s.quoteToken,
+            s.expiry,
+            s.expiryPricePublicationWindow,
+            price,
+            validUntil
         );
     }
 
@@ -478,29 +502,21 @@ contract IvyVaultsHub is
     /// @notice Market maker exercises `amount` underlying units. Partial exercise follows the immutable vault term; the vault finalizes
     ///         automatically once everything is exercised.
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
-        _requirePhase(vaultId, Phase.Live);
-        VaultState storage s = _state[vaultId];
-        VaultTerms storage t = _terms[vaultId];
-        (uint256 paid, uint256 got) = IvyOptionSettlement.exercise(s, t, _settlementPrices[vaultId], amount);
-        emit Exercised(vaultId, amount, paid, got);
-        if (s.exercisedNotional == s.totalNotional) {
-            _finalize(vaultId, s);
-        }
-        IvyOptionSettlement.notifyPayout(s, vaultId, t.collateral, got);
+        _exercise(vaultId, amount, false);
+    }
+
+    /// @notice Explicitly exchange strike assets when a cash vault's publication window closed without a final price.
+    function exercisePhysicalFallback(uint256 vaultId, uint256 amount) external nonReentrant {
+        _exercise(vaultId, amount, true);
     }
 
     // Settlement and payouts
 
-    /// @notice Permissionless. Physical: closes the vault. Cash: prices the remaining notional and reserves
-    ///         the market maker's payout (collected via `claimPayout`).
+    /// @notice Permissionless. Cash with a final report reserves its payout; a missing report lets the remainder lapse
+    ///         after both fallback windows. Neither path depends on buyer cooperation.
     function expire(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
-        VaultState storage s = _state[vaultId];
-        if (block.timestamp < expirationTimeOf(vaultId)) {
-            revert ExpirationNotReached();
-        }
-        IvyOptionSettlement.expire(s, _terms[vaultId], _settlementPrices[vaultId]);
-        _finalize(vaultId, s);
+        IvyOptionSettlement.expire(_state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId);
     }
 
     /// @notice Buyer or executor collects a reserved cash payout or unwind refund for the configured recipient. A failing transfer
@@ -671,10 +687,20 @@ contract IvyVaultsHub is
 
     // Public views
 
-    /// @notice First moment `expire` may be called: expiry for cash, expiry + exerciseWindow for physical.
+    /// @notice Current settlement route and fixed fallback deadlines. Inactive means the vault is not Live.
+    function settlementStatus(uint256 vaultId)
+        external
+        view
+        returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canExpire)
+    {
+        _requireExists(vaultId);
+        return IvyOptionSettlement.settlementStatus(_state[vaultId], _settlementPrices[vaultId]);
+    }
+
+    /// @notice Cash with an accepted price expires at expiry; otherwise LP recovery waits for both fallback windows.
     function expirationTimeOf(uint256 vaultId) public view returns (uint256) {
-        VaultState storage s = _state[vaultId];
-        return s.settlement == SettlementType.Cash ? uint256(s.expiry) : uint256(s.expiry) + s.exerciseWindow;
+        _requireExists(vaultId);
+        return IvyOptionSettlement.expirationTime(_state[vaultId], _settlementPrices[vaultId]);
     }
 
     /// @notice Shares outstanding for a vault (== credited collateral), read from the share token.
@@ -688,6 +714,13 @@ contract IvyVaultsHub is
     }
 
     // Internal helpers
+
+    function _exercise(uint256 vaultId, uint256 amount, bool physicalFallback) internal {
+        _requirePhase(vaultId, Phase.Live);
+        IvyOptionSettlement.exercise(
+            _state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId, amount, physicalFallback
+        );
+    }
 
     function _credit(uint256 vaultId, address depositor, uint256 received) internal {
         if (received == 0) {

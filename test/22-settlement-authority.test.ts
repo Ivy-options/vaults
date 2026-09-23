@@ -61,19 +61,19 @@ describe("Hub settlement authority", function () {
     await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, W)).revertedWithCustomError(c.hub, "StalePrice");
   });
 
-  it("locks missing expiry obligations until late recovery while keeping premium, fee and buyer reserves separate", async function () {
+  it("allows publisher recovery within the publication window while keeping premium, fee and buyer reserves separate", async function () {
     const c = await deployIvy(await network.create());
     await c.hub.setPlatformFeeBps(200);
     const v = await goLive(c, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash });
     await c.feed.set(c.wethAddress, c.usdcAddress, 2700n * U, v.bid.expiry);
     await at(c, v.bid.expiry);
-    await expect(c.hub.expire(v.vaultId)).revertedWithCustomError(c.hub, "ReportUnavailable");
+    await expect(c.hub.expire(v.vaultId)).revertedWithCustomError(c.hub, "ExpirationNotReached");
     expect(await c.hub.remainingNotional(v.vaultId)).equal(10n * W);
     expect((await c.hub.stateOf(v.vaultId)).phase).equal(2);
     await expect(c.hub.connect(c.alice).claim(v.vaultId, 30_000n * U)).revertedWithCustomError(c.hub, "WrongPhase");
     await c.hub.connect(c.alice).claimPremium(v.vaultId);
     await v.vault.claimPlatformFee();
-    await c.networkHelpers.time.increase(10000);
+    await c.networkHelpers.time.increase(1000);
     const role = await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE();
     await c.hub.grantRole(role, c.carol.address);
     await c.hub.revokeRole(role, c.admin.address);

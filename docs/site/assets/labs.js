@@ -322,8 +322,8 @@
       byId("cash-buyer-percent", scope).textContent = `${fmt(buyer / deposit * 100, 2)}% of collateral`;
       byId("cash-pool-percent", scope).textContent = `${fmt(pool / deposit * 100, 2)}% of collateral`;
       byId("cash-outcome-note", scope).textContent = buyer === 0
-        ? `No buyer payout at this price. All ${fmt(deposit)} ${unit} remains for shareholder claims.`
-        : `Both allocations stay in ${unit} until claimed.`;
+        ? `Timely final price: no buyer payout. All ${fmt(deposit)} ${unit} remains for shareholder claims.`
+        : `With a timely final price, both allocations stay in ${unit} until claimed.`;
       byId("cash-buyer-bar", scope).style.width = `${(buyer / deposit) * 100}%`;
       $(".cash-balance-bar", scope).setAttribute(
         "aria-label",
@@ -402,7 +402,7 @@
       ["Backing & proceeds", "Remaining backing assets, plus any tokens received from physical exercise.", "Premium & fee reserves", "Premium owed to LPs and fees owed to the treasury that have not yet been paid.", false],
       ["Shareholder pool", "Remaining collateral and exercise proceeds after unpaid obligations are set aside.", "Premium & fee reserves", "Premium owed to LPs and fees owed to the treasury that have not yet been paid.", false],
     ];
-    const reserves = { physical: null, cash: "Any cash-expiry payoff still owed to the buyer.", unwind: "The refund contributed separately by LPs and set aside for the buyer." };
+    const reserves = { physical: null, cash: "Any payoff from a timely final price still owed to the buyer. Missing-price fallback expiration creates no new cash reserve.", unwind: "The refund contributed separately by LPs and set aside for the buyer." };
     const sync = () => {
       const i = Number(phase.value), s = states[i];
       $(".custody-backing h4", scope).textContent = s[0]; $(".custody-backing p", scope).textContent = s[1];
