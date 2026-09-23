@@ -1,6 +1,12 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { AbiCoder, ZeroAddress, id } from "ethers";
+import {
+  ExerciseStyle, RuleKind, SettlementType, USDC_UNIT, WETH_UNIT,
+  callPairs, callTerms, createVaultAs, deployIvy, fund, premiumFloorRule, putPairs, putTerms,
+} from "./helpers/setup.js";
+import { signBid } from "./helpers/bids.js";
+import { CALL_DEPOSIT, STRIKE, activate, makeBid, openVault, setSpot } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers } = connection;
@@ -79,5 +85,99 @@ describe("IvyBidRules config", function () {
       .to.be.revertedWithCustomError(rules, "InvalidPremiumFloor");
     await expect(rules.validateConfig(kind("PremiumFloor"), terms(A, A), inQuote, premiumFloor(feedAddress, 60, 10_001)))
       .to.be.revertedWithCustomError(rules, "InvalidPremiumFloor");
+  });
+});
+
+describe("bid rules at activation", function () {
+  const { networkHelpers } = connection;
+  const fixture = () => deployIvy(connection);
+
+  it("PairLimits and SpotBand reproduce the previous acceptance conditions", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const call = await openVault(ctx, { pair: { strikeLimit: 3100n * USDC_UNIT, minPremium: 50n * USDC_UNIT }, withFeed: true });
+    await expect(activate(ctx, call.vaultId, call.vaultAddress)).to.be.revertedWithCustomError(ctx.hub, "StrikeBelowLimit");
+    await expect(activate(ctx, call.vaultId, call.vaultAddress, { strike: 3100n * USDC_UNIT, premium: 49n * USDC_UNIT })).to.be.revertedWithCustomError(ctx.hub, "PremiumTooLow");
+    await setSpot(ctx, 4000n * USDC_UNIT);
+    await expect(activate(ctx, call.vaultId, call.vaultAddress, { strike: 3100n * USDC_UNIT })).to.be.revertedWithCustomError(ctx.hub, "StrikeOutsideSpotBand");
+    await setSpot(ctx, STRIKE);
+    await activate(ctx, call.vaultId, call.vaultAddress, { strike: 3100n * USDC_UNIT });
+  });
+
+  it("an empty rule list accepts any well-formed bid and still guards a zero strike", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const { vaultId, vaultAddress } = await createVaultAs(ctx, ctx.alice, callTerms(ctx), callPairs(ctx), []);
+    await fund(ctx, ctx.weth, ctx.alice, vaultAddress, CALL_DEPOSIT);
+    await ctx.hub.connect(ctx.alice).deposit(vaultId, CALL_DEPOSIT);
+    await ctx.hub.connect(ctx.alice).openAuction(vaultId);
+    await activate(ctx, vaultId, vaultAddress, { strike: 1n, premium: 0n });
+    const put = await createVaultAs(ctx, ctx.alice, putTerms(ctx), putPairs(ctx), []);
+    await fund(ctx, ctx.usdc, ctx.alice, put.vaultAddress, 30_000n * USDC_UNIT);
+    await ctx.hub.connect(ctx.alice).deposit(put.vaultId, 30_000n * USDC_UNIT);
+    await ctx.hub.connect(ctx.alice).openAuction(put.vaultId);
+    await expect(activate(ctx, put.vaultId, put.vaultAddress, { strike: 0n })).to.be.revert(ethers);
+  });
+
+  it("every rule must approve, in order, and the same validator may appear twice", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const reject = await ctx.ethers.deployContract("RejectAllValidator");
+    const approve = await ctx.ethers.deployContract("ApproveAllValidator");
+    const rule = (v: string) => ({ validator: v, kind: RuleKind.PairLimits, data: "0x" });
+    const a = await openVault(ctx, { rules: [rule(await approve.getAddress()), rule(await reject.getAddress())] });
+    await expect(activate(ctx, a.vaultId, a.vaultAddress)).to.be.revertedWithCustomError(reject, "Rejected");
+    const b = await openVault(ctx, { pair: { minPremium: 0n }, rules: [premiumFloorRule(ctx, { maxPriceAge: 3600, minPremiumBps: 500 })] });
+    await setSpot(ctx, STRIKE);
+    await expect(activate(ctx, b.vaultId, b.vaultAddress, { premium: 149n * USDC_UNIT })).to.be.revertedWithCustomError(ctx.hub, "PremiumTooLow");
+    await activate(ctx, b.vaultId, b.vaultAddress, { premium: 150n * USDC_UNIT });
+  });
+
+  it("an approving validator cannot bypass the mandatory checks", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const approve = await ctx.ethers.deployContract("ApproveAllValidator");
+    const rules = [{ validator: await approve.getAddress(), kind: "0x00000000", data: "0x" }];
+    const v = await openVault(ctx, { terms: { allowedExercise: 0 }, rules });
+    await expect(activate(ctx, v.vaultId, v.vaultAddress, { style: ExerciseStyle.American })).to.be.revertedWithCustomError(ctx.hub, "StyleNotAllowed");
+    await expect(activate(ctx, v.vaultId, v.vaultAddress, { style: ExerciseStyle.European, settlement: SettlementType.Cash })).to.be.revertedWithCustomError(ctx.hub, "SettlementNotAllowed");
+    await expect(activate(ctx, v.vaultId, v.vaultAddress, { style: ExerciseStyle.European, quoteToken: ctx.daiAddress })).to.be.revertedWithCustomError(ctx.hub, "PairUnknown");
+    const bid = { ...(await makeBid(ctx, v.vaultId, { style: ExerciseStyle.European })), collateralAmount: 1n };
+    await fund(ctx, ctx.usdc, ctx.marketMaker, v.vaultAddress, 1000n * USDC_UNIT);
+    await expect(ctx.hub.connect(ctx.bidMaster).activate(v.vaultId, bid, await signBid(ctx.marketMaker, ctx.hubAddress, bid))).to.be.revertedWithCustomError(ctx.hub, "CommitmentMismatch");
+  });
+
+  it("a validator that writes state fails activation, and the auction stays cancellable", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const writer = await ctx.ethers.deployContract("StateWritingValidator");
+    const v = await openVault(ctx, { rules: [{ validator: await writer.getAddress(), kind: "0x00000000", data: "0x" }] });
+    await expect(activate(ctx, v.vaultId, v.vaultAddress)).to.be.revert(ethers);
+    expect(await writer.calls()).to.equal(0n);
+    await ctx.hub.connect(ctx.bidMaster).cancelAuction(v.vaultId);
+    await ctx.hub.connect(ctx.alice).withdraw(v.vaultId, CALL_DEPOSIT);
+  });
+
+  it("the context carries the resolved premium token, notional and auction timing", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const asserting = await ctx.ethers.deployContract("ContextAssertingValidator", [ctx.usdcAddress, CALL_DEPOSIT, 600]);
+    const v = await openVault(ctx, { rules: [{ validator: await asserting.getAddress(), kind: "0x00000000", data: "0x" }] });
+    await expect(activate(ctx, v.vaultId, v.vaultAddress)).to.be.revertedWithCustomError(asserting, "TooEarly");
+    await networkHelpers.time.increase(600n);
+    await activate(ctx, v.vaultId, v.vaultAddress);
+    const wrong = await ctx.ethers.deployContract("ContextAssertingValidator", [ctx.daiAddress, CALL_DEPOSIT, 0]);
+    const w = await openVault(ctx, { rules: [{ validator: await wrong.getAddress(), kind: "0x00000000", data: "0x" }] });
+    await expect(activate(ctx, w.vaultId, w.vaultAddress)).to.be.revertedWithCustomError(wrong, "ContextMismatch");
+  });
+
+  it("PremiumFloor prices the premium in the underlying without a feed", async function () {
+    const ctx = await networkHelpers.loadFixture(fixture);
+    const pairs = [{ quoteToken: ctx.usdcAddress, premiumToken: ctx.wethAddress }];
+    const rules = [premiumFloorRule(ctx, { priceFeed: ZeroAddress, maxPriceAge: 0, minPremiumBps: 100 })];
+    const { vaultId, vaultAddress } = await createVaultAs(ctx, ctx.alice, callTerms(ctx), pairs, rules);
+    await fund(ctx, ctx.weth, ctx.alice, vaultAddress, CALL_DEPOSIT);
+    await ctx.hub.connect(ctx.alice).deposit(vaultId, CALL_DEPOSIT);
+    await ctx.hub.connect(ctx.alice).openAuction(vaultId);
+    const tooLow = await makeBid(ctx, vaultId, { premium: WETH_UNIT / 100n - 1n });
+    await fund(ctx, ctx.weth, ctx.marketMaker, vaultAddress, WETH_UNIT);
+    await expect(ctx.hub.connect(ctx.bidMaster).activate(vaultId, tooLow, await signBid(ctx.marketMaker, ctx.hubAddress, tooLow))).to.be.revertedWithCustomError(ctx.hub, "PremiumTooLow");
+    const enough = await makeBid(ctx, vaultId, { premium: WETH_UNIT / 100n });
+    await ctx.hub.connect(ctx.bidMaster).activate(vaultId, enough, await signBid(ctx.marketMaker, ctx.hubAddress, enough));
+    expect((await ctx.hub.stateOf(vaultId)).premiumToken).to.equal(ctx.wethAddress);
   });
 });
