@@ -248,10 +248,10 @@
                     <span class="chip owner">Owner</span
                     ><span class="phase-actions"
                       ><span
-                        ><b>Keep or strengthen LP protections.</b><span>The owner
-                        can tighten the permitted terms while Open. For example,
-                        it can raise the minimum premium a buyer must offer, but
-                        cannot lower it after LPs have committed their funds.</span></span
+                        ><b>Fix the bid rules.</b><span>The owner chooses the
+                        rules a buyer's offer must pass when creating the vault.
+                        They cannot change afterwards, so LPs deposit against
+                        exactly what they read.</span></span
                       ><span
                         ><b>Manage ownership.</b><span>The owner can hand
                         management of the vault to another
@@ -506,8 +506,8 @@
               <dd>
                 <code>floor(grossPremium × feeBps / 10,000)</code> in premium
                 tokens. The fee rounds down to a whole raw token unit, leaving
-                the rounding remainder for LPs. The owner's
-                <code>minPremium</code> limit is the gross premium per whole
+                the rounding remainder for LPs. The owner's PairLimits rule's
+                <code>minPremium</code> is the gross premium per whole
                 underlying token, before the platform fee is deducted. The
                 total payment scales that per-token premium by the option's
                 size, called its notional. For example, 100 USDC per WETH
@@ -913,10 +913,11 @@
                       <dd>The token used to quote the strike.</dd>
                     </div>
                     <div>
-                      <dt><code>pairHash</code><small>bytes32</small></dt>
+                      <dt><code>termsHash</code><small>bytes32</small></dt>
                       <dd>
-                        A hash, or fingerprint, of the accepted token-pair
-                        settings. It binds the bid to that exact configuration.
+                        A hash, or fingerprint, of the vault's terms, token
+                        pairs and bid rules as created. It binds the bid to
+                        that exact configuration.
                       </dd>
                     </div>
                     <div>
@@ -1346,8 +1347,9 @@
                 <dt>Units & authority</dt>
                 <dd>
                   Prices use raw quote-token units per whole underlying token.
-                  The optional <code>priceFeed</code> is a separate source used
-                  to check whether a bid's strike is acceptable at activation.
+                  A SpotBand bid rule's <code>priceFeed</code> is a separate
+                  source used to check whether a bid's strike is acceptable at
+                  activation.
                   Its price cannot replace a missing cash-settlement report,
                   and neither can another vault's report.
                 </dd>
@@ -1604,11 +1606,13 @@
             <p class="section-intro">
               Before LPs deposit, the owner defines which trades the vault may
               accept. For example, a call vault can require a minimum strike and
-              a minimum premium. A buyer's offer must satisfy both limits to
+              a minimum premium. A buyer's offer must satisfy every limit to
               activate. The owner also chooses the tokens, expiry and exercise
-              rules. While the vault is Open, some limits can become stricter;
-              LP protections cannot be relaxed, and fields marked immutable
-              cannot change. The table below gives the rule for each term.
+              rules. Price conditions are bid rules: a list of validator
+              contracts and data the owner fixes at creation. The shipped
+              validator offers PairLimits, SpotBand and PremiumFloor. Nothing in
+              the terms or rules can change after creation. The table below
+              gives the rule for each term.
             </p>
           </header>
           <div class="terms">
@@ -1617,25 +1621,48 @@
               ><span>Owner changes</span>
             </div>
             <div class="row">
-              <span class="mono">strikeLimit</span
+              <span class="mono">PairLimits rule</span
               ><span
-                >Per quote token. Calls:
+                >Per quote token: a strike limit and a minimum gross premium
+                per whole underlying token. Calls:
                 <span class="mono">strike ≥ limit</span>, and 0 means no
                 limit. Puts: <span class="mono">strike ≤ limit</span>, and
-                the limit must be nonzero.</span
+                the limit must be nonzero. The buyer's premium must meet or
+                exceed the minimum.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">calls raise · puts lower</span></span
+                ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">
-              <span class="mono">minPremium</span
-              ><span>The minimum gross premium per whole underlying token,
-                configured separately for each accepted quote-token pair.
-                The buyer's offer must meet or exceed it.</span
+              <span class="mono">SpotBand rule</span
+              ><span
+                >Limits how far a bid's strike may differ in the buyer's favor
+                from the current market price. Here
+                <span class="mono">spot</span> is the price from the rule's
+                <span class="mono">priceFeed</span>, no older than its
+                <span class="mono">maxPriceAge</span> in seconds, and
+                <span class="mono">bps</span> is the permitted difference
+                in basis points. Calls:
+                <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts:
+                <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. It
+                does not impose a price requirement on physical exercise or
+                expiration.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">raise only</span></span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">PremiumFloor rule</span
+              ><span
+                >The premium must be at least
+                <span class="mono">minPremiumBps</span> of spot, priced in
+                the premium token. When the premium token is the underlying,
+                one whole token is the price and no feed is read.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">
@@ -1645,7 +1672,7 @@
                 collateral.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">raise only</span></span
+                ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">
@@ -1663,7 +1690,7 @@
               ><span>European, American, or Either. Each bid picks one.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">Either → one</span></span
+                ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">
@@ -1675,36 +1702,7 @@
                 flag.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">Either → one</span></span
-              >
-            </div>
-            <div class="row">
-              <span class="mono">priceFeed · maxInTheMoneyBps</span
-              ><span
-                >The owner can optionally limit how far a bid's strike may
-                differ in the buyer's favor from the current market price.
-                Here <span class="mono">spot</span> is that price from
-                <span class="mono">priceFeed</span>, and
-                <span class="mono">bps</span> is the permitted difference
-                in basis points. Calls:
-                <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts:
-                <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Both
-                this and <span class="mono">strikeLimit</span> must pass.</span
-              ><span class="term-rule"
-                ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">bps lower · feed fixed</span></span
-              >
-            </div>
-            <div class="row">
-              <span class="mono">maxPriceAge</span
-              ><span
-                >When the optional activation price feed is configured, this
-                is the oldest observation it may use, measured in seconds.
-                An older report rejects activation. It does not impose a
-                price requirement on physical exercise or expiration.</span
-              ><span class="term-rule"
-                ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">lower only, never 0</span></span
+                ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">
@@ -1726,11 +1724,10 @@
               ><span>The owner sets allowed strike currencies and a premium
                 token for each at creation. Calls may have several; puts have
                 one, with the strike priced in the deposited token. The buyer
-                chooses an enabled entry. While Open, the owner can disable
-                entries but cannot add them or change their tokens.</span
+                chooses one.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
-                ><span class="chip lp">disable only</span></span
+                ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">

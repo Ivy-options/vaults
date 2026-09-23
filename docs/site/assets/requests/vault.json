@@ -24,19 +24,14 @@
     "allowedSettlement": 0,
     "expiry": "FUTURE_UNIX_SECONDS",
     "auctionStartsAt": "0",
-    "priceFeed": "0x0000000000000000000000000000000000000000",
-    "maxInTheMoneyBps": 0,
-    "maxPriceAge": 0,
     "maxSettlementPriceAge": 0
   },
   "pairs": [
     {
       "quoteToken": "USDC_ADDRESS",
-      "terms": {
-        "premiumToken": "USDC_ADDRESS",
-        "minPremium": "100000000",
-        "enabled": true
-      }
+      "premiumToken": "USDC_ADDRESS",
+      "minPremium": "100000000"
     }
-  ]
+  ],
+  "bidRules": "BID_RULES_ADDRESS"
 }

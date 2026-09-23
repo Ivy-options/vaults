@@ -24,20 +24,20 @@
     "allowedSettlement": 1,
     "expiry": "FUTURE_UNIX_SECONDS",
     "auctionStartsAt": "0",
-    "priceFeed": "0x0000000000000000000000000000000000000000",
-    "maxInTheMoneyBps": 0,
-    "maxPriceAge": 0,
     "maxSettlementPriceAge": 3600
   },
   "pairs": [
     {
       "quoteToken": "USDC_ADDRESS",
-      "terms": {
-        "premiumToken": "USDC_ADDRESS",
-        "minPremium": "100000000",
-        "enabled": true
-      }
+      "premiumToken": "USDC_ADDRESS",
+      "minPremium": "100000000"
     }
   ],
+  "bidRules": "BID_RULES_ADDRESS",
+  "spotBand": {
+    "priceFeed": "PRICE_FEED_ADDRESS",
+    "maxPriceAge": 3600,
+    "maxInTheMoneyBps": 1000
+  },
   "settlementMethodology": "APPROVED_PER_PAIR_METHODOLOGY_ARTIFACT_REFERENCE"
 }

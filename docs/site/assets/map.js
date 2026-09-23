@@ -823,6 +823,7 @@
   /* ---------- Hash and aliases ---------- */
   // Compatibility with the former reference-heavy map and classic Guide anchors.
   const ALIASES = {
+    "tighten-open-terms": "how-bids-are-judged",
     "deposit-token-approval": "hub-and-vaults",
     "cash-expiration-reserve": "expire-the-vault",
     "buyer-reserve-sources": "buyer-claims-any-payout",

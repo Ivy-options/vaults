@@ -184,10 +184,21 @@ When opening an existing position, start from its stored reference. Do not call 
 2. Load the bundle and ABI for `reference.releaseId`.
 3. Verify that the registry still returns `reference.hubAddress` for that release. Registrations are permanent, so a mismatch is an integration or configuration error.
 4. Instantiate `IvyVaultsHub` at `reference.hubAddress`.
-5. Read `stateOf(reference.vaultId)`, `termsOf(reference.vaultId)` and `vaultOf(reference.vaultId)`.
+5. Read `stateOf(reference.vaultId)`, `termsOf(reference.vaultId)`, `rulesOf(reference.vaultId)`, `termsHashOf(reference.vaultId)` and `vaultOf(reference.vaultId)`.
 6. Send deposits, auction actions, exercise, expiration and claims to that original Hub.
 
 The current recommendation may point to a newer Hub. That has no effect on the existing vault's terms, modules, balances or claim paths.
+
+## Show a vault's bid rules
+
+A vault stores a list of bid rules chosen by its creator and frozen at creation. Each rule is a validator address, a `bytes4` kind and opaque data. Read them with `rulesOf(vaultId)`.
+
+- Label each rule by `(validator, kind)`. The release manifest's `addresses.IvyBidRules` is the shipped validator; its kinds are `PairLimits`, `SpotBand` and `PremiumFloor`, with ids `bytes4(keccak256(name))`.
+- Decode shipped data with these ABI types: PairLimits `tuple(address quoteToken,uint256 strikeLimit,uint256 minPremium)[]`; SpotBand `tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)`; PremiumFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)`.
+- Any other validator address is custom. Show it as such and do not attempt to decode its data.
+- An empty list means every bid that passes the Hub's own checks is acceptable. Show that plainly.
+
+Bids commit to `termsHashOf(vaultId)`, the hash of the creator's terms, pairs and rules. Fill `termsHash` from that view when building a bid to sign. Protocol settings snapshotted at creation (`exerciseWindow`, `auctionTimeout`, `expiryPricePublicationWindow`, `vaultPlatformFeeBps`) are not in the hash; read them from `stateOf` before quoting.
 
 ## Discover every historical vault
 
@@ -240,7 +251,7 @@ The same fallback applies to American and European cash options. It requires no 
 
 Track `PhysicalFallbackExercised` and `PhysicalFallbackExpired` alongside normal exercise/settlement events. The expiration event reports lapsed notional; it must not be displayed as an exercised amount. Cash reserves already earned remain excluded from LP claims. The CLI exposes these reads with `inspect-settlement` and explicit submission with `exercise-fallback`; an unavailable `physicalExercisePreview` is a quote of delivery terms, not a cash exercise funding requirement.
 
-This build uses interface format `ivy-vaults-v3` and deployment manifest 7. The constructor appends the publication-window argument, `setSettings` gains its third argument, and `VaultState` appends the saved publication window. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fallback is provided.
+This build uses interface format `ivy-vaults-v4` and deployment manifest 7. The constructor appends the publication-window argument, `setSettings` gains its third argument, and `VaultState` appends the saved publication window. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fallback is provided.
 
 ## Recommendation changes
 

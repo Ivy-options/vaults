@@ -108,7 +108,7 @@
       <li><strong>Limits</strong> a buyer’s offer must meet.</li>
     </ul>
     <section data-kind="action" id="set-the-terms" data-actor="owner"><h4>Set the boundaries</h4>
-    <p>The <strong class="role-owner">owner</strong> fixes the trade’s boundaries before LPs fund it. While Open, permitted updates can tighten depositor protections.</p><p class="reference"><a href="index.html#terms" data-guide>Complete parameter reference ↗</a></p>
+    <p>The <strong class="role-owner">owner</strong> fixes the trade’s boundaries before LPs fund it. Nothing economic changes afterwards.</p><p class="reference"><a href="index.html#terms" data-guide>Complete parameter reference ↗</a></p>
 
     <section data-kind="tile" id="fixed-vault-terms"><h5>What stays fixed</h5>
     <p>These terms stay fixed:</p>
@@ -126,24 +126,23 @@
       <li><strong class="key-term">Call:</strong> may require a minimum strike.</li>
       <li><strong class="key-term">Put:</strong> requires a nonzero maximum strike.</li>
     </ul>
-    <p>Both may require a <strong class="key-term">minimum premium per whole underlying token</strong>, paid in the pair’s premium token.</p>
+    <p>Both may require a <strong class="key-term">minimum premium per whole underlying token</strong>, paid in the pair’s premium token. These are the PairLimits rule.</p>
     </section>
-    <section data-kind="tile" id="tighten-open-terms"><h5>Which limits may tighten?</h5>
-    <p>LPs deposited under the terms they saw. So while <strong class="key-term">Open</strong>, the owner may only move them in the LPs’ favour:</p>
+    <section data-kind="tile" id="how-bids-are-judged"><h5>How bids are judged</h5>
+    <p>The owner lists <strong class="key-term">bid rules</strong> at creation: each names a validator contract and its data. At activation the Hub runs its own checks first, then every rule in order. All must approve.</p>
     <ul class="reading-list" role="list">
-      <li>Raise the <strong class="key-term">premium floor</strong>.</li>
-      <li>Raise a <strong class="key-term">call’s strike floor</strong>.</li>
-      <li>Lower a <strong class="key-term">put’s strike ceiling</strong>.</li>
-      <li>Raise <strong class="key-term">minimum collateral</strong>.</li>
+      <li><strong class="key-term">PairLimits</strong>: strike limit and premium floor per quote token.</li>
+      <li><strong class="key-term">SpotBand</strong>: strike within a band of the feed’s spot.</li>
+      <li><strong class="key-term">PremiumFloor</strong>: premium at least a share of spot.</li>
     </ul>
-    <p>Either policies may narrow to one method. Disabled quote pairs <strong class="key-term">cannot be re-enabled</strong>.</p>
+    <p>Rules from another validator are custom. An empty list accepts any well-formed bid.</p>
     <section data-kind="tile" id="activation-price-guard"><h5>Optional activation price check</h5>
-    <p>A strike far into the money sells the option too cheaply. If the <strong class="role-owner">owner</strong> configured a price feed, activation also checks the strike against spot:</p>
+    <p>A strike far into the money sells the option too cheaply. If the <strong class="role-owner">owner</strong> listed a SpotBand rule, activation also checks the strike against spot:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term"><code>maxInTheMoneyBps</code></strong> limits the strike’s deviation into the money from spot.</li>
       <li><strong class="key-term"><code>maxPriceAge</code></strong> limits the age of that spot price.</li>
     </ul>
-    <p>Both limits may tighten while Open.</p>
+    <p>Both values are fixed at creation.</p>
     </section>
     </section>
     </section>
