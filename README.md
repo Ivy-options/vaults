@@ -32,7 +32,7 @@ Compilation also checks deployed contract sizes. Tests run on a local simulated 
 To run one test file, for example the physical fallback tests:
 
 ```sh
-npm test -- test/34-physical-fallback.test.ts
+npm test -- test/physical-fallback.test.ts
 ```
 
 ## Solidity style
