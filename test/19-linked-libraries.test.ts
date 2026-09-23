@@ -61,9 +61,19 @@ describe('fixed linked libraries', function () {
     const coder = AbiCoder.defaultAbiCoder();
     // Solidity library selectors use named storage types. These bodies would succeed on zeroed
     // storage without the compiler's direct-call guard, so their rejection tests that guard.
-    const expire = id('expire(VaultState storage,VaultTerms storage,SettlementPrices storage,uint256)').slice(0, 10) + coder.encode(['uint256', 'uint256', 'uint256', 'uint256'], [0, 1, 2, 1]).slice(2);
-    for (const [to, data] of [[plan.addresses.IvyOptionSettlement, expire]]) {
-      await rejects(admin.provider!.call({ from: admin.address, to, data }), (error: any) => error.data === '0x');
+    const now = BigInt((await admin.provider!.getBlock('latest'))!.timestamp);
+    const call = (signature: string, types: string[], values: unknown[]) => ({ selector: id(signature).slice(0, 10), data: coder.encode(types, values).slice(2) });
+    const terms = 'tuple(address,address,bool,bool,uint8,uint8,uint64,uint64,uint256,uint32)';
+    const calls = [
+      [plan.addresses.IvyOptionSettlement, call('expire(VaultState storage,VaultTerms storage,SettlementPrices storage,uint256)', ['uint256', 'uint256', 'uint256', 'uint256'], [0, 1, 2, 1])],
+      [plan.addresses.IvyOptionSettlement, call('publishExpiry(SettlementPrices storage,uint256,address,address,uint64,uint64,uint256,uint64)', ['uint256', 'uint256', 'address', 'address', 'uint64', 'uint64', 'uint256', 'uint64'], [0, 1, admin.address, admin.address, now - 1n, 3600, 1, now + 3600n])],
+      [plan.addresses.IvyOptionSettlement, call('publishExercisePrice(SettlementPrices storage,uint256,address,address,uint256,uint64,uint64)', ['uint256', 'uint256', 'address', 'address', 'uint256', 'uint64', 'uint64'], [0, 1, admin.address, admin.address, 1, now - 1n, now + 3600n])],
+      [plan.addresses.IvyVaultRules, call('adoptRules(BidRule[] storage,VaultTerms,PairConfig[],BidRule[])', ['uint256', terms, 'tuple(address,address)[]', 'tuple(address,bytes4,bytes)[]'], [0, [admin.address, admin.address, false, false, 0, 0, now + 3600n, 0, 0, 0], [], []])],
+    ] as const;
+    for (const [to, { selector, data }] of calls) {
+      // A mistyped signature would also revert with empty data, so prove each selector is dispatched.
+      expect(await admin.provider!.getCode(to)).to.include('63' + selector.slice(2));
+      await rejects(admin.provider!.call({ from: admin.address, to, data: selector + data }), (error: any) => error.data === '0x');
     }
   });
   it('deploys the shipped validator as its own step', async function () {

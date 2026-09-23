@@ -86,16 +86,14 @@ for (const file of ["docs.css", "guide.css", "atlas.css", "roman.css", "referenc
     );
   }
 }
-for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "atlas.js", "labs.js", "map.js", "shell.js", "embed.js"]) {
+for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "labs.js", "map.js", "shell.js", "embed.js"]) {
   new Script(readFileSync(resolve(site, "assets", file), "utf8"));
 }
 
-// Exercise both payoff calculators — the classic guide's (docs.js, driven
-// through document.getElementById) and the map's (labs.js, driven through a
-// scoped querySelector) — with the same small DOM fixture. Expected amounts
-// are independent worked examples, not a second implementation of the
-// settlement formulas. Both calculators descend from the same worked
-// examples, so they share expected values.
+// Exercise the shared payoff calculator (labs.js, driven through a scoped
+// querySelector) against both pages that carry it: the guide and the labs
+// fixture. Expected amounts are independent worked examples, not a second
+// implementation of the settlement formulas.
 function makeElements(ids) {
   return Object.fromEntries(
     ids.map((id) => [
@@ -179,51 +177,12 @@ function verifyPayoffCalculator(elements, update) {
   assert.equal(elements.premiumApr.textContent, "40.56%");
 }
 
-// The classic guide: docs.js reads inputs through document.getElementById
-// and writes results back the same way.
-{
-  const ids = pageIds.get(guidePagePath);
-  const elements = makeElements(ids);
-  const inputCallbacks = {};
-  for (const id of CALC_INPUT_IDS) {
-    elements[id].addEventListener = (event, callback) => {
-      inputCallbacks[id] = callback;
-    };
-  }
-  Object.entries(CALC_DEFAULTS).forEach(([id, value]) => (elements[id].value = value));
-  const attributes = new Map([["data-theme", "dark"]]);
-  const documentElement = {
-    getAttribute: (key) => attributes.get(key),
-    setAttribute: (key, value) => attributes.set(key, value),
-  };
-  const docsJs = readFileSync(resolve(site, "assets/docs.js"), "utf8");
-  runInNewContext(docsJs, {
-    document: {
-      documentElement,
-      getElementById: (id) => elements[id],
-      querySelectorAll: () => [],
-    },
-    window: {
-      addEventListener() {},
-      matchMedia: () => ({ matches: true, addEventListener() {} }),
-    },
-    localStorage: { getItem: () => null, setItem() {} },
-    getComputedStyle: () => ({ getPropertyValue: () => "#888" }),
-  });
-  verifyPayoffCalculator(elements, (values) => {
-    for (const [id, value] of Object.entries(values)) elements[id].value = value;
-    inputCallbacks.dep();
-  });
-}
-
-// Reusable labs: the payoff widget lives in the labs fixture, not the curated map.
-// labs.js reads inputs through a scoped querySelector
-// (IvyLabs.mountAll normally scopes it to one lab card) and window is
+// labs.js reads inputs through a scoped querySelector (IvyLabs.mountAll
+// normally scopes it to one [data-lab] element) and window is
 // self-referential, as in a real browser, so its closing `window.IvyLabs =
-// {...}` also defines the bare `IvyLabs` global used below.
-{
-  const fixture = readFileSync(resolve(site, "test/fixtures/labs.html"), "utf8");
-  const ids = [...fixture.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+// {...}` also defines the bare `IvyLabs` global used below. Every id the
+// widget reads must exist on the page, or the scoped lookup returns null.
+function verifyLabsPayoff(ids) {
   const elements = makeElements(ids);
   const inputCallbacks = {};
   for (const id of CALC_INPUT_IDS) {
@@ -242,6 +201,7 @@ function verifyPayoffCalculator(elements, update) {
     document: { documentElement, addEventListener() {}, querySelector: () => null },
     scope: { querySelector: (s) => elements[s.replace(/^#/, "")] || null, querySelectorAll: () => [] },
     CSS: { escape: (s) => s },
+    MutationObserver: class { observe() {} },
     localStorage: { getItem: () => null, setItem() {} },
     getComputedStyle: () => ({ getPropertyValue: () => "#888" }),
     addEventListener() {},
@@ -254,7 +214,13 @@ function verifyPayoffCalculator(elements, update) {
     inputCallbacks.dep();
   });
 }
+verifyLabsPayoff(pageIds.get(guidePagePath));
+assert.match(readFileSync(guidePagePath, "utf8"), /class="calc" data-lab="payoff"/, "The guide mounts the shared payoff lab");
+{
+  const fixture = readFileSync(resolve(site, "test/fixtures/labs.html"), "utf8");
+  verifyLabsPayoff([...fixture.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
+}
 
 console.log(
-  `Docs checks passed: ${pages.length} HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, both payoff calculators, invalid inputs and recovery.`
+  `Docs checks passed: ${pages.length} HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, the shared payoff calculator on both pages, invalid inputs and recovery.`
 );

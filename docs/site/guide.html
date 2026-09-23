@@ -19,10 +19,10 @@
     <link rel="stylesheet" href="assets/guide.css" />
     <link rel="stylesheet" href="assets/atlas.css" />
     <link rel="stylesheet" href="assets/roman.css" />
+    <script src="assets/labs.js" defer></script>
     <script src="assets/docs.js" defer></script>
     <script src="assets/guide.js" defer></script>
     <script src="assets/vault-diagrams.js" defer></script>
-    <script src="assets/atlas.js" defer></script>
     <script>
       if (window.self === window.top) location.replace("index.html" + location.search + location.hash);
     </script>
@@ -442,7 +442,7 @@
               basis points, abbreviated bps: 100 bps is 1%, so 200 bps is 2%.
             </p>
           </header>
-          <div class="fee-laboratory interactive-example">
+          <div class="fee-laboratory interactive-example" data-lab="fees">
             <div class="fee-controls">
               <span class="inscription">ILLUSTRATIVE ACTIVATION</span
               ><strong class="large-amount">1,000 <small>USDC</small></strong
@@ -610,7 +610,7 @@
             <span>Whole-token estimates</span><span>Zero platform fee</span
             ><span>Same holders throughout</span>
           </div>
-          <div class="calc">
+          <div class="calc" data-lab="payoff">
             <p id="calcError" class="calc-error" role="status" hidden></p>
             <div class="inputs">
               <label
@@ -1459,7 +1459,7 @@
           <div class="reading-block reading-flow" id="cash-outcomes">
             <h3>Collateral after cash expiration</h3>
             <p class="prose">With a timely final price, expiration divides backing assets between the buyer's reserved payoff and the shareholders' remaining pool. This calculator assumes an accepted final report; a missing report uses the fallback described below. Both calculated amounts stay in the collateral token until claimed.</p>
-            <div class="cash-accounting interactive-example">
+            <div class="cash-accounting interactive-example" data-lab="cashAmounts">
               <div class="cash-inputs">
                 <label for="cash-kind-demo">Cash vault example</label
                 ><select id="cash-kind-demo" disabled>
@@ -1777,7 +1777,7 @@
               below shows why a new recommendation leaves an existing position on Hub A.
             </p>
           </header>
-          <div class="release-atlas interactive-example">
+          <div class="release-atlas interactive-example" data-lab="releases">
             <div class="registry-node">
               <span class="inscription">PERMANENT DISCOVERY ADDRESS</span>
               <h3>IvyVaultsRegistry</h3>
@@ -1897,6 +1897,7 @@
               from B, as well as the buyer's signature and both LPs' consent.</p>
             <div
               class="consent-example interactive-example"
+              data-lab="consent"
               aria-label="Illustrative unwind consent and refund"
             >
               <div>

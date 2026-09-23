@@ -23,7 +23,7 @@ test("every lab computes the documented worked examples inside its own scope", a
     assert.equal(await page.textContent("#fee-treasury"), "20 USDC");
     await page.fill("#fee-rate", "1000"); await page.dispatchEvent("#fee-rate", "input");
     assert.equal(await page.textContent("#fee-treasury"), "100 USDC");
-    // Fee boundaries: 0 bps and 10,000 bps (100%), matching atlas.js's un-grouped USDC amounts exactly.
+    // Fee boundaries: 0 bps and 10,000 bps (100%), matching the guide's un-grouped USDC amounts exactly.
     await page.fill("#fee-rate", "0"); await page.dispatchEvent("#fee-rate", "input");
     assert.equal(await page.textContent("#fee-rate-output"), "0 bps · 0%");
     assert.equal(await page.textContent("#fee-net"), "1000 USDC");
@@ -83,6 +83,53 @@ test("every lab fits a 276px-wide map card without horizontal overflow", async (
     for (const [lab, scrollWidth, clientWidth] of overflow)
       assert.ok(scrollWidth <= clientWidth + 1, `${lab}: scrollWidth ${scrollWidth} > clientWidth ${clientWidth}`);
     assert.equal(overflow.length, 7, "all seven labs were measured");
+    assert.deepEqual(errors, []);
+  } finally {
+    await close();
+    await server.close();
+  }
+});
+
+test("the guide's examples respond to input and the payoff chart follows a theme change from the shell", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "index.html");
+  try {
+    await page.waitForFunction(() => window.IvyShell?.state().guideLoaded);
+    const guide = page.frames().find((f) => f.parentFrame());
+    await guide.waitForFunction(() => document.querySelector("#rows tr"));
+    const set = (selector, value, event = "input") => guide.evaluate(([s, v, e]) => {
+      const el = document.querySelector(s);
+      if (el.type === "checkbox" || el.type === "radio") el.checked = v; else el.value = v;
+      el.dispatchEvent(new Event(e, { bubbles: true }));
+    }, [selector, value, event]);
+    const text = (selector) => guide.textContent(selector);
+
+    for (const id of ["fee-rate", "cash-kind-demo", "cash-price-demo", "consent-a", "unwind-refund"]) {
+      assert.equal(await guide.locator(`#${id}`).isDisabled(), false, `${id} is enabled`);
+    }
+    await set("#fee-rate", "500");
+    assert.equal(await text("#fee-net"), "950 USDC");
+    assert.equal(await text("#fee-treasury"), "50 USDC");
+    assert.equal(await guide.evaluate(() => document.querySelector("#fee-example-bar > span").style.width), "95%");
+
+    await set("#cash-price-demo", "3300");
+    assert.equal(await text("#cash-buyer-value"), "0.9091 WETH");
+    await set("#consent-b", false, "change");
+    assert.match(await text("#consent-status"), /60% of current shares approve · consent incomplete/);
+    await set('input[name="recommended-release"][value="B"]', true, "change");
+    assert.match(await text("#release-status"), /Hub B/);
+
+    await set("#kind", "put");
+    await set("#dep", "30000");
+    assert.equal(await text("#depLabel"), "Deposit (USDC)");
+    assert.equal(await text("#notional"), "10 WETH");
+
+    const stroke = () => guide.evaluate(() => document.querySelector("#calcChart polyline:last-of-type").getAttribute("stroke"));
+    const before = await stroke();
+    const theme = await guide.evaluate(() => document.documentElement.dataset.theme);
+    await page.click("#themeToggle");
+    await guide.waitForFunction((t) => document.documentElement.dataset.theme !== t, theme);
+    assert.notEqual(await stroke(), before, "chart redrawn in the new theme's ink");
     assert.deepEqual(errors, []);
   } finally {
     await close();

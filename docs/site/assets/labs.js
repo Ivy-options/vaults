@@ -1,11 +1,12 @@
-/* Interactive examples used inside map cards. Each function initialises one widget inside `scope`. */
+/* Interactive examples shared by the guide and the map cards. Each function initialises one widget inside `scope`;
+   mountAll(root) mounts every [data-lab] element under root once. */
 (() => {
   const $ = (s, scope) => scope.querySelector(s);
   const $$ = (s, scope) => [...scope.querySelectorAll(s)];
   const byId = (id, scope) => scope.querySelector(`#${CSS.escape(id)}`);
   const enable = (scope) => $$("input[disabled], select[disabled]", scope).forEach((el) => (el.disabled = false));
 
-  function fees(scope) {                     // from atlas.js fees()
+  function fees(scope) {
     enable(scope);
     const rate = byId("fee-rate", scope), out = byId("fee-rate-output", scope), net = byId("fee-net", scope), treasury = byId("fee-treasury", scope), bar = byId("fee-example-bar", scope);
     const sync = () => {
@@ -19,7 +20,7 @@
     sync();
   }
 
-  function payoff(scope) {                   // from docs.js: drawPayoff, params, render, redrawAll
+  function payoff(scope) {
     const $id = (id) => byId(id, scope);
     const fmt = function (x, d) {
       if (!isFinite(x)) return "–";
@@ -290,19 +291,17 @@
       if (o.K > 0) drawPayoff($id("calcChart"), o);
     }
 
-    function redrawAll() {
-      render();
-    }
-    window.addEventListener("resize", redrawAll);
+    window.addEventListener("resize", render);
     ["kind", "dep", "strike", "prem", "days", "entryPrice"].forEach(function (id) {
       $id(id).addEventListener("input", render);
     });
-    redrawAll();
-    const mapEl = document.querySelector("#map");
-    if (mapEl) mapEl.addEventListener("map:theme", redrawAll);
+    render();
+    // Every theme switch (page button, shell message, map button) lands on the root's data-theme, and the chart
+    // reads its ink from the root's custom properties, so redraw on that one attribute.
+    new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   }
 
-  function cashAmounts(scope) {              // from atlas.js cashAmounts()
+  function cashAmounts(scope) {
     enable(scope);
     const fmt = (n, d = 4) =>
       n.toLocaleString("en-US", { maximumFractionDigits: d });
@@ -340,7 +339,7 @@
     sync();
   }
 
-  function consent(scope) {                  // from atlas.js consent()
+  function consent(scope) {
     enable(scope);
     const sync = () => {
       const a = byId("consent-a", scope).checked,
@@ -374,7 +373,7 @@
     sync();
   }
 
-  function releases(scope) {                 // from atlas.js recommended-release radios
+  function releases(scope) {
     enable(scope);
     $$('input[name="recommended-release"]', scope).forEach((e) =>
       e.addEventListener("change", () => {
