@@ -174,25 +174,25 @@
               <dt>Executor</dt>
               <dd>An address allowed to submit exercise and payout-claim transactions for the buyer, such as an operator or bot. For physical exercise, the executor must supply and approve the tokens needed to pay the vault.</dd>
               <dt>Recipient</dt>
-              <dd>The address that receives the buyer's assets. For example, an operator can submit the transaction while the vault sends the assets directly to the buyer's treasury or multisig.</dd>
+              <dd>The address that receives the buyer's assets. For example, an operator can submit the transaction while the vault sends the assets directly to the buyer's treasury or multisig. If the recipient is a contract, the hub calls <code>onIvyPayout(vaultId, token, amount)</code> on it after each delivery, so the contract can swap or forward the proceeds in the same transaction.</dd>
             </dl>
             <p class="execution-control">Only the buyer can update the executor and recipient. An executor cannot change where assets are sent.</p>
-            <figure class="receipt-flow" aria-label="Direct receipt and a possible future swap route">
+            <figure class="receipt-flow" aria-label="Direct receipt and a contract recipient that converts the proceeds">
               <div class="receipt-lane receipt-direct" role="group" aria-label="Direct receipt: vault sends assets to the buyer">
                 <span class="receipt-label">Direct receipt</span>
                 <span class="receipt-node receipt-vault">Vault</span>
                 <span class="receipt-arrow receipt-direct-arrow" aria-hidden="true"></span>
                 <span class="receipt-node receipt-buyer">Buyer</span>
               </div>
-              <div class="receipt-lane" role="group" aria-label="Future integration: vault sends assets to a recipient swap adapter, which routes converted tokens to the buyer">
-                <span class="receipt-label">Future integration</span>
+              <div class="receipt-lane" role="group" aria-label="Contract recipient: vault sends assets to a recipient swap adapter and notifies it, and the adapter routes converted tokens to the buyer">
+                <span class="receipt-label">Contract recipient</span>
                 <span class="receipt-node receipt-vault">Vault</span>
                 <span class="receipt-arrow" aria-hidden="true"></span>
                 <span class="receipt-node receipt-adapter"><small>Recipient</small>Swap adapter</span>
                 <span class="receipt-arrow" aria-hidden="true"></span>
                 <span class="receipt-node receipt-buyer">Buyer<small>Converted tokens</small></span>
               </div>
-              <figcaption>A recipient adapter could swap and route tokens, for example through NEAR. This integration is not implemented; setting a recipient alone does not perform a swap.</figcaption>
+              <figcaption>A recipient adapter can swap and route tokens, for example through CoW Swap or NEAR, when its <code>onIvyPayout</code> hook runs. The vault itself never swaps: the tokens are already delivered when the hook runs, and a recipient without the hook, or one that reverts, still receives them. Only a hook that runs out of gas reverts the transaction, so gas estimates stay honest. Ivy ships no adapter.</figcaption>
             </figure>
           </div>
         </div>
@@ -978,7 +978,9 @@
                     <div>
                       <dt><code>recipient</code><small>address</small></dt>
                       <dd>The address that receives the buyer's exercise
-                        assets or reserved payout.</dd>
+                        assets or reserved payout. A contract recipient is
+                        notified through <code>onIvyPayout</code> after each
+                        delivery.</dd>
                     </div>
                   </dl>
                 </div>
@@ -1380,7 +1382,8 @@
                 <p>
                   Buyer or executor calls
                   <code>exercise(vaultId, amount)</code>. Intrinsic value is
-                  paid immediately.
+                  paid immediately, and a contract recipient is notified
+                  once the vault has finalized.
                 </p>
                 <strong>If the calculated payout is zero, exercise is rejected.</strong>
                 <p>
@@ -1395,7 +1398,8 @@
                 <p>
                   At or after expiry, anyone calls <code>expire(vaultId)</code>;
                   buyer or executor later uses
-                  <code>claimPayout(vaultId)</code>.
+                  <code>claimPayout(vaultId)</code>, which pays the recipient
+                  and notifies it if it is a contract.
                 </p>
                 <strong>Expiration can settle the vault even when the buyer is owed nothing.</strong>
                 <p>
