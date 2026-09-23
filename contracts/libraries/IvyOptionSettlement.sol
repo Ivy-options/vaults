@@ -125,8 +125,7 @@ library IvyOptionSettlement {
             emit IIvyVaultsHubEvents.PhysicalFallbackExercised(vaultId, amount, paid, got);
         }
         if (s.exercisedNotional == s.totalNotional) {
-            s.phase = Phase.Settled;
-            emit IIvyVaultsHubEvents.Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
+            _finalize(s, vaultId);
         }
         _notifyRecipient(vaultId, s.recipient, t.collateral, got);
     }
@@ -150,8 +149,7 @@ library IvyOptionSettlement {
             IIvyVault(s.vault).reserveBuyer(t.collateral, payout);
             s.exercisedNotional = s.totalNotional;
         }
-        s.phase = Phase.Settled;
-        emit IIvyVaultsHubEvents.Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
+        _finalize(s, vaultId);
     }
 
     /// @dev Hub checks the Settled phase. Pays the reserved cash payout and unwind refund to the recipient, then
@@ -243,6 +241,11 @@ library IvyOptionSettlement {
                 : uint256(s.expiry) + s.expiryPricePublicationWindow + s.exerciseWindow;
         }
         return uint256(s.expiry) + s.exerciseWindow;
+    }
+
+    function _finalize(VaultState storage s, uint256 vaultId) private {
+        s.phase = Phase.Settled;
+        emit IIvyVaultsHubEvents.Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
     }
 
     /// @dev Best-effort recipient hook. A missing method or an ordinary revert never blocks the payout; only a hook
