@@ -16,7 +16,7 @@ const sample: Bid = {
   expiry: 1_800_000_000n,
   validUntil: 1_700_000_000n,
   nonce: 42n,
-  auctionId: 1n, collateralAmount: 100n, pairHash: "0x" + "11".repeat(32),
+  auctionId: 1n, collateralAmount: 100n, termsHash: "0x" + "11".repeat(32),
   executor: "0x3333333333333333333333333333333333333333", recipient: "0x1111111111111111111111111111111111111111",
 };
 

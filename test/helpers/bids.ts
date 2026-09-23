@@ -14,7 +14,7 @@ export const BID_TYPES: Record<string, Array<{ name: string; type: string }>> = 
     { name: "nonce", type: "uint256" },
     { name: "auctionId", type: "uint256" },
     { name: "collateralAmount", type: "uint256" },
-    { name: "pairHash", type: "bytes32" },
+    { name: "termsHash", type: "bytes32" },
     { name: "executor", type: "address" },
     { name: "recipient", type: "address" },
   ],
@@ -33,13 +33,13 @@ export interface Bid {
   nonce: bigint;
   auctionId: bigint;
   collateralAmount: bigint;
-  pairHash: string;
+  termsHash: string;
   executor: string;
   recipient: string;
 }
 
 export async function signBid(signer: HardhatEthersSigner, hubAddress: string, bid: Bid): Promise<string> {
   const { chainId } = await signer.provider!.getNetwork();
-  const domain = { name: "IvyVaultsHub", version: "2", chainId, verifyingContract: hubAddress };
+  const domain = { name: "IvyVaultsHub", version: "3", chainId, verifyingContract: hubAddress };
   return signer.signTypedData(domain, BID_TYPES, bid);
 }

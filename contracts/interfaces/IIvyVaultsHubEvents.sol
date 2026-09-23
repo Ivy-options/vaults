@@ -44,7 +44,6 @@ interface IIvyVaultsHubEvents {
         uint256 price,
         uint64 validUntil
     );
-    event PairTermsTightened(uint256 indexed vaultId, address indexed quoteToken);
     event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 amount);
     event PayoutNotified(
         uint256 indexed vaultId, address indexed recipient, address token, uint256 amount, bool acknowledged
@@ -65,6 +64,5 @@ interface IIvyVaultsHubEvents {
         address collateral
     );
     event VaultOwnershipTransferred(uint256 indexed vaultId, address indexed previousOwner, address indexed newOwner);
-    event VaultTermsTightened(uint256 indexed vaultId);
     event Withdrawn(uint256 indexed vaultId, address indexed holder, uint256 shares);
 }

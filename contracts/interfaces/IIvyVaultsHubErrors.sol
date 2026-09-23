@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-/// @notice Errors propagated by linked libraries. Keep them in the hub ABI for clients and revert decoding.
+/// @notice Errors propagated by linked libraries and bid validators. Keep them in the hub ABI for clients and revert decoding.
 interface IIvyVaultsHubErrors {
     error CashSettlementDisabled();
     error CashSettlementNeedsMaxPriceAge();
@@ -15,15 +15,14 @@ interface IIvyVaultsHubErrors {
     error ExpiryPricePublicationClosed();
     error FeedNeedsMaxPriceAge();
     error InsufficientShares();
+    error InvalidPremiumFloor();
     error InvalidPrice();
     error InvalidStrikeLimit();
-    error LoosensTerms();
+    error InvalidValidator();
     error NoPairs();
     error NotExecutor();
     error NothingToClaim();
     error NothingToExercise();
-    error PairDisabled(address quoteToken);
-    error PairMustBeEnabled();
     error PairUnknown(address quoteToken);
     error PartialExerciseNotAllowed();
     error PayoutHookOutOfGas();
@@ -34,6 +33,7 @@ interface IIvyVaultsHubErrors {
     error QuoteIsUnderlying();
     error ReportFinalized();
     error ReportUnavailable();
+    error RuleMissingPair(address quoteToken);
     error SettlementNotAllowed();
     error ShortReceived(uint256 expected, uint256 received);
     error StalePrice();
@@ -41,4 +41,5 @@ interface IIvyVaultsHubErrors {
     error StrikeBelowLimit();
     error StrikeOutsideSpotBand();
     error StyleNotAllowed();
+    error UnknownRuleKind(bytes4 kind);
 }

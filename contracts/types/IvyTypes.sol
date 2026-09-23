@@ -56,13 +56,10 @@ struct VaultTerms {
     bool allowPartialExercise; // fixed at creation; false requires exercising all remaining notional
     bool publicDeposits; // false = only the vault owner may deposit
     ExercisePolicy allowedExercise;
-    SettlementPolicy allowedSettlement; // Cash requires maxSettlementPriceAge > 0
+    SettlementPolicy allowedSettlement; // not Physical requires maxSettlementPriceAge > 0
     uint64 expiry; // fixed absolute Unix timestamp, future at creation
-    uint64 auctionStartsAt; // 0 = manual only; else anyone may open the auction from this time
+    uint64 auctionStartsAt; // 0 = manual only; else anyone may open the auction from this time. Mutable; outside termsHash.
     uint256 minCollateral; // shares required to open the auction
-    address priceFeed; // 0 = no activation spot checks
-    uint16 maxInTheMoneyBps; // calls: strike >= spot*(1-bps); puts: strike <= spot*(1+bps)
-    uint32 maxPriceAge; // seconds; > 0 when priceFeed != 0
     uint32 maxSettlementPriceAge; // immutable exercise observation age limit
 }
 
@@ -78,24 +75,30 @@ struct SettlementPrices {
     uint256 expiry;
 }
 
-struct PairTerms {
-    address premiumToken; // token the market maker pays premium in
-    uint256 strikeLimit; // calls: min strike (0 = none). puts: max strike (max uint = none, must be > 0)
-    uint256 minPremium; // premiumToken units per 1 whole underlying
-    bool enabled;
-}
-
-struct PairInput {
+/// @notice Which tokens a pair moves. Acceptance conditions live in bid rules.
+struct PairConfig {
     address quoteToken;
-    PairTerms terms;
+    address premiumToken; // token the market maker pays premium in
 }
 
-struct TightenableTerms {
-    ExercisePolicy allowedExercise;
-    SettlementPolicy allowedSettlement;
-    uint256 minCollateral;
-    uint16 maxInTheMoneyBps;
-    uint32 maxPriceAge;
+/// @notice One creator-supplied acceptance condition. Frozen at creation and covered by termsHash.
+struct BidRule {
+    address validator;
+    bytes4 kind; // meaningful only to the validator; lets one contract serve several rule types
+    bytes data;
+}
+
+/// @notice What a validator learns about the vault beyond the bid itself. Built once per activation.
+struct BidContext {
+    uint256 vaultId;
+    bool isCall;
+    address underlying;
+    address collateral;
+    address premiumToken; // resolved by the hub from the bid's quote token
+    uint256 underlyingUnit; // 10 ** underlying decimals
+    uint256 collateralAmount; // share supply at activation; equals bid.collateralAmount
+    uint256 totalNotional; // underlying units, computed by the hub from supply and strike
+    uint64 auctionOpenedAt;
 }
 
 struct Bid {
@@ -111,7 +114,7 @@ struct Bid {
     uint256 nonce; // free-form, consumed on activation
     uint256 auctionId;
     uint256 collateralAmount;
-    bytes32 pairHash;
+    bytes32 termsHash; // creator inputs: terms, pairs, rules; excludes auctionStartsAt
     address executor;
     address recipient;
 }
@@ -181,10 +184,11 @@ error ExpiryPricePublicationClosed();
 error FeedNeedsMaxPriceAge();
 error InsufficientAvailable();
 error InsufficientShares();
+error InvalidPremiumFloor();
 error InvalidPrice();
 error InvalidSettlementWindow();
 error InvalidStrikeLimit();
-error LoosensTerms();
+error InvalidValidator();
 error NonceUsed();
 error NoPairs();
 error NotExecutor();
@@ -196,8 +200,6 @@ error NotPremiumModule();
 error NotShares();
 error NotVault();
 error NotVaultOwner();
-error PairDisabled(address quoteToken);
-error PairMustBeEnabled();
 error PairUnknown(address quoteToken);
 error PartialExerciseNotAllowed();
 error PayoutHookOutOfGas();
@@ -208,6 +210,7 @@ error PutRequiresSinglePair();
 error QuoteIsUnderlying();
 error ReportFinalized();
 error ReportUnavailable();
+error RuleMissingPair(address quoteToken);
 error SettlementNotAllowed();
 error ShortReceived(uint256 expected, uint256 received);
 error StalePrice();
@@ -215,6 +218,7 @@ error StrikeAboveLimit();
 error StrikeBelowLimit();
 error StrikeOutsideSpotBand();
 error StyleNotAllowed();
+error UnknownRuleKind(bytes4 kind);
 error UnknownVault();
 error WrongPhase(Phase expected, Phase actual);
 error ZeroAddress();
