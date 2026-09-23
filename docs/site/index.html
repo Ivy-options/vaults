@@ -623,44 +623,43 @@
     </section>
 
     <section data-kind="action" id="agreed-unwind" data-actor="all"><h4>Agree to end early</h4>
-    <p>An agreement offers another way to close the Live position. It needs the <strong class="role-buyer">buyer</strong> and <strong class="role-lp">every current shareholder</strong>.</p>
+    <p>A Live option normally ends by exercise or expiration. An <strong class="key-term">unwind</strong> ends it sooner: the <strong class="role-buyer">buyer</strong> gives the option up, and <strong class="role-lp">current LPs</strong> pay the buyer an agreed <strong class="key-term">refund</strong> in premium tokens.</p>
+    <p>It only happens if the buyer and <strong class="key-term">every current shareholder</strong> agree. Four steps: the buyer signs a proposal, LPs approve it, LPs fund the refund, anyone executes.</p>
     <p class="reference"><a href="index.html#early-exit" data-guide>Agreement, funding and recovery ↗</a></p>
     <p class="map-next"><a href="#settled">After the agreement executes →</a></p>
-    <section data-kind="tile" id="unwind-signed-snapshot"><h5>What the buyer signs</h5>
-    <p>The agreement binds:</p>
-    <ul class="reading-list" role="list">
-      <li><strong class="key-term">Identity:</strong> vault and proposal nonce.</li>
-      <li><strong class="key-term">Position:</strong> exercised notional and current share supply.</li>
-      <li><strong class="key-term">Agreement:</strong> refund and execution deadline.</li>
-    </ul>
-    <p>The <strong class="role-owner">owner</strong> or <strong class="role-buyer">buyer</strong> submits it. A replacement needs a <strong class="key-term">new buyer signature</strong>.</p>
+    <section data-kind="tile" id="unwind-signed-snapshot"><h5>Step 1: the buyer signs a proposal</h5>
+    <p>The deal starts as a proposal the <strong class="role-buyer">buyer</strong> signs. It names the <strong class="key-term">refund</strong> the buyer expects and a <strong class="key-term">deadline</strong> to execute by.</p>
+    <p>The signature also locks in the position as it is now: the vault, a proposal nonce, how much has been exercised and how many shares exist. If any of that changes, the signature no longer matches.</p>
+    <p>The <strong class="role-owner">owner</strong> or buyer submits it. Changing anything means a <strong class="key-term">new buyer signature</strong>.</p>
     </section>
-    <section data-kind="tile" id="unwind-consent-funding"><h5>Consent and funding are separate</h5>
-    <p><strong class="role-lp">Every current shareholder</strong> must both approve and separately fund its required refund contribution <strong class="key-term">in premium tokens</strong>.</p>
+    <section data-kind="tile" id="unwind-consent-funding"><h5>Step 2: every LP approves and funds its share</h5>
+    <p>The refund comes from the LPs, not from the vault. So <strong class="role-lp">every current shareholder</strong> does two things: approve the proposal, and deposit its share of the refund <strong class="key-term">in premium tokens</strong>.</p>
     <p>For a <strong class="key-term">100 USDC refund</strong> with 60% / 40% ownership:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term">60% holder: 60 USDC.</strong></li>
       <li><strong class="key-term">40% holder: 40 USDC.</strong></li>
     </ul>
-    <p>Earned premium and platform fees <strong class="key-term">are not clawed back</strong>.</p>
+    <p>Premium already earned and platform fees <strong class="key-term">stay where they are</strong>.</p>
     </section>
-    <section data-kind="tile" id="unwind-validity"><h5>What can invalidate agreement?</h5>
+    <section data-kind="tile" id="unwind-execution-deadline"><h5>Step 3: anyone executes before the deadline</h5>
+    <p>Once the buyer has signed, every LP has approved and the refund is fully funded, the agreement is ready. <strong class="key-term">Anyone</strong> may execute it while the vault is still <strong class="key-term">Live</strong> and the deadline has not passed.</p>
+    <p>Execution <strong class="key-term">settles the vault</strong>: the option ends, the refund is reserved for the buyer to claim, and LPs claim the remaining collateral as after any settlement.</p>
+    </section>
+    <section data-kind="tile" id="unwind-validity"><h5>What breaks an agreement before it executes</h5>
+    <p>Consent and funding are checked <strong class="key-term">at execution</strong>, not when they were given. Between proposal and execution:</p>
     <ul class="reading-list" role="list">
-      <li><strong class="key-term">Share transfers</strong> invalidate the sender’s and recipient’s approvals.</li>
-      <li><strong class="key-term">Further exercise</strong> changes the signed snapshot.</li>
+      <li><strong class="key-term">A share transfer</strong> cancels both the sender’s and the recipient’s approvals.</li>
+      <li><strong class="key-term">Further exercise</strong> changes the signed position, so the signature no longer matches.</li>
+      <li><strong class="key-term">The deadline passes.</strong></li>
     </ul>
-    <p>Consent and funding must still match <strong class="key-term">at execution</strong>.</p>
-    <p>Proposing does not pause exercise or expiration.</p>
+    <p>Proposing does not pause anything: the buyer can still exercise, and expiration can still happen.</p>
     </section>
-    <section data-kind="tile" id="unwind-execution-deadline"><h5>Who executes, and by when?</h5>
-    <p><strong class="key-term">Anyone</strong> may execute while the vault is <strong class="key-term">Live</strong>, all requirements hold and the proposal deadline has not passed.</p>
-    <p>Execution <strong class="key-term">settles the vault</strong> and reserves the buyer’s refund for later claim.</p>
-    <section data-kind="tile" id="unwind-recover-contribution"><h5>Recover an unused contribution</h5>
+    <section data-kind="tile" id="unwind-recover-contribution"><h5>Get an unused contribution back</h5>
+    <p>Funding is a deposit, not a payment. Until execution it is still the <strong class="role-lp">LP’s</strong> money.</p>
     <ul class="reading-list" role="list">
-      <li><strong class="key-term">Before execution:</strong> an <strong class="role-lp">LP</strong> may recover its contribution, including after withdrawing approval, proposal expiry or replacement.</li>
-      <li><strong class="key-term">After execution:</strong> the agreed refund belongs to the buyer reserve. Only excess contributions can be recovered.</li>
+      <li><strong class="key-term">Before execution:</strong> withdraw it at any time. Withdrawing also withdraws your approval. This includes after the deadline passes or the proposal is replaced.</li>
+      <li><strong class="key-term">After execution:</strong> the agreed refund belongs to the buyer. Only anything paid above your required share comes back.</li>
     </ul>
-    </section>
     </section>
     </section>
     </section>
