@@ -276,6 +276,23 @@ test("retired runbook bookmarks open the matching Guide section without nesting 
   } finally { await close(); await server.close(); }
 });
 
+test("a Guide URL for any sibling reference page reloads onto that page, never onto another origin or a nested shell", async () => {
+  const server = await startServer();
+  const { page, errors, close } = await openPage(server.url + "index.html?doc=frontend-integration.html#stable-identifiers");
+  try {
+    const guideFrame = () => page.frames().find(f => f.parentFrame());
+    await page.waitForFunction(() => window.IvyShell?.state().guideLoaded);
+    assert.ok(guideFrame().url().endsWith("/frontend-integration.html#stable-identifiers"));
+    assert.equal(new URL(page.url()).searchParams.get("doc"), "frontend-integration.html");
+    for (const doc of ["index.html", "https://example.com/x.html", "../x.html"]) {
+      await page.goto(server.url + "index.html?doc=" + encodeURIComponent(doc));
+      await page.waitForFunction(() => window.IvyShell?.state().guideLoaded);
+      assert.ok(new URL(guideFrame().url()).pathname.endsWith("/guide.html"), `${doc} falls back to the guide`);
+    }
+    assert.deepEqual(errors, []);
+  } finally { await close(); await server.close(); }
+});
+
 test("while Guide view is active, the map's document-level shortcuts (Escape, +, -, 0) do nothing", async () => {
   const server = await startServer();
   const { page, errors, close } = await openPage(server.url + "index.html?view=map");

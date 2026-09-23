@@ -108,6 +108,18 @@ describe("platform fees and transferable unpaid premium", function () {
     expect(await v.vault.platformFeeRemaining()).eq(20n*U);
     expect(await c.premiums.claimable(v.vaultId,c.alice.address)).eq(980n*U);
   });
+  it("preflight reports a zero-strike put as the hub's EmptyNotional, not a local division error", async function () {
+    const c = await networkHelpers.loadFixture(fixture);
+    const v = await openVault(c, { isCall: false });
+    const bid = await makeBid(c, v.vaultId, { strike: 0n });
+    const signature = await signBid(c.marketMaker, c.hubAddress, bid);
+    const error: any = await prepareOperation(c.admin.provider, await loadArtifacts(), "inspect-bid", {
+      sender: c.bidMaster.address, hub: c.hubAddress, vaultId: v.vaultId, bid, signature,
+      minTradeUsdE6: 10000n * U, collateralPriceUsdE6: U,
+    }).catch(e => e);
+    expect(error).to.be.instanceOf(Error);
+    expect(error.data).eq(c.hub.interface.getError("EmptyNotional")!.selector);
+  });
   it("preflights and submits the fixed vault fee despite later global rate changes", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     await c.hub.setPlatformFeeBps(200);

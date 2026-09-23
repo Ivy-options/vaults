@@ -27,9 +27,10 @@
   const initialMode = params.get("view") === "map" ? "map" : "guide";
   let mapHash = initialMode === "map" ? location.hash : "";
   let guideLocation = new URL("guide.html", location.href);
-  const referencePages = ["operations.html", "operator-examples.html", "settlement-pricing.html", "registry-specification.html", "releases.html", "project-setup.html", "license.html"];
+  // Any sibling page syncUrl can write: a bare file name, never a path, another origin or the shell itself.
+  const isReferencePage = (doc) => /^[a-z0-9-]+\.html$/.test(doc ?? "") && doc !== "index.html";
   if (initialMode === "guide") {
-    if (referencePages.includes(params.get("doc"))) guideLocation = new URL(params.get("doc"), location.href);
+    if (isReferencePage(params.get("doc"))) guideLocation = new URL(params.get("doc"), location.href);
     guideLocation.hash = location.hash;
   }
   const guideUrl = (href) => {

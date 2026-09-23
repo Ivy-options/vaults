@@ -19,6 +19,8 @@ export const encodePremiumFloor = (priceFeed,maxPriceAge,minPremiumBps) => coder
 export async function loadArtifacts() {
   return Object.fromEntries(await Promise.all(CONTRACTS.map(async name=>[name,JSON.parse(await readFile(new URL(artifactPath(name),import.meta.url),'utf8'))])));
 }
+/** Mirrors IvyMath.notionalOf: a put covers nothing at a zero strike, so the hub's own EmptyNotional check decides. */
+const notionalOf = (isCall,amount,unit,strike) => isCall?amount:strike===0n?0n:amount*unit/strike;
 const required = (o,key) => {if(o[key]===undefined) throw new Error(`Missing ${key}`); return o[key];};
 const fields = (type,value) => Object.fromEntries(type.map(f=>[f.name,required(value,f.name)]));
 const fallbackTerms = (expiry, publicationWindow, exerciseWindow) => ({
@@ -145,7 +147,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const token=new Contract(t.collateral,['function decimals() view returns(uint8)'],provider);
     const valueUsdE6=amount*price/(10n**BigInt(await token.decimals()));
     if(valueUsdE6<minimum) throw new Error('Below launch USD minimum at activation');
-    const notional=s.isCall?amount:amount*s.underlyingUnit/BigInt(r.bid.strike);
+    const notional=notionalOf(s.isCall,amount,s.underlyingUnit,BigInt(r.bid.strike));
     const totalPremium=BigInt(r.bid.premium)*notional/s.underlyingUnit;
     const platformFee=totalPremium*platformFeeBps/10000n;
     detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,platformFee,lpPremium:totalPremium-platformFee,
