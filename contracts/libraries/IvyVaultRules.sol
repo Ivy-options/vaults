@@ -1,104 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-import {IIvyPriceFeed} from "../interfaces/IIvyPriceFeed.sol";
+import {IIvyBidValidator} from "../interfaces/IIvyBidValidator.sol";
 import "../types/IvyTypes.sol";
 import {IvyMath} from "./IvyMath.sol";
 
-/// @notice Linked vault validation and tightening. Hub entrypoints enforce owner and phase authority.
+/// @notice Linked vault validation: creation inputs, the mandatory bid checks, and the creator's bid rules.
 /// @dev Storage references address the calling hub under DELEGATECALL. No configurable target or independent state.
+///      Validators are reached through STATICCALL (view interface calls) and their reverts bubble unchanged.
 library IvyVaultRules {
-    function tightenVaultTerms(VaultTerms storage t, TightenableTerms calldata n) external {
-        if (!(t.allowedExercise == n.allowedExercise || t.allowedExercise == ExercisePolicy.Either)) {
-            revert LoosensTerms();
-        }
-        if (!(t.allowedSettlement == n.allowedSettlement || t.allowedSettlement == SettlementPolicy.Either)) {
-            revert LoosensTerms();
-        }
-        if (n.minCollateral < t.minCollateral) {
-            revert LoosensTerms();
-        }
-        if (t.priceFeed != address(0)) {
-            if (n.maxInTheMoneyBps > t.maxInTheMoneyBps) {
-                revert LoosensTerms();
-            }
-            if (n.maxPriceAge == 0) {
-                revert FeedNeedsMaxPriceAge();
-            }
-            if (n.maxPriceAge > t.maxPriceAge) {
-                revert LoosensTerms();
-            }
-            t.maxInTheMoneyBps = n.maxInTheMoneyBps;
-            t.maxPriceAge = n.maxPriceAge;
-        }
-        t.allowedExercise = n.allowedExercise;
-        t.allowedSettlement = n.allowedSettlement;
-        t.minCollateral = n.minCollateral;
-    }
-
-    function tightenPairTerms(PairTerms storage p, bool isCall, address quoteToken, PairTerms calldata n) external {
-        if (p.premiumToken == address(0)) {
-            revert PairUnknown(quoteToken);
-        }
-        if (n.premiumToken != p.premiumToken) {
-            revert LoosensTerms();
-        }
-        if (isCall ? n.strikeLimit < p.strikeLimit : n.strikeLimit > p.strikeLimit) {
-            revert LoosensTerms();
-        }
-        if (!isCall && n.strikeLimit == 0) {
-            revert InvalidStrikeLimit();
-        }
-        if (n.minPremium < p.minPremium) {
-            revert LoosensTerms();
-        }
-        if (n.enabled && !p.enabled) {
-            revert LoosensTerms();
-        }
-        p.strikeLimit = n.strikeLimit;
-        p.minPremium = n.minPremium;
-        p.enabled = n.enabled;
-    }
-
-    /// @dev Bid signature and caller authorization are enforced by the hub.
-    function validateBid(
-        VaultState storage s,
-        VaultTerms storage t,
-        PairTerms storage p,
-        Bid calldata bid,
-        uint256 supply
-    ) external view {
-        if (p.premiumToken == address(0)) {
-            revert PairUnknown(bid.quoteToken);
-        }
-        if (!p.enabled) {
-            revert PairDisabled(bid.quoteToken);
-        }
-        if (t.allowedExercise != ExercisePolicy.Either && uint8(t.allowedExercise) != uint8(bid.style)) {
-            revert StyleNotAllowed();
-        }
-        if (t.allowedSettlement != SettlementPolicy.Either && uint8(t.allowedSettlement) != uint8(bid.settlement)) {
-            revert SettlementNotAllowed();
-        }
-        if (bid.expiry <= block.timestamp) {
-            revert ExpiryInPast();
-        }
-        if (
-            bid.expiry != t.expiry || bid.auctionId != s.auctionId || bid.collateralAmount != supply
-                || bid.pairHash != keccak256(abi.encode(p))
-        ) {
-            revert CommitmentMismatch();
-        }
-        if (bid.recipient == address(0)) {
-            revert ZeroAddress();
-        }
-        _checkStrike(s.isCall, t, p, bid.quoteToken, bid.strike);
-        if (bid.premium < p.minPremium) {
-            revert PremiumTooLow();
-        }
-    }
-
-    function validateTerms(VaultTerms calldata t, PairInput[] calldata pairs) external view {
+    function validateTerms(VaultTerms calldata t, PairConfig[] calldata pairs) external view {
         if (t.underlying == address(0) || t.collateral == address(0)) {
             revert ZeroAddress();
         }
@@ -108,17 +19,6 @@ library IvyVaultRules {
         bool isCall = t.collateral == t.underlying;
         if (t.allowedSettlement != SettlementPolicy.Physical && t.maxSettlementPriceAge == 0) {
             revert CashSettlementNeedsMaxPriceAge();
-        }
-        if (t.priceFeed != address(0)) {
-            if (t.priceFeed.code.length == 0) {
-                revert BindingMismatch();
-            }
-            if (t.maxPriceAge == 0) {
-                revert FeedNeedsMaxPriceAge();
-            }
-            if (isCall && t.maxInTheMoneyBps > 10_000) {
-                revert DeviationTooLarge();
-            }
         }
         if (pairs.length == 0) {
             revert NoPairs();
@@ -132,18 +32,12 @@ library IvyVaultRules {
             }
         }
         for (uint256 i = 0; i < pairs.length; ++i) {
-            PairInput calldata p = pairs[i];
-            if (p.quoteToken == address(0) || p.terms.premiumToken == address(0)) {
+            PairConfig calldata p = pairs[i];
+            if (p.quoteToken == address(0) || p.premiumToken == address(0)) {
                 revert ZeroAddress();
             }
             if (isCall && p.quoteToken == t.underlying) {
                 revert QuoteIsUnderlying();
-            }
-            if (!p.terms.enabled) {
-                revert PairMustBeEnabled();
-            }
-            if (!isCall && p.terms.strikeLimit == 0) {
-                revert InvalidStrikeLimit();
             }
             for (uint256 j = 0; j < i; ++j) {
                 if (pairs[j].quoteToken == p.quoteToken) {
@@ -153,36 +47,110 @@ library IvyVaultRules {
         }
     }
 
-    /// @dev Spec §5.1: the configured limit and, when a feed is set, the oracle band. Both must pass.
-    function _checkStrike(bool isCall, VaultTerms storage t, PairTerms storage p, address quoteToken, uint256 strike)
-        private
+    /// @dev Every rule's validator must have code and accept its own data before any deposit can arrive.
+    function validateRules(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules)
+        external
         view
     {
-        if (isCall) {
-            if (strike < p.strikeLimit) {
-                revert StrikeBelowLimit();
+        for (uint256 i = 0; i < rules.length; ++i) {
+            BidRule calldata r = rules[i];
+            if (r.validator == address(0) || r.validator.code.length == 0) {
+                revert InvalidValidator();
             }
-        } else {
-            if (strike > p.strikeLimit) {
-                revert StrikeAboveLimit();
-            }
-        }
-        if (t.priceFeed != address(0)) {
-            uint256 bound = IvyMath.spotBound(isCall, _readSpot(t, quoteToken), t.maxInTheMoneyBps);
-            if (isCall ? strike < bound : strike > bound) {
-                revert StrikeOutsideSpotBand();
+            bytes4 ok = IIvyBidValidator(r.validator).validateConfig(r.kind, t, pairs, r.data);
+            if (ok != IIvyBidValidator.validateConfig.selector) {
+                revert InvalidValidator();
             }
         }
     }
 
-    function _readSpot(VaultTerms storage t, address quoteToken) private view returns (uint256) {
-        (uint256 price, uint256 updatedAt) = IIvyPriceFeed(t.priceFeed).spot(t.underlying, quoteToken);
-        if (price == 0 || updatedAt > block.timestamp) {
-            revert InvalidPrice();
+    /// @dev Mandatory checks. Bid signature and caller authorization are enforced by the hub before this runs.
+    ///      A validator that approves everything cannot bypass anything here.
+    function checkBid(
+        VaultState storage s,
+        VaultTerms storage t,
+        address premiumToken,
+        bytes32 expectedTermsHash,
+        Bid calldata bid,
+        uint256 supply
+    ) external view returns (uint256 totalNotional) {
+        if (premiumToken == address(0)) {
+            revert PairUnknown(bid.quoteToken);
         }
-        if (block.timestamp - updatedAt > t.maxPriceAge) {
-            revert StalePrice();
+        if (t.allowedExercise != ExercisePolicy.Either && uint8(t.allowedExercise) != uint8(bid.style)) {
+            revert StyleNotAllowed();
         }
-        return price;
+        if (t.allowedSettlement != SettlementPolicy.Either && uint8(t.allowedSettlement) != uint8(bid.settlement)) {
+            revert SettlementNotAllowed();
+        }
+        if (bid.expiry <= block.timestamp) {
+            revert ExpiryInPast();
+        }
+        if (
+            bid.expiry != t.expiry || bid.auctionId != s.auctionId || bid.collateralAmount != supply
+                || bid.termsHash != expectedTermsHash
+        ) {
+            revert CommitmentMismatch();
+        }
+        if (bid.recipient == address(0)) {
+            revert ZeroAddress();
+        }
+        totalNotional = IvyMath.notionalOf(s.isCall, supply, s.underlyingUnit, bid.strike);
+        if (totalNotional == 0) {
+            revert EmptyNotional();
+        }
+    }
+
+    /// @dev Runs every creator rule in order. The first rejection ends activation.
+    function runRules(
+        VaultState storage s,
+        VaultTerms storage t,
+        BidRule[] storage rules,
+        address premiumToken,
+        Bid calldata bid,
+        uint256 supply,
+        uint256 totalNotional
+    ) external view {
+        BidContext memory context = BidContext({
+            vaultId: bid.vaultId,
+            isCall: s.isCall,
+            underlying: t.underlying,
+            collateral: t.collateral,
+            premiumToken: premiumToken,
+            underlyingUnit: s.underlyingUnit,
+            collateralAmount: supply,
+            totalNotional: totalNotional,
+            auctionOpenedAt: s.auctionOpenedAt
+        });
+        for (uint256 i = 0; i < rules.length; ++i) {
+            BidRule storage r = rules[i];
+            bytes4 ok = IIvyBidValidator(r.validator).validateBid(r.kind, context, bid, r.data);
+            if (ok != IIvyBidValidator.validateBid.selector) {
+                revert InvalidValidator();
+            }
+        }
+    }
+
+    /// @dev Commitment to the creator-supplied inputs of createVault. auctionStartsAt is operational and excluded.
+    function termsHash(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules)
+        external
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(
+                t.underlying,
+                t.collateral,
+                t.allowPartialExercise,
+                t.publicDeposits,
+                t.allowedExercise,
+                t.allowedSettlement,
+                t.expiry,
+                t.minCollateral,
+                t.maxSettlementPriceAge,
+                keccak256(abi.encode(pairs)),
+                keccak256(abi.encode(rules))
+            )
+        );
     }
 }
