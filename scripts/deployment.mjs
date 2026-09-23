@@ -108,9 +108,8 @@ export async function verifyBindings(provider, plan, { requireInitialAdmin = tru
   if(requireInitialAdmin && !(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(),plan.admin))) throw new Error('Admin role missing');
 }
 
-/** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
-export async function resumeDeployment(signer, plan, journal = /** @type {{planHash?: string, startBlock?: number, steps?: Record<string, any>, complete?: boolean}} */ ({}), persist = async (_journal) => {}) {
-  if (plan.version !== 7) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
+/** Checks chain, deployer and plan identity, then binds the journal to this plan. Shared by every executor. */
+export async function openJournal(signer, plan, journal) {
   const provider = signer.provider;
   if(String((await provider.getNetwork()).chainId) !== plan.chainId || (await provider.getBlock(0)).hash !== plan.genesisHash) throw new Error('Wrong chain');
   if((await signer.getAddress()).toLowerCase() !== plan.deployer.toLowerCase()) throw new Error('Wrong deployer');
@@ -119,6 +118,13 @@ export async function resumeDeployment(signer, plan, journal = /** @type {{planH
   journal.planHash = digest;
   journal.startBlock ??= await provider.getBlockNumber();
   journal.steps ??= {};
+}
+
+/** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
+export async function resumeDeployment(signer, plan, journal = /** @type {{planHash?: string, startBlock?: number, steps?: Record<string, any>, complete?: boolean}} */ ({}), persist = async (_journal) => {}) {
+  if (plan.version !== 7) throw new Error('Unsupported deployment plan version; prepare a new plan for this build');
+  const provider = signer.provider;
+  await openJournal(signer, plan, journal);
   await persist(journal);
   for(const step of plan.steps) {
     const entry = journal.steps[step.name] ??= {};

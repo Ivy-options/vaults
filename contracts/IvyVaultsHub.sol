@@ -144,7 +144,7 @@ contract IvyVaultsHub is
     // Administration
 
     function setPlatformFeeBps(uint16 rate) external onlyRole(PLATFORM_FEE_MANAGER_ROLE) {
-        if (rate > 10_000) {
+        if (rate > IvyMath.BPS) {
             revert InvalidPlatformFee();
         }
         emit PlatformFeeBpsUpdated(platformFeeBps, rate);
@@ -272,7 +272,7 @@ contract IvyVaultsHub is
 
     /// @inheritdoc IIvyVaultsHub
     function onVaultDeposit(uint256 vaultId, address depositor, uint256 amount) external nonReentrant {
-        if (vaultId == 0 || vaultId > vaultCount || msg.sender != _state[vaultId].vault) {
+        if (msg.sender != _state[vaultId].vault) {
             revert NotVault();
         }
         _checkDeposit(vaultId, depositor, amount);
@@ -393,8 +393,8 @@ contract IvyVaultsHub is
         VaultTerms storage t = _terms[vaultId];
         address premiumToken = _premiumTokens[vaultId][bid.quoteToken];
         uint256 supply = shareToken.totalSupply(vaultId);
-        uint256 totalNotional = IvyVaultRules.checkBid(s, t, premiumToken, _termsHash[vaultId], bid, supply);
-        IvyVaultRules.runRules(s, t, _rules[vaultId], premiumToken, bid, supply, totalNotional);
+        uint256 totalNotional =
+            IvyVaultRules.checkBid(s, t, _rules[vaultId], premiumToken, _termsHash[vaultId], bid, supply);
         uint256 totalPremium = IvyMath.premiumTotal(bid.premium, totalNotional, s.underlyingUnit);
 
         s.marketMaker = bid.marketMaker;
@@ -406,13 +406,12 @@ contract IvyVaultsHub is
         s.premium = bid.premium;
         s.style = bid.style;
         s.settlement = bid.settlement;
-        s.expiry = bid.expiry;
         s.totalNotional = totalNotional;
         s.phase = Phase.Live;
 
         uint16 feeRate = vaultPlatformFeeBps[vaultId];
         address treasury = platformTreasury;
-        uint256 fee = Math.mulDiv(totalPremium, feeRate, 10_000);
+        uint256 fee = Math.mulDiv(totalPremium, feeRate, IvyMath.BPS);
         platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);
         premiums.activate(vaultId, s.vault, totalPremium - fee, supply);
         IIvyVault(s.vault).collectPremium(premiumToken, bid.marketMaker, totalPremium, fee, treasury);

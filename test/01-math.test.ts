@@ -23,6 +23,12 @@ describe("IvyMath", function () {
     expect(await m.notionalOf(false, 30_001n * USDC, UNIT, STRIKE)).to.equal(10_000_333_333_333_333_333n);
   });
 
+  it("put notional is zero at a zero strike, while call notional ignores the strike", async function () {
+    const m = await harness();
+    expect(await m.notionalOf(false, 30_000n * USDC, UNIT, 0n)).to.equal(0n);
+    expect(await m.notionalOf(true, 10n * UNIT, UNIT, 0n)).to.equal(10n * UNIT);
+  });
+
   it("premium total floors", async function () {
     const m = await harness();
     expect(await m.premiumTotal(100n * USDC, 10n * UNIT, UNIT)).to.equal(1000n * USDC);

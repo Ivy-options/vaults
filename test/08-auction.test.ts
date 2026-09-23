@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import {
-  AUCTION_TIMEOUT, ExercisePolicy, Phase, SettlementPolicy, WETH_UNIT,
+  AUCTION_TIMEOUT, Phase, WETH_UNIT,
   callPairs, callTerms, createVaultAs, deployIvy, fund,
 } from "./helpers/setup.js";
 
@@ -19,7 +19,7 @@ describe("auction", function () {
 
   it("owner opens the auction and the vault freezes", async function () {
     const ctx = await networkHelpers.loadFixture(fixture);
-    const { hub, alice, vault, vaultId, vaultAddress, weth, usdcAddress } = ctx;
+    const { hub, alice, vault, vaultId, vaultAddress, weth } = ctx;
     await expect(hub.connect(alice).openAuction(vaultId)).to.emit(hub, "AuctionOpened").withArgs(vaultId, 6n * WETH_UNIT);
     const s = await hub.stateOf(vaultId);
     expect(s.phase).to.equal(Phase.Auction);

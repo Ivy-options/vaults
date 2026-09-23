@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { AbiCoder, Contract, Interface, JsonRpcProvider, VoidSigner, ZeroAddress, id, keccak256 } from 'ethers';
+import { AbiCoder, Contract, JsonRpcProvider, VoidSigner, ZeroAddress, id } from 'ethers';
 import { CONTRACTS, artifactPath, buildDeploymentPlan, resumeDeployment, json } from './deployment.mjs';
 import { buildRegistryDeploymentPlan, resumeRegistryDeployment } from './registry-deployment.mjs';
 import { REGISTRY_ABI, RELEASE_FORMAT, verifyRelease, resolveRelease } from './releases.mjs';
@@ -10,8 +10,12 @@ export const UNWIND_TYPES = {UnwindAgreement:[['vaultId','uint256'],['nonce','ui
 export const REPORT_TYPES = {
   SpotReport:[['underlying','address'],['quote','address'],['price','uint256'],['observedAt','uint64'],['validUntil','uint64']].map(([name,type])=>({name,type})),
 };
-const RULE_KIND = { PairLimits: id('PairLimits').slice(0, 10), SpotBand: id('SpotBand').slice(0, 10) };
+export const RULE_KIND = { PairLimits: id('PairLimits').slice(0, 10), SpotBand: id('SpotBand').slice(0, 10), PremiumFloor: id('PremiumFloor').slice(0, 10) };
 const coder = AbiCoder.defaultAbiCoder();
+/** IvyBidRules data layouts. `data` is opaque bytes on-chain, so these are the only off-chain definitions. */
+export const encodePairLimits = limits => coder.encode(['tuple(address quoteToken,uint256 strikeLimit,uint256 minPremium)[]'],[limits]);
+export const encodeSpotBand = (priceFeed,maxPriceAge,maxInTheMoneyBps) => coder.encode(['tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)'],[[priceFeed,maxPriceAge,maxInTheMoneyBps]]);
+export const encodePremiumFloor = (priceFeed,maxPriceAge,minPremiumBps) => coder.encode(['tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)'],[[priceFeed,maxPriceAge,minPremiumBps]]);
 export async function loadArtifacts() {
   return Object.fromEntries(await Promise.all(CONTRACTS.map(async name=>[name,JSON.parse(await readFile(new URL(artifactPath(name),import.meta.url),'utf8'))])));
 }
@@ -82,10 +86,10 @@ export async function prepareVault(provider, request, release) {
     if(spot<=0n||bps<0n||(!call&&bps>=10000n)) throw new Error('Invalid strike inputs');
     return [p.quoteToken, call?(spot*(10000n+bps)+9999n)/10000n:spot*(10000n-bps)/10000n, BigInt(p.minPremium??0)];
   });
-  const rules=[{validator,kind:RULE_KIND.PairLimits,data:coder.encode(['tuple(address,uint256,uint256)[]'],[limits])}];
+  const rules=[{validator,kind:RULE_KIND.PairLimits,data:encodePairLimits(limits)}];
   if(r.spotBand) {
     const b=r.spotBand;
-    rules.push({validator,kind:RULE_KIND.SpotBand,data:coder.encode(['tuple(address,uint32,uint16)'],[[required(b,'priceFeed'),required(b,'maxPriceAge'),required(b,'maxInTheMoneyBps')]])});
+    rules.push({validator,kind:RULE_KIND.SpotBand,data:encodeSpotBand(required(b,'priceFeed'),required(b,'maxPriceAge'),required(b,'maxInTheMoneyBps'))});
   }
   return {terms:t,pairs,rules,valueUsdE6,settlementMethodology:r.settlementMethodology};
 }
@@ -107,8 +111,8 @@ export async function prepareOperation(provider, artifacts, command, r) {
     return {pricingAuthority:'indicative activation only; does not supply cash vault settlement prices',domain:domain('IvyPriceFeed','1',required(r,'feed')),types:REPORT_TYPES,value:fields(REPORT_TYPES.SpotReport,r.report)};
   }
   if(command==='typed-bid') {
-    const s=await hub.stateOf(r.vaultId);
-    const value={...r.bid,vaultId:r.vaultId,expiry:s.expiry,auctionId:s.auctionId,collateralAmount:await hub.totalShares(r.vaultId),termsHash:await hub.termsHashOf(r.vaultId),executor:r.bid.executor??ZeroAddress,recipient:r.bid.recipient??r.bid.marketMaker};
+    const [s,collateralAmount,termsHash]=await Promise.all([hub.stateOf(r.vaultId),hub.totalShares(r.vaultId),hub.termsHashOf(r.vaultId)]);
+    const value={...r.bid,vaultId:r.vaultId,expiry:s.expiry,auctionId:s.auctionId,collateralAmount,termsHash,executor:r.bid.executor??ZeroAddress,recipient:r.bid.recipient??r.bid.marketMaker};
     return {domain:domain('IvyVaultsHub','3',r.hub),types:BID_TYPES,value:fields(BID_TYPES.Bid,value),
       ...(Number(r.bid.settlement)===1?{fallbackTerms:fallbackTerms(s.expiry,s.expiryPricePublicationWindow,s.exerciseWindow)}:{})};
   }
@@ -132,18 +136,17 @@ export async function prepareOperation(provider, artifacts, command, r) {
     } else { method='setRecommendedVersion';args=[required(r,'releaseId')];detail={hub:await target.hubOf(r.releaseId),releaseId:r.releaseId}; }
   } else if(command==='prepare-vault') {
     detail=await prepareVault(provider,r,release); method='createVault';args=[detail.terms,detail.pairs,detail.rules];
-    if(Number(detail.terms.allowedSettlement)!==0) detail.fallbackTerms=fallbackTerms(detail.terms.expiry,await hub.expiryPricePublicationWindow(),await hub.exerciseWindow());
+    if(Number(detail.terms.allowedSettlement)!==0) detail.fallbackTerms=fallbackTerms(detail.terms.expiry,...await Promise.all([hub.expiryPricePublicationWindow(),hub.exerciseWindow()]));
   } else if(command==='inspect-bid'||command==='activate') {
     method='activate';args=[r.vaultId,r.bid,r.signature];
-    const s=await hub.stateOf(r.vaultId), t=await hub.termsOf(r.vaultId);
-    const token=new Contract(t.collateral,['function decimals() view returns(uint8)'],provider);
     const minimum=BigInt(required(r,'minTradeUsdE6')), price=BigInt(required(r,'collateralPriceUsdE6'));
     if(minimum<=0n||price<=0n) throw new Error('Explicit positive launch valuation and minimum required');
-    const amount=await hub.totalShares(r.vaultId), valueUsdE6=amount*price/(10n**BigInt(await token.decimals()));
+    const [s,t,amount,platformFeeBps]=await Promise.all([hub.stateOf(r.vaultId),hub.termsOf(r.vaultId),hub.totalShares(r.vaultId),hub.vaultPlatformFeeBps(r.vaultId)]);
+    const token=new Contract(t.collateral,['function decimals() view returns(uint8)'],provider);
+    const valueUsdE6=amount*price/(10n**BigInt(await token.decimals()));
     if(valueUsdE6<minimum) throw new Error('Below launch USD minimum at activation');
     const notional=s.isCall?amount:amount*s.underlyingUnit/BigInt(r.bid.strike);
     const totalPremium=BigInt(r.bid.premium)*notional/s.underlyingUnit;
-    const platformFeeBps=await hub.vaultPlatformFeeBps(r.vaultId);
     const platformFee=totalPremium*platformFeeBps/10000n;
     detail={allowPartialExercise:t.allowPartialExercise,valueUsdE6,notional,totalPremium,platformFeeBps,platformFee,lpPremium:totalPremium-platformFee,
       ...(Number(r.bid.settlement)===1?{fallbackTerms:fallbackTerms(s.expiry,s.expiryPricePublicationWindow,s.exerciseWindow)}:{})};
@@ -161,7 +164,7 @@ export async function prepareOperation(provider, artifacts, command, r) {
     const exercise=command==='publish-settlement-exercise';
     const names=exercise?['price','observedAt','validUntil']:['price','validUntil'];
     const report=Object.fromEntries(names.map(name=>[name,required(r.report,name)]));
-    const terms=await hub.termsOf(vaultId), state=await hub.stateOf(vaultId);
+    const [terms,state]=await Promise.all([hub.termsOf(vaultId),hub.stateOf(vaultId)]);
     method=exercise?'publishExercisePrice':'publishExpiry';args=[vaultId,...names.map(name=>report[name])];
     if (typeof r.settlementMethodology !== 'string' || !r.settlementMethodology.trim()) throw new Error('Missing settlementMethodology artifact reference');
     detail={pricingAuthority:'authoritative cash settlement',hub:r.hub,vaultId,underlying:terms.underlying,quote:state.quoteToken,expiry:state.expiry,report,units:'integer quote-token units per whole underlying token',settlementMethodology:r.settlementMethodology};
@@ -207,6 +210,11 @@ export async function prepareOperation(provider, artifacts, command, r) {
   return {chainId,from:r.sender,to:await target.getAddress(),data,value:'0',method,detail,...(release?{release:{registry:release.registry,releaseId:release.releaseId,hub:release.hub,manifestHash:release.manifestHash}}:{})};
 }
 
+async function readJournal(file) {
+  try {return JSON.parse(await readFile(file,'utf8'));} catch(e) {if(e.code!=='ENOENT')throw e; return {};}
+}
+const persistTo = file => async j=>{await writeFile(file+'.tmp',json(j));await rename(file+'.tmp',file);};
+
 async function main() {
   const [command,file,...flags]=process.argv.slice(2);
   if(!command||!file) throw new Error('Usage: npm run operator -- <command> request.json [--send]. Default: preflight and calldata only.');
@@ -227,9 +235,7 @@ async function main() {
     }
     if(!flags.includes('--send')) throw new Error('Registry deployment requires --send');
     const plan=JSON.parse(await readFile(r.planFile,'utf8'));
-    let journal={};try {journal=JSON.parse(await readFile(r.journalFile,'utf8'));} catch(e) {if(e.code!=='ENOENT')throw e;}
-    const persist=async j=>{await writeFile(r.journalFile+'.tmp',json(j));await rename(r.journalFile+'.tmp',r.journalFile);};
-    console.log(json(await resumeRegistryDeployment(await provider.getSigner(plan.deployer),plan,artifact,journal,persist)));return;
+    console.log(json(await resumeRegistryDeployment(await provider.getSigner(plan.deployer),plan,artifact,await readJournal(r.journalFile),persistTo(r.journalFile))));return;
   }
   if(command==='prepare-deployment') {
     const plan=await buildDeploymentPlan({...r,artifacts,chainId:(await provider.getNetwork()).chainId,genesisHash:(await provider.getBlock(0)).hash,startNonce:await provider.getTransactionCount(r.deployer,'pending')});
@@ -238,13 +244,11 @@ async function main() {
   if(command==='deploy') {
     if(!flags.includes('--send')) throw new Error('Deploy requires --send; prepare-deployment is read-only');
     const plan=JSON.parse(await readFile(r.planFile,'utf8'));
-    let journal={};try {journal=JSON.parse(await readFile(r.journalFile,'utf8'));} catch(e) {if(e.code!=='ENOENT')throw e;}
     // Rebuild constructor transactions from this checkout before trusting a saved plan.
     const rebuilt=await buildDeploymentPlan({...plan,artifacts});
     if(json(rebuilt)!==json(plan)) throw new Error('Saved deployment plan does not match this build');
-    const persist=async j=>{await writeFile(r.journalFile+'.tmp',json(j));await rename(r.journalFile+'.tmp',r.journalFile);};
     const signer=await provider.getSigner(plan.deployer);
-    console.log(json(await resumeDeployment(signer,plan,journal,persist)));return;
+    console.log(json(await resumeDeployment(signer,plan,await readJournal(r.journalFile),persistTo(r.journalFile))));return;
   }
   const prepared=await prepareOperation(provider,artifacts,command,r);
   if(flags.includes('--send')) {

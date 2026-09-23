@@ -4,7 +4,7 @@ import {
   EXERCISE_WINDOW, EXPIRY_PRICE_PUBLICATION_WINDOW, ExerciseStyle, Phase, SettlementType, USDC_UNIT, WETH_UNIT,
   callPairs, callTerms, createVaultAs, deployIvy, fund,
 } from "./helpers/setup.js";
-import { at, goLive, setSpot, setExercisePrice, publishExpiryPrice } from "./helpers/scenarios.js";
+import { at, goLive, setExercisePrice, publishExpiryPrice } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;

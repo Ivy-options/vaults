@@ -1,5 +1,5 @@
 import { Contract, ContractFactory, getCreateAddress, ZeroHash } from 'ethers';
-import { currentCode, findCreation, verifyCreation, json, planHash } from './deployment.mjs';
+import { currentCode, findCreation, openJournal, verifyCreation, json } from './deployment.mjs';
 
 export async function buildRegistryDeploymentPlan({ artifact, chainId, genesisHash, deployer, startNonce, admin }) {
   const address = getCreateAddress({ from: deployer, nonce: startNonce });
@@ -13,11 +13,7 @@ export async function resumeRegistryDeployment(signer, plan, artifact, journal =
   if (plan.version !== 1 || plan.kind !== 'ivy-registry') throw new Error('Unsupported registry plan');
   if (json(await buildRegistryDeploymentPlan({ ...plan, artifact })) !== json(plan)) throw new Error('Registry plan does not match this build');
   const provider = signer.provider;
-  if (String((await provider.getNetwork()).chainId) !== plan.chainId || (await provider.getBlock(0)).hash !== plan.genesisHash) throw new Error('Wrong chain');
-  if ((await signer.getAddress()).toLowerCase() !== plan.deployer.toLowerCase()) throw new Error('Wrong deployer');
-  const digest = planHash(plan);
-  if (journal.planHash && journal.planHash !== digest) throw new Error('Journal belongs to another plan');
-  journal.planHash = digest; journal.startBlock ??= await provider.getBlockNumber(); journal.steps ??= {};
+  await openJournal(signer, plan, journal);
   const step = plan.steps[0], entry = journal.steps.IvyVaultsRegistry ??= {};
   await persist(journal);
   if (await currentCode(provider, plan.address) !== '0x') entry.hash ??= await findCreation(provider, plan, step, journal.startBlock);

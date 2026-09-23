@@ -104,8 +104,10 @@ export interface BidOptions {
 
 /** Physical American bid at STRIKE / PREMIUM expiring in TENOR, valid for one hour, fresh nonce. */
 export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = {}): Promise<Bid> {
-  const now = BigInt(await ctx.networkHelpers.time.latest());
-  const state = await ctx.hub.stateOf(vaultId);
+  const [latest, state, collateralAmount, termsHash] = await Promise.all([
+    ctx.networkHelpers.time.latest(), ctx.hub.stateOf(vaultId), ctx.hub.totalShares(vaultId), ctx.hub.termsHashOf(vaultId),
+  ]);
+  const now = BigInt(latest);
   return {
     vaultId: o.vaultId ?? vaultId,
     marketMaker: o.marketMaker ?? ctx.marketMaker.address,
@@ -118,8 +120,8 @@ export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = 
     validUntil: now + (o.validFor ?? 3600n),
     nonce: o.nonce ?? nonceCounter++,
     auctionId: state.auctionId,
-    collateralAmount: await ctx.hub.totalShares(vaultId),
-    termsHash: await ctx.hub.termsHashOf(vaultId),
+    collateralAmount,
+    termsHash,
     executor: o.executor ?? ZeroAddress,
     recipient: o.recipient ?? ctx.marketMaker.address,
   };

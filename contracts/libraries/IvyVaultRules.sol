@@ -72,11 +72,13 @@ library IvyVaultRules {
         }
     }
 
-    /// @dev Mandatory checks. Bid signature and caller authorization are enforced by the hub before this runs.
-    ///      A validator that approves everything cannot bypass anything here.
+    /// @dev Mandatory checks, then every creator rule in order. Bid signature and caller authorization are enforced by
+    ///      the hub before this runs. A validator that approves everything cannot bypass the mandatory checks, and the
+    ///      first rule rejection ends activation.
     function checkBid(
         VaultState storage s,
         VaultTerms storage t,
+        BidRule[] storage rules,
         address premiumToken,
         bytes32 expectedTermsHash,
         Bid calldata bid,
@@ -103,17 +105,14 @@ library IvyVaultRules {
         if (bid.recipient == address(0)) {
             revert ZeroAddress();
         }
-        if (!s.isCall && bid.strike == 0) {
-            revert EmptyNotional();
-        }
         totalNotional = IvyMath.notionalOf(s.isCall, supply, s.underlyingUnit, bid.strike);
         if (totalNotional == 0) {
             revert EmptyNotional();
         }
+        _runRules(s, t, rules, premiumToken, bid, supply, totalNotional);
     }
 
-    /// @dev Runs every creator rule in order. The first rejection ends activation.
-    function runRules(
+    function _runRules(
         VaultState storage s,
         VaultTerms storage t,
         BidRule[] storage rules,
@@ -121,7 +120,7 @@ library IvyVaultRules {
         Bid calldata bid,
         uint256 supply,
         uint256 totalNotional
-    ) external view {
+    ) private view {
         BidContext memory context = BidContext({
             vaultId: bid.vaultId,
             isCall: s.isCall,

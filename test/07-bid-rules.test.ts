@@ -1,30 +1,25 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import { AbiCoder, ZeroAddress, id } from "ethers";
+import { ZeroAddress, id } from "ethers";
 import {
-  ExerciseStyle, RuleKind, SettlementType, USDC_UNIT, WETH_UNIT,
-  callPairs, callTerms, createVaultAs, deployIvy, fund, premiumFloorRule, putPairs, putTerms,
+  ExercisePolicy, ExerciseStyle, RuleKind, SettlementPolicy, SettlementType, USDC_UNIT, WETH_UNIT,
+  deployIvy, fund, premiumFloorRule,
 } from "./helpers/setup.js";
 import { signBid } from "./helpers/bids.js";
 import { CALL_DEPOSIT, STRIKE, activate, makeBid, openVault, setSpot } from "./helpers/scenarios.js";
+import { encodePairLimits as pairLimits, encodePremiumFloor as premiumFloor, encodeSpotBand as spotBand } from "../scripts/operator.mjs";
 
 const connection = await network.create();
 const { ethers } = connection;
-const coder = AbiCoder.defaultAbiCoder();
 const kind = (name: string) => id(name).slice(0, 10);
 const A = "0x1000000000000000000000000000000000000001";
 const B = "0x2000000000000000000000000000000000000002";
 
 const terms = (underlying: string, collateral: string) => ({
-  underlying, collateral, allowPartialExercise: true, publicDeposits: true, allowedExercise: 2, allowedSettlement: 0,
+  underlying, collateral, allowPartialExercise: true, publicDeposits: true,
+  allowedExercise: ExercisePolicy.Either, allowedSettlement: SettlementPolicy.Physical,
   expiry: 4_000_000_000n, auctionStartsAt: 0n, minCollateral: 0n, maxSettlementPriceAge: 0,
 });
-const pairLimits = (entries: Array<[string, bigint, bigint]>) =>
-  coder.encode(["tuple(address quoteToken,uint256 strikeLimit,uint256 minPremium)[]"], [entries]);
-const spotBand = (priceFeed: string, maxPriceAge: number, bps: number) =>
-  coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)"], [[priceFeed, maxPriceAge, bps]]);
-const premiumFloor = (priceFeed: string, maxPriceAge: number, bps: number) =>
-  coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)"], [[priceFeed, maxPriceAge, bps]]);
 
 describe("IvyBidRules config", function () {
   async function fixture() {
@@ -105,15 +100,9 @@ describe("bid rules at activation", function () {
 
   it("an empty rule list accepts any well-formed bid and still guards a zero strike", async function () {
     const ctx = await networkHelpers.loadFixture(fixture);
-    const { vaultId, vaultAddress } = await createVaultAs(ctx, ctx.alice, callTerms(ctx), callPairs(ctx), []);
-    await fund(ctx, ctx.weth, ctx.alice, vaultAddress, CALL_DEPOSIT);
-    await ctx.hub.connect(ctx.alice).deposit(vaultId, CALL_DEPOSIT);
-    await ctx.hub.connect(ctx.alice).openAuction(vaultId);
-    await activate(ctx, vaultId, vaultAddress, { strike: 0n, premium: 0n });
-    const put = await createVaultAs(ctx, ctx.alice, putTerms(ctx), putPairs(ctx), []);
-    await fund(ctx, ctx.usdc, ctx.alice, put.vaultAddress, 30_000n * USDC_UNIT);
-    await ctx.hub.connect(ctx.alice).deposit(put.vaultId, 30_000n * USDC_UNIT);
-    await ctx.hub.connect(ctx.alice).openAuction(put.vaultId);
+    const call = await openVault(ctx);
+    await activate(ctx, call.vaultId, call.vaultAddress, { strike: 0n, premium: 0n });
+    const put = await openVault(ctx, { isCall: false });
     await expect(activate(ctx, put.vaultId, put.vaultAddress, { strike: 0n })).to.be.revertedWithCustomError(ctx.hub, "EmptyNotional");
   });
 
@@ -180,12 +169,8 @@ describe("bid rules at activation", function () {
 
   it("PremiumFloor prices the premium in the underlying without a feed", async function () {
     const ctx = await networkHelpers.loadFixture(fixture);
-    const pairs = [{ quoteToken: ctx.usdcAddress, premiumToken: ctx.wethAddress }];
     const rules = [premiumFloorRule(ctx, { priceFeed: ZeroAddress, maxPriceAge: 0, minPremiumBps: 100 })];
-    const { vaultId, vaultAddress } = await createVaultAs(ctx, ctx.alice, callTerms(ctx), pairs, rules);
-    await fund(ctx, ctx.weth, ctx.alice, vaultAddress, CALL_DEPOSIT);
-    await ctx.hub.connect(ctx.alice).deposit(vaultId, CALL_DEPOSIT);
-    await ctx.hub.connect(ctx.alice).openAuction(vaultId);
+    const { vaultId, vaultAddress } = await openVault(ctx, { premiumToken: ctx.wethAddress, rules });
     const tooLow = await makeBid(ctx, vaultId, { premium: WETH_UNIT / 100n - 1n });
     await fund(ctx, ctx.weth, ctx.marketMaker, vaultAddress, WETH_UNIT);
     await expect(ctx.hub.connect(ctx.bidMaster).activate(vaultId, tooLow, await signBid(ctx.marketMaker, ctx.hubAddress, tooLow))).to.be.revertedWithCustomError(ctx.hub, "PremiumTooLow");

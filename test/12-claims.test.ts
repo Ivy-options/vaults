@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { EXERCISE_WINDOW, ExerciseStyle, Phase, SettlementType, USDC_UNIT, WETH_UNIT, deployIvy, fund, type IvyContext } from "./helpers/setup.js";
-import { at, goLive, setSpot, publishExpiryPrice } from "./helpers/scenarios.js";
+import { at, goLive, publishExpiryPrice } from "./helpers/scenarios.js";
 
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;

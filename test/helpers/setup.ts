@@ -1,6 +1,7 @@
-import { AbiCoder, ZeroAddress, getCreateAddress, id } from "ethers";
+import { getCreateAddress } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { artifacts, type network } from "hardhat";
+import { RULE_KIND, encodePairLimits, encodePremiumFloor, encodeSpotBand } from "../../scripts/operator.mjs";
 
 export type Connection = Awaited<ReturnType<typeof network.create>>;
 
@@ -49,13 +50,7 @@ export interface PairLimitInput {
   minPremium: bigint;
 }
 
-export const RuleKind = {
-  PairLimits: id("PairLimits").slice(0, 10),
-  SpotBand: id("SpotBand").slice(0, 10),
-  PremiumFloor: id("PremiumFloor").slice(0, 10),
-} as const;
-
-const coder = AbiCoder.defaultAbiCoder();
+export const RuleKind = RULE_KIND;
 
 /** Deploys peers and grants trading roles. Cash scenarios explicitly grant a publisher and enable admissions. */
 export async function deployIvy(connection: Connection, { enableCashSettlement = true } = {}) {
@@ -168,7 +163,7 @@ export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRu
   return {
     validator: ctx.bidRulesAddress,
     kind: RuleKind.PairLimits,
-    data: coder.encode(["tuple(address quoteToken,uint256 strikeLimit,uint256 minPremium)[]"], [limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremium])]),
+    data: encodePairLimits(limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremium])),
   };
 }
 
@@ -176,7 +171,7 @@ export function spotBandRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceA
   return {
     validator: ctx.bidRulesAddress,
     kind: RuleKind.SpotBand,
-    data: coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)"], [[o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps]]),
+    data: encodeSpotBand(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps),
   };
 }
 
@@ -184,7 +179,7 @@ export function premiumFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPr
   return {
     validator: ctx.bidRulesAddress,
     kind: RuleKind.PremiumFloor,
-    data: coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)"], [[o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minPremiumBps]]),
+    data: encodePremiumFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minPremiumBps),
   };
 }
 

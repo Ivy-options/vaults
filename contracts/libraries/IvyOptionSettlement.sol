@@ -95,21 +95,15 @@ library IvyOptionSettlement {
         uint256 paid;
         uint256 got;
         if (s.settlement == SettlementType.Physical || physicalFallback) {
-            if (s.isCall) {
-                paid = IvyMath.quoteDueCeil(amount, s.strike, s.underlyingUnit);
-                uint256 received = vault.pull(s.quoteToken, msg.sender, paid);
-                if (received < paid) {
-                    revert ShortReceived(paid, received);
-                }
-                got = amount;
-            } else {
-                paid = amount;
-                uint256 received = vault.pull(t.underlying, msg.sender, amount);
-                if (received < amount) {
-                    revert ShortReceived(amount, received);
-                }
-                got = IvyMath.quoteOutFloor(amount, s.strike, s.underlyingUnit);
+            (address payToken, uint256 due) = s.isCall
+                ? (s.quoteToken, IvyMath.quoteDueCeil(amount, s.strike, s.underlyingUnit))
+                : (t.underlying, amount);
+            uint256 received = vault.pull(payToken, msg.sender, due);
+            if (received < due) {
+                revert ShortReceived(due, received);
             }
+            paid = due;
+            got = s.isCall ? amount : IvyMath.quoteOutFloor(amount, s.strike, s.underlyingUnit);
         } else {
             uint256 spot = block.timestamp < s.expiry ? _readExercisePrice(t, prices) : _readExpiryPrice(prices);
             got = s.isCall
@@ -119,15 +113,16 @@ library IvyOptionSettlement {
                 revert NothingToExercise();
             }
         }
-        vault.push(t.collateral, s.recipient, got);
+        address recipient = s.recipient;
+        vault.push(t.collateral, recipient, got);
         emit IIvyVaultsHubEvents.Exercised(vaultId, amount, paid, got);
         if (physicalFallback) {
             emit IIvyVaultsHubEvents.PhysicalFallbackExercised(vaultId, amount, paid, got);
         }
-        if (s.exercisedNotional == s.totalNotional) {
+        if (amount == remaining) {
             _finalize(s, vaultId);
         }
-        _notifyRecipient(vaultId, s.recipient, t.collateral, got);
+        _notifyRecipient(vaultId, recipient, t.collateral, got);
     }
 
     function expire(VaultState storage s, VaultTerms storage t, SettlementPrices storage prices, uint256 vaultId)
@@ -185,19 +180,18 @@ library IvyOptionSettlement {
         }
         uint256 supply = shareToken.totalSupply(vaultId);
 
+        IIvyVault vault = IIvyVault(s.vault);
         address[3] memory tokens = [t.collateral, s.premiumToken, s.isCall ? s.quoteToken : t.underlying];
         uint256[3] memory amounts;
         for (uint256 i = 0; i < 3; ++i) {
             if (_seenBefore(tokens, i)) {
                 continue;
             }
-            uint256 available = IERC20(tokens[i]).balanceOf(s.vault);
-            available -= IIvyVault(s.vault).reserved(tokens[i]);
+            uint256 available = IERC20(tokens[i]).balanceOf(address(vault)) - vault.reserved(tokens[i]);
             amounts[i] = (available * shares) / supply;
         }
 
         shareToken.burn(msg.sender, vaultId, shares);
-        IIvyVault vault = IIvyVault(s.vault);
         for (uint256 i = 0; i < 3; ++i) {
             if (amounts[i] > 0) {
                 vault.push(tokens[i], msg.sender, amounts[i]);
@@ -216,22 +210,16 @@ library IvyOptionSettlement {
         if (s.phase != Phase.Live) {
             return (SettlementRoute.Inactive, publicationDeadline, fallbackDeadline, false);
         }
+        canExpire = block.timestamp >= expirationTime(s, prices);
         if (s.settlement == SettlementType.Physical) {
-            return (
-                SettlementRoute.Physical,
-                publicationDeadline,
-                fallbackDeadline,
-                block.timestamp >= uint256(s.expiry) + s.exerciseWindow
-            );
+            route = SettlementRoute.Physical;
+        } else if (prices.expiry != 0 || block.timestamp < s.expiry) {
+            route = SettlementRoute.Cash;
+        } else if (block.timestamp < publicationDeadline) {
+            route = SettlementRoute.AwaitingExpiryPrice;
+        } else {
+            route = canExpire ? SettlementRoute.FallbackExpired : SettlementRoute.PhysicalFallback;
         }
-        if (prices.expiry != 0 || block.timestamp < s.expiry) {
-            return (SettlementRoute.Cash, publicationDeadline, fallbackDeadline, block.timestamp >= s.expiry);
-        }
-        if (block.timestamp < publicationDeadline) {
-            return (SettlementRoute.AwaitingExpiryPrice, publicationDeadline, fallbackDeadline, false);
-        }
-        canExpire = block.timestamp >= fallbackDeadline;
-        route = canExpire ? SettlementRoute.FallbackExpired : SettlementRoute.PhysicalFallback;
     }
 
     function expirationTime(VaultState storage s, SettlementPrices storage prices) public view returns (uint256) {
@@ -284,17 +272,11 @@ library IvyOptionSettlement {
 
     function _checkExerciseWindow(VaultState storage s) private view {
         uint256 ts = block.timestamp;
-        if (s.settlement == SettlementType.Cash) {
-            if (s.style == ExerciseStyle.European && ts < s.expiry) {
-                revert ExerciseNotOpenYet();
-            }
-        } else {
-            if (ts >= uint256(s.expiry) + s.exerciseWindow) {
-                revert ExerciseWindowClosed();
-            }
-            if (s.style == ExerciseStyle.European && ts < s.expiry) {
-                revert ExerciseNotOpenYet();
-            }
+        if (s.settlement != SettlementType.Cash && ts >= uint256(s.expiry) + s.exerciseWindow) {
+            revert ExerciseWindowClosed();
+        }
+        if (s.style == ExerciseStyle.European && ts < s.expiry) {
+            revert ExerciseNotOpenYet();
         }
     }
 

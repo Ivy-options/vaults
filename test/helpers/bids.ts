@@ -1,24 +1,7 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import { BID_TYPES } from "../../scripts/operator.mjs";
 
-export const BID_TYPES: Record<string, Array<{ name: string; type: string }>> = {
-  Bid: [
-    { name: "vaultId", type: "uint256" },
-    { name: "marketMaker", type: "address" },
-    { name: "quoteToken", type: "address" },
-    { name: "strike", type: "uint256" },
-    { name: "premium", type: "uint256" },
-    { name: "style", type: "uint8" },
-    { name: "settlement", type: "uint8" },
-    { name: "expiry", type: "uint64" },
-    { name: "validUntil", type: "uint64" },
-    { name: "nonce", type: "uint256" },
-    { name: "auctionId", type: "uint256" },
-    { name: "collateralAmount", type: "uint256" },
-    { name: "termsHash", type: "bytes32" },
-    { name: "executor", type: "address" },
-    { name: "recipient", type: "address" },
-  ],
-};
+export { BID_TYPES };
 
 export interface Bid {
   vaultId: bigint;

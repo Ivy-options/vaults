@@ -4,7 +4,7 @@ import {
   EXERCISE_WINDOW, AUCTION_TIMEOUT, ExerciseStyle, SettlementPolicy, SettlementType, Phase,
   WETH_UNIT as W, USDC_UNIT as U, callTerms, callPairs, createVaultAs, deployIvy, fund,
 } from "./helpers/setup.js";
-import { at, goLive, publishExpiryPrice, setExercisePrice } from "./helpers/scenarios.js";
+import { at, goLive, setExercisePrice } from "./helpers/scenarios.js";
 import { proposeUnwind } from "./helpers/unwind.js";
 
 const connection = await network.create();

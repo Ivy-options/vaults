@@ -7,7 +7,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 library IvyMath {
     uint256 internal constant BPS = 10_000;
 
-    /// @dev Underlying units the vault can cover. Calls: the collateral itself. Puts: collateral / strike.
+    /// @dev Underlying units the vault can cover. Calls: the collateral itself. Puts: collateral / strike, and nothing
+    ///      at a zero strike.
     function notionalOf(bool isCall, uint256 collateralAmount, uint256 underlyingUnit, uint256 strike)
         internal
         pure
@@ -15,6 +16,9 @@ library IvyMath {
     {
         if (isCall) {
             return collateralAmount;
+        }
+        if (strike == 0) {
+            return 0;
         }
         return (collateralAmount * underlyingUnit) / strike;
     }
