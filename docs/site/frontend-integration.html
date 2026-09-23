@@ -59,7 +59,7 @@ Existing vault
 <li>The interface format and ABIs are supported by the frontend.</li>
 <li>The deployed code and immutable module bindings match the bundle.</li>
 </ol>
-<p>The reusable <code>resolveRelease</code> function in <code>scripts/releases.mjs</code> performs these checks with an ethers <code>JsonRpcProvider</code> or <code>BrowserProvider</code>. A production frontend can package this resolver and load the JSON bundles from its static assets or a content-addressed release store.</p>
+<p>The reusable <code>resolveRelease</code> function in <code>scripts/releases.ts</code> performs these checks with an ethers <code>JsonRpcProvider</code> or <code>BrowserProvider</code>. A production frontend can package this resolver and load the JSON bundles from its static assets or a content-addressed release store.</p>
 <h2 id="stable-identifiers">Stable identifiers</h2>
 <p>Vault IDs are local to one Hub. Release 1 and release 2 can both contain <code>vaultId == 1</code>, so <code>vaultId</code> alone is never a globally unique position identifier.</p>
 <p>Persist at least:</p>
@@ -80,7 +80,7 @@ Existing vault
 <h2 id="resolve-the-hub-for-a-new-vault">Resolve the Hub for a new vault</h2>
 <p>Read the recommendation when the user begins a new-vault flow. Resolve and verify that release, then pin its Hub and release ID in the form state. Show both values in the final transaction review.</p>
 <pre><code class="language-ts">import { BrowserProvider, Contract } from &quot;ethers&quot;;
-import { resolveRelease } from &quot;../scripts/releases.mjs&quot;;
+import { resolveRelease } from &quot;../scripts/releases.ts&quot;;
 
 const REGISTRY_ABI = [
   &quot;function recommendedVersion() view returns (uint256)&quot;,

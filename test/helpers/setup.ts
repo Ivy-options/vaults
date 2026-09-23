@@ -1,7 +1,7 @@
 import { getCreateAddress } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { artifacts, type network } from "hardhat";
-import { RULE_KIND, encodePairLimits, encodePremiumFloor, encodeSpotBand } from "../../scripts/encoding.mjs";
+import { RULE_KIND, encodePairLimits, encodePremiumFloor, encodeSpotBand } from "../../scripts/encoding.ts";
 
 export type Connection = Awaited<ReturnType<typeof network.create>>;
 

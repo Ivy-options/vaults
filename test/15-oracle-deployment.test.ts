@@ -1,8 +1,8 @@
 import { rejects } from "node:assert/strict";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { REPORT_TYPES } from "../scripts/encoding.mjs";
-import { buildDeploymentPlan, resumeDeployment, verifyBindings, loadArtifacts, CONTRACTS } from "../scripts/deployment.mjs";
+import { REPORT_TYPES } from "../scripts/encoding.ts";
+import { buildDeploymentPlan, resumeDeployment, verifyBindings, loadArtifacts, CONTRACTS } from "../scripts/deployment.ts";
 import { deployIvy, USDC_UNIT as U } from "./helpers/setup.js";
 const spotArgs = (r: any) => [r.underlying,r.quote,r.price,r.observedAt,r.validUntil] as const;
 const connection=await network.create();

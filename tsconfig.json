@@ -12,6 +12,8 @@
       "mocha"
     ],
     "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "allowJs": true
   }
 }

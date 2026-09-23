@@ -30,10 +30,10 @@ describe("Immutable release registry", function () {
   });
 });
 
-import { buildDeploymentPlan, resumeDeployment, loadArtifacts } from "../scripts/deployment.mjs";
-import { RULE_KIND, encodePairLimits } from "../scripts/encoding.mjs";
+import { buildDeploymentPlan, resumeDeployment, loadArtifacts } from "../scripts/deployment.ts";
+import { RULE_KIND, encodePairLimits } from "../scripts/encoding.ts";
 import { signBid } from "./helpers/bids.js";
-import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease } from "../scripts/releases.mjs";
+import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease } from "../scripts/releases.ts";
 
 async function releaseFixture() {
   const c = await network.create();
@@ -113,7 +113,7 @@ describe("Release-resolved vault creation", function () {
   });
 });
 
-import { buildRegistryDeploymentPlan, resumeRegistryDeployment } from '../scripts/registry-deployment.mjs';
+import { buildRegistryDeploymentPlan, resumeRegistryDeployment } from '../scripts/registry-deployment.ts';
 
 describe('Separate registry deployment', function () {
   it('recovers a mined creation after interruption without consuming a second nonce', async function () {

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { TypedDataEncoder } from "ethers";
-import { UNWIND_TYPES } from "../scripts/encoding.mjs";
+import { UNWIND_TYPES } from "../scripts/encoding.ts";
 import { deployIvy, fund, WETH_UNIT as W, USDC_UNIT as U, Phase } from "./helpers/setup.js";
 import { goLive } from "./helpers/scenarios.js";
 import { proposeUnwind, signUnwindProposal } from "./helpers/unwind.js";

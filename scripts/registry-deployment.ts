@@ -1,7 +1,12 @@
 import { Contract, ContractFactory, getCreateAddress, ZeroHash } from 'ethers';
-import { currentCode, findCreation, openJournal, verifyCreation, json } from './deployment.mjs';
+import type { BigNumberish, Signer } from 'ethers';
+import { currentCode, findCreation, openJournal, rpc, verifyCreation, json } from './deployment.ts';
+import type { Artifact, CreationStep, Journal, Persist, PlanIdentity } from './deployment.ts';
 
-export async function buildRegistryDeploymentPlan({ artifact, chainId, genesisHash, deployer, startNonce, admin }) {
+export interface RegistryDeploymentInput { artifact: Artifact; chainId: BigNumberish; genesisHash: string | null; deployer: string; startNonce: number; admin: string }
+export interface RegistryPlan extends PlanIdentity { version: number; kind: string; startNonce: number; admin: string; address: string; steps: CreationStep[] }
+
+export async function buildRegistryDeploymentPlan({ artifact, chainId, genesisHash, deployer, startNonce, admin }: RegistryDeploymentInput): Promise<RegistryPlan> {
   const address = getCreateAddress({ from: deployer, nonce: startNonce });
   const tx = await new ContractFactory(artifact.abi, artifact.bytecode).getDeployTransaction(admin);
   return { version: 1, kind: 'ivy-registry', chainId: String(chainId), genesisHash, deployer, startNonce, admin, address,
@@ -9,14 +14,14 @@ export async function buildRegistryDeploymentPlan({ artifact, chainId, genesisHa
 }
 
 /** Independent nonce sequence and journal, validated against the local registry artifact on every resume. */
-export async function resumeRegistryDeployment(signer, plan, artifact, journal = /** @type {any} */ ({}), persist = async (_journal) => {}) {
+export async function resumeRegistryDeployment(signer: Signer, plan: RegistryPlan, artifact: Artifact, journal: Journal = {}, persist: Persist = async () => {}) {
   if (plan.version !== 1 || plan.kind !== 'ivy-registry') throw new Error('Unsupported registry plan');
   if (json(await buildRegistryDeploymentPlan({ ...plan, artifact })) !== json(plan)) throw new Error('Registry plan does not match this build');
-  const provider = signer.provider;
-  await openJournal(signer, plan, journal);
-  const step = plan.steps[0], entry = journal.steps.IvyVaultsRegistry ??= {};
+  const provider = rpc(signer.provider);
+  const { startBlock, steps } = await openJournal(signer, plan, journal);
+  const step = plan.steps[0], entry = steps.IvyVaultsRegistry ??= {};
   await persist(journal);
-  if (await currentCode(provider, plan.address) !== '0x') entry.hash ??= await findCreation(provider, plan, step, journal.startBlock);
+  if (await currentCode(provider, plan.address) !== '0x') entry.hash ??= await findCreation(provider, plan, step, startBlock);
   if (!entry.hash) {
     const nonce = Number(BigInt(await provider.send('eth_getTransactionCount', [plan.deployer, 'pending'])));
     if (nonce !== plan.startNonce) throw new Error('Registry nonce drift');

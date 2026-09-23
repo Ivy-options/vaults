@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext, Script } from "node:vm";
-import { buildDocs } from "./build-docs.mjs";
+import { buildDocs } from "./build-docs.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pagePath = resolve(root, "docs/site/index.html");
@@ -72,7 +72,7 @@ for (const path of pages) {
       const ok =
         pageIds.get(destination)?.includes(decodedAnchor) ||
         ([pagePath, v2PagePath].includes(destination) &&
-          (mapAliasKeys.has(decodedAnchor) || pageIds.get(guidePagePath).includes(decodedAnchor)));
+          (mapAliasKeys.has(decodedAnchor) || pageIds.get(guidePagePath)!.includes(decodedAnchor)));
       assert.ok(ok, `Missing anchor: ${path}: ${url}`);
     }
   }
@@ -94,7 +94,18 @@ for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", 
 // querySelector) against both pages that carry it: the guide and the labs
 // fixture. Expected amounts are independent worked examples, not a second
 // implementation of the settlement formulas.
-function makeElements(ids) {
+/** The few element properties labs.js reads and writes. */
+interface FakeElement {
+  value: string;
+  textContent: string;
+  innerHTML: string;
+  hidden: boolean;
+  ariaInvalid?: string;
+  addEventListener(event: string, callback: () => void): void;
+  setAttribute(): void;
+}
+type Elements = Record<string, FakeElement>;
+function makeElements(ids: string[]): Elements {
   return Object.fromEntries(
     ids.map((id) => [
       id,
@@ -118,7 +129,7 @@ const CALC_DEFAULTS = {
   days: "30",
   entryPrice: "3000",
 };
-function verifyPayoffCalculator(elements, update) {
+function verifyPayoffCalculator(elements: Elements, update: (values: Record<string, string>) => void) {
   assert.equal(elements.premiumYield.textContent, "3.33%");
   assert.equal(elements.premiumApr.textContent, "40.56%");
   function resultRows() {
@@ -182,25 +193,25 @@ function verifyPayoffCalculator(elements, update) {
 // self-referential, as in a real browser, so its closing `window.IvyLabs =
 // {...}` also defines the bare `IvyLabs` global used below. Every id the
 // widget reads must exist on the page, or the scoped lookup returns null.
-function verifyLabsPayoff(ids) {
+function verifyLabsPayoff(ids: string[]) {
   const elements = makeElements(ids);
-  const inputCallbacks = {};
+  const inputCallbacks: Record<string, () => void> = {};
   for (const id of CALC_INPUT_IDS) {
-    elements[id].addEventListener = (event, callback) => {
+    elements[id].addEventListener = (_event, callback) => {
       inputCallbacks[id] = callback;
     };
   }
   Object.entries(CALC_DEFAULTS).forEach(([id, value]) => (elements[id].value = value));
   const attributes = new Map([["data-theme", "dark"]]);
   const documentElement = {
-    getAttribute: (key) => attributes.get(key),
-    setAttribute: (key, value) => attributes.set(key, value),
+    getAttribute: (key: string) => attributes.get(key),
+    setAttribute: (key: string, value: string) => attributes.set(key, value),
   };
   const labsJs = readFileSync(resolve(site, "assets/labs.js"), "utf8");
-  const sandbox = {
+  const sandbox: Record<string, unknown> = {
     document: { documentElement, addEventListener() {}, querySelector: () => null },
-    scope: { querySelector: (s) => elements[s.replace(/^#/, "")] || null, querySelectorAll: () => [] },
-    CSS: { escape: (s) => s },
+    scope: { querySelector: (s: string) => elements[s.replace(/^#/, "")] || null, querySelectorAll: () => [] },
+    CSS: { escape: (s: string) => s },
     MutationObserver: class { observe() {} },
     localStorage: { getItem: () => null, setItem() {} },
     getComputedStyle: () => ({ getPropertyValue: () => "#888" }),
@@ -214,7 +225,7 @@ function verifyLabsPayoff(ids) {
     inputCallbacks.dep();
   });
 }
-verifyLabsPayoff(pageIds.get(guidePagePath));
+verifyLabsPayoff(pageIds.get(guidePagePath)!);
 assert.match(readFileSync(guidePagePath, "utf8"), /class="calc" data-lab="payoff"/, "The guide mounts the shared payoff lab");
 {
   const fixture = readFileSync(resolve(site, "test/fixtures/labs.html"), "utf8");

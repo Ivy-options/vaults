@@ -35,7 +35,7 @@ For each supported release, verify:
 4. The interface format and ABIs are supported by the frontend.
 5. The deployed code and immutable module bindings match the bundle.
 
-The reusable `resolveRelease` function in `scripts/releases.mjs` performs these checks with an ethers `JsonRpcProvider` or `BrowserProvider`. A production frontend can package this resolver and load the JSON bundles from its static assets or a content-addressed release store.
+The reusable `resolveRelease` function in `scripts/releases.ts` performs these checks with an ethers `JsonRpcProvider` or `BrowserProvider`. A production frontend can package this resolver and load the JSON bundles from its static assets or a content-addressed release store.
 
 ## Stable identifiers
 
@@ -70,7 +70,7 @@ Read the recommendation when the user begins a new-vault flow. Resolve and verif
 
 ```ts
 import { BrowserProvider, Contract } from "ethers";
-import { resolveRelease } from "../scripts/releases.mjs";
+import { resolveRelease } from "../scripts/releases.ts";
 
 const REGISTRY_ABI = [
   "function recommendedVersion() view returns (uint256)",

@@ -7,6 +7,7 @@ import {
 import { resolve, dirname, basename, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Marked, Renderer } from "marked";
+import type { Tokens } from "marked";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const site = resolve(root, "docs/site");
@@ -15,19 +16,19 @@ const pages = [
   { source: "LICENSE.md", output: "license.html", title: "Business Source License 1.1" },
   { source: "README.md", output: "project-setup.html", title: "Project setup" },
 ];
-const destinations = new Map(
+const destinations = new Map<string, string>(
   pages.map((page) => [resolve(root, page.source), page.output])
 );
 destinations.set(resolve(root, "docs/site/index.html"), "index.html");
-const escape = (text) =>
+const escape = (text: unknown) =>
   String(text).replace(
     /[&<>"']/g,
     (char) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[
         char
-      ])
+      ]
   );
-const slug = (text) =>
+const slug = (text: string) =>
   text
     .toLowerCase()
     .replace(/<[^>]*>/g, "")
@@ -37,7 +38,7 @@ const slug = (text) =>
     .replace(/\s/g, "-");
 
 export function buildDocs({ check = false } = {}) {
-  const outputs = new Map();
+  const outputs = new Map<string, string>();
   const rawSources = [
     "contracts/examples/ExampleSettlementPublisher.sol",
     "contracts/interfaces/IIvySettlementPricePublication.sol",
@@ -49,8 +50,8 @@ export function buildDocs({ check = false } = {}) {
   }
   for (const page of pages) {
     const source = readFileSync(resolve(root, page.source), "utf8");
-    const headings = [];
-    const usedIds = new Map();
+    const headings: { id: string; content: string; depth: number }[] = [];
+    const usedIds = new Map<string, number>();
     const renderer = new Renderer();
     renderer.heading = function ({ tokens, depth }) {
       const content = this.parser.parseInline(tokens);
@@ -90,7 +91,7 @@ export function buildDocs({ check = false } = {}) {
       }${download}>${this.parser.parseInline(tokens)}</a>`;
     };
     const defaultTable = renderer.table;
-    renderer.table = function (token) {
+    renderer.table = function (token: Tokens.Table) {
       return `<div class="tablewrap" tabindex="0" role="region" aria-label="${escape(
         page.title
       )} reference table">${defaultTable.call(this, token)}</div>\n`;
