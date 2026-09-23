@@ -58,7 +58,7 @@ describe('contract buyers and admission boundaries', function () {
     await fund(c, c.usdc, c.marketMaker, b.vaultAddress, 1000n * U);
     await c.hub.connect(c.bidMaster).activate(b.vaultId, bid, await signBid(c.marketMaker, c.hubAddress, bid));
     await c.hub.setAdmissionPause(0, true);
-    await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c))).revertedWithCustomError(c.hub, 'AdmissionPaused');
+    await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [])).revertedWithCustomError(c.hub, 'AdmissionPaused');
     await c.hub.connect(c.alice).withdraw(a.vaultId, 10n * W);
   });
   it('invalidates an agreement when normal settlement wins the race, without consuming the sponsor refund', async function () {

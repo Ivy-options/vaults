@@ -28,10 +28,10 @@ describe("cash settlement physical fallback", function () {
     await expect(c.hub.setSettings(20n, AUCTION_TIMEOUT, 0n)).revertedWithCustomError(c.hub, "InvalidSettlementWindow");
     await c.hub.setSettings(0n, AUCTION_TIMEOUT, P);
     for (const allowedSettlement of [SettlementPolicy.Cash, SettlementPolicy.Either]) {
-      await expect(c.hub.createVault({ ...terms, allowedSettlement }, callPairs(c)))
+      await expect(c.hub.createVault({ ...terms, allowedSettlement }, callPairs(c), []))
         .revertedWithCustomError(c.hub, "InvalidSettlementWindow");
     }
-    await c.hub.createVault(callTerms(c), callPairs(c));
+    await c.hub.createVault(callTerms(c), callPairs(c), []);
   });
 
   it("lets an unrelated caller release LP collateral after an entirely unattended publisher outage", async function () {

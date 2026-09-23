@@ -49,10 +49,12 @@ export interface VaultOptions {
   deposit?: bigint;
   extraDeposits?: Array<{ signer: HardhatEthersSigner; amount: bigint }>;
   terms?: Partial<VaultTermsInput>;
-  /** Strike limit and premium floor for the USDC pair, as one PairLimits rule. Puts always get one. */
+  /** Strike limit and premium floor for the USDC pair, as one PairLimits rule. Omitted = no rule. */
   pair?: Partial<PairLimitInput>;
   /** Extra rules appended after the generated ones. */
   rules?: BidRuleInput[];
+  /** Premium token for the USDC pair. Defaults to USDC. */
+  premiumToken?: string;
 }
 
 /** alice creates a vault, funds it (plus any extra depositors) and opens the auction. */
@@ -64,8 +66,9 @@ export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
   const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR;
   const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });
   const pairs = isCall ? callPairs(ctx) : putPairs(ctx);
+  if (o.premiumToken) pairs[0].premiumToken = o.premiumToken;
   const rules: BidRuleInput[] = [];
-  if (o.pair || !isCall) rules.push(pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair)));
+  if (o.pair) rules.push(pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair)));
   if (o.withFeed) rules.push(spotBandRule(ctx, { maxPriceAge: 3600, maxInTheMoneyBps: 1000 }));
   rules.push(...(o.rules ?? []));
   const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs, rules);

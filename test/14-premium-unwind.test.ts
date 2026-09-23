@@ -159,7 +159,7 @@ describe("admission and delegated execution", function () {
     const c = await networkHelpers.loadFixture(fixture); const o = await openVault(c);
     const b = await makeBid(c,o.vaultId);
     await fund(c,c.usdc,c.marketMaker,o.vaultAddress,10000n*U);
-    for(const bad of [{...b,collateralAmount:b.collateralAmount+1n},{...b,pairHash:"0x"+"00".repeat(32)}]) {
+    for(const bad of [{...b,collateralAmount:b.collateralAmount+1n},{...b,termsHash:"0x"+"00".repeat(32)}]) {
       await expect(c.hub.connect(c.bidMaster).activate(o.vaultId,bad,await signBid(c.marketMaker,c.hubAddress,bad))).revertedWithCustomError(c.hub,"CommitmentMismatch");
     }
     await c.hub.connect(c.bidMaster).cancelAuction(o.vaultId); await c.hub.connect(c.alice).openAuction(o.vaultId);

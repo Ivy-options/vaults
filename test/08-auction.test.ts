@@ -17,14 +17,6 @@ describe("auction", function () {
     return { ...ctx, ...v };
   }
 
-  const anyTerms = {
-    allowedExercise: ExercisePolicy.Either,
-    allowedSettlement: SettlementPolicy.Physical,
-    minCollateral: 5n * WETH_UNIT,
-    maxInTheMoneyBps: 0,
-    maxPriceAge: 0,
-  };
-
   it("owner opens the auction and the vault freezes", async function () {
     const ctx = await networkHelpers.loadFixture(fixture);
     const { hub, alice, vault, vaultId, vaultAddress, weth, usdcAddress } = ctx;
@@ -37,8 +29,6 @@ describe("auction", function () {
     await expect(hub.connect(alice).deposit(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(hub, "WrongPhase").withArgs(Phase.Open, Phase.Auction);
     await expect(vault.connect(alice).deposit(WETH_UNIT)).to.be.revertedWithCustomError(hub, "WrongPhase");
     await expect(hub.connect(alice).withdraw(vaultId, WETH_UNIT)).to.be.revertedWithCustomError(hub, "WrongPhase");
-    await expect(hub.connect(alice).tightenVaultTerms(vaultId, anyTerms)).to.be.revertedWithCustomError(hub, "WrongPhase");
-    await expect(hub.connect(alice).tightenPairTerms(vaultId, usdcAddress, { premiumToken: usdcAddress, strikeLimit: 0n, minPremium: 0n, enabled: true })).to.be.revertedWithCustomError(hub, "WrongPhase");
     await expect(hub.connect(alice).scheduleAuction(vaultId, 1n)).to.be.revertedWithCustomError(hub, "WrongPhase");
     await expect(hub.connect(alice).openAuction(vaultId)).to.be.revertedWithCustomError(hub, "WrongPhase");
   });

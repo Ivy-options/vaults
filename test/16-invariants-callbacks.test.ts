@@ -8,7 +8,7 @@ describe('cross-module callbacks and reserve invariants',function(){
  const fixture=async()=>{const c=await deployIvy(connection);await c.hub.setTransfersEnabled(true);return c;};
  it('checks holder revision after contribution-token callbacks and rolls back funding and share movement',async()=>{
   const c=await networkHelpers.loadFixture(fixture), token=await ethers.deployContract('CallbackToken');
-  const v=await openVault(c,{pair:{premiumToken:await token.getAddress()}});
+  const v=await openVault(c,{premiumToken:await token.getAddress()});
   await token.mint(c.marketMaker.address,1000n*U);await token.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
   await activate(c,v.vaultId,v.vaultAddress);
   const {agreement:a,signature:sig}=await proposeUnwind(c,v.vaultId,BigInt(await networkHelpers.time.latest())+86400n,100n*U);
@@ -34,7 +34,7 @@ describe('cross-module callbacks and reserve invariants',function(){
  });
  it('snapshots premium before collection callbacks can transfer shares',async()=>{
   const c=await networkHelpers.loadFixture(fixture), token=await ethers.deployContract('CallbackToken');
-  const v=await openVault(c,{pair:{premiumToken:await token.getAddress()}});
+  const v=await openVault(c,{premiumToken:await token.getAddress()});
   await token.mint(c.marketMaker.address,1000n*U);await token.connect(c.marketMaker).approve(v.vaultAddress,1000n*U);
   await c.shares.connect(c.alice).setApprovalForAll(await token.getAddress(),true);
   await token.arm(c.sharesAddress,c.shares.interface.encodeFunctionData('safeTransferFrom',[c.alice.address,c.carol.address,v.vaultId,10n*W,'0x']));

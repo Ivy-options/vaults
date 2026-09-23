@@ -160,20 +160,20 @@ describe("activate", function () {
         .to.be.revertedWithCustomError(ctx.hub, "BadSignature");
     });
 
-    it("pair must exist and be enabled", async function () {
+    it("pair must exist", async function () {
       const ctx = await networkHelpers.loadFixture(fixture);
-      const { hub, alice, usdcAddress, daiAddress, weth } = ctx;
       const a = await openVault(ctx);
-      await expect(activate(ctx, a.vaultId, a.vaultAddress, { quoteToken: daiAddress }))
-        .to.be.revertedWithCustomError(hub, "PairUnknown").withArgs(daiAddress);
+      await expect(activate(ctx, a.vaultId, a.vaultAddress, { quoteToken: ctx.daiAddress }))
+        .to.be.revertedWithCustomError(ctx.hub, "PairUnknown").withArgs(ctx.daiAddress);
+    });
 
-      const b = await createVaultAs(ctx, alice, callTerms(ctx), callPairs(ctx));
-      await hub.connect(alice).tightenPairTerms(b.vaultId, usdcAddress, { premiumToken: usdcAddress, strikeLimit: 0n, minPremium: 0n, enabled: false });
-      await fund(ctx, weth, alice, b.vaultAddress, CALL_DEPOSIT);
-      await hub.connect(alice).deposit(b.vaultId, CALL_DEPOSIT);
-      await hub.connect(alice).openAuction(b.vaultId);
-      await expect(activate(ctx, b.vaultId, b.vaultAddress))
-        .to.be.revertedWithCustomError(hub, "PairDisabled").withArgs(usdcAddress);
+    it("termsHash must match the vault", async function () {
+      const ctx = await networkHelpers.loadFixture(fixture);
+      const { vaultId, vaultAddress } = await openVault(ctx);
+      const bid = { ...(await makeBid(ctx, vaultId)), termsHash: "0x" + "22".repeat(32) };
+      await fund(ctx, ctx.usdc, ctx.marketMaker, vaultAddress, 1000n * USDC_UNIT);
+      const signature = await signBid(ctx.marketMaker, ctx.hubAddress, bid);
+      await expect(ctx.hub.connect(ctx.bidMaster).activate(vaultId, bid, signature)).to.be.revertedWithCustomError(ctx.hub, "CommitmentMismatch");
     });
 
     it("style must be allowed by the vault", async function () {

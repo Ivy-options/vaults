@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import { AUCTION_TIMEOUT, EXERCISE_WINDOW, callPairs, callTerms, createVaultAs, deployIvy } from "./helpers/setup.js";
+import { AUCTION_TIMEOUT, EXERCISE_WINDOW, callPairs, callTerms, createVaultAs, deployIvy, spotBandRule } from "./helpers/setup.js";
 const connection = await network.create();
 const { ethers, networkHelpers } = connection;
 describe("immutable hub", function () {
@@ -14,7 +14,7 @@ describe("immutable hub", function () {
     expect(await c.premiums.shares()).eq(c.sharesAddress);
     expect(await c.unwind.shares()).eq(c.sharesAddress);
     for (const name of ["upgradeToAndCall", "initialize", "setShares", "setVaultImplementation"]) expect(c.hub.interface.getFunction(name as any)).eq(null);
-    expect((await c.hub.eip712Domain()).version).eq("2");
+    expect((await c.hub.eip712Domain()).version).eq("3");
   });
   it("only admin changes defaults; existing vault timing stays fixed", async function () {
     const c = await networkHelpers.loadFixture(fixture);
@@ -31,12 +31,12 @@ describe("immutable hub", function () {
   it("rejects a hub referencing peers bound to another hub", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const h = await ethers.deployContract("IvyVaultsHub",[c.admin.address,c.vaultImplAddress,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1,1], { libraries: c.libraries });
-    await expect(h.createVault(callTerms(c),callPairs(c))).revertedWithCustomError(h,"BindingMismatch");
+    await expect(h.createVault(callTerms(c),callPairs(c),[])).revertedWithCustomError(h,"BindingMismatch");
   });
   it("rejects missing implementation and price-feed code", async function () {
     const c = await networkHelpers.loadFixture(fixture);
     await expect(ethers.deployContract("IvyVaultsHub",[c.admin.address,c.alice.address,c.sharesAddress,await c.premiums.getAddress(),await c.unwind.getAddress(),1,1,1], { libraries: c.libraries })).revertedWithCustomError(c.hub,"BindingMismatch");
-    await expect(c.hub.createVault({...callTerms(c),priceFeed:c.alice.address,maxPriceAge:100},callPairs(c))).revertedWithCustomError(c.hub,"BindingMismatch");
+    await expect(c.hub.createVault(callTerms(c),callPairs(c),[spotBandRule(c,{priceFeed:c.alice.address,maxPriceAge:100,maxInTheMoneyBps:0})])).revertedWithCustomError(c.hub,"BindingMismatch");
   });
   it("rejects a zero publication window at deployment", async function () {
     const c = await networkHelpers.loadFixture(fixture);

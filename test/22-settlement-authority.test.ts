@@ -27,11 +27,11 @@ describe("Hub settlement authority", function () {
 
   it("requires and preserves a cash observation age limit without a source-contract binding", async function () {
     const c = await deployIvy(await network.create());
-    await expect(c.hub.createVault(callTerms(c, { allowedSettlement: 1 }), callPairs(c)))
+    await expect(c.hub.createVault(callTerms(c, { allowedSettlement: 1 }), callPairs(c), []))
       .revertedWithCustomError(c.hub, "CashSettlementNeedsMaxPriceAge");
-    await c.hub.connect(c.alice).createVault(callTerms(c, { allowedSettlement: 2, maxSettlementPriceAge: 60 }), callPairs(c));
-    await c.hub.connect(c.alice).tightenVaultTerms(1, { allowedExercise: 1, allowedSettlement: 1, minCollateral: 0, maxInTheMoneyBps: 0, maxPriceAge: 0 });
+    await c.hub.connect(c.alice).createVault(callTerms(c, { allowedSettlement: 1, maxSettlementPriceAge: 60 }), callPairs(c), []);
     expect((await c.hub.termsOf(1)).maxSettlementPriceAge).equal(60);
+    expect(await c.hub.rulesOf(1)).deep.equal([]);
   });
 
   it("enforces age and report-validity boundaries independently of indicative prices", async function () {

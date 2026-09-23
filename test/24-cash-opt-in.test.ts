@@ -19,7 +19,7 @@ describe("Cash settlement opt-in", function () {
     await expect(c.hub.publishExercisePrice(1n, 4000n * U, now, now + 100n))
       .revertedWithCustomError(c.hub, "AccessControlUnauthorizedAccount");
     for (const policy of [SettlementPolicy.Cash, SettlementPolicy.Either]) {
-      await expect(c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c)))
+      await expect(c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c), []))
         .revertedWithCustomError(c.hub, "CashSettlementDisabled");
     }
     expect(await c.hub.vaultCount()).equal(0);
@@ -42,16 +42,13 @@ describe("Cash settlement opt-in", function () {
   it("explicitly enables cash with an EOA or authenticated helper available and preserves physical-only terms", async function () {
     const c = await defaultDeployment();
     const role = await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE();
-    const physical = await createVaultAs(c, c.alice, callTerms(c), callPairs(c));
+    const physical = await createVaultAs(c, c.alice, callTerms(c), callPairs(c), []);
     await c.hub.grantRole(role, c.bob.address);
     await c.hub.setCashSettlementEnabled(true);
     for (const policy of [SettlementPolicy.Cash, SettlementPolicy.Either]) {
-      await c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c));
-      await expect(c.hub.createVault(callTerms(c, { allowedSettlement: policy }), callPairs(c)))
+      await c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c), []);
+      await expect(c.hub.createVault(callTerms(c, { allowedSettlement: policy }), callPairs(c), []))
         .revertedWithCustomError(c.hub, "CashSettlementNeedsMaxPriceAge");
-      await expect(c.hub.connect(c.alice).tightenVaultTerms(physical.vaultId, {
-        allowedExercise: 2, allowedSettlement: policy, minCollateral: 0, maxInTheMoneyBps: 0, maxPriceAge: 0,
-      })).revertedWithCustomError(c.hub, "LoosensTerms");
     }
     await c.hub.revokeRole(role, c.bob.address);
     expect(await c.hub.cashSettlementEnabled()).equal(true);
@@ -65,7 +62,7 @@ describe("Cash settlement opt-in", function () {
     await c.hub.setCashSettlementEnabled(false);
     await c.hub.revokeRole(role, await helper.getAddress());
     expect(await c.hub.cashSettlementEnabled()).equal(false);
-    await expect(c.hub.createVault(callTerms(c, { allowedSettlement: SettlementPolicy.Cash, maxSettlementPriceAge: 3600 }), callPairs(c)))
+    await expect(c.hub.createVault(callTerms(c, { allowedSettlement: SettlementPolicy.Cash, maxSettlementPriceAge: 3600 }), callPairs(c), []))
       .revertedWithCustomError(c.hub, "CashSettlementDisabled");
   });
 
@@ -104,7 +101,7 @@ describe("Cash settlement opt-in", function () {
     it(`completes the physical ${isCall ? "call" : "put"} lifecycle without any settlement publisher or indicative feed`, async function () {
       const c = await defaultDeployment();
       const v = await goLive(c, { isCall });
-      expect((await c.hub.termsOf(v.vaultId)).priceFeed).equal(ZeroAddress);
+      expect(await c.hub.rulesOf(v.vaultId)).deep.equal([]);
       await fund(c, isCall ? c.usdc : c.weth, c.marketMaker, v.vaultAddress, isCall ? 30_000n * U : 10n * W);
       await c.hub.connect(c.marketMaker).exercise(v.vaultId, 10n * W);
       await expect(c.hub.connect(c.alice).claim(v.vaultId, isCall ? 10n * W : 30_000n * U))

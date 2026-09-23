@@ -62,10 +62,14 @@ describe('fixed linked libraries', function () {
     // Solidity library selectors use named storage types. These bodies would succeed on zeroed
     // storage without the compiler's direct-call guard, so their rejection tests that guard.
     const expire = id('expire(VaultState storage,VaultTerms storage,SettlementPrices storage,uint256)').slice(0, 10) + coder.encode(['uint256', 'uint256', 'uint256', 'uint256'], [0, 1, 2, 1]).slice(2);
-    const tighten = id('tightenVaultTerms(VaultTerms storage,TightenableTerms)').slice(0, 10)
-      + coder.encode(['uint256', 'tuple(uint8,uint8,uint256,uint16,uint32)'], [0, [0, 0, 0, 0, 0]]).slice(2);
-    for (const [to, data] of [[plan.addresses.IvyOptionSettlement, expire], [plan.addresses.IvyVaultRules, tighten]]) {
+    for (const [to, data] of [[plan.addresses.IvyOptionSettlement, expire]]) {
       await rejects(admin.provider!.call({ from: admin.address, to, data }), (error: any) => error.data === '0x');
     }
+  });
+  it('deploys the shipped validator as its own step', async function () {
+    const { admin, plan } = await networkHelpers.loadFixture(fixture);
+    const step = plan.steps.find(s => s.name === 'IvyBidRules')!;
+    expect(step.libraryLinks).deep.equal([]);
+    expect((await admin.provider!.getCode(step.address)).length).greaterThan(2);
   });
 });

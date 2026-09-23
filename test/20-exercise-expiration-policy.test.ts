@@ -41,12 +41,11 @@ describe("exercise policy and expiration", function () {
     }
   }
 
-  for (const allowPartialExercise of [false, true]) it(`keeps partial policy ${allowPartialExercise} through owner tightening`, async function () {
+  for (const allowPartialExercise of [false, true]) it(`keeps partial policy ${allowPartialExercise} and exposes no tightening`, async function () {
     const c = await networkHelpers.loadFixture(fixture);
     const v = await createVaultAs(c, c.alice, callTerms(c, { allowPartialExercise }), callPairs(c));
-    await c.hub.connect(c.alice).tightenVaultTerms(v.vaultId, { allowedExercise: ExerciseStyle.European, allowedSettlement: SettlementType.Physical, minCollateral: W, maxInTheMoneyBps: 0, maxPriceAge: 0 });
     expect((await c.hub.termsOf(v.vaultId)).allowPartialExercise).eq(allowPartialExercise);
-    expect(c.hub.interface.getFunction("tightenVaultTerms")!.inputs[1].components!.map(p => p.name)).not.include("allowPartialExercise");
+    expect(new Interface(c.hub.interface.fragments).getFunction("tightenVaultTerms")).eq(null);
     expect(new Interface(c.hub.interface.fragments).getFunction("settle(uint256)")).eq(null);
   });
 

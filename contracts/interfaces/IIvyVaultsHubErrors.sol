@@ -8,6 +8,7 @@ interface IIvyVaultsHubErrors {
     error CommitmentMismatch();
     error DeviationTooLarge();
     error DuplicatePair(address quoteToken);
+    error EmptyNotional();
     error ExceedsRemaining(uint256 remaining);
     error ExerciseNotOpenYet();
     error ExerciseWindowClosed();
