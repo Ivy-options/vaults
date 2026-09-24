@@ -21,6 +21,7 @@
   <aside class="rail"><a class="back-guide" href="index.html">← Protocol guide</a><details id="contents" open><summary>In this document</summary><nav aria-label="Page sections"><a href="#read-the-guide">Read the guide</a>
 <a href="#build-and-verify">Build and verify</a>
 <a href="#solidity-style">Solidity style</a>
+<a href="#typescript-style">TypeScript style</a>
 <a href="#edit-the-docs">Edit the docs</a>
 <a href="#license">License</a></nav></details></aside>
   <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
@@ -58,6 +59,23 @@ npm test -- --no-compile
 npm run format:solidity:check
 </code></pre>
 <p>Formatting is configured in <code>foundry.toml</code>. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
+<h2 id="typescript-style">TypeScript style</h2>
+<p>Scripts and tests are TypeScript that Node runs directly. Prettier formats them (<code>.prettierrc.json</code>, 120-character lines):</p>
+<pre><code class="language-sh">npm run format
+npm run format:check
+</code></pre>
+<p>Each test file creates its chain with <code>network.create()</code> and wraps its deployment in <code>fixture(connection, build)</code> from <code>test/helpers/setup.ts</code>. A <code>beforeEach</code> loads it, so every test starts from the same snapshot:</p>
+<pre><code class="language-ts">const connection = await network.create();
+const load = fixture(connection, () =&gt; deployIvy(connection));
+
+describe(&quot;activate&quot;, () =&gt; {
+  let c: IvyContext;
+  beforeEach(async () =&gt; {
+    c = await load();
+  });
+});
+</code></pre>
+<p>Snapshots on one chain are stacked, so give each distinct deployment its own connection.</p>
 <h2 id="edit-the-docs">Edit the docs</h2>
 <p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README. The frontend integration page is generated from <code>docs/frontend-integration.md</code>; the license page is generated from <code>LICENSE.md</code>.</p>
 <p>After changing docs or request templates, rebuild, check, and test:</p>

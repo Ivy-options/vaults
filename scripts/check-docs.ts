@@ -19,8 +19,8 @@ const aliasBlock = mapJs.match(/const ALIASES = \{([\s\S]*?)\n  \};/);
 assert.ok(aliasBlock, "Could not find ALIASES block in assets/map.js");
 const mapAliasKeys = new Set(
   [...aliasBlock[1].matchAll(/(?:^|[\s,{])(?:"([^"]+)"|([A-Za-z_$][\w$]*))\s*:/gm)].map(
-    (match) => match[1] ?? match[2]
-  )
+    (match) => match[1] ?? match[2],
+  ),
 );
 
 // Reference pages are hand-maintained HTML; check every page in the site,
@@ -39,15 +39,13 @@ const pages = [
 const pageIds = new Map(
   pages.map((path) => {
     const content = readFileSync(path, "utf8");
-    const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map(
-      (match) => match[1]
-    );
+    const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     assert.equal(new Set(ids).size, ids.length, `Duplicate IDs: ${path}`);
     assert.match(content, /<html lang="en"/);
     assert.equal((content.match(/<main\b/g) || []).length, 1, path);
     assert.equal((content.match(/<h1\b/g) || []).length, 1, path);
     return [path, ids];
-  })
+  }),
 );
 for (const path of pages) {
   const content = readFileSync(path, "utf8");
@@ -56,13 +54,8 @@ for (const path of pages) {
     assert.ok(!/\.md(?:$|#|\?)/i.test(url), `Markdown link: ${path}: ${url}`);
     const [address, anchor] = url.split("#");
     const target = address.split("?")[0];
-    const destination = target
-      ? resolve(dirname(path), decodeURIComponent(target))
-      : path;
-    assert.ok(
-      destination.startsWith(site + "/"),
-      `Link leaves standalone site: ${url}`
-    );
+    const destination = target ? resolve(dirname(path), decodeURIComponent(target)) : path;
+    assert.ok(destination.startsWith(site + "/"), `Link leaves standalone site: ${url}`);
     assert.ok(existsSync(destination), `Missing link: ${path}: ${url}`);
     if (anchor) {
       const decodedAnchor = decodeURIComponent(anchor);
@@ -77,16 +70,31 @@ for (const path of pages) {
     }
   }
 }
-for (const file of ["docs.css", "guide.css", "atlas.css", "roman.css", "reference.css", "labs.css", "map.css", "shell.css"]) {
+for (const file of [
+  "docs.css",
+  "guide.css",
+  "atlas.css",
+  "roman.css",
+  "reference.css",
+  "labs.css",
+  "map.css",
+  "shell.css",
+]) {
   const css = readFileSync(resolve(site, "assets", file), "utf8");
   for (const [, url] of css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
-    assert.ok(
-      existsSync(resolve(site, "assets", url)),
-      `Missing CSS asset: ${url}`
-    );
+    assert.ok(existsSync(resolve(site, "assets", url)), `Missing CSS asset: ${url}`);
   }
 }
-for (const file of ["docs.js", "guide.js", "reference.js", "vault-diagrams.js", "labs.js", "map.js", "shell.js", "embed.js"]) {
+for (const file of [
+  "docs.js",
+  "guide.js",
+  "reference.js",
+  "vault-diagrams.js",
+  "labs.js",
+  "map.js",
+  "shell.js",
+  "embed.js",
+]) {
   new Script(readFileSync(resolve(site, "assets", file), "utf8"));
 }
 
@@ -117,7 +125,7 @@ function makeElements(ids: string[]): Elements {
         addEventListener() {},
         setAttribute() {},
       },
-    ])
+    ]),
   );
 }
 const CALC_INPUT_IDS = ["kind", "dep", "strike", "prem", "days", "entryPrice"];
@@ -134,7 +142,7 @@ function verifyPayoffCalculator(elements: Elements, update: (values: Record<stri
   assert.equal(elements.premiumApr.textContent, "40.56%");
   function resultRows() {
     return [...elements.rows.innerHTML.matchAll(/<tr>(.*?)<\/tr>/g)].map(([, row]) =>
-      [...row.matchAll(/<td\b[^>]*>(.*?)<\/td>/g)].map((match) => match[1].replace(/<[^>]+>/g, ""))
+      [...row.matchAll(/<td\b[^>]*>(.*?)<\/td>/g)].map((match) => match[1].replace(/<[^>]+>/g, "")),
     );
   }
   const callRows = [
@@ -212,7 +220,9 @@ function verifyLabsPayoff(ids: string[]) {
     document: { documentElement, addEventListener() {}, querySelector: () => null },
     scope: { querySelector: (s: string) => elements[s.replace(/^#/, "")] || null, querySelectorAll: () => [] },
     CSS: { escape: (s: string) => s },
-    MutationObserver: class { observe() {} },
+    MutationObserver: class {
+      observe() {}
+    },
     localStorage: { getItem: () => null, setItem() {} },
     getComputedStyle: () => ({ getPropertyValue: () => "#888" }),
     addEventListener() {},
@@ -226,12 +236,16 @@ function verifyLabsPayoff(ids: string[]) {
   });
 }
 verifyLabsPayoff(pageIds.get(guidePagePath)!);
-assert.match(readFileSync(guidePagePath, "utf8"), /class="calc" data-lab="payoff"/, "The guide mounts the shared payoff lab");
+assert.match(
+  readFileSync(guidePagePath, "utf8"),
+  /class="calc" data-lab="payoff"/,
+  "The guide mounts the shared payoff lab",
+);
 {
   const fixture = readFileSync(resolve(site, "test/fixtures/labs.html"), "utf8");
   verifyLabsPayoff([...fixture.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
 }
 
 console.log(
-  `Docs checks passed: ${pages.length} HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, the shared payoff calculator on both pages, invalid inputs and recovery.`
+  `Docs checks passed: ${pages.length} HTML pages, generated content, standalone links, cross-page anchors, assets, JavaScript, the shared payoff calculator on both pages, invalid inputs and recovery.`,
 );

@@ -1,0 +1,11 @@
+# Generated output and dependencies
+node_modules
+artifacts
+cache
+types
+dist
+coverage
+lib
+# Solidity is formatted by forge fmt; the docs site and its assets are hand-maintained
+contracts
+docs

@@ -53,7 +53,10 @@ export interface PairLimitInput {
 export const RuleKind = RULE_KIND;
 
 /** Deploys peers and grants trading roles. Cash scenarios explicitly grant a publisher and enable admissions. */
-export async function deployIvy(connection: Connection, { enableCashSettlement = true } = {}) {
+export async function deployIvy(
+  connection: Connection,
+  { enableCashSettlement = true, transfersEnabled = false } = {},
+) {
   const { ethers, networkHelpers } = connection;
   const [admin, bidMaster, marketMaker, alice, bob, carol] = await ethers.getSigners();
 
@@ -64,13 +67,41 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
   const bidRules = await ethers.deployContract("IvyBidRules");
   const vaultImpl = await ethers.deployContract("IvyVault");
   const vaultImplAddress = await vaultImpl.getAddress();
-  const rules = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyVaultRules")).bytecode, admin).deploy();
-  const settlement = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyOptionSettlement")).bytecode, admin).deploy();
+  const rules = await new ethers.ContractFactory(
+    [],
+    (await artifacts.readArtifact("IvyVaultRules")).bytecode,
+    admin,
+  ).deploy();
+  const settlement = await new ethers.ContractFactory(
+    [],
+    (await artifacts.readArtifact("IvyOptionSettlement")).bytecode,
+    admin,
+  ).deploy();
   const libraries = { IvyVaultRules: await rules.getAddress(), IvyOptionSettlement: await settlement.getAddress() };
   const nonce = await admin.getNonce();
-  const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map(i => getCreateAddress({ from: admin.address, nonce: nonce + i }));
-  const hub = await ethers.deployContract("IvyVaultsHub", [admin.address, vaultImplAddress, sharesAddress, premiumsAddress, unwindAddress, EXERCISE_WINDOW, AUCTION_TIMEOUT, EXPIRY_PRICE_PUBLICATION_WINDOW], { libraries });
-  const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, unwindAddress, "ipfs://ivy/{id}.json"]);
+  const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map((i) =>
+    getCreateAddress({ from: admin.address, nonce: nonce + i }),
+  );
+  const hub = await ethers.deployContract(
+    "IvyVaultsHub",
+    [
+      admin.address,
+      vaultImplAddress,
+      sharesAddress,
+      premiumsAddress,
+      unwindAddress,
+      EXERCISE_WINDOW,
+      AUCTION_TIMEOUT,
+      EXPIRY_PRICE_PUBLICATION_WINDOW,
+    ],
+    { libraries },
+  );
+  const shares = await ethers.deployContract("IvyShares", [
+    hubAddress,
+    premiumsAddress,
+    unwindAddress,
+    "ipfs://ivy/{id}.json",
+  ]);
   const premiums = await ethers.deployContract("IvyPremiums", [hubAddress, sharesAddress]);
   const unwind = await ethers.deployContract("IvyUnwind", [hubAddress, sharesAddress]);
   const defaultExpiry = BigInt(await networkHelpers.time.latest()) + THIRTY_DAYS;
@@ -81,6 +112,7 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
     await (await hub.grantRole(await hub.SETTLEMENT_PRICE_PUBLISHER_ROLE(), admin.address)).wait();
     await (await hub.setCashSettlementEnabled(true)).wait();
   }
+  if (transfersEnabled) await (await hub.setTransfersEnabled(true)).wait();
 
   return {
     libraries,
@@ -118,6 +150,19 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 }
 
 export type IvyContext = Awaited<ReturnType<typeof deployIvy>>;
+
+/**
+ * Returns a loader for `build` on `connection`. The first call deploys and snapshots;
+ * later calls revert to that snapshot, so tests share setup but never state.
+ * Snapshots on one chain are stacked, so give each distinct deployment its own connection.
+ */
+export function fixture<T>(connection: Connection, build: () => Promise<T>): () => Promise<T> {
+  // loadFixture keys snapshots by function identity and rejects anonymous functions.
+  async function snapshot() {
+    return build();
+  }
+  return () => connection.networkHelpers.loadFixture(snapshot);
+}
 
 /** Covered call on WETH, quoted in USDC, physical only, no feed. */
 export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): VaultTermsInput {
@@ -163,11 +208,14 @@ export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRu
   return {
     validator: ctx.bidRulesAddress,
     kind: RuleKind.PairLimits,
-    data: encodePairLimits(limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremium])),
+    data: encodePairLimits(limits.map((l) => [l.quoteToken, l.strikeLimit, l.minPremium])),
   };
 }
 
-export function spotBandRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number }): BidRuleInput {
+export function spotBandRule(
+  ctx: IvyContext,
+  o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number },
+): BidRuleInput {
   return {
     validator: ctx.bidRulesAddress,
     kind: RuleKind.SpotBand,
@@ -175,7 +223,10 @@ export function spotBandRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceA
   };
 }
 
-export function premiumFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minPremiumBps: number }): BidRuleInput {
+export function premiumFloorRule(
+  ctx: IvyContext,
+  o: { priceFeed?: string; maxPriceAge: number; minPremiumBps: number },
+): BidRuleInput {
   return {
     validator: ctx.bidRulesAddress,
     kind: RuleKind.PremiumFloor,

@@ -1,15 +1,31 @@
 import { ZeroAddress } from "ethers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import {
-  ExerciseStyle, SettlementPolicy, SettlementType, USDC_UNIT, WETH_UNIT,
-  callLimits, callPairs, callTerms, createVaultAs, fund, pairLimitsRule, putLimits, putPairs, putTerms, spotBandRule,
-  type BidRuleInput, type IvyContext, type PairLimitInput, type VaultTermsInput,
+  ExerciseStyle,
+  SettlementPolicy,
+  SettlementType,
+  USDC_UNIT,
+  WETH_UNIT,
+  callLimits,
+  callPairs,
+  callTerms,
+  createVaultAs,
+  fund,
+  pairLimitsRule,
+  putLimits,
+  putPairs,
+  putTerms,
+  spotBandRule,
+  type BidRuleInput,
+  type IvyContext,
+  type PairLimitInput,
+  type VaultTermsInput,
 } from "./setup.js";
 import { signBid, type Bid } from "./bids.js";
 
-export const STRIKE = 3000n * USDC_UNIT;        // 3000 USDC per WETH
-export const PREMIUM = 100n * USDC_UNIT;        // 100 USDC per WETH
-export const CALL_DEPOSIT = 10n * WETH_UNIT;    // 10 WETH → notional 10 WETH
+export const STRIKE = 3000n * USDC_UNIT; // 3000 USDC per WETH
+export const PREMIUM = 100n * USDC_UNIT; // 100 USDC per WETH
+export const CALL_DEPOSIT = 10n * WETH_UNIT; // 10 WETH → notional 10 WETH
 export const PUT_DEPOSIT = 30_000n * USDC_UNIT; // 30,000 USDC → notional 10 WETH at strike 3000
 export const TENOR = 7n * 24n * 3600n;
 export const MM_BANKROLL = 1_000_000n * USDC_UNIT;
@@ -64,7 +80,9 @@ export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
     ? { maxSettlementPriceAge: 3600, allowedSettlement: SettlementPolicy.Either }
     : {};
   const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR;
-  const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });
+  const terms = isCall
+    ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms })
+    : putTerms(ctx, { expiry, ...feedTerms, ...o.terms });
   const pairs = isCall ? callPairs(ctx) : putPairs(ctx);
   if (o.premiumToken) pairs[0].premiumToken = o.premiumToken;
   const rules: BidRuleInput[] = [];
@@ -105,7 +123,10 @@ export interface BidOptions {
 /** Physical American bid at STRIKE / PREMIUM expiring in TENOR, valid for one hour, fresh nonce. */
 export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = {}): Promise<Bid> {
   const [latest, state, collateralAmount, termsHash] = await Promise.all([
-    ctx.networkHelpers.time.latest(), ctx.hub.stateOf(vaultId), ctx.hub.totalShares(vaultId), ctx.hub.termsHashOf(vaultId),
+    ctx.networkHelpers.time.latest(),
+    ctx.hub.stateOf(vaultId),
+    ctx.hub.totalShares(vaultId),
+    ctx.hub.termsHashOf(vaultId),
   ]);
   const now = BigInt(latest);
   return {

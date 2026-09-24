@@ -55,6 +55,31 @@ npm run format:solidity:check
 
 Formatting is configured in `foundry.toml`. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run `npm run docs:build` to refresh the guide's source copies.
 
+## TypeScript style
+
+Scripts and tests are TypeScript that Node runs directly. Prettier formats them (`.prettierrc.json`, 120-character lines):
+
+```sh
+npm run format
+npm run format:check
+```
+
+Each test file creates its chain with `network.create()` and wraps its deployment in `fixture(connection, build)` from `test/helpers/setup.ts`. A `beforeEach` loads it, so every test starts from the same snapshot:
+
+```ts
+const connection = await network.create();
+const load = fixture(connection, () => deployIvy(connection));
+
+describe("activate", () => {
+  let c: IvyContext;
+  beforeEach(async () => {
+    c = await load();
+  });
+});
+```
+
+Snapshots on one chain are stacked, so give each distinct deployment its own connection.
+
 ## Edit the docs
 
 Edit the guide and reference pages in `docs/site/`. `project-setup.html` is generated from this README. The frontend integration page is generated from `docs/frontend-integration.md`; the license page is generated from `LICENSE.md`.
