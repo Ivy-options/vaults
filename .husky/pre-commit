@@ -1,0 +1,49 @@
+#!/bin/sh
+
+# Operate only on staged files, and leave partially staged paths untouched.
+STAGED_LIST=$(mktemp)
+FORMAT_LIST=$(mktemp)
+trap 'rm -f "$STAGED_LIST" "$FORMAT_LIST"' EXIT
+
+git diff --cached --name-only --diff-filter=ACMR > "$STAGED_LIST"
+
+if [ ! -s "$STAGED_LIST" ]; then
+    exit 0
+fi
+
+while IFS= read -r file; do
+    if git diff --quiet -- "$file"; then
+        printf '%s\n' "$file" >> "$FORMAT_LIST"
+    else
+        printf 'Skipping format, partially staged: %s\n' "$file"
+    fi
+done < "$STAGED_LIST"
+
+if [ -s "$FORMAT_LIST" ]; then
+    echo "Formatting staged files..."
+
+    # Prettier respects .prettierignore; Solidity is formatted with Forge below.
+    tr '\n' '\0' < "$FORMAT_LIST" | xargs -0 npx prettier --write --ignore-unknown
+    if [ $? -ne 0 ]; then
+        echo "Formatting failed. Aborting commit."
+        exit 1
+    fi
+
+    while IFS= read -r file; do
+        case "$file" in
+            *.sol)
+                forge fmt "$file" || exit 1
+                ;;
+        esac
+    done < "$FORMAT_LIST"
+
+    tr '\n' '\0' < "$FORMAT_LIST" | xargs -0 git add --
+fi
+
+if grep -q '\.sol$' "$STAGED_LIST"; then
+    echo "Solidity files changed. Compiling contracts..."
+    npx hardhat compile || {
+        echo "Compilation failed. Aborting commit."
+        exit 1
+    }
+fi

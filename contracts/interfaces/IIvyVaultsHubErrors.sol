@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-/// @notice Errors propagated by linked libraries and bid validators. Keep them in the hub ABI for clients and revert decoding.
+/// @notice Library and validator errors included in the Hub ABI for revert decoding.
 interface IIvyVaultsHubErrors {
     error CashSettlementDisabled();
     error CashSettlementNeedsMaxPriceAge();

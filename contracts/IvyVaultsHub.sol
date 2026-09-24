@@ -21,10 +21,9 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @notice Immutable factory and rule engine for individual option vaults.
-/// @dev Owns lifecycle state and permissions. Vaults own custody, Shares owns balances,
-///      Premiums owns premium credits, and Unwind owns consent and contributions.
-///      Fixed linked libraries execute in Hub storage under its entrypoint guards.
+/// @notice Creates option vaults and manages their lifecycle.
+/// @dev Vaults hold tokens; Shares tracks LP balances; Premiums and Unwind track their respective claims.
+///      Linked libraries run in Hub storage through guarded entrypoints.
 contract IvyVaultsHub is
     IIvyVaultsHubEvents,
     IIvyVaultsHubErrors,
@@ -33,15 +32,11 @@ contract IvyVaultsHub is
     ReentrancyGuardTransient,
     IIvyVaultsHub
 {
-    // Types
-
     struct PlatformFee {
         uint16 rateBps;
         address recipient;
         uint256 amount;
     }
-
-    // Constants
 
     bytes32 public constant BID_MASTER_ROLE = keccak256("BID_MASTER_ROLE");
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
@@ -49,14 +44,10 @@ contract IvyVaultsHub is
     bytes32 public constant PLATFORM_FEE_MANAGER_ROLE = keccak256("PLATFORM_FEE_MANAGER_ROLE");
     bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE = keccak256("SETTLEMENT_PRICE_PUBLISHER_ROLE");
 
-    // Immutables
-
     address public immutable vaultImplementation;
     IvyPremiums public immutable premiums;
     IvyUnwind public immutable unwind;
     IIvyShares public immutable shareToken;
-
-    // Storage
 
     bool public cashSettlementEnabled;
     mapping(uint256 vaultId => SettlementPrices) internal _settlementPrices;
@@ -83,18 +74,12 @@ contract IvyVaultsHub is
     /// @notice Premium fee rate fixed at vault creation, including a zero rate.
     mapping(uint256 vaultId => uint16) public vaultPlatformFeeBps;
 
-    // Events
-
     event PlatformFeeAllocated(uint256 indexed vaultId, address indexed recipient, uint16 rateBps, uint256 amount);
     event PlatformFeeBpsUpdated(uint16 oldRate, uint16 newRate);
     event PlatformTreasuryUpdated(address oldTreasury, address newTreasury);
     event TransfersEnabledUpdated(bool enabled);
 
-    // Errors
-
     error InvalidPlatformFee();
-
-    // Modifiers
 
     modifier onlyVaultOwner(uint256 vaultId) {
         _requireExists(vaultId);
@@ -103,8 +88,6 @@ contract IvyVaultsHub is
         }
         _;
     }
-
-    // Constructor
 
     constructor(
         address admin,
@@ -141,8 +124,6 @@ contract IvyVaultsHub is
         platformTreasury = admin;
     }
 
-    // Administration
-
     function setPlatformFeeBps(uint16 rate) external onlyRole(PLATFORM_FEE_MANAGER_ROLE) {
         if (rate > IvyMath.BPS) {
             revert InvalidPlatformFee();
@@ -164,8 +145,8 @@ contract IvyVaultsHub is
         emit TransfersEnabledUpdated(enabled);
     }
 
-    /// @notice Controls new cash admissions. Admins must arrange publisher authority before enabling.
-    /// @dev Existing positions and publisher membership are independent of this flag.
+    /// @notice Gate new cash vaults and cash bid activations. Existing positions are unaffected.
+    /// @dev Enabling this does not grant the publisher role.
     function setCashSettlementEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
         cashSettlementEnabled = enabled;
         emit CashSettlementEnabledUpdated(enabled);
@@ -199,10 +180,8 @@ contract IvyVaultsHub is
         shareToken.setURI(uri_);
     }
 
-    // Vault creation (spec 4.2)
-
-    /// @notice Create a vault. Kind is derived: `collateral == underlying` is a covered call, anything else a put.
-    ///         Rules are the creator's bid acceptance conditions; they are frozen with the terms and pairs.
+    /// @notice Create a vault with bid terms, token pairs, and rules.
+    /// @dev `collateral == underlying` makes a covered call; otherwise the vault is a put.
     function createVault(VaultTerms calldata terms, PairConfig[] calldata pairs, BidRule[] calldata rules)
         external
         nonReentrant
@@ -261,9 +240,7 @@ contract IvyVaultsHub is
         }
     }
 
-    // Deposits and withdrawals (spec 6.1)
-
-    /// @notice Deposit through the hub. The caller must have approved the vault address.
+    /// @notice Deposit collateral through the hub. Approve the vault address to spend it first.
     function deposit(uint256 vaultId, uint256 amount) external nonReentrant {
         _checkDeposit(vaultId, msg.sender, amount);
         uint256 received = IIvyVault(_state[vaultId].vault).pull(_terms[vaultId].collateral, msg.sender, amount);
@@ -279,7 +256,7 @@ contract IvyVaultsHub is
         _credit(vaultId, depositor, amount);
     }
 
-    /// @notice Burn shares and take collateral back. Only while the vault is Open.
+    /// @notice Burn shares for collateral while the vault is Open.
     function withdraw(uint256 vaultId, uint256 shares) external nonReentrant {
         _requirePhase(vaultId, Phase.Open);
         if (shares == 0) {
@@ -290,9 +267,7 @@ contract IvyVaultsHub is
         emit Withdrawn(vaultId, msg.sender, shares);
     }
 
-    // Owner controls (spec 8)
-
-    /// @notice Set or clear the time from which anyone may open the auction. Operational, not economic.
+    /// @notice Set when anyone may open the auction; zero restricts opening to the owner.
     function scheduleAuction(uint256 vaultId, uint64 auctionStartsAt) external onlyVaultOwner(vaultId) {
         _requirePhase(vaultId, Phase.Open);
         _terms[vaultId].auctionStartsAt = auctionStartsAt;
@@ -308,9 +283,7 @@ contract IvyVaultsHub is
         emit VaultOwnershipTransferred(vaultId, previous, newOwner);
     }
 
-    // Auctions (spec 6.1, 6.2)
-
-    /// @notice Freeze deposits and start the off-chain auction. Owner any time; anyone once `auctionStartsAt` passed.
+    /// @notice Freeze deposits and open the auction. The owner can act any time; others wait for `auctionStartsAt`.
     function openAuction(uint256 vaultId) external {
         _requirePhase(vaultId, Phase.Open);
         _admission(vaultId);
@@ -337,7 +310,8 @@ contract IvyVaultsHub is
         emit AuctionOpened(vaultId, collateral);
     }
 
-    /// @notice Bid master any time; owner after timeout, at expiry, or during admission pause. Clears the schedule.
+    /// @notice Cancel the auction and clear its schedule. The owner must wait for timeout, expiry, or a pause.
+    /// @dev The bid master can cancel any time.
     function cancelAuction(uint256 vaultId) external {
         _requirePhase(vaultId, Phase.Auction);
         VaultState storage s = _state[vaultId];
@@ -358,9 +332,7 @@ contract IvyVaultsHub is
         emit AuctionCancelled(vaultId);
     }
 
-    // Activation
-
-    /// @notice Bid master submits the winning bid, signed by the market maker. Checks run in spec §7.2 order.
+    /// @notice Activate the market maker's signed bid. Only the bid master may submit it.
     function activate(uint256 vaultId, Bid calldata bid, bytes calldata signature)
         external
         nonReentrant
@@ -432,7 +404,7 @@ contract IvyVaultsHub is
         );
     }
 
-    /// @notice Burn one of your own bid nonces so a bid signed with it can never be activated.
+    /// @notice Invalidate one of your bid nonces.
     function cancelBid(uint256 nonce) external {
         if (usedBidNonces[msg.sender][nonce]) {
             revert NonceUsed();
@@ -441,9 +413,7 @@ contract IvyVaultsHub is
         emit BidCancelled(msg.sender, nonce);
     }
 
-    // Settlement price publication
-
-    /// @notice The authorized EOA or contract publishes a strictly newer observation for one live cash vault.
+    /// @notice Publish a newer exercise price for one live cash vault.
     function publishExercisePrice(uint256 vaultId, uint256 price, uint64 observedAt, uint64 validUntil)
         external
         onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
@@ -460,7 +430,8 @@ contract IvyVaultsHub is
         );
     }
 
-    /// @notice Finalize a cash price during its fixed publication window. Stored prices cannot be replaced.
+    /// @notice Publish the final cash price during the vault's fixed publication window.
+    /// @dev A finalized price cannot be replaced.
     function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil)
         external
         onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE)
@@ -479,30 +450,26 @@ contract IvyVaultsHub is
         );
     }
 
-    // Exercise
-
-    /// @notice Market maker exercises `amount` underlying units. Partial exercise follows the immutable vault term; the vault finalizes
-    ///         automatically once everything is exercised.
+    /// @notice Exercise `amount` underlying units. The market maker or executor may call this.
+    /// @dev Partial exercise follows the vault term; exercising the remainder finalizes the vault.
     function exercise(uint256 vaultId, uint256 amount) external nonReentrant {
         _exercise(vaultId, amount, false);
     }
 
-    /// @notice Explicitly exchange strike assets when a cash vault's publication window closed without a final price.
+    /// @notice Exercise physically if a cash vault's price publication window closed without a final price.
     function exercisePhysicalFallback(uint256 vaultId, uint256 amount) external nonReentrant {
         _exercise(vaultId, amount, true);
     }
 
-    // Settlement and payouts
-
-    /// @notice Permissionless. Cash with a final report reserves its payout; a missing report lets the remainder lapse
-    ///         after both fallback windows. Neither path depends on buyer cooperation.
+    /// @notice Finalize a live vault once its settlement deadline passes. Anyone may call.
+    /// @dev A final cash price reserves the buyer payout; without one, remaining notional lapses after the fallback window.
     function expire(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         IvyOptionSettlement.expire(_state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId);
     }
 
-    /// @notice Buyer or executor collects a reserved cash payout or unwind refund for the configured recipient. A failing transfer
-    ///         can never block `expire`. A contract recipient is notified through `IIvyPayoutReceiver` afterwards.
+    /// @notice Send a reserved cash payout or unwind refund to the buyer's chosen recipient.
+    /// @dev Only the buyer or executor may call. Contract recipients receive a best-effort `IIvyPayoutReceiver` callback.
     function claimPayout(uint256 vaultId) external nonReentrant {
         _requirePhase(vaultId, Phase.Settled);
         IvyOptionSettlement.claimPayout(_state[vaultId], _terms[vaultId], vaultId);
@@ -526,8 +493,6 @@ contract IvyVaultsHub is
         s.recipient = recipient;
         emit ExecutionUpdated(vaultId, executor, recipient);
     }
-
-    // Unwind
 
     function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund, bytes calldata buyerSignature)
         external
@@ -558,7 +523,7 @@ contract IvyVaultsHub is
         unwind.revoke(vaultId, msg.sender);
     }
 
-    /// @notice Each current LP deposits premium tokens into this vault's segregated refund reserve.
+    /// @notice Fund this vault's unwind refund reserve with premium tokens.
     function fundUnwind(uint256 vaultId, uint256 nonce, uint256 amount) external nonReentrant {
         _requirePhase(vaultId, Phase.Live);
         VaultState storage s = _state[vaultId];
@@ -588,19 +553,15 @@ contract IvyVaultsHub is
         emit Unwound(vaultId, nonce, refund);
     }
 
-    // Claims (spec 10)
-
-    /// @notice Burn `shares` for proportional unreserved collateral and settlement proceeds.
-    ///         Unpaid activation premium, premium dust and buyer obligations remain reserved.
+    /// @notice Burn shares for proportional unreserved collateral and settlement proceeds.
+    /// @dev Unpaid premium, premium dust, and buyer obligations remain reserved.
     function claim(uint256 vaultId, uint256 shares) external nonReentrant {
         _requirePhase(vaultId, Phase.Settled);
         IvyOptionSettlement.claim(_state[vaultId], _terms[vaultId], shareToken, vaultId, shares);
         emit Claimed(vaultId, msg.sender, shares);
     }
 
-    // External views
-
-    /// @notice Preview the next buyer agreement. Intervening proposals or exercises make its signature stale.
+    /// @notice Preview the next buyer agreement. A new proposal or exercise invalidates its signature.
     function previewUnwind(uint256 vaultId, uint64 deadline, uint256 refund)
         external
         view
@@ -671,15 +632,11 @@ contract IvyVaultsHub is
         return _state[vaultId].isCall ? OptionKind.CoveredCall : OptionKind.CashSecuredPut;
     }
 
-    // Version
-
     function version() external pure returns (string memory) {
         return "3";
     }
 
-    // Public views
-
-    /// @notice Current settlement route and fixed fallback deadlines. Inactive means the vault is not Live.
+    /// @notice Current settlement route and fallback deadlines. `Inactive` means the vault is not Live.
     function settlementStatus(uint256 vaultId)
         external
         view
@@ -695,7 +652,7 @@ contract IvyVaultsHub is
         return IvyOptionSettlement.expirationTime(_state[vaultId], _settlementPrices[vaultId]);
     }
 
-    /// @notice Shares outstanding for a vault (== credited collateral), read from the share token.
+    /// @notice Shares outstanding for a vault, equal to credited collateral units.
     function totalShares(uint256 vaultId) public view returns (uint256) {
         return shareToken.totalSupply(vaultId);
     }
@@ -704,8 +661,6 @@ contract IvyVaultsHub is
         VaultState storage s = _state[vaultId];
         return s.totalNotional - s.exercisedNotional;
     }
-
-    // Internal helpers
 
     function _exercise(uint256 vaultId, uint256 amount, bool physicalFallback) internal {
         _requirePhase(vaultId, Phase.Live);
@@ -733,8 +688,6 @@ contract IvyVaultsHub is
         }
         return super._grantRole(role, account);
     }
-
-    // Internal guards
 
     function _checkDeposit(uint256 vaultId, address depositor, uint256 amount) internal view {
         _admission(vaultId);
@@ -772,8 +725,6 @@ contract IvyVaultsHub is
             revert WrongPhase(expected, actual);
         }
     }
-
-    // Private guards
 
     function _requireCashPublication(uint256 vaultId) private view {
         _requirePhase(vaultId, Phase.Live);

@@ -138,8 +138,9 @@ contract IvyUnwind is EIP712 {
         emit ContributionFunded(id, nonce, holder, amount);
     }
 
-    /// @notice Before execution withdrawal revokes this holder's current consent. After execution only excess is recoverable.
-    ///         Ceiling surplus is apportioned over remaining weights; the final withdrawing participant receives the dust.
+    /// @notice Withdraw a contribution. Before execution, this revokes the holder's consent.
+    /// @dev After execution, only excess funding is returned. Remaining surplus is split by obligation weight;
+    ///      the final withdrawal receives rounding dust.
     function withdraw(uint256 id, uint256 nonce, address holder) external onlyHub returns (uint256 amount) {
         amount = contributions[id][nonce][holder];
         if (amount == 0) {
@@ -155,7 +156,7 @@ contract IvyUnwind is EIP712 {
             completion.remainingSurplus -= surplus;
             amount = amount - weight + surplus;
         } else if (nonce == agreements[id].nonce) {
-            // Invalidate against the original funded amount, before removing the ledger entry.
+            // Invalidate while the contribution is still recorded.
             _invalidate(id, holder);
         }
         delete contributions[id][nonce][holder];

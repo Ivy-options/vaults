@@ -5,12 +5,10 @@ import {IIvyBidValidator} from "../interfaces/IIvyBidValidator.sol";
 import "../types/IvyTypes.sol";
 import {IvyMath} from "./IvyMath.sol";
 
-/// @notice Linked vault validation: creation inputs, the mandatory bid checks, and the creator's bid rules.
-/// @dev Storage references address the calling hub under DELEGATECALL. No configurable target or independent state.
-///      Validators are reached through STATICCALL (view interface calls) and their reverts bubble unchanged.
+/// @notice Validates vault creation and bids against hub checks and creator rules.
+/// @dev Runs in Hub storage by DELEGATECALL. Validator calls use STATICCALL; reverts propagate.
 library IvyVaultRules {
-    /// @dev Validates, stores and commits the creator's rules in one call. Every validator must have code and
-    ///      accept its own data before any deposit can arrive. Returns the termsHash bids must carry.
+    /// @dev Validates and stores each rule before deposits are possible. Returns the terms hash signed bids must carry.
     function adoptRules(
         BidRule[] storage stored,
         VaultTerms calldata t,
@@ -72,9 +70,7 @@ library IvyVaultRules {
         }
     }
 
-    /// @dev Mandatory checks, then every creator rule in order. Bid signature and caller authorization are enforced by
-    ///      the hub before this runs. A validator that approves everything cannot bypass the mandatory checks, and the
-    ///      first rule rejection ends activation.
+    /// @dev The Hub checks caller and signature first. Mandatory checks run before creator rules, in order.
     function checkBid(
         VaultState storage s,
         VaultTerms storage t,
@@ -141,7 +137,7 @@ library IvyVaultRules {
         }
     }
 
-    /// @dev Commitment to the creator-supplied inputs of createVault. auctionStartsAt is operational and excluded.
+    /// @dev Hashes creator terms, pairs, and rules. `auctionStartsAt` is mutable and excluded.
     function _termsHash(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules)
         private
         pure

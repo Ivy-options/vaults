@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-/// @notice The hub-owned ERC-1155 share token. Token id == vault id. 1 share == 1 smallest unit of collateral.
+/// @notice ERC-1155 LP shares. A token ID identifies a vault; one share equals the smallest collateral unit.
+/// @dev Only the Hub may mint, burn, or set the URI.
 interface IIvyShares {
-    /// @notice Hub only.
     function mint(address to, uint256 id, uint256 amount) external;
 
-    /// @notice Hub only.
     function burn(address from, uint256 id, uint256 amount) external;
 
-    /// @notice Hub only.
     function setURI(string calldata newUri) external;
 
     function premiums() external view returns (address);

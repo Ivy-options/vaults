@@ -12,9 +12,9 @@ interface IShareTransferPolicy {
     function transfersEnabled() external view returns (bool);
 }
 
-/// @title IvyShares
-/// @notice ERC-1155 LP share token for Ivy vaults. Minted and burned only by the hub; transfers controlled by the hub.
-///         Token id == vault id. Lives outside the hub so the hub stays under the EIP-170 bytecode limit.
+/// @notice ERC-1155 LP shares. Each token ID is a vault ID; one share equals the smallest collateral unit.
+/// @dev Only the hub mints and burns. The hub also controls whether shares can transfer.
+///      This separate contract keeps the Hub within the EIP-170 code size limit.
 contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
     address public immutable override hub;
     address public immutable override premiums;

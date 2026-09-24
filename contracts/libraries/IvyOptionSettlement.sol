@@ -9,11 +9,11 @@ import "../types/IvyTypes.sol";
 import {IvyMath} from "./IvyMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/// @notice Fixed linked exercise, settlement and residual-claim implementation.
-/// @dev Payments use phase-checked, nonReentrant Hub entrypoints; publication uses publisher-role guards.
-///      DELEGATECALL preserves Hub storage, msg.sender and custody authority. No independent payment route.
+/// @notice Exercise, expiry settlement, and LP claims for the Hub.
+/// @dev Runs by DELEGATECALL in Hub storage. The Hub checks phases, guards payments against reentrancy,
+///      and restricts price writes to publishers.
 library IvyOptionSettlement {
-    /// @dev Hub checks publisher authority before delegating here. Observations live in Hub storage.
+    /// @dev Stores per-vault observations in Hub storage.
     function publishExercisePrice(
         SettlementPrices storage prices,
         uint256 vaultId,
@@ -31,7 +31,7 @@ library IvyOptionSettlement {
         emit IIvyVaultsHubEvents.ExercisePricePublished(vaultId, underlying, quote, price, observedAt, validUntil);
     }
 
-    /// @dev Hub checks publisher authority. Revocation does not alter previously finalized prices.
+    /// @dev Once stored, an expiry price cannot be replaced, even if publisher roles change.
     function publishExpiry(
         SettlementPrices storage prices,
         uint256 vaultId,
@@ -147,8 +147,7 @@ library IvyOptionSettlement {
         _finalize(s, vaultId);
     }
 
-    /// @dev Hub checks the Settled phase. Pays the reserved cash payout and unwind refund to the recipient, then
-    ///      notifies it once per token delivered.
+    /// @dev Pays reserved collateral and premium tokens, then notifies the recipient for each token delivered.
     function claimPayout(VaultState storage s, VaultTerms storage t, uint256 vaultId) external {
         if (msg.sender != s.marketMaker && msg.sender != s.executor) {
             revert NotExecutor();
@@ -236,10 +235,7 @@ library IvyOptionSettlement {
         emit IIvyVaultsHubEvents.Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
     }
 
-    /// @dev Best-effort recipient hook. A missing method or an ordinary revert never blocks the payout; only a hook
-    ///      that exhausts its gas reverts, so gas estimation cannot settle on a limit that silently starves it. The
-    ///      recipient is the market maker's own choice and only the market maker or executor reach this path, so a
-    ///      misbehaving hook affects nobody else. Acknowledged means the call returned the hook selector.
+    /// @dev Ignores missing hooks and ordinary reverts; gas exhaustion reverts to avoid silently starving the hook.
     function _notifyRecipient(uint256 vaultId, address recipient, address token, uint256 amount) private {
         if (amount == 0 || recipient.code.length == 0) {
             return;

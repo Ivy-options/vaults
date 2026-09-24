@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-/// @dev Shared enums, structs and custom errors for Ivy Vaults.
-
 /// Derived from `collateral == underlying`; never an input.
 enum OptionKind {
     CoveredCall,
@@ -63,7 +61,7 @@ struct VaultTerms {
     uint32 maxSettlementPriceAge; // immutable exercise observation age limit
 }
 
-/// @dev Hub-owned authoritative observations scoped to one activated cash vault.
+/// @dev Exercise prices are stored per activated cash vault in Hub storage.
 struct ExercisePriceObservation {
     uint256 price;
     uint64 observedAt;
@@ -75,7 +73,7 @@ struct SettlementPrices {
     uint256 expiry;
 }
 
-/// @notice Which tokens a pair moves. Acceptance conditions live in bid rules.
+/// @notice Quote and premium tokens for a permitted bid pair. Bid rules set acceptance conditions.
 struct PairConfig {
     address quoteToken;
     address premiumToken; // token the market maker pays premium in
@@ -88,7 +86,7 @@ struct BidRule {
     bytes data;
 }
 
-/// @notice What a validator learns about the vault beyond the bid itself. Built once per activation.
+/// @notice Vault data passed to bid validators at activation.
 struct BidContext {
     uint256 vaultId;
     bool isCall;
@@ -154,8 +152,6 @@ struct UnwindAgreement {
     uint256 supply;
     uint256 refund;
 }
-
-// Errors
 
 error AdmissionPaused();
 error AgreementInvalid();

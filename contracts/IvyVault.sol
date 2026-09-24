@@ -95,7 +95,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
         reserved[token] += amount;
     }
 
-    /// @notice Anyone may deliver the fee to its immutable activation recipient.
+    /// @notice Send the activation fee to the treasury fixed at activation. Anyone may call.
     function claimPlatformFee() external nonReentrant {
         uint256 amount = platformFeeRemaining;
         if (amount == 0) {
@@ -141,7 +141,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
     function consumeUnwind(uint256 amount) external onlyHub nonReentrant {
         unwindReserved -= amount;
         buyerReserved[premiumToken] += amount;
-        // Both obligations are reserved: conversion must not expose funds to ordinary claims.
+        // The refund stays reserved as a buyer payout.
     }
 
     function reserveBuyer(address token, uint256 amount) external onlyHub nonReentrant {

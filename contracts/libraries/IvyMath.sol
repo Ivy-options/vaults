@@ -3,12 +3,10 @@ pragma solidity ^0.8.34;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @dev Pure option math. Every rounding favours the LPs.
 library IvyMath {
     uint256 internal constant BPS = 10_000;
 
-    /// @dev Underlying units the vault can cover. Calls: the collateral itself. Puts: collateral / strike, and nothing
-    ///      at a zero strike.
+    /// @dev Covered calls use collateral as notional. Puts divide collateral by strike; zero strike yields zero.
     function notionalOf(bool isCall, uint256 collateralAmount, uint256 underlyingUnit, uint256 strike)
         internal
         pure
@@ -23,7 +21,7 @@ library IvyMath {
         return (collateralAmount * underlyingUnit) / strike;
     }
 
-    /// @dev Total premium for `notional` at `premiumPerUnit` (per 1 whole underlying).
+    /// @dev `premiumPerUnit` is priced per whole underlying token.
     function premiumTotal(uint256 premiumPerUnit, uint256 notional, uint256 underlyingUnit)
         internal
         pure
@@ -32,17 +30,17 @@ library IvyMath {
         return (premiumPerUnit * notional) / underlyingUnit;
     }
 
-    /// @dev Quote the market maker must pay for `amount` underlying at `strike` (rounded up).
+    /// @dev Quote owed by the market maker, rounded up.
     function quoteDueCeil(uint256 amount, uint256 strike, uint256 underlyingUnit) internal pure returns (uint256) {
         return Math.ceilDiv(amount * strike, underlyingUnit);
     }
 
-    /// @dev Quote the market maker receives for `amount` underlying at `strike` (rounded down).
+    /// @dev Quote received by the market maker, rounded down.
     function quoteOutFloor(uint256 amount, uint256 strike, uint256 underlyingUnit) internal pure returns (uint256) {
         return (amount * strike) / underlyingUnit;
     }
 
-    /// @dev Cash-settled call payout, in underlying. Always < amount.
+    /// @dev Cash call payout in underlying units, always less than `amount`.
     function callIntrinsic(uint256 amount, uint256 strike, uint256 spot) internal pure returns (uint256) {
         if (spot <= strike) {
             return 0;
@@ -50,7 +48,7 @@ library IvyMath {
         return (amount * (spot - strike)) / spot;
     }
 
-    /// @dev Cash-settled put payout, in quote. Always below the quote locked for `amount`.
+    /// @dev Cash put payout in quote units, below the quote locked for `amount`.
     function putIntrinsic(uint256 amount, uint256 strike, uint256 spot, uint256 underlyingUnit)
         internal
         pure

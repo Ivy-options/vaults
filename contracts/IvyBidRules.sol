@@ -6,11 +6,8 @@ import {IIvyPriceFeed} from "./interfaces/IIvyPriceFeed.sol";
 import {IvyMath} from "./libraries/IvyMath.sol";
 import "./types/IvyTypes.sol";
 
-/// @notice The shipped bid validator. Stateless and ownerless. One contract, three named kinds.
-/// @dev Listing PairLimits and SpotBand reproduces the acceptance conditions of the previous release.
+/// @notice Stateless validator for PairLimits, PremiumFloor, and SpotBand bid rules.
 contract IvyBidRules is IIvyBidValidator {
-    // Types
-
     struct PairLimit {
         address quoteToken;
         uint256 strikeLimit; // calls: minimum strike, 0 = none. puts: maximum strike, must be > 0
@@ -29,13 +26,9 @@ contract IvyBidRules is IIvyBidValidator {
         uint16 minPremiumBps; // premium >= spot * minPremiumBps / 10_000, in (0, 10_000]
     }
 
-    // Constants
-
     bytes4 public constant PAIR_LIMITS = bytes4(keccak256("PairLimits"));
     bytes4 public constant PREMIUM_FLOOR = bytes4(keccak256("PremiumFloor"));
     bytes4 public constant SPOT_BAND = bytes4(keccak256("SpotBand"));
-
-    // External functions
 
     /// @inheritdoc IIvyBidValidator
     function validateConfig(bytes4 kind, VaultTerms calldata terms, PairConfig[] calldata pairs, bytes calldata data)
@@ -96,7 +89,7 @@ contract IvyBidRules is IIvyBidValidator {
             }
         } else if (kind == PREMIUM_FLOOR) {
             PremiumFloorRule memory rule = abi.decode(data, (PremiumFloorRule));
-            // One whole underlying priced in itself is exactly one unit; the feed refuses same-token pairs.
+            // Same-token premium needs no feed: one whole underlying equals `underlyingUnit`.
             uint256 spot = context.premiumToken == context.underlying
                 ? context.underlyingUnit
                 : _readSpot(rule.priceFeed, rule.maxPriceAge, context.underlying, context.premiumToken);
@@ -108,8 +101,6 @@ contract IvyBidRules is IIvyBidValidator {
         }
         return IIvyBidValidator.validateBid.selector;
     }
-
-    // Private functions
 
     function _checkFeed(address priceFeed, uint32 maxPriceAge) private view {
         if (priceFeed.code.length == 0) {

@@ -5,9 +5,8 @@ import {IIvySettlementPricePublication} from "../interfaces/IIvySettlementPriceP
 import "../types/IvyTypes.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @notice Optional example: its owner supplies prices and this contract submits them to the Hub.
-/// @dev Grant this contract the Hub publisher role. A production adapter can replace owner-supplied
-///      observations with authenticated source logic; the Hub never calls back into the publisher.
+/// @notice Example publisher that forwards owner-supplied prices to the Hub.
+/// @dev Grant this contract the Hub publisher role. It does not verify a price source.
 contract ExampleSettlementPublisher is Ownable {
     IIvySettlementPricePublication public immutable hub;
 
