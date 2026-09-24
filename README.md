@@ -29,10 +29,11 @@ npm test -- --no-compile
 
 Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.
 
-To run one test file, for example the physical fallback tests:
+To run one test file, or only the tests whose titles match a pattern:
 
 ```sh
-npm test -- test/physical-fallback.test.ts
+npm test -- test/hub/physical-fallback.test.ts
+npm test -- --grep "physical fallback"
 ```
 
 ## Solidity style
@@ -64,21 +65,51 @@ npm run format
 npm run format:check
 ```
 
-Each test file creates its chain with `network.create()` and wraps its deployment in `fixture(connection, build)` from `test/helpers/setup.ts`. A `beforeEach` loads it, so every test starts from the same snapshot:
+## Tests
+
+Tests live in `test/`, grouped by what they cover:
+
+- `test/hub/`: the Hub, one file per entrypoint or feature (`create-vault`, `activate`, `exercise`, `expire`, `claim`, `unwind`, `physical-fallback`, …).
+- `test/contracts/`: contracts and libraries on their own (`IvyVault`, `IvyShares`, `IvyPremiums`, `IvyUnwind`, `IvyBidRules`, `IvyPriceFeed`, `IvyMath`, `BidHash`, `ExampleSettlementPublisher`).
+- `test/deployment/`: deployment plans, linked libraries and the release registry.
+- `test/properties/`: reentrancy, cross-module callbacks and stateful conservation.
+- `test/helpers/`: deployment, fixtures, scenarios and signing.
+
+A file's top-level `describe` names what it tests: an entrypoint, a contract or a feature. A `context` names the state its tests run in, and each `it` checks one behaviour:
 
 ```ts
 const connection = await network.create();
-const load = fixture(connection, () => deployIvy(connection));
+const deployed = fixture(connection, () => deployIvy(connection));
+const cashPut = fixture(deployed, async c => ({
+	c,
+	v: await goLive(c, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash }),
+}));
 
-describe("activate", () => {
-  let c: IvyContext;
-  beforeEach(async () => {
-    c = await load();
-  });
+describe("expire", () => {
+	let c: IvyContext;
+	let v: LiveVault;
+
+	context("cash put", () => {
+		beforeEach(async () => {
+			({ c, v } = await cashPut());
+		});
+
+		it("reserves the in-the-money payout in the quote token", async () => {
+			// ...
+		});
+	});
 });
 ```
 
-Snapshots on one chain are stacked, so give each distinct deployment its own connection.
+`fixture` from `test/helpers/setup.ts` builds its state once and snapshots it. Later loads revert to that snapshot, so every test starts from the same state and passes on its own. A fixture built from a connection starts from the chain's genesis, and one built from another fixture starts from that fixture's state, so one chain per file covers every scenario. Create fixtures at module scope or while defining a `describe`, never inside a hook or a test.
+
+Measure coverage with:
+
+```sh
+npm run coverage
+```
+
+The report lands in `coverage/html`. Instrumented bytecode is larger than EIP-170 allows, and deployment plans refuse it by design, so suites that build deployment plans call `skipUnderCoverage()` and show as pending. Coverage also writes instrumented artifacts: run `npm test` or `npm run compile` before using `--no-compile` again.
 
 ## Edit the docs
 

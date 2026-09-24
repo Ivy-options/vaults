@@ -123,3 +123,18 @@ contract ContextAssertingValidator is IIvyBidValidator {
         return IIvyBidValidator.validateBid.selector;
     }
 }
+
+/// @dev Accepts every config but answers validateBid with another function's selector.
+contract WrongBidSelectorValidator is IIvyBidValidator {
+    function validateConfig(bytes4, VaultTerms calldata, PairConfig[] calldata, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
+        return IIvyBidValidator.validateConfig.selector;
+    }
+
+    function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external pure returns (bytes4) {
+        return IIvyBidValidator.validateConfig.selector;
+    }
+}

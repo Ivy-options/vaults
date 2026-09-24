@@ -22,6 +22,7 @@
 <a href="#build-and-verify">Build and verify</a>
 <a href="#solidity-style">Solidity style</a>
 <a href="#typescript-style">TypeScript style</a>
+<a href="#tests">Tests</a>
 <a href="#edit-the-docs">Edit the docs</a>
 <a href="#license">License</a></nav></details></aside>
   <main id="content" class="content doc-page" tabindex="-1"><article><h1 id="ivy-vaults">Project setup</h1>
@@ -41,8 +42,9 @@ npm run typecheck
 npm test -- --no-compile
 </code></pre>
 <p>Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.</p>
-<p>To run one test file, for example the physical fallback tests:</p>
-<pre><code class="language-sh">npm test -- test/physical-fallback.test.ts
+<p>To run one test file, or only the tests whose titles match a pattern:</p>
+<pre><code class="language-sh">npm test -- test/hub/physical-fallback.test.ts
+npm test -- --grep &quot;physical fallback&quot;
 </code></pre>
 <h2 id="solidity-style">Solidity style</h2>
 <p>The contracts follow the Solidity style guide (<code>https://docs.soliditylang.org/en/latest/style-guide.html</code>).</p>
@@ -64,18 +66,43 @@ npm run format:solidity:check
 <pre><code class="language-sh">npm run format
 npm run format:check
 </code></pre>
-<p>Each test file creates its chain with <code>network.create()</code> and wraps its deployment in <code>fixture(connection, build)</code> from <code>test/helpers/setup.ts</code>. A <code>beforeEach</code> loads it, so every test starts from the same snapshot:</p>
+<h2 id="tests">Tests</h2>
+<p>Tests live in <code>test/</code>, grouped by what they cover:</p>
+<ul>
+<li><code>test/hub/</code>: the Hub, one file per entrypoint or feature (<code>create-vault</code>, <code>activate</code>, <code>exercise</code>, <code>expire</code>, <code>claim</code>, <code>unwind</code>, <code>physical-fallback</code>, …).</li>
+<li><code>test/contracts/</code>: contracts and libraries on their own (<code>IvyVault</code>, <code>IvyShares</code>, <code>IvyPremiums</code>, <code>IvyUnwind</code>, <code>IvyBidRules</code>, <code>IvyPriceFeed</code>, <code>IvyMath</code>, <code>BidHash</code>, <code>ExampleSettlementPublisher</code>).</li>
+<li><code>test/deployment/</code>: deployment plans, linked libraries and the release registry.</li>
+<li><code>test/properties/</code>: reentrancy, cross-module callbacks and stateful conservation.</li>
+<li><code>test/helpers/</code>: deployment, fixtures, scenarios and signing.</li>
+</ul>
+<p>A file&#39;s top-level <code>describe</code> names what it tests: an entrypoint, a contract or a feature. A <code>context</code> names the state its tests run in, and each <code>it</code> checks one behaviour:</p>
 <pre><code class="language-ts">const connection = await network.create();
-const load = fixture(connection, () =&gt; deployIvy(connection));
+const deployed = fixture(connection, () =&gt; deployIvy(connection));
+const cashPut = fixture(deployed, async c =&gt; ({
+	c,
+	v: await goLive(c, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash }),
+}));
 
-describe(&quot;activate&quot;, () =&gt; {
-  let c: IvyContext;
-  beforeEach(async () =&gt; {
-    c = await load();
-  });
+describe(&quot;expire&quot;, () =&gt; {
+	let c: IvyContext;
+	let v: LiveVault;
+
+	context(&quot;cash put&quot;, () =&gt; {
+		beforeEach(async () =&gt; {
+			({ c, v } = await cashPut());
+		});
+
+		it(&quot;reserves the in-the-money payout in the quote token&quot;, async () =&gt; {
+			// ...
+		});
+	});
 });
 </code></pre>
-<p>Snapshots on one chain are stacked, so give each distinct deployment its own connection.</p>
+<p><code>fixture</code> from <code>test/helpers/setup.ts</code> builds its state once and snapshots it. Later loads revert to that snapshot, so every test starts from the same state and passes on its own. A fixture built from a connection starts from the chain&#39;s genesis, and one built from another fixture starts from that fixture&#39;s state, so one chain per file covers every scenario. Create fixtures at module scope or while defining a <code>describe</code>, never inside a hook or a test.</p>
+<p>Measure coverage with:</p>
+<pre><code class="language-sh">npm run coverage
+</code></pre>
+<p>The report lands in <code>coverage/html</code>. Instrumented bytecode is larger than EIP-170 allows, and deployment plans refuse it by design, so suites that build deployment plans call <code>skipUnderCoverage()</code> and show as pending. Coverage also writes instrumented artifacts: run <code>npm test</code> or <code>npm run compile</code> before using <code>--no-compile</code> again.</p>
 <h2 id="edit-the-docs">Edit the docs</h2>
 <p>Edit the guide and reference pages in <code>docs/site/</code>. <code>project-setup.html</code> is generated from this README. The frontend integration page is generated from <code>docs/frontend-integration.md</code>; the license page is generated from <code>LICENSE.md</code>.</p>
 <p>After changing docs or request templates, rebuild, check, and test:</p>
