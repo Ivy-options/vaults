@@ -6,6 +6,6 @@ types
 dist
 coverage
 lib
-# Solidity is formatted by forge fmt; the docs site and its assets are hand-maintained
+# Solidity follows the style guide by hand; the docs site and its assets are hand-maintained
 contracts
 docs

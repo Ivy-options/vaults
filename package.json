@@ -16,8 +16,6 @@
 		"docs:check": "node scripts/check-docs.ts",
 		"docs:build": "node scripts/build-docs.ts",
 		"docs:test": "node --test --test-concurrency=1 \"docs/site/test/*.test.mjs\"",
-		"format:solidity": "forge fmt contracts",
-		"format:solidity:check": "forge fmt --check contracts",
 		"format": "prettier --write \"**/*.ts\"",
 		"format:check": "prettier --check \"**/*.ts\""
 	},

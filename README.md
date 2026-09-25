@@ -47,18 +47,11 @@ The contracts follow the Solidity style guide (`https://docs.soliditylang.org/en
 - Order functions: constructor, receive/fallback, external, public, internal, private; put view and pure functions last within each visibility group.
 - Preserve storage-variable order, struct-field order, enum values, inheritance order, and modifier execution order during style changes.
 
-Install Foundry (`https://getfoundry.sh/introduction/installation/`) to use the formatter (validated with Forge 1.7.1). Hardhat remains the compiler and test runner.
-
-```sh
-npm run format:solidity
-npm run format:solidity:check
-```
-
-Formatting is configured in `foundry.toml`. Declaration ordering and control-flow braces are review conventions; the formatter does not enforce them. After editing downloadable Solidity examples, run `npm run docs:build` to refresh the guide's source copies.
+These are review conventions; no formatter enforces them. After editing downloadable Solidity examples, run `npm run docs:build` to refresh the guide's source copies.
 
 ## TypeScript style
 
-Scripts and tests are TypeScript that Node runs directly. Prettier formats them (`.prettierrc.json`, 120-character lines):
+Scripts and tests are TypeScript that Node runs directly. Prettier formats them (`.prettierrc.yml`: tabs, no semicolons, 150-character lines, sorted imports), and the pre-commit hook formats staged files automatically:
 
 ```sh
 npm run format
