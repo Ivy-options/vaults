@@ -65,7 +65,7 @@ export interface BidRuleInput {
 export interface PairLimitInput {
 	quoteToken: string
 	strikeLimit: bigint
-	minPremium: bigint
+	minPremiumPerUnit: bigint
 }
 
 export const RuleKind = RULE_KIND
@@ -255,19 +255,19 @@ export function putPairs(ctx: IvyContext): PairConfigInput[] {
 
 /** Today's call default: no strike floor and no premium floor. */
 export function callLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
-	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 0n, minPremium: 0n, ...o }]
+	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 0n, minPremiumPerUnit: 0n, ...o }]
 }
 
 /** Today's put default: no ceiling (max uint) and no premium floor. */
 export function putLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
-	return [{ quoteToken: ctx.usdcAddress, strikeLimit: MAX_UINT, minPremium: 0n, ...o }]
+	return [{ quoteToken: ctx.usdcAddress, strikeLimit: MAX_UINT, minPremiumPerUnit: 0n, ...o }]
 }
 
 export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
 		kind: RuleKind.PairLimits,
-		data: encodePairLimits(limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremium])),
+		data: encodePairLimits(limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremiumPerUnit])),
 	}
 }
 

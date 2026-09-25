@@ -507,7 +507,7 @@
                 <code>floor(grossPremium × feeBps / 10,000)</code> in premium
                 tokens. The fee rounds down to a whole raw token unit, leaving
                 the rounding remainder for LPs. The owner's PairLimits rule's
-                <code>minPremium</code> is the gross premium per whole
+                <code>minPremiumPerUnit</code> is the gross premium per whole
                 underlying token, before the platform fee is deducted. The
                 total payment scales that per-token premium by the option's
                 size, called its notional. For example, 100 USDC per WETH
@@ -814,7 +814,7 @@
                 <h3>Approve the vault</h3>
                 <p>The buyer gives the individual vault permission to collect
                   the full premium from its wallet. That amount is
-                  <code>floor(premium × notional / underlyingUnit)</code>.</p>
+                  <code>floor(premiumPerUnit × notional / underlyingUnit)</code>.</p>
                 <span class="process-note"
                   >Approval grants permission to spend; activation is the
                   transaction that collects the premium. Exercise has its own
@@ -925,7 +925,7 @@
                       <dd>Raw quote-token units per whole underlying.</dd>
                     </div>
                     <div>
-                      <dt><code>premium</code><small>uint256</small></dt>
+                      <dt><code>premiumPerUnit</code><small>uint256</small></dt>
                       <dd>Raw premium-token units per whole underlying.</dd>
                     </div>
                   </dl>

@@ -9,7 +9,7 @@ export interface Bid {
 	marketMaker: string
 	quoteToken: string
 	strike: bigint
-	premium: bigint
+	premiumPerUnit: bigint
 	style: number
 	settlement: number
 	expiry: bigint

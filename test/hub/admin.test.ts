@@ -98,7 +98,7 @@ const deployed = fixture(connection, () => deployIvy(connection))
 const hubOnOwnPeers = fixture(deployed, async c => ({ c, hub: await deployHubWithOwnPeers(c) }))
 const vaultsAroundNewSettings = fixture(deployed, async c => {
 	const earlier = await createVaultAs(c, c.alice, callTerms(c), callPairs(c))
-	await c.hub.setSettings(1n, 2n, 3n)
+	await c.hub.setVaultWindowDefaults(1n, 2n, 3n)
 	const later = await createVaultAs(c, c.alice, callTerms(c), callPairs(c))
 	return { c, earlier: earlier.vaultId, later: later.vaultId }
 })
@@ -222,7 +222,7 @@ describe("hub administration", () => {
 		}
 	})
 
-	describe("setSettings", () => {
+	describe("setVaultWindowDefaults", () => {
 		let c: IvyContext
 		let earlier: bigint
 		let later: bigint
@@ -233,18 +233,18 @@ describe("hub administration", () => {
 			})
 
 			it("rejects a caller without the admin role", async () => {
-				await expect(c.hub.connect(c.alice).setSettings(1n, 2n, 3n))
+				await expect(c.hub.connect(c.alice).setVaultWindowDefaults(1n, 2n, 3n))
 					.to.be.revertedWithCustomError(c.hub, "AccessControlUnauthorizedAccount")
 					.withArgs(c.alice.address, await c.hub.DEFAULT_ADMIN_ROLE())
 			})
 
 			it("rejects a zero expiry price publication window", async () => {
-				await expect(c.hub.setSettings(20n, AUCTION_TIMEOUT, 0n)).to.be.revertedWithCustomError(c.hub, "InvalidSettlementWindow")
+				await expect(c.hub.setVaultWindowDefaults(20n, AUCTION_TIMEOUT, 0n)).to.be.revertedWithCustomError(c.hub, "InvalidSettlementWindow")
 			})
 
-			it("emits SettingsUpdated with the new windows and auction timeout", async () => {
-				await expect(c.hub.setSettings(1n, 2n, 3n))
-					.to.emit(c.hub, "SettingsUpdated")
+			it("emits VaultWindowDefaultsUpdated with the new windows and auction timeout", async () => {
+				await expect(c.hub.setVaultWindowDefaults(1n, 2n, 3n))
+					.to.emit(c.hub, "VaultWindowDefaultsUpdated")
 					.withArgs(1n, 2n, 3n)
 			})
 		})
@@ -272,7 +272,7 @@ describe("hub administration", () => {
 		context("with a zero exercise window", () => {
 			beforeEach(async () => {
 				c = await deployed()
-				await c.hub.setSettings(0n, AUCTION_TIMEOUT, EXPIRY_PRICE_PUBLICATION_WINDOW)
+				await c.hub.setVaultWindowDefaults(0n, AUCTION_TIMEOUT, EXPIRY_PRICE_PUBLICATION_WINDOW)
 			})
 
 			for (const { name, allowedSettlement } of [

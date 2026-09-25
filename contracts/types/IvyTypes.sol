@@ -104,7 +104,7 @@ struct Bid {
     address marketMaker;
     address quoteToken;
     uint256 strike;
-    uint256 premium;
+    uint256 premiumPerUnit;
     ExerciseStyle style;
     SettlementType settlement;
     uint64 expiry; // absolute unix timestamp
@@ -134,7 +134,7 @@ struct VaultState {
     address quoteToken;
     address premiumToken;
     uint256 strike;
-    uint256 premium;
+    uint256 premiumPerUnit;
     ExerciseStyle style;
     SettlementType settlement;
     uint64 expiry;

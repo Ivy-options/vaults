@@ -35,7 +35,7 @@ const dustCall = fixture(deployed, async c => ({
 				{ signer: c.carol, amount: 1n },
 			],
 		},
-		{ premium: 0n },
+		{ premiumPerUnit: 0n },
 	),
 }))
 

@@ -91,9 +91,7 @@ contract ContextAssertingValidator is IIvyBidValidator {
 		) {
 			revert ContextMismatch();
 		}
-		if (block.timestamp < uint256(context.auctionOpenedAt) + minAuctionAge) {
-			revert TooEarly();
-		}
+		if (block.timestamp < uint256(context.auctionOpenedAt) + minAuctionAge) revert TooEarly();
 		return IIvyBidValidator.validateBid.selector;
 	}
 }

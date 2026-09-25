@@ -11,103 +11,71 @@ library IvyVaultRules {
 	/// @dev Validates and stores each rule before deposits are possible. Returns the terms hash signed bids must carry.
 	function adoptRules(
 		BidRule[] storage stored,
-		VaultTerms calldata t,
+		VaultTerms calldata terms,
 		PairConfig[] calldata pairs,
 		BidRule[] calldata rules
 	) external returns (bytes32) {
 		for (uint256 i = 0; i < rules.length; ++i) {
-			BidRule calldata r = rules[i];
-			if (r.validator == address(0) || r.validator.code.length == 0) {
-				revert InvalidValidator();
-			}
-			bytes4 ok = IIvyBidValidator(r.validator).validateConfig(r.kind, t, pairs, r.data);
-			if (ok != IIvyBidValidator.validateConfig.selector) {
-				revert InvalidValidator();
-			}
+			BidRule calldata rule = rules[i];
+			if (rule.validator == address(0) || rule.validator.code.length == 0) revert InvalidValidator();
+			bytes4 ok = IIvyBidValidator(rule.validator).validateConfig(rule.kind, terms, pairs, rule.data);
+			if (ok != IIvyBidValidator.validateConfig.selector) revert InvalidValidator();
 			BidRule storage slot = stored.push();
-			slot.validator = r.validator;
-			slot.kind = r.kind;
-			slot.data = r.data;
+			slot.validator = rule.validator;
+			slot.kind = rule.kind;
+			slot.data = rule.data;
 		}
-		return _termsHash(t, pairs, rules);
+		return _termsHash(terms, pairs, rules);
 	}
 
-	function validateTerms(VaultTerms calldata t, PairConfig[] calldata pairs) external view {
-		if (t.underlying == address(0) || t.collateral == address(0)) {
-			revert ZeroAddress();
-		}
-		if (t.expiry <= block.timestamp) {
-			revert ExpiryInPast();
-		}
-		bool isCall = t.collateral == t.underlying;
-		if (t.allowedSettlement != SettlementPolicy.Physical && t.maxSettlementPriceAge == 0) {
-			revert CashSettlementNeedsMaxPriceAge();
-		}
-		if (pairs.length == 0) {
-			revert NoPairs();
-		}
+	function validateTerms(VaultTerms calldata terms, PairConfig[] calldata pairs) external view {
+		if (terms.underlying == address(0) || terms.collateral == address(0)) revert ZeroAddress();
+		if (terms.expiry <= block.timestamp) revert ExpiryInPast();
+		bool isCall = terms.collateral == terms.underlying;
+		if (terms.allowedSettlement != SettlementPolicy.Physical && terms.maxSettlementPriceAge == 0) revert CashSettlementNeedsMaxPriceAge();
+		if (pairs.length == 0) revert NoPairs();
 		if (!isCall) {
-			if (pairs.length != 1) {
-				revert PutRequiresSinglePair();
-			}
-			if (pairs[0].quoteToken != t.collateral) {
-				revert PutPairMustBeCollateral();
-			}
+			if (pairs.length != 1) revert PutRequiresSinglePair();
+			if (pairs[0].quoteToken != terms.collateral) revert PutPairMustBeCollateral();
 		}
 		for (uint256 i = 0; i < pairs.length; ++i) {
-			PairConfig calldata p = pairs[i];
-			if (p.quoteToken == address(0) || p.premiumToken == address(0)) {
-				revert ZeroAddress();
-			}
-			if (isCall && p.quoteToken == t.underlying) {
-				revert QuoteIsUnderlying();
-			}
+			PairConfig calldata pair = pairs[i];
+			if (pair.quoteToken == address(0) || pair.premiumToken == address(0)) revert ZeroAddress();
+			if (isCall && pair.quoteToken == terms.underlying) revert QuoteIsUnderlying();
 			for (uint256 j = 0; j < i; ++j) {
-				if (pairs[j].quoteToken == p.quoteToken) {
-					revert DuplicatePair(p.quoteToken);
-				}
+				if (pairs[j].quoteToken == pair.quoteToken) revert DuplicatePair(pair.quoteToken);
 			}
 		}
 	}
 
 	/// @dev The Hub checks caller and signature first. Mandatory checks run before creator rules, in order.
 	function checkBid(
-		VaultState storage s,
-		VaultTerms storage t,
+		VaultState storage state,
+		VaultTerms storage terms,
 		BidRule[] storage rules,
 		address premiumToken,
 		bytes32 expectedTermsHash,
 		Bid calldata bid,
 		uint256 supply
 	) external view returns (uint256 totalNotional) {
-		if (premiumToken == address(0)) {
-			revert PairUnknown(bid.quoteToken);
-		}
-		if (t.allowedExercise != ExercisePolicy.Either && uint8(t.allowedExercise) != uint8(bid.style)) {
-			revert StyleNotAllowed();
-		}
-		if (t.allowedSettlement != SettlementPolicy.Either && uint8(t.allowedSettlement) != uint8(bid.settlement)) {
+		if (premiumToken == address(0)) revert PairUnknown(bid.quoteToken);
+		if (terms.allowedExercise != ExercisePolicy.Either && uint8(terms.allowedExercise) != uint8(bid.style)) revert StyleNotAllowed();
+		if (terms.allowedSettlement != SettlementPolicy.Either && uint8(terms.allowedSettlement) != uint8(bid.settlement)) {
 			revert SettlementNotAllowed();
 		}
-		if (bid.expiry <= block.timestamp) {
-			revert ExpiryInPast();
-		}
-		if (bid.expiry != t.expiry || bid.auctionId != s.auctionId || bid.collateralAmount != supply || bid.termsHash != expectedTermsHash) {
+		if (bid.expiry <= block.timestamp) revert ExpiryInPast();
+		if (bid.expiry != terms.expiry || bid.auctionId != state.auctionId || bid.collateralAmount != supply || bid.termsHash != expectedTermsHash) {
 			revert CommitmentMismatch();
 		}
-		if (bid.recipient == address(0)) {
-			revert ZeroAddress();
-		}
-		totalNotional = IvyMath.notionalOf(s.isCall, supply, s.underlyingUnit, bid.strike);
-		if (totalNotional == 0) {
-			revert EmptyNotional();
-		}
-		_runRules(s, t, rules, premiumToken, bid, supply, totalNotional);
+		if (bid.recipient == address(0)) revert ZeroAddress();
+		totalNotional = IvyMath.notionalOf(state.isCall, supply, state.underlyingUnit, bid.strike);
+		if (totalNotional == 0) revert EmptyNotional();
+		_runRules(state, terms, rules, premiumToken, bid, supply, totalNotional);
 	}
 
 	function _runRules(
-		VaultState storage s,
-		VaultTerms storage t,
+		VaultState storage state,
+		VaultTerms storage terms,
 		BidRule[] storage rules,
 		address premiumToken,
 		Bid calldata bid,
@@ -116,38 +84,36 @@ library IvyVaultRules {
 	) private view {
 		BidContext memory context = BidContext({
 			vaultId: bid.vaultId,
-			isCall: s.isCall,
-			underlying: t.underlying,
-			collateral: t.collateral,
+			isCall: state.isCall,
+			underlying: terms.underlying,
+			collateral: terms.collateral,
 			premiumToken: premiumToken,
-			underlyingUnit: s.underlyingUnit,
+			underlyingUnit: state.underlyingUnit,
 			collateralAmount: supply,
 			totalNotional: totalNotional,
-			auctionOpenedAt: s.auctionOpenedAt
+			auctionOpenedAt: state.auctionOpenedAt
 		});
 		for (uint256 i = 0; i < rules.length; ++i) {
-			BidRule storage r = rules[i];
-			bytes4 ok = IIvyBidValidator(r.validator).validateBid(r.kind, context, bid, r.data);
-			if (ok != IIvyBidValidator.validateBid.selector) {
-				revert InvalidValidator();
-			}
+			BidRule storage rule = rules[i];
+			bytes4 ok = IIvyBidValidator(rule.validator).validateBid(rule.kind, context, bid, rule.data);
+			if (ok != IIvyBidValidator.validateBid.selector) revert InvalidValidator();
 		}
 	}
 
 	/// @dev Hashes creator terms, pairs, and rules. `auctionStartsAt` is mutable and excluded.
-	function _termsHash(VaultTerms calldata t, PairConfig[] calldata pairs, BidRule[] calldata rules) private pure returns (bytes32) {
+	function _termsHash(VaultTerms calldata terms, PairConfig[] calldata pairs, BidRule[] calldata rules) private pure returns (bytes32) {
 		return
 			keccak256(
 				abi.encode(
-					t.underlying,
-					t.collateral,
-					t.allowPartialExercise,
-					t.publicDeposits,
-					t.allowedExercise,
-					t.allowedSettlement,
-					t.expiry,
-					t.minCollateral,
-					t.maxSettlementPriceAge,
+					terms.underlying,
+					terms.collateral,
+					terms.allowPartialExercise,
+					terms.publicDeposits,
+					terms.allowedExercise,
+					terms.allowedSettlement,
+					terms.expiry,
+					terms.minCollateral,
+					terms.maxSettlementPriceAge,
 					keccak256(abi.encode(pairs)),
 					keccak256(abi.encode(rules))
 				)

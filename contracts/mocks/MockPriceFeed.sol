@@ -22,7 +22,7 @@ contract MockPriceFeed is IIvyPriceFeed {
 
 	function spot(address underlying, address quote) external view returns (uint256 price, uint256 updatedAt) {
 		require(!shouldRevert, "feed down");
-		Quote memory q = quotes[underlying][quote];
-		return (q.price, q.updatedAt);
+		Quote memory stored = quotes[underlying][quote];
+		return (stored.price, stored.updatedAt);
 	}
 }

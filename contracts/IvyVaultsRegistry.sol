@@ -22,19 +22,13 @@ contract IvyVaultsRegistry is AccessControl {
 	error UnknownRelease(uint256 releaseId);
 
 	constructor(address admin) {
-		if (admin == address(0)) {
-			revert InvalidRegistration();
-		}
+		if (admin == address(0)) revert InvalidRegistration();
 		_grantRole(DEFAULT_ADMIN_ROLE, admin);
 	}
 
 	function registerVersion(uint256 releaseId, address hub, bytes32 manifestHash) external onlyRole(DEFAULT_ADMIN_ROLE) {
-		if (releaseId == 0 || hub.code.length == 0 || manifestHash == bytes32(0)) {
-			revert InvalidRegistration();
-		}
-		if (releases[releaseId].hub != address(0) || registeredHubs[hub]) {
-			revert AlreadyRegistered();
-		}
+		if (releaseId == 0 || hub.code.length == 0 || manifestHash == bytes32(0)) revert InvalidRegistration();
+		if (releases[releaseId].hub != address(0) || registeredHubs[hub]) revert AlreadyRegistered();
 		releases[releaseId] = Release(hub, manifestHash);
 		registeredHubs[hub] = true;
 		emit VersionRegistered(releaseId, hub, manifestHash);
@@ -56,8 +50,6 @@ contract IvyVaultsRegistry is AccessControl {
 
 	function _release(uint256 releaseId) private view returns (Release storage release) {
 		release = releases[releaseId];
-		if (release.hub == address(0)) {
-			revert UnknownRelease(releaseId);
-		}
+		if (release.hub == address(0)) revert UnknownRelease(releaseId);
 	}
 }

@@ -63,7 +63,7 @@ const BID: Bid = {
 	marketMaker: ZeroAddress,
 	quoteToken: QUOTE,
 	strike: usdc(3000),
-	premium: usdc(100),
+	premiumPerUnit: usdc(100),
 	style: ExerciseStyle.American,
 	settlement: SettlementType.Physical,
 	expiry: 4_000_000_000n,

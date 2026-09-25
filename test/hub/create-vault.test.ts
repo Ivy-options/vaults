@@ -293,7 +293,7 @@ describe("createVault", () => {
 		})
 
 		it("stores the rules in the order given", async () => {
-			const rules = [pairLimitsRule(c, callLimits(c, { minPremium: 5n })), spotBandRule(c, { maxPriceAge: 60, maxInTheMoneyBps: 500 })]
+			const rules = [pairLimitsRule(c, callLimits(c, { minPremiumPerUnit: 5n })), spotBandRule(c, { maxPriceAge: 60, maxInTheMoneyBps: 500 })]
 			const { vaultId } = await createVaultAs(c, c.alice, callTerms(c), callPairs(c), rules)
 			const stored = await c.hub.rulesOf(vaultId)
 			expect(stored.map(r => [r.validator, r.kind, r.data])).to.deep.equal(rules.map(r => [r.validator, r.kind, r.data]))

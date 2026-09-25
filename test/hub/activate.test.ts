@@ -5,7 +5,7 @@ import { network } from "hardhat"
 import { signBid, type Bid } from "../helpers/bids.js"
 import {
 	CALL_DEPOSIT,
-	PREMIUM,
+	PREMIUM_PER_UNIT,
 	PUT_DEPOSIT,
 	STRIKE,
 	TENOR,
@@ -89,11 +89,11 @@ const putWithStrikeLimit = fixture(deployed, async c => ({
 }))
 const callWithMinPremium = fixture(deployed, async c => ({
 	c,
-	v: await openVault(c, { pair: { minPremium: usdc(200) } }),
+	v: await openVault(c, { pair: { minPremiumPerUnit: usdc(200) } }),
 }))
 const callWithLimitsAndBand = fixture(deployed, async c => ({
 	c,
-	v: await openVault(c, { pair: { strikeLimit: usdc(3100), minPremium: usdc(50) }, withFeed: true }),
+	v: await openVault(c, { pair: { strikeLimit: usdc(3100), minPremiumPerUnit: usdc(50) }, withFeed: true }),
 }))
 const approveThenReject = fixture(deployed, async c => {
 	const reject = await c.ethers.deployContract("RejectAllValidator")
@@ -103,7 +103,7 @@ const approveThenReject = fixture(deployed, async c => {
 })
 const limitsThenPremiumFloor = fixture(deployed, async c => {
 	const v = await openVault(c, {
-		pair: { strikeLimit: usdc(3100), minPremium: 0n },
+		pair: { strikeLimit: usdc(3100), minPremiumPerUnit: 0n },
 		rules: [premiumFloorRule(c, { maxPriceAge: 3600, minPremiumBps: 500 })],
 	})
 	await setSpot(c, STRIKE)
@@ -111,9 +111,9 @@ const limitsThenPremiumFloor = fixture(deployed, async c => {
 })
 const twinCalls = fixture(deployed, async c => {
 	const expiry = BigInt(await c.networkHelpers.time.latest()) + TENOR
-	const v = await openVault(c, { terms: { expiry }, pair: { minPremium: 1n } })
+	const v = await openVault(c, { terms: { expiry }, pair: { minPremiumPerUnit: 1n } })
 	// The terms hash excludes the auction schedule, so only this start time differs.
-	const twin = await openVault(c, { terms: { expiry, auctionStartsAt: 1_900_000_000n }, pair: { minPremium: 1n } })
+	const twin = await openVault(c, { terms: { expiry, auctionStartsAt: 1_900_000_000n }, pair: { minPremiumPerUnit: 1n } })
 	return { c, v, twin }
 })
 const approvedEuropeanOnlyCall = fixture(deployed, async c => {
@@ -231,7 +231,7 @@ describe("activate", () => {
 						c.usdcAddress,
 						c.usdcAddress,
 						STRIKE,
-						PREMIUM,
+						PREMIUM_PER_UNIT,
 						ExerciseStyle.American,
 						SettlementType.Physical,
 						bid.expiry,
@@ -254,7 +254,7 @@ describe("activate", () => {
 				expect(s.quoteToken).to.equal(c.usdcAddress)
 				expect(s.premiumToken).to.equal(c.usdcAddress)
 				expect(s.strike).to.equal(STRIKE)
-				expect(s.premium).to.equal(PREMIUM)
+				expect(s.premiumPerUnit).to.equal(PREMIUM_PER_UNIT)
 				expect(s.style).to.equal(ExerciseStyle.American)
 				expect(s.settlement).to.equal(SettlementType.Physical)
 				expect(s.expiry).to.equal(bid.expiry)
@@ -561,7 +561,7 @@ describe("activate", () => {
 			})
 
 			it("rejects a premium below the 50 USDC minimum", async () => {
-				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: usdc(3100), premium: usdc(49) })).to.be.revertedWithCustomError(
+				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: usdc(3100), premiumPerUnit: usdc(49) })).to.be.revertedWithCustomError(
 					c.hub,
 					"PremiumTooLow",
 				)
@@ -584,7 +584,7 @@ describe("activate", () => {
 			})
 
 			it("accepts a zero strike and a zero premium", async () => {
-				await activate(c, v.vaultId, v.vaultAddress, { strike: 0n, premium: 0n })
+				await activate(c, v.vaultId, v.vaultAddress, { strike: 0n, premiumPerUnit: 0n })
 				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 			})
 		})
@@ -621,19 +621,19 @@ describe("activate", () => {
 			})
 
 			it("rejects a strike below the limit even with a premium on the floor", async () => {
-				await expect(activate(c, v.vaultId, v.vaultAddress, { premium: usdc(150) })).to.be.revertedWithCustomError(c.hub, "StrikeBelowLimit")
+				await expect(activate(c, v.vaultId, v.vaultAddress, { premiumPerUnit: usdc(150) })).to.be.revertedWithCustomError(c.hub, "StrikeBelowLimit")
 			})
 
 			it("rejects a premium below the floor", async () => {
 				// 5% of the 3000 spot is 150 USDC.
-				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: usdc(3100), premium: usdc(149) })).to.be.revertedWithCustomError(
+				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: usdc(3100), premiumPerUnit: usdc(149) })).to.be.revertedWithCustomError(
 					c.hub,
 					"PremiumTooLow",
 				)
 			})
 
 			it("accepts a bid that satisfies both rules", async () => {
-				await activate(c, v.vaultId, v.vaultAddress, { strike: usdc(3100), premium: usdc(150) })
+				await activate(c, v.vaultId, v.vaultAddress, { strike: usdc(3100), premiumPerUnit: usdc(150) })
 				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 			})
 		})
@@ -764,12 +764,12 @@ describe("activate", () => {
 			})
 
 			it("rejects a premium just under 1% of the underlying, without a feed", async () => {
-				const bid = await makeBid(c, v.vaultId, { premium: weth(1) / 100n - 1n })
+				const bid = await makeBid(c, v.vaultId, { premiumPerUnit: weth(1) / 100n - 1n })
 				await expect(submit(c, v.vaultId, bid)).to.be.revertedWithCustomError(c.hub, "PremiumTooLow")
 			})
 
 			it("accepts a 1% premium and records WETH as the premium token", async () => {
-				await submit(c, v.vaultId, await makeBid(c, v.vaultId, { premium: weth(1) / 100n }))
+				await submit(c, v.vaultId, await makeBid(c, v.vaultId, { premiumPerUnit: weth(1) / 100n }))
 				expect((await c.hub.stateOf(v.vaultId)).premiumToken).to.equal(c.wethAddress)
 			})
 		})

@@ -44,7 +44,7 @@ const cashPut = fixture(deployed, async c => ({
 /** Twice the exercise window, so neither window can stand in for the other. */
 const TWO_HOUR_PUBLICATION_WINDOW = 2n * EXERCISE_WINDOW
 const cashCallWithTwoHourPublication = fixture(deployed, async c => {
-	await c.hub.setSettings(EXERCISE_WINDOW, AUCTION_TIMEOUT, TWO_HOUR_PUBLICATION_WINDOW)
+	await c.hub.setVaultWindowDefaults(EXERCISE_WINDOW, AUCTION_TIMEOUT, TWO_HOUR_PUBLICATION_WINDOW)
 	return { c, v: await goLive(c, { withFeed: true }, { settlement: SettlementType.Cash }) }
 })
 const cashEuropeanCall = fixture(deployed, async c => ({
@@ -558,7 +558,7 @@ describe("physical fallback", () => {
 				await c.hub.setAdmissionPause(0, true)
 				await c.hub.setAdmissionPause(v.vaultId, true)
 				await c.hub.setCashSettlementEnabled(false)
-				await c.hub.setSettings(0, 1, 1)
+				await c.hub.setVaultWindowDefaults(0, 1, 1)
 				const publisher = await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE()
 				await c.hub.revokeRole(publisher, c.admin.address)
 				await c.hub.grantRole(publisher, c.bob.address)

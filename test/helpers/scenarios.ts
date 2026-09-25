@@ -25,15 +25,15 @@ import {
 } from "./setup.js"
 
 export const STRIKE = 3000n * USDC_UNIT // 3000 USDC per WETH
-export const PREMIUM = 100n * USDC_UNIT // 100 USDC per WETH
+export const PREMIUM_PER_UNIT = 100n * USDC_UNIT // 100 USDC per WETH
 export const CALL_DEPOSIT = 10n * WETH_UNIT // 10 WETH → notional 10 WETH
 export const PUT_DEPOSIT = 30_000n * USDC_UNIT // 30,000 USDC → notional 10 WETH at strike 3000
 export const TENOR = 7n * 24n * 3600n
 export const MM_BANKROLL = 1_000_000n * USDC_UNIT
 /** A fixed auction start well in the future (March 2030), for scheduling tests. */
 export const AUCTION_START = 1_900_000_000n
-/** PREMIUM on the 10 WETH notional of either default vault: 1,000 USDC. */
-export const PREMIUM_TOTAL = (PREMIUM * CALL_DEPOSIT) / WETH_UNIT
+/** PREMIUM_PER_UNIT on the 10 WETH notional of either default vault: 1,000 USDC. */
+export const PREMIUM_TOTAL = (PREMIUM_PER_UNIT * CALL_DEPOSIT) / WETH_UNIT
 /** Cash-only settlement with the one-hour price age the feed scenarios use. */
 export const CASH_TERMS = { allowedSettlement: SettlementPolicy.Cash, maxSettlementPriceAge: 3600 }
 
@@ -112,7 +112,7 @@ export interface BidOptions {
 	marketMaker?: string
 	quoteToken?: string
 	strike?: bigint
-	premium?: bigint
+	premiumPerUnit?: bigint
 	style?: number
 	settlement?: number
 	tenor?: bigint
@@ -123,7 +123,7 @@ export interface BidOptions {
 	recipient?: string
 }
 
-/** Physical American bid at STRIKE / PREMIUM expiring in TENOR, valid for one hour, fresh nonce. */
+/** Physical American bid at STRIKE / PREMIUM_PER_UNIT expiring in TENOR, valid for one hour, fresh nonce. */
 export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = {}): Promise<Bid> {
 	const [latest, state, collateralAmount, termsHash] = await Promise.all([
 		ctx.networkHelpers.time.latest(),
@@ -137,7 +137,7 @@ export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = 
 		marketMaker: o.marketMaker ?? ctx.marketMaker.address,
 		quoteToken: o.quoteToken ?? ctx.usdcAddress,
 		strike: o.strike ?? STRIKE,
-		premium: o.premium ?? PREMIUM,
+		premiumPerUnit: o.premiumPerUnit ?? PREMIUM_PER_UNIT,
 		style: o.style ?? ExerciseStyle.American,
 		settlement: o.settlement ?? SettlementType.Physical,
 		expiry: o.expiry ?? (o.tenor ? now + o.tenor : state.expiry),

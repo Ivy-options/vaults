@@ -11,7 +11,7 @@ contract IvyBidRules is IIvyBidValidator {
 	struct PairLimit {
 		address quoteToken;
 		uint256 strikeLimit; // calls: minimum strike, 0 = none. puts: maximum strike, must be > 0
-		uint256 minPremium; // premium-token units per 1 whole underlying
+		uint256 minPremiumPerUnit; // premium-token units per 1 whole underlying
 	}
 
 	struct SpotBandRule {
@@ -23,7 +23,7 @@ contract IvyBidRules is IIvyBidValidator {
 	struct PremiumFloorRule {
 		address priceFeed; // may be zero when every pair pays premium in the underlying
 		uint32 maxPriceAge;
-		uint16 minPremiumBps; // premium >= spot * minPremiumBps / 10_000, in (0, 10_000]
+		uint16 minPremiumBps; // premiumPerUnit >= spot * minPremiumBps / 10_000, in (0, 10_000]
 	}
 
 	bytes4 public constant PAIR_LIMITS = bytes4(keccak256("PairLimits"));
@@ -38,14 +38,10 @@ contract IvyBidRules is IIvyBidValidator {
 		} else if (kind == SPOT_BAND) {
 			SpotBandRule memory rule = abi.decode(data, (SpotBandRule));
 			_checkFeed(rule.priceFeed, rule.maxPriceAge);
-			if (isCall && rule.maxInTheMoneyBps > IvyMath.BPS) {
-				revert DeviationTooLarge();
-			}
+			if (isCall && rule.maxInTheMoneyBps > IvyMath.BPS) revert DeviationTooLarge();
 		} else if (kind == PREMIUM_FLOOR) {
 			PremiumFloorRule memory rule = abi.decode(data, (PremiumFloorRule));
-			if (rule.minPremiumBps == 0 || rule.minPremiumBps > IvyMath.BPS) {
-				revert InvalidPremiumFloor();
-			}
+			if (rule.minPremiumBps == 0 || rule.minPremiumBps > IvyMath.BPS) revert InvalidPremiumFloor();
 			for (uint256 i = 0; i < pairs.length; ++i) {
 				if (pairs[i].premiumToken != terms.underlying) {
 					_checkFeed(rule.priceFeed, rule.maxPriceAge);
@@ -63,22 +59,16 @@ contract IvyBidRules is IIvyBidValidator {
 		if (kind == PAIR_LIMITS) {
 			PairLimit memory limit = _limitFor(abi.decode(data, (PairLimit[])), bid.quoteToken);
 			if (context.isCall) {
-				if (bid.strike < limit.strikeLimit) {
-					revert StrikeBelowLimit();
-				}
+				if (bid.strike < limit.strikeLimit) revert StrikeBelowLimit();
 			} else if (bid.strike > limit.strikeLimit) {
 				revert StrikeAboveLimit();
 			}
-			if (bid.premium < limit.minPremium) {
-				revert PremiumTooLow();
-			}
+			if (bid.premiumPerUnit < limit.minPremiumPerUnit) revert PremiumTooLow();
 		} else if (kind == SPOT_BAND) {
 			SpotBandRule memory rule = abi.decode(data, (SpotBandRule));
 			uint256 spot = _readSpot(rule.priceFeed, rule.maxPriceAge, context.underlying, bid.quoteToken);
 			uint256 bound = IvyMath.spotBound(context.isCall, spot, rule.maxInTheMoneyBps);
-			if (context.isCall ? bid.strike < bound : bid.strike > bound) {
-				revert StrikeOutsideSpotBand();
-			}
+			if (context.isCall ? bid.strike < bound : bid.strike > bound) revert StrikeOutsideSpotBand();
 		} else if (kind == PREMIUM_FLOOR) {
 			PremiumFloorRule memory rule = abi.decode(data, (PremiumFloorRule));
 			// Same-token premium needs no feed: one whole underlying equals `underlyingUnit`.
@@ -86,9 +76,7 @@ contract IvyBidRules is IIvyBidValidator {
 				context.premiumToken == context.underlying
 					? context.underlyingUnit
 					: _readSpot(rule.priceFeed, rule.maxPriceAge, context.underlying, context.premiumToken);
-			if (bid.premium * IvyMath.BPS < spot * rule.minPremiumBps) {
-				revert PremiumTooLow();
-			}
+			if (bid.premiumPerUnit * IvyMath.BPS < spot * rule.minPremiumBps) revert PremiumTooLow();
 		} else {
 			revert UnknownRuleKind(kind);
 		}
@@ -96,22 +84,14 @@ contract IvyBidRules is IIvyBidValidator {
 	}
 
 	function _checkFeed(address priceFeed, uint32 maxPriceAge) private view {
-		if (priceFeed.code.length == 0) {
-			revert BindingMismatch();
-		}
-		if (maxPriceAge == 0) {
-			revert FeedNeedsMaxPriceAge();
-		}
+		if (priceFeed.code.length == 0) revert BindingMismatch();
+		if (maxPriceAge == 0) revert FeedNeedsMaxPriceAge();
 	}
 
 	function _readSpot(address priceFeed, uint32 maxPriceAge, address underlying, address quote) private view returns (uint256) {
 		(uint256 price, uint256 updatedAt) = IIvyPriceFeed(priceFeed).spot(underlying, quote);
-		if (price == 0 || updatedAt > block.timestamp) {
-			revert InvalidPrice();
-		}
-		if (block.timestamp - updatedAt > maxPriceAge) {
-			revert StalePrice();
-		}
+		if (price == 0 || updatedAt > block.timestamp) revert InvalidPrice();
+		if (block.timestamp - updatedAt > maxPriceAge) revert StalePrice();
 		return price;
 	}
 
@@ -124,9 +104,7 @@ contract IvyBidRules is IIvyBidValidator {
 					break;
 				}
 			}
-			if (!found) {
-				revert RuleMissingPair(pairs[i].quoteToken);
-			}
+			if (!found) revert RuleMissingPair(pairs[i].quoteToken);
 		}
 		for (uint256 i = 0; i < limits.length; ++i) {
 			bool known = false;
@@ -136,25 +114,17 @@ contract IvyBidRules is IIvyBidValidator {
 					break;
 				}
 			}
-			if (!known) {
-				revert PairUnknown(limits[i].quoteToken);
-			}
+			if (!known) revert PairUnknown(limits[i].quoteToken);
 			for (uint256 j = 0; j < i; ++j) {
-				if (limits[j].quoteToken == limits[i].quoteToken) {
-					revert DuplicatePair(limits[i].quoteToken);
-				}
+				if (limits[j].quoteToken == limits[i].quoteToken) revert DuplicatePair(limits[i].quoteToken);
 			}
-			if (!isCall && limits[i].strikeLimit == 0) {
-				revert InvalidStrikeLimit();
-			}
+			if (!isCall && limits[i].strikeLimit == 0) revert InvalidStrikeLimit();
 		}
 	}
 
 	function _limitFor(PairLimit[] memory limits, address quoteToken) private pure returns (PairLimit memory) {
 		for (uint256 i = 0; i < limits.length; ++i) {
-			if (limits[i].quoteToken == quoteToken) {
-				return limits[i];
-			}
+			if (limits[i].quoteToken == quoteToken) return limits[i];
 		}
 		revert PairUnknown(quoteToken);
 	}

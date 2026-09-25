@@ -11,12 +11,8 @@ contract ExampleSettlementPublisher is Ownable {
 	IIvySettlementPricePublication public immutable hub;
 
 	constructor(address hub_, address owner_) Ownable(owner_) {
-		if (hub_ == address(0)) {
-			revert ZeroAddress();
-		}
-		if (hub_.code.length == 0) {
-			revert BindingMismatch();
-		}
+		if (hub_ == address(0)) revert ZeroAddress();
+		if (hub_.code.length == 0) revert BindingMismatch();
 		hub = IIvySettlementPricePublication(hub_);
 	}
 

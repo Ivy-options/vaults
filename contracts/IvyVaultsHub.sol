@@ -49,7 +49,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	uint16 public platformFeeBps;
 	address public platformTreasury;
 	mapping(uint256 => PlatformFee) public platformFees;
-	bool public paused;
+	bool public globalPaused;
 	bool public transfersEnabled;
 	mapping(uint256 => bool) public vaultPaused;
 	uint64 public exerciseWindow;
@@ -76,9 +76,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	modifier onlyVaultOwner(uint256 vaultId) {
 		_requireExists(vaultId);
-		if (msg.sender != _state[vaultId].owner) {
-			revert NotVaultOwner();
-		}
+		if (msg.sender != _state[vaultId].owner) revert NotVaultOwner();
 		_;
 	}
 
@@ -88,26 +86,22 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		address shares_,
 		address premiums_,
 		address unwind_,
-		uint64 window_,
-		uint64 timeout_,
-		uint64 publicationWindow_
+		uint64 exerciseWindow_,
+		uint64 auctionTimeout_,
+		uint64 expiryPricePublicationWindow_
 	) EIP712("IvyVaultsHub", "3") {
 		if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) {
 			revert ZeroAddress();
 		}
-		if (implementation.code.length == 0) {
-			revert BindingMismatch();
-		}
-		if (publicationWindow_ == 0) {
-			revert InvalidSettlementWindow();
-		}
+		if (implementation.code.length == 0) revert BindingMismatch();
+		if (expiryPricePublicationWindow_ == 0) revert InvalidSettlementWindow();
 		vaultImplementation = implementation;
 		shareToken = IIvyShares(shares_);
 		premiums = IvyPremiums(premiums_);
 		unwind = IvyUnwind(unwind_);
-		exerciseWindow = window_;
-		auctionTimeout = timeout_;
-		expiryPricePublicationWindow = publicationWindow_;
+		exerciseWindow = exerciseWindow_;
+		auctionTimeout = auctionTimeout_;
+		expiryPricePublicationWindow = expiryPricePublicationWindow_;
 		_grantRole(DEFAULT_ADMIN_ROLE, admin);
 		_grantRole(GUARDIAN_ROLE, admin);
 		_grantRole(PLATFORM_FEE_MANAGER_ROLE, admin);
@@ -115,17 +109,13 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	}
 
 	function setPlatformFeeBps(uint16 rate) external onlyRole(PLATFORM_FEE_MANAGER_ROLE) {
-		if (rate > IvyMath.BPS) {
-			revert InvalidPlatformFee();
-		}
+		if (rate > IvyMath.BPS) revert InvalidPlatformFee();
 		emit PlatformFeeBpsUpdated(platformFeeBps, rate);
 		platformFeeBps = rate;
 	}
 
 	function setPlatformTreasury(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
-		if (recipient == address(0)) {
-			revert ZeroAddress();
-		}
+		if (recipient == address(0)) revert ZeroAddress();
 		emit PlatformTreasuryUpdated(platformTreasury, recipient);
 		platformTreasury = recipient;
 	}
@@ -142,20 +132,23 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		emit CashSettlementEnabledUpdated(enabled);
 	}
 
-	function setSettings(uint64 window_, uint64 timeout_, uint64 publicationWindow_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-		if (publicationWindow_ == 0) {
-			revert InvalidSettlementWindow();
-		}
-		exerciseWindow = window_;
-		auctionTimeout = timeout_;
-		expiryPricePublicationWindow = publicationWindow_;
-		emit SettingsUpdated(window_, timeout_, publicationWindow_);
+	/// @notice Set the windows each new vault copies at creation. Existing vaults keep their own.
+	function setVaultWindowDefaults(
+		uint64 exerciseWindow_,
+		uint64 auctionTimeout_,
+		uint64 expiryPricePublicationWindow_
+	) external onlyRole(DEFAULT_ADMIN_ROLE) {
+		if (expiryPricePublicationWindow_ == 0) revert InvalidSettlementWindow();
+		exerciseWindow = exerciseWindow_;
+		auctionTimeout = auctionTimeout_;
+		expiryPricePublicationWindow = expiryPricePublicationWindow_;
+		emit VaultWindowDefaultsUpdated(exerciseWindow_, auctionTimeout_, expiryPricePublicationWindow_);
 	}
 
 	/// @param vaultId Zero pauses admission globally; other ids pause one vault.
 	function setAdmissionPause(uint256 vaultId, bool value) external onlyRole(GUARDIAN_ROLE) {
 		if (vaultId == 0) {
-			paused = value;
+			globalPaused = value;
 		} else {
 			_requireExists(vaultId);
 			vaultPaused[vaultId] = value;
@@ -177,9 +170,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		_admission(0);
 		if (terms.allowedSettlement != SettlementPolicy.Physical) {
 			_requireCashSettlementEnabled();
-			if (exerciseWindow == 0) {
-				revert InvalidSettlementWindow();
-			}
+			if (exerciseWindow == 0) revert InvalidSettlementWindow();
 		}
 		if (
 			shareToken.hub() != address(this) ||
@@ -201,16 +192,16 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 		_terms[vaultId] = terms;
 		vaultPlatformFeeBps[vaultId] = platformFeeBps;
-		VaultState storage s = _state[vaultId];
-		s.vault = vault;
-		s.owner = msg.sender;
-		s.expiry = terms.expiry;
-		s.exerciseWindow = exerciseWindow;
-		s.auctionTimeout = auctionTimeout;
-		s.expiryPricePublicationWindow = expiryPricePublicationWindow;
-		s.isCall = isCall;
-		s.phase = Phase.Open;
-		s.underlyingUnit = 10 ** IERC20Metadata(terms.underlying).decimals();
+		VaultState storage state = _state[vaultId];
+		state.vault = vault;
+		state.owner = msg.sender;
+		state.expiry = terms.expiry;
+		state.exerciseWindow = exerciseWindow;
+		state.auctionTimeout = auctionTimeout;
+		state.expiryPricePublicationWindow = expiryPricePublicationWindow;
+		state.isCall = isCall;
+		state.phase = Phase.Open;
+		state.underlyingUnit = 10 ** IERC20Metadata(terms.underlying).decimals();
 
 		for (uint256 i = 0; i < pairs.length; ++i) {
 			_premiumTokens[vaultId][pairs[i].quoteToken] = pairs[i].premiumToken;
@@ -226,33 +217,27 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 			terms.underlying,
 			terms.collateral
 		);
-		if (terms.auctionStartsAt != 0) {
-			emit AuctionScheduled(vaultId, terms.auctionStartsAt);
-		}
+		if (terms.auctionStartsAt != 0) emit AuctionScheduled(vaultId, terms.auctionStartsAt);
 	}
 
 	/// @notice Deposit collateral through the hub. Approve the vault address to spend it first.
 	function deposit(uint256 vaultId, uint256 amount) external nonReentrant {
 		_checkDeposit(vaultId, msg.sender, amount);
 		uint256 received = IIvyVault(_state[vaultId].vault).pull(_terms[vaultId].collateral, msg.sender, amount);
-		_credit(vaultId, msg.sender, received);
+		_mintShares(vaultId, msg.sender, received);
 	}
 
 	/// @inheritdoc IIvyVaultsHub
 	function onVaultDeposit(uint256 vaultId, address depositor, uint256 amount) external nonReentrant {
-		if (msg.sender != _state[vaultId].vault) {
-			revert NotVault();
-		}
+		if (msg.sender != _state[vaultId].vault) revert NotVault();
 		_checkDeposit(vaultId, depositor, amount);
-		_credit(vaultId, depositor, amount);
+		_mintShares(vaultId, depositor, amount);
 	}
 
 	/// @notice Burn shares for collateral while the vault is Open.
 	function withdraw(uint256 vaultId, uint256 shares) external nonReentrant {
 		_requirePhase(vaultId, Phase.Open);
-		if (shares == 0) {
-			revert ZeroAmount();
-		}
+		if (shares == 0) revert ZeroAmount();
 		shareToken.burn(msg.sender, vaultId, shares);
 		IIvyVault(_state[vaultId].vault).push(_terms[vaultId].collateral, msg.sender, shares);
 		emit Withdrawn(vaultId, msg.sender, shares);
@@ -266,9 +251,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	}
 
 	function transferVaultOwnership(uint256 vaultId, address newOwner) external onlyVaultOwner(vaultId) {
-		if (newOwner == address(0)) {
-			revert ZeroAddress();
-		}
+		if (newOwner == address(0)) revert ZeroAddress();
 		address previous = _state[vaultId].owner;
 		_state[vaultId].owner = newOwner;
 		emit VaultOwnershipTransferred(vaultId, previous, newOwner);
@@ -278,26 +261,18 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	function openAuction(uint256 vaultId) external {
 		_requirePhase(vaultId, Phase.Open);
 		_admission(vaultId);
-		VaultState storage s = _state[vaultId];
-		VaultTerms storage t = _terms[vaultId];
-		if (block.timestamp >= t.expiry) {
-			revert ExpiryInPast();
-		}
-		bool scheduled = t.auctionStartsAt != 0 && block.timestamp >= t.auctionStartsAt;
-		if (msg.sender != s.owner && !scheduled) {
-			revert AuctionNotStartable();
-		}
+		VaultState storage state = _state[vaultId];
+		VaultTerms storage terms = _terms[vaultId];
+		if (block.timestamp >= terms.expiry) revert ExpiryInPast();
+		bool scheduled = terms.auctionStartsAt != 0 && block.timestamp >= terms.auctionStartsAt;
+		if (msg.sender != state.owner && !scheduled) revert AuctionNotStartable();
 		uint256 collateral = shareToken.totalSupply(vaultId);
-		if (collateral == 0) {
-			revert ZeroAmount();
-		}
-		if (collateral < t.minCollateral) {
-			revert BelowMinCollateral(collateral, t.minCollateral);
-		}
-		++s.auctionId;
-		emit AuctionIdentity(vaultId, s.auctionId);
-		s.phase = Phase.Auction;
-		s.auctionOpenedAt = uint64(block.timestamp);
+		if (collateral == 0) revert ZeroAmount();
+		if (collateral < terms.minCollateral) revert BelowMinCollateral(collateral, terms.minCollateral);
+		++state.auctionId;
+		emit AuctionIdentity(vaultId, state.auctionId);
+		state.phase = Phase.Auction;
+		state.auctionOpenedAt = uint64(block.timestamp);
 		emit AuctionOpened(vaultId, collateral);
 	}
 
@@ -305,17 +280,20 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @dev The bid master can cancel any time.
 	function cancelAuction(uint256 vaultId) external {
 		_requirePhase(vaultId, Phase.Auction);
-		VaultState storage s = _state[vaultId];
+		VaultState storage state = _state[vaultId];
 		if (!hasRole(BID_MASTER_ROLE, msg.sender)) {
-			if (msg.sender != s.owner) {
-				revert NotVaultOwner();
-			}
-			if (!paused && !vaultPaused[vaultId] && block.timestamp < s.expiry && block.timestamp < uint256(s.auctionOpenedAt) + s.auctionTimeout) {
+			if (msg.sender != state.owner) revert NotVaultOwner();
+			if (
+				!globalPaused &&
+				!vaultPaused[vaultId] &&
+				block.timestamp < state.expiry &&
+				block.timestamp < uint256(state.auctionOpenedAt) + state.auctionTimeout
+			) {
 				revert AuctionTimeoutNotReached();
 			}
 		}
-		s.phase = Phase.Open;
-		s.auctionOpenedAt = 0;
+		state.phase = Phase.Open;
+		state.auctionOpenedAt = 0;
 		_terms[vaultId].auctionStartsAt = 0;
 		emit AuctionCancelled(vaultId);
 	}
@@ -324,52 +302,40 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	function activate(uint256 vaultId, Bid calldata bid, bytes calldata signature) external nonReentrant onlyRole(BID_MASTER_ROLE) {
 		_admission(vaultId);
 		_requirePhase(vaultId, Phase.Auction);
-		if (bid.settlement == SettlementType.Cash) {
-			_requireCashSettlementEnabled();
-		}
-		if (bid.vaultId != vaultId) {
-			revert BidVaultMismatch();
-		}
-		if (!hasRole(MARKET_MAKER_ROLE, bid.marketMaker)) {
-			revert NotMarketMaker();
-		}
-		if (block.timestamp > bid.validUntil) {
-			revert BidExpired();
-		}
-		if (usedBidNonces[bid.marketMaker][bid.nonce]) {
-			revert NonceUsed();
-		}
+		if (bid.settlement == SettlementType.Cash) _requireCashSettlementEnabled();
+		if (bid.vaultId != vaultId) revert BidVaultMismatch();
+		if (!hasRole(MARKET_MAKER_ROLE, bid.marketMaker)) revert NotMarketMaker();
+		if (block.timestamp > bid.validUntil) revert BidExpired();
+		if (usedBidNonces[bid.marketMaker][bid.nonce]) revert NonceUsed();
 		usedBidNonces[bid.marketMaker][bid.nonce] = true;
 		bytes32 digest = _hashTypedDataV4(BidHash.hash(bid));
-		if (!SignatureChecker.isValidSignatureNow(bid.marketMaker, digest, signature)) {
-			revert BadSignature();
-		}
+		if (!SignatureChecker.isValidSignatureNow(bid.marketMaker, digest, signature)) revert BadSignature();
 
-		VaultState storage s = _state[vaultId];
-		VaultTerms storage t = _terms[vaultId];
+		VaultState storage state = _state[vaultId];
+		VaultTerms storage terms = _terms[vaultId];
 		address premiumToken = _premiumTokens[vaultId][bid.quoteToken];
 		uint256 supply = shareToken.totalSupply(vaultId);
-		uint256 totalNotional = IvyVaultRules.checkBid(s, t, _rules[vaultId], premiumToken, _termsHash[vaultId], bid, supply);
-		uint256 totalPremium = IvyMath.premiumTotal(bid.premium, totalNotional, s.underlyingUnit);
+		uint256 totalNotional = IvyVaultRules.checkBid(state, terms, _rules[vaultId], premiumToken, _termsHash[vaultId], bid, supply);
+		uint256 totalPremium = IvyMath.premiumTotal(bid.premiumPerUnit, totalNotional, state.underlyingUnit);
 
-		s.marketMaker = bid.marketMaker;
-		s.executor = bid.executor;
-		s.recipient = bid.recipient;
-		s.quoteToken = bid.quoteToken;
-		s.premiumToken = premiumToken;
-		s.strike = bid.strike;
-		s.premium = bid.premium;
-		s.style = bid.style;
-		s.settlement = bid.settlement;
-		s.totalNotional = totalNotional;
-		s.phase = Phase.Live;
+		state.marketMaker = bid.marketMaker;
+		state.executor = bid.executor;
+		state.recipient = bid.recipient;
+		state.quoteToken = bid.quoteToken;
+		state.premiumToken = premiumToken;
+		state.strike = bid.strike;
+		state.premiumPerUnit = bid.premiumPerUnit;
+		state.style = bid.style;
+		state.settlement = bid.settlement;
+		state.totalNotional = totalNotional;
+		state.phase = Phase.Live;
 
 		uint16 feeRate = vaultPlatformFeeBps[vaultId];
 		address treasury = platformTreasury;
 		uint256 fee = Math.mulDiv(totalPremium, feeRate, IvyMath.BPS);
 		platformFees[vaultId] = PlatformFee(feeRate, treasury, fee);
-		premiums.activate(vaultId, s.vault, totalPremium - fee, supply);
-		IIvyVault(s.vault).collectPremium(premiumToken, bid.marketMaker, totalPremium, fee, treasury);
+		premiums.activate(vaultId, state.vault, totalPremium - fee, supply);
+		IIvyVault(state.vault).collectPremium(premiumToken, bid.marketMaker, totalPremium, fee, treasury);
 		emit PlatformFeeAllocated(vaultId, treasury, feeRate, fee);
 
 		emit Activated(
@@ -378,7 +344,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 			bid.quoteToken,
 			premiumToken,
 			bid.strike,
-			bid.premium,
+			bid.premiumPerUnit,
 			bid.style,
 			bid.settlement,
 			bid.expiry,
@@ -389,9 +355,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	/// @notice Invalidate one of your bid nonces.
 	function cancelBid(uint256 nonce) external {
-		if (usedBidNonces[msg.sender][nonce]) {
-			revert NonceUsed();
-		}
+		if (usedBidNonces[msg.sender][nonce]) revert NonceUsed();
 		usedBidNonces[msg.sender][nonce] = true;
 		emit BidCancelled(msg.sender, nonce);
 	}
@@ -419,14 +383,14 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @dev A finalized price cannot be replaced.
 	function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE) {
 		_requireCashPublication(vaultId);
-		VaultState storage s = _state[vaultId];
+		VaultState storage state = _state[vaultId];
 		IvyOptionSettlement.publishExpiry(
 			_settlementPrices[vaultId],
 			vaultId,
 			_terms[vaultId].underlying,
-			s.quoteToken,
-			s.expiry,
-			s.expiryPricePublicationWindow,
+			state.quoteToken,
+			state.expiry,
+			state.expiryPricePublicationWindow,
 			price,
 			validUntil
 		);
@@ -464,25 +428,19 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	function setExecution(uint256 vaultId, address executor, address recipient) external nonReentrant {
 		_requireExists(vaultId);
-		VaultState storage s = _state[vaultId];
-		if (msg.sender != s.marketMaker) {
-			revert NotMarketMaker();
-		}
-		if (recipient == address(0)) {
-			revert ZeroAddress();
-		}
-		s.executor = executor;
-		s.recipient = recipient;
+		VaultState storage state = _state[vaultId];
+		if (msg.sender != state.marketMaker) revert NotMarketMaker();
+		if (recipient == address(0)) revert ZeroAddress();
+		state.executor = executor;
+		state.recipient = recipient;
 		emit ExecutionUpdated(vaultId, executor, recipient);
 	}
 
 	function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund, bytes calldata buyerSignature) external nonReentrant {
 		_requirePhase(vaultId, Phase.Live);
-		VaultState storage s = _state[vaultId];
-		if (msg.sender != s.owner && msg.sender != s.marketMaker) {
-			revert NotVaultOwner();
-		}
-		unwind.propose(vaultId, deadline, s.exercisedNotional, shareToken.totalSupply(vaultId), refund, s.marketMaker, buyerSignature);
+		VaultState storage state = _state[vaultId];
+		if (msg.sender != state.owner && msg.sender != state.marketMaker) revert NotVaultOwner();
+		unwind.propose(vaultId, deadline, state.exercisedNotional, shareToken.totalSupply(vaultId), refund, state.marketMaker, buyerSignature);
 	}
 
 	function approveUnwind(uint256 vaultId, uint256 nonce) external nonReentrant {
@@ -497,14 +455,12 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @notice Fund this vault's unwind refund reserve with premium tokens.
 	function fundUnwind(uint256 vaultId, uint256 nonce, uint256 amount) external nonReentrant {
 		_requirePhase(vaultId, Phase.Live);
-		VaultState storage s = _state[vaultId];
-		if (shareToken.balanceOf(msg.sender, vaultId) == 0) {
-			revert AgreementInvalid();
-		}
+		VaultState storage state = _state[vaultId];
+		if (shareToken.balanceOf(msg.sender, vaultId) == 0) revert AgreementInvalid();
 		uint256 revision = unwind.revisions(vaultId, msg.sender);
-		uint256 received = IIvyVault(s.vault).fundUnwind(msg.sender, amount);
+		uint256 received = IIvyVault(state.vault).fundUnwind(msg.sender, amount);
 		// A token callback that transfers shares, even away and back, invalidates this funding attempt.
-		unwind.fund(vaultId, nonce, msg.sender, received, s.exercisedNotional, revision);
+		unwind.fund(vaultId, nonce, msg.sender, received, state.exercisedNotional, revision);
 	}
 
 	function withdrawUnwindContribution(uint256 vaultId, uint256 nonce) external nonReentrant {
@@ -515,10 +471,10 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	function executeUnwind(uint256 vaultId, uint256 nonce, bytes calldata buyerSignature) external nonReentrant {
 		_requirePhase(vaultId, Phase.Live);
-		VaultState storage s = _state[vaultId];
-		uint256 refund = unwind.consume(vaultId, nonce, s.exercisedNotional, shareToken.totalSupply(vaultId), s.marketMaker, buyerSignature);
-		IIvyVault(s.vault).consumeUnwind(refund);
-		_finalize(vaultId, s);
+		VaultState storage state = _state[vaultId];
+		uint256 refund = unwind.consume(vaultId, nonce, state.exercisedNotional, shareToken.totalSupply(vaultId), state.marketMaker, buyerSignature);
+		IIvyVault(state.vault).consumeUnwind(refund);
+		_finalize(vaultId, state);
 		emit Unwound(vaultId, nonce, refund);
 	}
 
@@ -549,9 +505,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	function settlementPrice(uint256 vaultId) external view returns (uint256 price) {
 		_requireExists(vaultId);
 		price = _settlementPrices[vaultId].expiry;
-		if (price == 0) {
-			revert ReportUnavailable();
-		}
+		if (price == 0) revert ReportUnavailable();
 	}
 
 	function termsOf(uint256 vaultId) external view returns (VaultTerms memory) {
@@ -618,8 +572,8 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	}
 
 	function remainingNotional(uint256 vaultId) public view returns (uint256) {
-		VaultState storage s = _state[vaultId];
-		return s.totalNotional - s.exercisedNotional;
+		VaultState storage state = _state[vaultId];
+		return state.totalNotional - state.exercisedNotional;
 	}
 
 	function _exercise(uint256 vaultId, uint256 amount, bool physicalFallback) internal {
@@ -627,67 +581,49 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		IvyOptionSettlement.exercise(_state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId, amount, physicalFallback);
 	}
 
-	function _credit(uint256 vaultId, address depositor, uint256 received) internal {
-		if (received == 0) {
-			revert ZeroAmount();
-		}
+	function _mintShares(uint256 vaultId, address depositor, uint256 received) internal {
+		if (received == 0) revert ZeroAmount();
 		shareToken.mint(depositor, vaultId, received);
 		emit Deposited(vaultId, depositor, received);
 	}
 
-	function _finalize(uint256 vaultId, VaultState storage s) internal {
-		s.phase = Phase.Settled;
-		emit Settled(vaultId, s.exercisedNotional, s.totalNotional, s.pendingPayout);
+	function _finalize(uint256 vaultId, VaultState storage state) internal {
+		state.phase = Phase.Settled;
+		emit Settled(vaultId, state.exercisedNotional, state.totalNotional, state.pendingPayout);
 	}
 
 	function _grantRole(bytes32 role, address account) internal override returns (bool changed) {
-		if (role == SETTLEMENT_PRICE_PUBLISHER_ROLE && account == address(0)) {
-			revert ZeroAddress();
-		}
+		if (role == SETTLEMENT_PRICE_PUBLISHER_ROLE && account == address(0)) revert ZeroAddress();
 		return super._grantRole(role, account);
 	}
 
 	function _checkDeposit(uint256 vaultId, address depositor, uint256 amount) internal view {
 		_admission(vaultId);
 		_requirePhase(vaultId, Phase.Open);
-		if (amount == 0) {
-			revert ZeroAmount();
-		}
-		if (!_terms[vaultId].publicDeposits && depositor != _state[vaultId].owner) {
-			revert DepositsNotPublic();
-		}
+		if (amount == 0) revert ZeroAmount();
+		if (!_terms[vaultId].publicDeposits && depositor != _state[vaultId].owner) revert DepositsNotPublic();
 	}
 
 	function _requireCashSettlementEnabled() internal view {
-		if (!cashSettlementEnabled) {
-			revert CashSettlementDisabled();
-		}
+		if (!cashSettlementEnabled) revert CashSettlementDisabled();
 	}
 
 	function _admission(uint256 vaultId) internal view {
-		if (paused || vaultPaused[vaultId]) {
-			revert AdmissionPaused();
-		}
+		if (globalPaused || vaultPaused[vaultId]) revert AdmissionPaused();
 	}
 
 	function _requireExists(uint256 vaultId) internal view {
-		if (vaultId == 0 || vaultId > vaultCount) {
-			revert UnknownVault();
-		}
+		if (vaultId == 0 || vaultId > vaultCount) revert UnknownVault();
 	}
 
 	function _requirePhase(uint256 vaultId, Phase expected) internal view {
 		_requireExists(vaultId);
 		Phase actual = _state[vaultId].phase;
-		if (actual != expected) {
-			revert WrongPhase(expected, actual);
-		}
+		if (actual != expected) revert WrongPhase(expected, actual);
 	}
 
 	function _requireCashPublication(uint256 vaultId) private view {
 		_requirePhase(vaultId, Phase.Live);
-		if (_state[vaultId].settlement != SettlementType.Cash) {
-			revert SettlementNotAllowed();
-		}
+		if (_state[vaultId].settlement != SettlementType.Cash) revert SettlementNotAllowed();
 	}
 }

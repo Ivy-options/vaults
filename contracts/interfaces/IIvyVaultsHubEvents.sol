@@ -10,7 +10,7 @@ interface IIvyVaultsHubEvents {
 		address quoteToken,
 		address premiumToken,
 		uint256 strike,
-		uint256 premium,
+		uint256 premiumPerUnit,
 		ExerciseStyle style,
 		SettlementType settlement,
 		uint64 expiry,
@@ -48,7 +48,7 @@ interface IIvyVaultsHubEvents {
 	event PayoutNotified(uint256 indexed vaultId, address indexed recipient, address token, uint256 amount, bool acknowledged);
 	event PhysicalFallbackExercised(uint256 indexed vaultId, uint256 amount, uint256 paidByMarketMaker, uint256 receivedByMarketMaker);
 	event PhysicalFallbackExpired(uint256 indexed vaultId, uint256 lapsedNotional);
-	event SettingsUpdated(uint64 exerciseWindow, uint64 auctionTimeout, uint64 expiryPricePublicationWindow);
+	event VaultWindowDefaultsUpdated(uint64 exerciseWindow, uint64 auctionTimeout, uint64 expiryPricePublicationWindow);
 	event Settled(uint256 indexed vaultId, uint256 exercisedNotional, uint256 totalNotional, uint256 pendingPayout);
 	event Unwound(uint256 indexed vaultId, uint256 nonce, uint256 refund);
 	event VaultCreated(

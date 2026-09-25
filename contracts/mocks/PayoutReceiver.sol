@@ -48,12 +48,8 @@ contract PayoutReceiver is IIvyPayoutReceiver {
 		lastAmount = amount;
 		balanceSeen = IERC20(token).balanceOf(address(this));
 		phaseSeen = uint8(IHubView(hub).stateOf(vaultId).phase);
-		if (mode == Mode.Revert) {
-			revert("PayoutReceiver: rejected");
-		}
-		if (mode == Mode.Reenter) {
-			IHubView(hub).claimPayout(vaultId);
-		}
+		if (mode == Mode.Revert) revert("PayoutReceiver: rejected");
+		if (mode == Mode.Reenter) IHubView(hub).claimPayout(vaultId);
 		if (mode == Mode.BurnGas) {
 			for (;;) {
 				++calls;

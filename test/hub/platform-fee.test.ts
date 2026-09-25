@@ -66,7 +66,7 @@ const reopenedAt200 = fixture(deployed, async c => {
 // One USDC base unit of premium per wei of WETH, so 3 wei of collateral earn a 3-unit premium.
 const dustPremiumAt3333 = fixture(deployed, async c => {
 	await c.hub.setPlatformFeeBps(3333)
-	return { c, v: await goLive(c, { deposit: 3n }, { premium: usdc(10n ** 12n) }) }
+	return { c, v: await goLive(c, { deposit: 3n }, { premiumPerUnit: usdc(10n ** 12n) }) }
 })
 const liveAtFullRate = fixture(deployed, async c => {
 	await c.hub.setPlatformFeeBps(10_000)

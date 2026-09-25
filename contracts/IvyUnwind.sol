@@ -52,16 +52,12 @@ contract IvyUnwind is EIP712 {
 	error FundingMissing();
 
 	modifier onlyHub() {
-		if (msg.sender != hub) {
-			revert NotHub();
-		}
+		if (msg.sender != hub) revert NotHub();
 		_;
 	}
 
 	constructor(address hub_, address shares_) EIP712("IvyUnwind", "1") {
-		if (hub_ == address(0) || shares_ == address(0)) {
-			revert ZeroAddress();
-		}
+		if (hub_ == address(0) || shares_ == address(0)) revert ZeroAddress();
 		hub = hub_;
 		shares = shares_;
 	}
@@ -75,32 +71,24 @@ contract IvyUnwind is EIP712 {
 		address buyer,
 		bytes calldata signature
 	) external onlyHub {
-		(UnwindAgreement memory a, bytes32 digest) = preview(id, deadline, exercised, supply, refund);
-		if (!SignatureChecker.isValidSignatureNow(buyer, digest, signature)) {
-			revert BadSignature();
-		}
-		agreements[id] = a;
+		(UnwindAgreement memory agreement, bytes32 digest) = preview(id, deadline, exercised, supply, refund);
+		if (!SignatureChecker.isValidSignatureNow(buyer, digest, signature)) revert BadSignature();
+		agreements[id] = agreement;
 		approvedShares[id] = 0;
 		fundedShares[id] = 0;
 		approvedRequired[id] = 0;
-		emit Proposed(id, a.nonce, digest, deadline, exercised, supply, refund);
+		emit Proposed(id, agreement.nonce, digest, deadline, exercised, supply, refund);
 	}
 
 	function approve(uint256 id, uint256 nonce, address holder, uint256 balance) external onlyHub {
-		UnwindAgreement storage a = agreements[id];
-		if (nonce == 0 || nonce != a.nonce || block.timestamp > a.deadline) {
-			revert AgreementInvalid();
-		}
+		UnwindAgreement storage agreement = agreements[id];
+		if (nonce == 0 || nonce != agreement.nonce || block.timestamp > agreement.deadline) revert AgreementInvalid();
 		_invalidate(id, holder);
-		if (balance == 0) {
-			revert AgreementInvalid();
-		}
-		uint256 required = Math.mulDiv(a.refund, balance, a.supply, Math.Rounding.Ceil);
+		if (balance == 0) revert AgreementInvalid();
+		uint256 required = Math.mulDiv(agreement.refund, balance, agreement.supply, Math.Rounding.Ceil);
 		obligations[id][nonce][holder] = required;
 		approvedRequired[id] += required;
-		if (contributions[id][nonce][holder] >= required) {
-			fundedShares[id] += balance;
-		}
+		if (contributions[id][nonce][holder] >= required) fundedShares[id] += balance;
 		approvals[id][holder] = Approval(nonce, balance);
 		approvedShares[id] += balance;
 		emit ApprovalUpdated(id, holder, nonce, balance);
@@ -111,19 +99,17 @@ contract IvyUnwind is EIP712 {
 	}
 
 	function beforeShareUpdate(uint256 id, address holder) external {
-		if (msg.sender != shares) {
-			revert NotShares();
-		}
+		if (msg.sender != shares) revert NotShares();
 		_invalidate(id, holder);
 	}
 
 	function fund(uint256 id, uint256 nonce, address holder, uint256 amount, uint256 exercised, uint256 revision) external onlyHub {
-		UnwindAgreement storage a = agreements[id];
+		UnwindAgreement storage agreement = agreements[id];
 		if (
 			nonce == 0 ||
-			nonce != a.nonce ||
-			block.timestamp > a.deadline ||
-			a.exercisedNotional != exercised ||
+			nonce != agreement.nonce ||
+			block.timestamp > agreement.deadline ||
+			agreement.exercisedNotional != exercised ||
 			revisions[id][holder] != revision ||
 			amount == 0
 		) {
@@ -133,9 +119,7 @@ contract IvyUnwind is EIP712 {
 		contributions[id][nonce][holder] = previous + amount;
 		Approval storage approval = approvals[id][holder];
 		uint256 required = obligations[id][nonce][holder];
-		if (approval.nonce == nonce && previous < required && previous + amount >= required) {
-			fundedShares[id] += approval.balance;
-		}
+		if (approval.nonce == nonce && previous < required && previous + amount >= required) fundedShares[id] += approval.balance;
 		emit ContributionFunded(id, nonce, holder, amount);
 	}
 
@@ -144,9 +128,7 @@ contract IvyUnwind is EIP712 {
 	///      the final withdrawal receives rounding dust.
 	function withdraw(uint256 id, uint256 nonce, address holder) external onlyHub returns (uint256 amount) {
 		amount = contributions[id][nonce][holder];
-		if (amount == 0) {
-			revert NothingToClaim();
-		}
+		if (amount == 0) revert NothingToClaim();
 		Completion storage completion = completions[id][nonce];
 		if (completion.executed) {
 			uint256 weight = obligations[id][nonce][holder];
@@ -171,31 +153,29 @@ contract IvyUnwind is EIP712 {
 		address buyer,
 		bytes calldata signature
 	) external onlyHub returns (uint256 refund) {
-		UnwindAgreement memory a = agreements[id];
-		if (nonce == 0 || nonce != a.nonce || block.timestamp > a.deadline || a.exercisedNotional != exercised || a.supply != supply) {
+		UnwindAgreement memory agreement = agreements[id];
+		if (
+			nonce == 0 ||
+			nonce != agreement.nonce ||
+			block.timestamp > agreement.deadline ||
+			agreement.exercisedNotional != exercised ||
+			agreement.supply != supply
+		) {
 			revert AgreementInvalid();
 		}
-		if (approvedShares[id] != supply) {
-			revert ConsentMissing();
-		}
-		if (fundedShares[id] != supply) {
-			revert FundingMissing();
-		}
-		if (!SignatureChecker.isValidSignatureNow(buyer, hashAgreement(a), signature)) {
-			revert BadSignature();
-		}
-		completions[id][nonce] = Completion(true, approvedRequired[id], approvedRequired[id] - a.refund);
+		if (approvedShares[id] != supply) revert ConsentMissing();
+		if (fundedShares[id] != supply) revert FundingMissing();
+		if (!SignatureChecker.isValidSignatureNow(buyer, hashAgreement(agreement), signature)) revert BadSignature();
+		completions[id][nonce] = Completion(true, approvedRequired[id], approvedRequired[id] - agreement.refund);
 		agreements[id].deadline = 0;
-		return a.refund;
+		return agreement.refund;
 	}
 
 	/// @notice Rounded-up funding threshold for a holder balance in the current proposal.
 	function requiredContribution(uint256 id, uint256 balance) external view returns (uint256) {
-		UnwindAgreement storage a = agreements[id];
-		if (a.nonce == 0) {
-			revert AgreementInvalid();
-		}
-		return Math.mulDiv(a.refund, balance, a.supply, Math.Rounding.Ceil);
+		UnwindAgreement storage agreement = agreements[id];
+		if (agreement.nonce == 0) revert AgreementInvalid();
+		return Math.mulDiv(agreement.refund, balance, agreement.supply, Math.Rounding.Ceil);
 	}
 
 	function refundOf(uint256 id) external view returns (uint256) {
@@ -209,34 +189,30 @@ contract IvyUnwind is EIP712 {
 		uint256 exercised,
 		uint256 supply,
 		uint256 refund
-	) public view returns (UnwindAgreement memory a, bytes32 digest) {
-		if (deadline <= block.timestamp || supply == 0) {
-			revert AgreementInvalid();
-		}
-		a = UnwindAgreement(id, agreements[id].nonce + 1, deadline, exercised, supply, refund);
-		digest = hashAgreement(a);
+	) public view returns (UnwindAgreement memory agreement, bytes32 digest) {
+		if (deadline <= block.timestamp || supply == 0) revert AgreementInvalid();
+		agreement = UnwindAgreement(id, agreements[id].nonce + 1, deadline, exercised, supply, refund);
+		digest = hashAgreement(agreement);
 	}
 
-	function hashAgreement(UnwindAgreement memory a) public view returns (bytes32) {
-		return _hashTypedDataV4(keccak256(abi.encode(TYPEHASH, a)));
+	function hashAgreement(UnwindAgreement memory agreement) public view returns (bytes32) {
+		return _hashTypedDataV4(keccak256(abi.encode(TYPEHASH, agreement)));
 	}
 
 	function _invalidate(uint256 id, address holder) private {
 		revisions[id][holder]++;
-		Approval storage a = approvals[id][holder];
-		if (completions[id][a.nonce].executed) {
+		Approval storage approval = approvals[id][holder];
+		if (completions[id][approval.nonce].executed) {
 			delete approvals[id][holder];
 			return;
 		}
-		if (a.nonce == agreements[id].nonce && a.balance > 0) {
-			uint256 required = obligations[id][a.nonce][holder];
+		if (approval.nonce == agreements[id].nonce && approval.balance > 0) {
+			uint256 required = obligations[id][approval.nonce][holder];
 			approvedRequired[id] -= required;
-			if (contributions[id][a.nonce][holder] >= required) {
-				fundedShares[id] -= a.balance;
-			}
-			delete obligations[id][a.nonce][holder];
-			approvedShares[id] -= a.balance;
-			emit ApprovalUpdated(id, holder, a.nonce, 0);
+			if (contributions[id][approval.nonce][holder] >= required) fundedShares[id] -= approval.balance;
+			delete obligations[id][approval.nonce][holder];
+			approvedShares[id] -= approval.balance;
+			emit ApprovalUpdated(id, holder, approval.nonce, 0);
 		}
 		delete approvals[id][holder];
 	}

@@ -30,9 +30,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	error InvalidPlatformFee();
 
 	modifier onlyHub() {
-		if (msg.sender != hub) {
-			revert NotHub();
-		}
+		if (msg.sender != hub) revert NotHub();
 		_;
 	}
 
@@ -41,12 +39,8 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	}
 
 	function initialize(address hub_, uint256 id, address collateral_, address premiums_) external {
-		if (hub != address(0)) {
-			revert AlreadyInitialized();
-		}
-		if (hub_ == address(0) || collateral_ == address(0) || premiums_ == address(0)) {
-			revert ZeroAddress();
-		}
+		if (hub != address(0)) revert AlreadyInitialized();
+		if (hub_ == address(0) || collateral_ == address(0) || premiums_ == address(0)) revert ZeroAddress();
 		hub = hub_;
 		vaultId = id;
 		collateral = collateral_;
@@ -68,24 +62,16 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	}
 
 	function collectPremium(address token, address from, uint256 amount, uint256 fee, address treasury) external onlyHub nonReentrant {
-		if (premiumCollected) {
-			revert AlreadyInitialized();
-		}
-		if (treasury == address(0)) {
-			revert ZeroAddress();
-		}
-		if (fee > amount || treasury == address(this)) {
-			revert InvalidPlatformFee();
-		}
+		if (premiumCollected) revert AlreadyInitialized();
+		if (treasury == address(0)) revert ZeroAddress();
+		if (fee > amount || treasury == address(this)) revert InvalidPlatformFee();
 		platformFeeRemaining = fee;
 		platformFeeRecipient = treasury;
 		premiumCollected = true;
 		premiumToken = token;
 		if (amount > 0) {
 			uint256 received = _pull(token, from, amount);
-			if (received < amount) {
-				revert ShortReceived(amount, received);
-			}
+			if (received < amount) revert ShortReceived(amount, received);
 		}
 		premiumRemaining = amount - fee;
 		reserved[token] += amount;
@@ -94,9 +80,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	/// @notice Send the activation fee to the treasury fixed at activation. Anyone may call.
 	function claimPlatformFee() external nonReentrant {
 		uint256 amount = platformFeeRemaining;
-		if (amount == 0) {
-			revert NothingToClaim();
-		}
+		if (amount == 0) revert NothingToClaim();
 		platformFeeRemaining = 0;
 		reserved[premiumToken] -= amount;
 		IERC20(premiumToken).safeTransfer(platformFeeRecipient, amount);
@@ -104,24 +88,16 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	}
 
 	function payPremium(address to, uint256 amount) external nonReentrant {
-		if (msg.sender != premiums) {
-			revert NotPremiumModule();
-		}
-		if (amount > premiumRemaining) {
-			revert InsufficientAvailable();
-		}
+		if (msg.sender != premiums) revert NotPremiumModule();
+		if (amount > premiumRemaining) revert InsufficientAvailable();
 		premiumRemaining -= amount;
 		reserved[premiumToken] -= amount;
-		if (amount > 0) {
-			IERC20(premiumToken).safeTransfer(to, amount);
-		}
+		if (amount > 0) IERC20(premiumToken).safeTransfer(to, amount);
 	}
 
 	function fundUnwind(address from, uint256 amount) external onlyHub nonReentrant returns (uint256 received) {
 		received = _pull(premiumToken, from, amount);
-		if (received < amount) {
-			revert ShortReceived(amount, received);
-		}
+		if (received < amount) revert ShortReceived(amount, received);
 		unwindReserved += received;
 		reserved[premiumToken] += received;
 	}
@@ -129,9 +105,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	function returnUnwind(address to, uint256 amount) external onlyHub nonReentrant {
 		unwindReserved -= amount;
 		reserved[premiumToken] -= amount;
-		if (amount > 0) {
-			IERC20(premiumToken).safeTransfer(to, amount);
-		}
+		if (amount > 0) IERC20(premiumToken).safeTransfer(to, amount);
 	}
 
 	function consumeUnwind(uint256 amount) external onlyHub nonReentrant {
@@ -150,9 +124,7 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 		amount = buyerReserved[token];
 		buyerReserved[token] = 0;
 		reserved[token] -= amount;
-		if (amount > 0) {
-			IERC20(token).safeTransfer(to, amount);
-		}
+		if (amount > 0) IERC20(token).safeTransfer(to, amount);
 	}
 
 	function _pull(address token, address from, uint256 amount) private returns (uint256 received) {
@@ -162,8 +134,6 @@ contract IvyVault is IIvyVault, ReentrancyGuardTransient {
 	}
 
 	function _checkAvailable(address token, uint256 amount) private view {
-		if (amount > IERC20(token).balanceOf(address(this)) - reserved[token]) {
-			revert InsufficientAvailable();
-		}
+		if (amount > IERC20(token).balanceOf(address(this)) - reserved[token]) revert InsufficientAvailable();
 	}
 }

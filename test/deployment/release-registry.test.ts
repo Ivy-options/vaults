@@ -17,7 +17,7 @@ import { encodePairLimits } from "../../scripts/encoding.ts"
 import { buildRegistryDeploymentPlan, resumeRegistryDeployment, type RegistryPlan } from "../../scripts/registry-deployment.ts"
 import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease, type ReleaseBundle, type ReleaseRequest } from "../../scripts/releases.ts"
 import { signBid, type Bid } from "../helpers/bids.js"
-import { PREMIUM, STRIKE, goLive, type LiveVault } from "../helpers/scenarios.js"
+import { PREMIUM_PER_UNIT, STRIKE, goLive, type LiveVault } from "../helpers/scenarios.js"
 import {
 	EXERCISE_WINDOW,
 	EXPIRY_PRICE_PUBLICATION_WINDOW,
@@ -458,7 +458,7 @@ describe("release registry", () => {
 					{
 						validator: resolved.addresses.IvyBidRules,
 						kind: RuleKind.PairLimits,
-						data: encodePairLimits([[usdcAddress, STRIKE, PREMIUM]]),
+						data: encodePairLimits([[usdcAddress, STRIKE, PREMIUM_PER_UNIT]]),
 					},
 				]
 				await hub.createVault(terms, [{ quoteToken: usdcAddress, premiumToken: usdcAddress }], rules)
@@ -473,7 +473,7 @@ describe("release registry", () => {
 					marketMaker: admin.address,
 					quoteToken: usdcAddress,
 					strike: STRIKE,
-					premium: PREMIUM,
+					premiumPerUnit: PREMIUM_PER_UNIT,
 					style: ExerciseStyle.American,
 					settlement: SettlementType.Physical,
 					expiry,
@@ -486,8 +486,8 @@ describe("release registry", () => {
 					recipient: admin.address,
 				}
 				// Premium on 1 WETH of notional.
-				await usdcToken.mint(admin.address, PREMIUM)
-				await usdcToken.approve(vault, PREMIUM)
+				await usdcToken.mint(admin.address, PREMIUM_PER_UNIT)
+				await usdcToken.approve(vault, PREMIUM_PER_UNIT)
 				await hub.activate(vaultId, bid, await signBid(admin, resolved.hub, bid))
 				expect((await hub.stateOf(vaultId)).phase).to.equal(Phase.Live)
 			})
@@ -651,8 +651,8 @@ describe("release registry", () => {
 			})
 
 			it("leaves both hubs unpaused", async () => {
-				expect(await first.hub.paused()).to.equal(false)
-				expect(await second.hub.paused()).to.equal(false)
+				expect(await first.hub.globalPaused()).to.equal(false)
+				expect(await second.hub.globalPaused()).to.equal(false)
 			})
 
 			it("gives neither the registry nor its curator admin over the first hub", async () => {

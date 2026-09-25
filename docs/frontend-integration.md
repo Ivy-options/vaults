@@ -195,7 +195,7 @@ The current recommendation may point to a newer Hub. That has no effect on the e
 A vault stores a list of bid rules chosen by its creator and frozen at creation. Each rule is a validator address, a `bytes4` kind and opaque data. Read them with `rulesOf(vaultId)`.
 
 - Label each rule by `(validator, kind)`. The release manifest's `addresses.IvyBidRules` is the shipped validator; its kinds are `PairLimits`, `SpotBand` and `PremiumFloor`, with ids `bytes4(keccak256(name))`.
-- Decode shipped data with these ABI types: PairLimits `tuple(address quoteToken,uint256 strikeLimit,uint256 minPremium)[]`; SpotBand `tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)`; PremiumFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)`.
+- Decode shipped data with these ABI types: PairLimits `tuple(address quoteToken,uint256 strikeLimit,uint256 minPremiumPerUnit)[]`; SpotBand `tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)`; PremiumFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)`.
 - Any other validator address is custom. Show it as such and do not attempt to decode its data.
 - An empty list means every bid that passes the Hub's own checks is acceptable. Show that plainly.
 

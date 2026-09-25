@@ -3,7 +3,7 @@ import { TypedDataEncoder, id as keccakOfString } from "ethers"
 import { network } from "hardhat"
 
 import { BID_TYPES, type Bid } from "../helpers/bids.js"
-import { PREMIUM, STRIKE } from "../helpers/scenarios.js"
+import { PREMIUM_PER_UNIT, STRIKE } from "../helpers/scenarios.js"
 import { ExerciseStyle, SettlementType } from "../helpers/setup.js"
 
 const connection = await network.create()
@@ -16,7 +16,7 @@ const sample: Bid = {
 	marketMaker: "0x1111111111111111111111111111111111111111",
 	quoteToken: "0x2222222222222222222222222222222222222222",
 	strike: STRIKE,
-	premium: PREMIUM,
+	premiumPerUnit: PREMIUM_PER_UNIT,
 	style: ExerciseStyle.American,
 	settlement: SettlementType.Physical,
 	expiry: 1_800_000_000n,

@@ -33,9 +33,7 @@ contract MockERC20 is ERC20 {
 	}
 
 	function _update(address from, address to, uint256 value) internal override {
-		if (blockedRecipients[to]) {
-			revert RecipientBlocked();
-		}
+		if (blockedRecipients[to]) revert RecipientBlocked();
 		if (feeBps != 0 && from != address(0) && to != address(0)) {
 			uint256 fee = (value * feeBps) / 10_000;
 			super._update(from, address(0), fee);

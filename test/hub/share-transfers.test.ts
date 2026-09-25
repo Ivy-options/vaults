@@ -26,7 +26,7 @@ const sharedCall = fixture(transfersEnabled, async c => ({
 // Half a unit per wei: the 1.5-unit premium floors to 1.
 const flooredDustCall = fixture(transfersEnabled, async c => ({
 	c,
-	v: await goLive(c, dustDeposits(c), { premium: UNIT_PER_WEI / 2n }),
+	v: await goLive(c, dustDeposits(c), { premiumPerUnit: UNIT_PER_WEI / 2n }),
 }))
 
 describe("share transfers", () => {

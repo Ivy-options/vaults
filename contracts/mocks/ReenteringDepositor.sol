@@ -37,12 +37,8 @@ contract ReenteringDepositor is IERC1155Receiver {
 
 	function onERC1155Received(address, address, uint256 id, uint256, bytes calldata) external returns (bytes4) {
 		callbacks++;
-		if (mode == 1) {
-			hub.deposit(id, 1);
-		}
-		if (mode == 2) {
-			hub.withdraw(id, 1);
-		}
+		if (mode == 1) hub.deposit(id, 1);
+		if (mode == 2) hub.withdraw(id, 1);
 		return IERC1155Receiver.onERC1155Received.selector;
 	}
 

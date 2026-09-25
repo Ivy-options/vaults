@@ -23,16 +23,12 @@ contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
 	error TransfersDisabled();
 
 	modifier onlyHub() {
-		if (msg.sender != hub) {
-			revert NotHub();
-		}
+		if (msg.sender != hub) revert NotHub();
 		_;
 	}
 
 	constructor(address hub_, address premiums_, address unwind_, string memory uri_) ERC1155(uri_) {
-		if (hub_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) {
-			revert ZeroAddress();
-		}
+		if (hub_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) revert ZeroAddress();
 		hub = hub_;
 		premiums = premiums_;
 		unwind = unwind_;
@@ -59,12 +55,8 @@ contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
 	}
 
 	function _update(address from, address to, uint256[] memory ids, uint256[] memory values) internal override(ERC1155, ERC1155Supply) {
-		if (from != address(0) && to != address(0) && !IShareTransferPolicy(hub).transfersEnabled()) {
-			revert TransfersDisabled();
-		}
-		if (ids.length != values.length) {
-			revert ERC1155InvalidArrayLength(ids.length, values.length);
-		}
+		if (from != address(0) && to != address(0) && !IShareTransferPolicy(hub).transfersEnabled()) revert TransfersDisabled();
+		if (ids.length != values.length) revert ERC1155InvalidArrayLength(ids.length, values.length);
 		if (from != to) {
 			for (uint256 i; i < ids.length; ++i) {
 				bool seen;
@@ -74,29 +66,17 @@ contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
 						break;
 					}
 				}
-				if (seen) {
-					continue;
-				}
+				if (seen) continue;
 				uint256 amount;
 				for (uint256 j = i; j < ids.length; ++j) {
-					if (ids[j] == ids[i]) {
-						amount += values[j];
-					}
+					if (ids[j] == ids[i]) amount += values[j];
 				}
-				if (amount == 0) {
-					continue;
-				}
+				if (amount == 0) continue;
 				uint256 fromBalance = from == address(0) ? 0 : balanceOf(from, ids[i]);
-				if (from != address(0) && amount > fromBalance) {
-					revert ERC1155InsufficientBalance(from, fromBalance, amount, ids[i]);
-				}
+				if (from != address(0) && amount > fromBalance) revert ERC1155InsufficientBalance(from, fromBalance, amount, ids[i]);
 				IvyPremiums(premiums).beforeShareUpdate(ids[i], from, to, amount, fromBalance, to == address(0) ? 0 : balanceOf(to, ids[i]));
-				if (from != address(0)) {
-					IvyUnwind(unwind).beforeShareUpdate(ids[i], from);
-				}
-				if (to != address(0)) {
-					IvyUnwind(unwind).beforeShareUpdate(ids[i], to);
-				}
+				if (from != address(0)) IvyUnwind(unwind).beforeShareUpdate(ids[i], from);
+				if (to != address(0)) IvyUnwind(unwind).beforeShareUpdate(ids[i], to);
 			}
 		}
 		super._update(from, to, ids, values);
