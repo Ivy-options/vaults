@@ -22,7 +22,7 @@ done < "$STAGED_LIST"
 if [ -s "$FORMAT_LIST" ]; then
     echo "Formatting staged files..."
 
-    # Prettier respects .prettierignore, which leaves contracts unformatted here.
+    # Prettier formats TypeScript and Solidity and respects .prettierignore.
     tr '\n' '\0' < "$FORMAT_LIST" | xargs -0 npx prettier --write --ignore-unknown
     if [ $? -ne 0 ]; then
         echo "Formatting failed. Aborting commit."

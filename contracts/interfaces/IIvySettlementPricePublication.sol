@@ -5,7 +5,7 @@ pragma solidity ^0.8.34;
 /// @dev The caller needs the Hub publisher role. Prices use quote-token units per whole underlying token.
 ///      Publishing is write-only; no price-reader interface is required.
 interface IIvySettlementPricePublication {
-    function publishExercisePrice(uint256 vaultId, uint256 price, uint64 observedAt, uint64 validUntil) external;
+	function publishExercisePrice(uint256 vaultId, uint256 price, uint64 observedAt, uint64 validUntil) external;
 
-    function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
+	function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
 }

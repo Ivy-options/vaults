@@ -16,8 +16,8 @@
 		"docs:check": "node scripts/check-docs.ts",
 		"docs:build": "node scripts/build-docs.ts",
 		"docs:test": "node --test --test-concurrency=1 \"docs/site/test/*.test.mjs\"",
-		"format": "prettier --write \"**/*.ts\"",
-		"format:check": "prettier --check \"**/*.ts\""
+		"format": "prettier --write \"**/*.{ts,sol}\"",
+		"format:check": "prettier --check \"**/*.{ts,sol}\""
 	},
 	"devDependencies": {
 		"@nomicfoundation/hardhat-ethers": "^4.0.15",

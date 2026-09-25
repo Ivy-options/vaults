@@ -6,6 +6,5 @@ types
 dist
 coverage
 lib
-# Solidity follows the style guide by hand; the docs site and its assets are hand-maintained
-contracts
+# The docs site and its assets are hand-maintained
 docs

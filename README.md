@@ -40,14 +40,14 @@ npm test -- --grep "physical fallback"
 
 The contracts follow the Solidity style guide (`https://docs.soliditylang.org/en/latest/style-guide.html`).
 
-- Use four spaces, a 120-character line target, and braces for control-flow bodies.
+- Use braces for control-flow bodies.
 - Keep imports sorted and separate declarations with blank lines.
 - Order contract members: using directives, enums, structs, constants, immutables, storage, events, errors, modifiers, then functions.
 - Sort events and errors alphabetically within each contract or interface.
 - Order functions: constructor, receive/fallback, external, public, internal, private; put view and pure functions last within each visibility group.
 - Preserve storage-variable order, struct-field order, enum values, inheritance order, and modifier execution order during style changes.
 
-These are review conventions; no formatter enforces them. After editing downloadable Solidity examples, run `npm run docs:build` to refresh the guide's source copies.
+Prettier formats the contracts with `prettier-plugin-solidity` (tabs, 150-character lines), both through `npm run format` and on every commit. The list above is for review; Prettier does not enforce it. After editing downloadable Solidity examples, run `npm run docs:build` to refresh the guide's source copies.
 
 ## TypeScript style
 

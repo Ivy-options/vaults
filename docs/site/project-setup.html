@@ -49,14 +49,14 @@ npm test -- --grep &quot;physical fallback&quot;
 <h2 id="solidity-style">Solidity style</h2>
 <p>The contracts follow the Solidity style guide (<code>https://docs.soliditylang.org/en/latest/style-guide.html</code>).</p>
 <ul>
-<li>Use four spaces, a 120-character line target, and braces for control-flow bodies.</li>
+<li>Use braces for control-flow bodies.</li>
 <li>Keep imports sorted and separate declarations with blank lines.</li>
 <li>Order contract members: using directives, enums, structs, constants, immutables, storage, events, errors, modifiers, then functions.</li>
 <li>Sort events and errors alphabetically within each contract or interface.</li>
 <li>Order functions: constructor, receive/fallback, external, public, internal, private; put view and pure functions last within each visibility group.</li>
 <li>Preserve storage-variable order, struct-field order, enum values, inheritance order, and modifier execution order during style changes.</li>
 </ul>
-<p>These are review conventions; no formatter enforces them. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
+<p>Prettier formats the contracts with <code>prettier-plugin-solidity</code> (tabs, 150-character lines), both through <code>npm run format</code> and on every commit. The list above is for review; Prettier does not enforce it. After editing downloadable Solidity examples, run <code>npm run docs:build</code> to refresh the guide&#39;s source copies.</p>
 <h2 id="typescript-style">TypeScript style</h2>
 <p>Scripts and tests are TypeScript that Node runs directly. Prettier formats them (<code>.prettierrc.yml</code>: tabs, no semicolons, 150-character lines, sorted imports), and the pre-commit hook formats staged files automatically:</p>
 <pre><code class="language-sh">npm run format
