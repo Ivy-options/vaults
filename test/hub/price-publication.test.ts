@@ -163,7 +163,7 @@ describe("settlement prices", () => {
 		})
 	})
 
-	describe("publishExpiry", () => {
+	describe("publishExpiryPrice", () => {
 		let c: IvyContext
 		let v: LiveVault
 		let now: bigint
@@ -176,7 +176,7 @@ describe("settlement prices", () => {
 
 			for (const { name, vaultId } of unknownVaults) {
 				it(`reverts with UnknownVault for ${name}`, async () => {
-					await expect(c.hub.publishExpiry(vaultId, 4000, now + 1000n)).to.be.revertedWithCustomError(c.hub, "UnknownVault")
+					await expect(c.hub.publishExpiryPrice(vaultId, 4000, now + 1000n)).to.be.revertedWithCustomError(c.hub, "UnknownVault")
 				})
 			}
 		})
@@ -191,7 +191,7 @@ describe("settlement prices", () => {
 				})
 
 				it(`reverts with ${error}`, async () => {
-					await expect(c.hub.publishExpiry(vaultId, 4000, now + 1000n)).to.be.revertedWithCustomError(c.hub, error)
+					await expect(c.hub.publishExpiryPrice(vaultId, 4000, now + 1000n)).to.be.revertedWithCustomError(c.hub, error)
 				})
 			})
 		}
@@ -204,7 +204,7 @@ describe("settlement prices", () => {
 			})
 
 			it("reverts with WrongPhase", async () => {
-				await expect(c.hub.publishExpiry(v.vaultId, 4000, observedAt + 100n)).to.be.revertedWithCustomError(c.hub, "WrongPhase")
+				await expect(c.hub.publishExpiryPrice(v.vaultId, 4000, observedAt + 100n)).to.be.revertedWithCustomError(c.hub, "WrongPhase")
 			})
 		})
 
@@ -215,32 +215,32 @@ describe("settlement prices", () => {
 			})
 
 			it("rejects a zero price", async () => {
-				await expect(c.hub.publishExpiry(v.vaultId, 0, now + 1000n)).to.be.revertedWithCustomError(c.hub, "InvalidPrice")
+				await expect(c.hub.publishExpiryPrice(v.vaultId, 0, now + 1000n)).to.be.revertedWithCustomError(c.hub, "InvalidPrice")
 			})
 
 			it("reverts before the option expiry", async () => {
-				await expect(c.hub.publishExpiry(v.vaultId, 1, v.bid.expiry + 2000n)).to.be.revertedWithCustomError(c.hub, "ExpirationNotReached")
+				await expect(c.hub.publishExpiryPrice(v.vaultId, 1, v.bid.expiry + 2000n)).to.be.revertedWithCustomError(c.hub, "ExpirationNotReached")
 			})
 
 			it("rejects a report whose validity has already ended", async () => {
-				await expect(c.hub.publishExpiry(v.vaultId, 5000, now)).to.be.revertedWithCustomError(c.hub, "BidExpired")
+				await expect(c.hub.publishExpiryPrice(v.vaultId, 5000, now)).to.be.revertedWithCustomError(c.hub, "BidExpired")
 			})
 
 			it("finalizes a report at the expiry second that is valid until then", async () => {
 				await at(c, v.bid.expiry)
-				await expect(c.hub.publishExpiry(v.vaultId, 3000, v.bid.expiry))
-					.to.emit(c.hub, "ExpiryPublished")
+				await expect(c.hub.publishExpiryPrice(v.vaultId, 3000, v.bid.expiry))
+					.to.emit(c.hub, "ExpiryPricePublished")
 					.withArgs(v.vaultId, c.wethAddress, c.usdcAddress, v.bid.expiry, 3000, v.bid.expiry)
 			})
 
 			context("after a report", () => {
 				beforeEach(async () => {
 					await at(c, v.bid.expiry)
-					await c.hub.publishExpiry(v.vaultId, 3000, v.bid.expiry)
+					await c.hub.publishExpiryPrice(v.vaultId, 3000, v.bid.expiry)
 				})
 
 				it("rejects a second report", async () => {
-					await expect(c.hub.publishExpiry(v.vaultId, 4000, v.bid.expiry + 100n)).to.be.revertedWithCustomError(c.hub, "ReportFinalized")
+					await expect(c.hub.publishExpiryPrice(v.vaultId, 4000, v.bid.expiry + 100n)).to.be.revertedWithCustomError(c.hub, "ReportFinalized")
 				})
 			})
 		})
@@ -272,7 +272,7 @@ describe("settlement prices", () => {
 					const role = await c.hub.SETTLEMENT_PRICE_PUBLISHER_ROLE()
 					await c.hub.grantRole(role, c.carol.address)
 					await c.hub.revokeRole(role, c.admin.address)
-					await c.hub.connect(c.carol).publishExpiry(v.vaultId, usdc(2700), (await latest()) + 100n)
+					await c.hub.connect(c.carol).publishExpiryPrice(v.vaultId, usdc(2700), (await latest()) + 100n)
 					await c.hub.settleAtExpiry(v.vaultId)
 				})
 
@@ -484,7 +484,7 @@ describe("settlement prices", () => {
 			})
 
 			it("rejects an expiry price from an account without the role", async () => {
-				await expect(c.hub.connect(c.bob).publishExpiry(v.vaultId, 3000, now + 100n)).to.be.revertedWithCustomError(
+				await expect(c.hub.connect(c.bob).publishExpiryPrice(v.vaultId, 3000, now + 100n)).to.be.revertedWithCustomError(
 					c.hub,
 					"AccessControlUnauthorizedAccount",
 				)
@@ -492,7 +492,7 @@ describe("settlement prices", () => {
 
 			context("after a report and a rotation to a new publisher", () => {
 				beforeEach(async () => {
-					await c.hub.publishExpiry(v.vaultId, 3000, now + 100n)
+					await c.hub.publishExpiryPrice(v.vaultId, 3000, now + 100n)
 					await c.hub.grantRole(role, c.bob.address)
 					await c.hub.revokeRole(role, c.admin.address)
 				})
@@ -505,7 +505,7 @@ describe("settlement prices", () => {
 				})
 
 				it("rejects a replacement report from the new publisher", async () => {
-					await expect(c.hub.connect(c.bob).publishExpiry(v.vaultId, 4000, now + 100n)).to.be.revertedWithCustomError(c.hub, "ReportFinalized")
+					await expect(c.hub.connect(c.bob).publishExpiryPrice(v.vaultId, 4000, now + 100n)).to.be.revertedWithCustomError(c.hub, "ReportFinalized")
 				})
 
 				it("keeps the finalized price", async () => {
@@ -546,7 +546,7 @@ describe("settlement prices", () => {
 				})
 
 				it("rejects an expiry price from anyone but its owner", async () => {
-					await expect(helper.connect(c.carol).publishExpiry(v.vaultId, 4000, now + 100n)).to.be.revertedWithCustomError(
+					await expect(helper.connect(c.carol).publishExpiryPrice(v.vaultId, 4000, now + 100n)).to.be.revertedWithCustomError(
 						helper,
 						"OwnableUnauthorizedAccount",
 					)
@@ -561,12 +561,12 @@ describe("settlement prices", () => {
 					beforeEach(async () => {
 						await helper.connect(c.bob).publishExercisePrice(v.vaultId, 4000, now, now + 100n)
 						await at(c, v.bid.expiry)
-						await helper.connect(c.bob).publishExpiry(v.vaultId, 3000, v.bid.expiry + 100n)
+						await helper.connect(c.bob).publishExpiryPrice(v.vaultId, 3000, v.bid.expiry + 100n)
 						await c.hub.revokeRole(role, helperAddress)
 					})
 
 					it("rejects its next expiry price", async () => {
-						await expect(helper.connect(c.bob).publishExpiry(v.vaultId, 5000, v.bid.expiry + 100n))
+						await expect(helper.connect(c.bob).publishExpiryPrice(v.vaultId, 5000, v.bid.expiry + 100n))
 							.to.be.revertedWithCustomError(c.hub, "AccessControlUnauthorizedAccount")
 							.withArgs(helperAddress, role)
 					})
@@ -656,7 +656,7 @@ describe("settlement prices", () => {
 						await c.hub.connect(c.marketMaker).exercise(first.vaultId, weth(1))
 						await c.hub.connect(c.marketMaker).exercise(second.vaultId, weth(1))
 						await at(c, c.defaultExpiry)
-						await c.hub.publishExpiry(first.vaultId, usdc(6000), c.defaultExpiry + 100n)
+						await c.hub.publishExpiryPrice(first.vaultId, usdc(6000), c.defaultExpiry + 100n)
 					})
 
 					it("keeps the second vault from expiring until its own report", async () => {
@@ -665,11 +665,11 @@ describe("settlement prices", () => {
 
 					context("and the second vault's expiry report", () => {
 						beforeEach(async () => {
-							await c.hub.publishExpiry(second.vaultId, usdc(4000), c.defaultExpiry + 100n)
+							await c.hub.publishExpiryPrice(second.vaultId, usdc(4000), c.defaultExpiry + 100n)
 						})
 
 						it("rejects a second report for the first vault", async () => {
-							await expect(c.hub.publishExpiry(first.vaultId, usdc(7000), c.defaultExpiry + 100n)).to.be.revertedWithCustomError(
+							await expect(c.hub.publishExpiryPrice(first.vaultId, usdc(7000), c.defaultExpiry + 100n)).to.be.revertedWithCustomError(
 								c.hub,
 								"ReportFinalized",
 							)
@@ -721,7 +721,7 @@ describe("settlement prices", () => {
 			context("after the first hub reports its expiry price", () => {
 				beforeEach(async () => {
 					await at(c, expiry)
-					await c.hub.publishExpiry(first.vaultId, 5000, expiry + 100n)
+					await c.hub.publishExpiryPrice(first.vaultId, 5000, expiry + 100n)
 				})
 
 				it("leaves the second hub's vault unreported", async () => {
@@ -729,7 +729,7 @@ describe("settlement prices", () => {
 				})
 
 				it("keeps each hub's price separate", async () => {
-					await other.hub.connect(other.bob).publishExpiry(second.vaultId, 3000, expiry + 100n)
+					await other.hub.connect(other.bob).publishExpiryPrice(second.vaultId, 3000, expiry + 100n)
 					expect(await other.hub.settlementPrice(second.vaultId)).to.equal(3000n)
 					expect(await c.hub.settlementPrice(first.vaultId)).to.equal(5000n)
 				})

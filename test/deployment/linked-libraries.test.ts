@@ -56,9 +56,9 @@ const directCalls = [
 		values: (): unknown[] => [0, 1, 2, 1],
 	},
 	{
-		name: "IvyOptionSettlement.publishExpiry",
+		name: "IvyOptionSettlement.publishExpiryPrice",
 		library: "IvyOptionSettlement",
-		signature: "publishExpiry(SettlementPrices storage,uint256,address,address,uint64,uint64,uint256,uint64)",
+		signature: "publishExpiryPrice(SettlementPrices storage,uint256,address,address,uint64,uint64,uint256,uint64)",
 		types: ["uint256", "uint256", "address", "address", "uint64", "uint64", "uint256", "uint64"],
 		values: (admin: string, now: bigint): unknown[] => [0, 1, admin, admin, now - 1n, 3600, 1, now + 3600n],
 	},

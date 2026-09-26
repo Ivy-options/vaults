@@ -85,7 +85,7 @@ function publishExercisePrice(
 function exercisePrice(uint256 vaultId)
     external view returns (uint256 price, uint256 observedAt, uint256 validUntil);
 
-function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external;
+function publishExpiryPrice(uint256 vaultId, uint256 price, uint64 validUntil) external;
 
 function settlementPrice(uint256 vaultId)
     external view returns (uint256 price);

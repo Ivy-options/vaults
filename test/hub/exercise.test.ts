@@ -346,7 +346,7 @@ describe("exercise", () => {
 			context("once the expiry report is published", () => {
 				beforeEach(async () => {
 					await at(c, v.bid.expiry)
-					await c.hub.publishExpiry(v.vaultId, usdc(6000), v.bid.expiry + 100n)
+					await c.hub.publishExpiryPrice(v.vaultId, usdc(6000), v.bid.expiry + 100n)
 				})
 
 				it("pays at the expiry report instead of the observation", async () => {

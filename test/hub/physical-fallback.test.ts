@@ -275,7 +275,7 @@ describe("physical fallback", () => {
 				})
 
 				it("rejects a late expiry price", async () => {
-					await expect(c.hub.publishExpiry(v.vaultId, usdc(6000), publicationDeadline(v) + 100n)).to.be.revertedWithCustomError(
+					await expect(c.hub.publishExpiryPrice(v.vaultId, usdc(6000), publicationDeadline(v) + 100n)).to.be.revertedWithCustomError(
 						c.hub,
 						"ExpiryPricePublicationClosed",
 					)
@@ -566,7 +566,7 @@ describe("physical fallback", () => {
 
 			it("rejects the new publisher's expiry price at the publication deadline", async () => {
 				await at(c, publicationDeadline(v))
-				await expect(c.hub.connect(c.bob).publishExpiry(v.vaultId, usdc(6000), fallbackDeadline(v))).to.be.revertedWithCustomError(
+				await expect(c.hub.connect(c.bob).publishExpiryPrice(v.vaultId, usdc(6000), fallbackDeadline(v))).to.be.revertedWithCustomError(
 					c.hub,
 					"ExpiryPricePublicationClosed",
 				)
@@ -729,7 +729,7 @@ describe("physical fallback", () => {
 		})
 	})
 
-	describe("publishExpiry", () => {
+	describe("publishExpiryPrice", () => {
 		let c: IvyContext
 		let v: LiveVault
 
@@ -740,7 +740,7 @@ describe("physical fallback", () => {
 
 			it("rejects the expiry price even as the first interaction, leaving the fallback open", async () => {
 				await at(c, publicationDeadline(v))
-				await expect(c.hub.publishExpiry(v.vaultId, usdc(6000), publicationDeadline(v) + 100n)).to.be.revertedWithCustomError(
+				await expect(c.hub.publishExpiryPrice(v.vaultId, usdc(6000), publicationDeadline(v) + 100n)).to.be.revertedWithCustomError(
 					c.hub,
 					"ExpiryPricePublicationClosed",
 				)
@@ -756,7 +756,7 @@ describe("physical fallback", () => {
 					beforeEach(async () => {
 						await ethers.provider.send("evm_setAutomine", [false])
 						// Explicit gas limits skip estimation, which would run before the deadline and reject the fallback.
-						const sendPublication = () => c.hub.publishExpiry(v.vaultId, usdc(6000), publicationDeadline(v) + 100n, { gasLimit: 500_000 })
+						const sendPublication = () => c.hub.publishExpiryPrice(v.vaultId, usdc(6000), publicationDeadline(v) + 100n, { gasLimit: 500_000 })
 						const sendExercise = () => c.hub.connect(c.marketMaker).exercisePhysicalFallback(v.vaultId, weth(1), { gasLimit: 500_000 })
 						let publishTx: ContractTransactionResponse
 						let exerciseTx: ContractTransactionResponse
@@ -899,7 +899,7 @@ describe("physical fallback", () => {
 						beforeEach(async () => {
 							;({ c, v } = await load())
 							await at(c, publicationDeadline(v) - 1n)
-							await c.hub.publishExpiry(v.vaultId, price, publicationDeadline(v) - 1n)
+							await c.hub.publishExpiryPrice(v.vaultId, price, publicationDeadline(v) - 1n)
 							await networkHelpers.time.increaseTo(fallbackDeadline(v) + ONE_DAY)
 						})
 

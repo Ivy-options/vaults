@@ -30,7 +30,7 @@ library IvyOptionSettlement {
 	}
 
 	/// @dev Once stored, an expiry price cannot be replaced, even if publisher roles change.
-	function publishExpiry(
+	function publishExpiryPrice(
 		SettlementPrices storage prices,
 		uint256 vaultId,
 		address underlying,
@@ -45,7 +45,7 @@ library IvyOptionSettlement {
 		if (block.timestamp >= uint256(expiry) + publicationWindow) revert ExpiryPricePublicationClosed();
 		if (prices.expiry != 0) revert ReportFinalized();
 		prices.expiry = price;
-		emit IIvyVaultsHubEvents.ExpiryPublished(vaultId, underlying, quote, expiry, price, validUntil);
+		emit IIvyVaultsHubEvents.ExpiryPricePublished(vaultId, underlying, quote, expiry, price, validUntil);
 	}
 
 	function exercise(

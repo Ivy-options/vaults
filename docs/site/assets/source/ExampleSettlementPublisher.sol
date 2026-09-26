@@ -20,7 +20,7 @@ contract ExampleSettlementPublisher is Ownable {
 		hub.publishExercisePrice(vaultId, price, observedAt, validUntil);
 	}
 
-	function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external onlyOwner {
-		hub.publishExpiry(vaultId, price, validUntil);
+	function publishExpiryPrice(uint256 vaultId, uint256 price, uint64 validUntil) external onlyOwner {
+		hub.publishExpiryPrice(vaultId, price, validUntil);
 	}
 }

@@ -497,7 +497,7 @@ describe("cash settlement opt-in", () => {
 							await v.vault.claimPlatformFee()
 							await networkHelpers.time.increase(1000)
 							await c.hub.grantRole(role, c.bob.address)
-							await c.hub.connect(c.bob).publishExpiry(v.vaultId, usdc(2700), (await latest()) + 100n)
+							await c.hub.connect(c.bob).publishExpiryPrice(v.vaultId, usdc(2700), (await latest()) + 100n)
 							await c.hub.connect(c.bob).renounceRole(role, c.bob.address)
 						})
 

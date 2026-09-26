@@ -381,10 +381,10 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	/// @notice Publish the final cash price during the vault's fixed publication window.
 	/// @dev A finalized price cannot be replaced.
-	function publishExpiry(uint256 vaultId, uint256 price, uint64 validUntil) external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE) {
+	function publishExpiryPrice(uint256 vaultId, uint256 price, uint64 validUntil) external onlyRole(SETTLEMENT_PRICE_PUBLISHER_ROLE) {
 		_requireCashPublication(vaultId);
 		VaultState storage state = _state[vaultId];
-		IvyOptionSettlement.publishExpiry(
+		IvyOptionSettlement.publishExpiryPrice(
 			_settlementPrices[vaultId],
 			vaultId,
 			_terms[vaultId].underlying,

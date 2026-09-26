@@ -56,7 +56,7 @@ export async function publishExpiryPrice(ctx: IvyContext, vaultId: bigint, price
 	const expiry = (await ctx.hub.stateOf(vaultId)).expiry
 	const now = BigInt(await ctx.networkHelpers.time.latest())
 	if (now < expiry) await ctx.networkHelpers.time.setNextBlockTimestamp(expiry)
-	await ctx.hub.publishExpiry(vaultId, price, (now > expiry ? now : expiry) + 3600n)
+	await ctx.hub.publishExpiryPrice(vaultId, price, (now > expiry ? now : expiry) + 3600n)
 }
 
 /** Makes the next mined block carry exactly `timestamp`. */

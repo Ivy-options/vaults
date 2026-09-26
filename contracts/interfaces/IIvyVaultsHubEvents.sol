@@ -36,7 +36,7 @@ interface IIvyVaultsHubEvents {
 		uint64 observedAt,
 		uint64 validUntil
 	);
-	event ExpiryPublished(
+	event ExpiryPricePublished(
 		uint256 indexed vaultId,
 		address indexed underlying,
 		address indexed quote,
