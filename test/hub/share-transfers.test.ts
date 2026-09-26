@@ -33,10 +33,10 @@ describe("share transfers", () => {
 	let c: IvyContext
 	let v: LiveVault
 
-	// Expires in the first second it is due.
-	const expireVault = async () => {
+	// Settles in the first second it is allowed.
+	const settleVault = async () => {
 		await at(c, v.bid.expiry + EXERCISE_WINDOW)
-		await c.hub.expire(v.vaultId)
+		await c.hub.settleAtExpiry(v.vaultId)
 	}
 
 	context("before transfers are enabled", () => {
@@ -76,7 +76,7 @@ describe("share transfers", () => {
 		})
 
 		it("still burns shares when holders claim after expiry", async () => {
-			await expireVault()
+			await settleVault()
 			await c.hub.connect(c.alice).claim(v.vaultId, weth(10))
 			expect(await c.hub.totalShares(v.vaultId)).to.equal(0n)
 		})
@@ -139,7 +139,7 @@ describe("share transfers", () => {
 
 				context("after expiry and a partial burn by alice", () => {
 					beforeEach(async () => {
-						await expireVault()
+						await settleVault()
 						await c.hub.connect(c.alice).claim(v.vaultId, weth(1))
 					})
 
@@ -196,10 +196,10 @@ describe("share transfers", () => {
 				await expect(c.hub.connect(c.alice).claimPremium(v.vaultId)).to.be.revertedWithCustomError(c.premiums, "NothingToClaim")
 			})
 
-			context("after carol collects, the vault expires and bob burns all his shares", () => {
+			context("after carol collects, the vault settles and bob burns all his shares", () => {
 				beforeEach(async () => {
 					await c.hub.connect(c.carol).claimPremium(v.vaultId)
-					await expireVault()
+					await settleVault()
 					await c.hub.connect(c.bob).claim(v.vaultId, weth(4))
 				})
 
@@ -264,7 +264,7 @@ describe("share transfers", () => {
 
 			context("after expiry and every LP burns their shares", () => {
 				beforeEach(async () => {
-					await expireVault()
+					await settleVault()
 					await c.hub.connect(c.alice).claim(v.vaultId, 1n)
 					await c.hub.connect(c.bob).claim(v.vaultId, 2n)
 				})

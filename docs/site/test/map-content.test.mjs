@@ -333,7 +333,8 @@ test("wide cards reflow on resize without losing the selected topic, focus or la
 test("bookmarks to merged explanations resolve to their surviving topic", () => withMap(async page => {
   for (const [old, current] of [
     ['deposit-token-approval', 'hub-and-vaults'],
-    ['cash-expiration-reserve', 'expire-the-vault'],
+    ['cash-expiration-reserve', 'settle-at-expiry'],
+    ['expire-the-vault', 'settle-at-expiry'],
     ['buyer-reserve-sources', 'buyer-claims-any-payout'],
     ['buyer-claim-recipient', 'claim-payout'],
   ]) {

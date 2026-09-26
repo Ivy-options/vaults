@@ -49,9 +49,9 @@ const TERMS_TUPLE = "tuple(address,address,bool,bool,uint8,uint8,uint64,uint64,u
 // observations just made and valid for an hour, and terms expiring an hour out.
 const directCalls = [
 	{
-		name: "IvyOptionSettlement.expire",
+		name: "IvyOptionSettlement.settleAtExpiry",
 		library: "IvyOptionSettlement",
-		signature: "expire(VaultState storage,VaultTerms storage,SettlementPrices storage,uint256)",
+		signature: "settleAtExpiry(VaultState storage,VaultTerms storage,SettlementPrices storage,uint256)",
 		types: ["uint256", "uint256", "uint256", "uint256"],
 		values: (): unknown[] => [0, 1, 2, 1],
 	},

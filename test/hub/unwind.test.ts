@@ -281,13 +281,13 @@ describe("approveUnwind", () => {
 		})
 	})
 
-	context("after the vault expires with a proposal still open", () => {
+	context("after the vault settles at expiry with a proposal still open", () => {
 		beforeEach(async () => {
 			;({ c, v } = await physicalCall())
 			// The deadline outlives the exercise window, so only the phase stops approval.
 			p = await proposeUnwind(c, v.vaultId, v.bid.expiry + 2n * EXERCISE_WINDOW, 0n)
 			await at(c, v.bid.expiry + EXERCISE_WINDOW)
-			await c.hub.expire(v.vaultId)
+			await c.hub.settleAtExpiry(v.vaultId)
 		})
 
 		it("rejects approval with WrongPhase", async () => {
@@ -529,7 +529,7 @@ describe("executeUnwind", () => {
 		})
 	})
 
-	context("after the vault expires first", () => {
+	context("after the vault settles at expiry first", () => {
 		beforeEach(async () => {
 			;({ c, v } = await physicalCall())
 			// The deadline outlives the exercise window, so only the phase stops execution.
@@ -537,7 +537,7 @@ describe("executeUnwind", () => {
 			await c.hub.connect(c.alice).approveUnwind(v.vaultId, 1n)
 			await fund(c, c.usdc, c.carol, v.vaultAddress, usdc(100))
 			await at(c, v.bid.expiry + EXERCISE_WINDOW)
-			await c.hub.expire(v.vaultId)
+			await c.hub.settleAtExpiry(v.vaultId)
 		})
 
 		it("reverts with WrongPhase without taking the sponsor's refund", async () => {

@@ -130,7 +130,7 @@ const invalidations: Array<{
 		name: "settlement and burning every share",
 		invalidate: async (c, v) => {
 			await at(c, v.bid.expiry + EXERCISE_WINDOW)
-			await c.hub.expire(v.vaultId)
+			await c.hub.settleAtExpiry(v.vaultId)
 			await c.hub.connect(c.alice).claim(v.vaultId, PUT_DEPOSIT)
 			await c.hub.connect(c.alice).claimPremium(v.vaultId)
 		},

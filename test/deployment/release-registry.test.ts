@@ -130,22 +130,22 @@ const oldExercised = fixture(secondRecommended, async s => {
 	await s.first.hub.connect(s.first.marketMaker).exercise(1, weth(4))
 	return s
 })
-const oldExpired = fixture(oldExercised, async s => {
-	await networkHelpers.time.increaseTo(await s.first.hub.expirationTimeOf(1))
-	await s.first.hub.connect(s.first.bob).expire(1)
+const oldSettled = fixture(oldExercised, async s => {
+	await networkHelpers.time.increaseTo(await s.first.hub.settleAtExpiryTimeOf(1))
+	await s.first.hub.connect(s.first.bob).settleAtExpiry(1)
 	return s
 })
-const oldCashedOut = fixture(oldExpired, async s => {
+const oldCashedOut = fixture(oldSettled, async s => {
 	await s.first.hub.connect(s.first.alice).claim(1, weth(10))
 	await s.first.hub.connect(s.first.alice).claimPremium(1)
 	return s
 })
-const newExpired = fixture(oldCashedOut, async s => {
-	await networkHelpers.time.increaseTo(await s.second.hub.expirationTimeOf(1))
-	await s.second.hub.connect(s.second.bob).expire(1)
+const newSettled = fixture(oldCashedOut, async s => {
+	await networkHelpers.time.increaseTo(await s.second.hub.settleAtExpiryTimeOf(1))
+	await s.second.hub.connect(s.second.bob).settleAtExpiry(1)
 	return s
 })
-const bothCashedOut = fixture(newExpired, async s => {
+const bothCashedOut = fixture(newSettled, async s => {
 	await s.second.hub.connect(s.second.alice).claim(1, weth(10))
 	await s.second.hub.connect(s.second.alice).claimPremium(1)
 	return s
@@ -685,9 +685,9 @@ describe("release registry", () => {
 			})
 		})
 
-		context("once the first hub expires the old position", () => {
+		context("once the first hub settles the old position at expiry", () => {
 			beforeEach(async () => {
-				;({ first, oldPosition } = await oldExpired())
+				;({ first, oldPosition } = await oldSettled())
 			})
 
 			it("pays the LP the unexercised collateral and the strike proceeds", async () => {
@@ -722,9 +722,9 @@ describe("release registry", () => {
 			})
 		})
 
-		context("once the second hub expires the new position", () => {
+		context("once the second hub settles the new position at expiry", () => {
 			beforeEach(async () => {
-				;({ second, newPosition } = await newExpired())
+				;({ second, newPosition } = await newSettled())
 			})
 
 			it("pays the LP the new position's full collateral", async () => {

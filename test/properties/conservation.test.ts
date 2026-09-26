@@ -70,16 +70,16 @@ interface SettlementCase {
 
 const cashExpiry = (price: bigint) => async (c: IvyContext, v: LiveVault) => {
 	await publishExpiryPrice(c, v.vaultId, price)
-	await c.hub.expire(v.vaultId)
+	await c.hub.settleAtExpiry(v.vaultId)
 }
 
-const exerciseFourThenExpire =
+const exerciseFourThenSettle =
 	({ deliverWeth }: { deliverWeth: boolean }) =>
 	async (c: IvyContext, v: LiveVault) => {
 		if (deliverWeth) await fund(c, c.weth, c.marketMaker, v.vaultAddress, weth(4))
 		await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(4))
 		await at(c, v.bid.expiry + EXERCISE_WINDOW)
-		await c.hub.expire(v.vaultId)
+		await c.hub.settleAtExpiry(v.vaultId)
 	}
 
 const optionKinds: Array<{ name: string; isCall: boolean; unit: bigint; settlements: SettlementCase[] }> = [
@@ -98,7 +98,7 @@ const optionKinds: Array<{ name: string; isCall: boolean; unit: bigint; settleme
 			{
 				name: "physical settlement",
 				type: SettlementType.Physical,
-				settle: exerciseFourThenExpire({ deliverWeth: false }),
+				settle: exerciseFourThenSettle({ deliverWeth: false }),
 				// Premium plus 4 WETH bought at the strike.
 				holdersUsdc: PREMIUM_TOTAL + 4n * STRIKE,
 			},
@@ -120,7 +120,7 @@ const optionKinds: Array<{ name: string; isCall: boolean; unit: bigint; settleme
 			{
 				name: "physical settlement",
 				type: SettlementType.Physical,
-				settle: exerciseFourThenExpire({ deliverWeth: true }),
+				settle: exerciseFourThenSettle({ deliverWeth: true }),
 				// Collateral on 10 WETH of notional plus premium, less 4 WETH sold to the vault at the strike.
 				holdersUsdc: 10n * STRIKE + PREMIUM_TOTAL - 4n * STRIKE,
 			},

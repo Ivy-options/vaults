@@ -98,8 +98,8 @@ library IvyOptionSettlement {
 		_notifyRecipient(vaultId, recipient, terms.collateral, got);
 	}
 
-	function expire(VaultState storage state, VaultTerms storage terms, SettlementPrices storage prices, uint256 vaultId) external {
-		if (block.timestamp < expirationTime(state, prices)) revert ExpirationNotReached();
+	function settleAtExpiry(VaultState storage state, VaultTerms storage terms, SettlementPrices storage prices, uint256 vaultId) external {
+		if (block.timestamp < settleAtExpiryTime(state, prices)) revert TooEarlyToSettle();
 		uint256 remaining = state.totalNotional - state.exercisedNotional;
 		if (state.settlement == SettlementType.Cash && prices.expiry == 0) emit IIvyVaultsHubEvents.PhysicalFallbackExpired(vaultId, remaining);
 		if (state.settlement == SettlementType.Cash && remaining > 0 && prices.expiry != 0) {
@@ -156,11 +156,11 @@ library IvyOptionSettlement {
 	function settlementStatus(
 		VaultState storage state,
 		SettlementPrices storage prices
-	) external view returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canExpire) {
+	) external view returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canSettleAtExpiry) {
 		publicationDeadline = uint256(state.expiry) + state.expiryPricePublicationWindow;
 		fallbackDeadline = publicationDeadline + state.exerciseWindow;
 		if (state.phase != Phase.Live) return (SettlementRoute.Inactive, publicationDeadline, fallbackDeadline, false);
-		canExpire = block.timestamp >= expirationTime(state, prices);
+		canSettleAtExpiry = block.timestamp >= settleAtExpiryTime(state, prices);
 		if (state.settlement == SettlementType.Physical) {
 			route = SettlementRoute.Physical;
 		} else if (prices.expiry != 0 || block.timestamp < state.expiry) {
@@ -168,11 +168,11 @@ library IvyOptionSettlement {
 		} else if (block.timestamp < publicationDeadline) {
 			route = SettlementRoute.AwaitingExpiryPrice;
 		} else {
-			route = canExpire ? SettlementRoute.FallbackExpired : SettlementRoute.PhysicalFallback;
+			route = canSettleAtExpiry ? SettlementRoute.FallbackExpired : SettlementRoute.PhysicalFallback;
 		}
 	}
 
-	function expirationTime(VaultState storage state, SettlementPrices storage prices) public view returns (uint256) {
+	function settleAtExpiryTime(VaultState storage state, SettlementPrices storage prices) public view returns (uint256) {
 		if (state.settlement == SettlementType.Cash) {
 			return prices.expiry != 0 ? uint256(state.expiry) : uint256(state.expiry) + state.expiryPricePublicationWindow + state.exerciseWindow;
 		}

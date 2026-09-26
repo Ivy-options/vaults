@@ -129,21 +129,21 @@ const finalizedCashCalls = [
 ]
 
 const routeTimeline = [
-	{ name: "at expiry", time: (v: LiveVault) => v.bid.expiry, route: "AwaitingExpiryPrice", canExpire: false },
+	{ name: "at expiry", time: (v: LiveVault) => v.bid.expiry, route: "AwaitingExpiryPrice", canSettleAtExpiry: false },
 	{
 		name: "one second before the publication deadline",
 		time: (v: LiveVault) => publicationDeadline(v) - 1n,
 		route: "AwaitingExpiryPrice",
-		canExpire: false,
+		canSettleAtExpiry: false,
 	},
-	{ name: "at the publication deadline", time: publicationDeadline, route: "PhysicalFallback", canExpire: false },
+	{ name: "at the publication deadline", time: publicationDeadline, route: "PhysicalFallback", canSettleAtExpiry: false },
 	{
 		name: "one second before the fallback deadline",
 		time: (v: LiveVault) => fallbackDeadline(v) - 1n,
 		route: "PhysicalFallback",
-		canExpire: false,
+		canSettleAtExpiry: false,
 	},
-	{ name: "at the fallback deadline", time: fallbackDeadline, route: "FallbackExpired", canExpire: true },
+	{ name: "at the fallback deadline", time: fallbackDeadline, route: "FallbackExpired", canSettleAtExpiry: true },
 ] as const
 
 const expiryPrices = [
@@ -333,8 +333,8 @@ describe("physical fallback", () => {
 							)
 						})
 
-						it("rejects expiration", async () => {
-							await expect(c.hub.expire(v.vaultId)).to.be.revertedWithCustomError(c.hub, "WrongPhase")
+						it("rejects settleAtExpiry", async () => {
+							await expect(c.hub.settleAtExpiry(v.vaultId)).to.be.revertedWithCustomError(c.hub, "WrongPhase")
 						})
 					})
 				})
@@ -600,14 +600,14 @@ describe("physical fallback", () => {
 							await c.hub.connect(c.marketMaker).exercisePhysicalFallback(v.vaultId, weth(1))
 						})
 
-						it("lets anyone expire at the fallback deadline", async () => {
+						it("lets anyone settle at the fallback deadline", async () => {
 							await at(c, fallbackDeadline(v))
-							await expect(c.hub.connect(c.carol).expire(v.vaultId)).not.to.be.revert(ethers)
+							await expect(c.hub.connect(c.carol).settleAtExpiry(v.vaultId)).not.to.be.revert(ethers)
 						})
 
-						it("returns the unexercised collateral to the LPs once expired", async () => {
+						it("returns the unexercised collateral to the LPs once settled", async () => {
 							await networkHelpers.time.increaseTo(fallbackDeadline(v))
-							await c.hub.connect(c.carol).expire(v.vaultId)
+							await c.hub.connect(c.carol).settleAtExpiry(v.vaultId)
 							await expect(c.hub.connect(c.alice).claim(v.vaultId, weth(10))).to.changeTokenBalance(ethers, c.weth, c.alice, weth(9))
 						})
 					})
@@ -630,8 +630,8 @@ describe("physical fallback", () => {
 					await expect(c.hub.connect(c.marketMaker).exercisePhysicalFallback(v.vaultId, weth(1))).to.be.revertedWithCustomError(c.hub, "WrongPhase")
 				})
 
-				it("rejects expiration", async () => {
-					await expect(c.hub.expire(v.vaultId)).to.be.revertedWithCustomError(c.hub, "WrongPhase")
+				it("rejects settleAtExpiry", async () => {
+					await expect(c.hub.settleAtExpiry(v.vaultId)).to.be.revertedWithCustomError(c.hub, "WrongPhase")
 				})
 
 				it("lets the LP claim only once", async () => {
@@ -696,7 +696,7 @@ describe("physical fallback", () => {
 						BigInt(SettlementRoute[step.route]),
 						publicationDeadline(v),
 						fallbackDeadline(v),
-						step.canExpire,
+						step.canSettleAtExpiry,
 					])
 				})
 			}
@@ -708,7 +708,7 @@ describe("physical fallback", () => {
 			context("after lapsing at the fallback deadline", () => {
 				beforeEach(async () => {
 					await networkHelpers.time.increaseTo(fallbackDeadline(v))
-					await c.hub.expire(v.vaultId)
+					await c.hub.settleAtExpiry(v.vaultId)
 				})
 
 				it("reports the Inactive route", async () => {
@@ -799,7 +799,7 @@ describe("physical fallback", () => {
 		})
 	})
 
-	describe("expire", () => {
+	describe("settleAtExpiry", () => {
 		let c: IvyContext
 		let v: LiveVault
 
@@ -808,13 +808,13 @@ describe("physical fallback", () => {
 				;({ c, v } = await cashCall())
 			})
 
-			it("is due at the fallback deadline", async () => {
-				expect(await c.hub.expirationTimeOf(v.vaultId)).to.equal(fallbackDeadline(v))
+			it("opens at the fallback deadline", async () => {
+				expect(await c.hub.settleAtExpiryTimeOf(v.vaultId)).to.equal(fallbackDeadline(v))
 			})
 
 			it("reverts at expiry", async () => {
 				await at(c, v.bid.expiry)
-				await expect(c.hub.expire(v.vaultId)).to.be.revertedWithCustomError(c.hub, "ExpirationNotReached")
+				await expect(c.hub.settleAtExpiry(v.vaultId)).to.be.revertedWithCustomError(c.hub, "TooEarlyToSettle")
 			})
 
 			context("at the fallback deadline", () => {
@@ -823,7 +823,7 @@ describe("physical fallback", () => {
 				})
 
 				it("lapses the unexercised notional", async () => {
-					await expect(c.hub.expire(v.vaultId)).to.emit(c.hub, "PhysicalFallbackExpired").withArgs(v.vaultId, weth(10))
+					await expect(c.hub.settleAtExpiry(v.vaultId)).to.emit(c.hub, "PhysicalFallbackExpired").withArgs(v.vaultId, weth(10))
 				})
 			})
 
@@ -833,13 +833,13 @@ describe("physical fallback", () => {
 				})
 
 				it("lets an unrelated caller settle with nothing exercised or reserved", async () => {
-					await expect(c.hub.connect(c.carol).expire(v.vaultId)).to.emit(c.hub, "Settled").withArgs(v.vaultId, 0n, weth(10), 0n)
+					await expect(c.hub.connect(c.carol).settleAtExpiry(v.vaultId)).to.emit(c.hub, "Settled").withArgs(v.vaultId, 0n, weth(10), 0n)
 					expect(await v.vault.buyerReserved(c.wethAddress)).to.equal(0n)
 				})
 
 				context("once settled", () => {
 					beforeEach(async () => {
-						await c.hub.connect(c.carol).expire(v.vaultId)
+						await c.hub.connect(c.carol).settleAtExpiry(v.vaultId)
 					})
 
 					it("returns all collateral to the LPs", async () => {
@@ -862,7 +862,7 @@ describe("physical fallback", () => {
 
 					it("lets anyone lapse the remainder at the fallback deadline", async () => {
 						await at(c, fallbackDeadline(v))
-						await expect(c.hub.connect(c.carol).expire(v.vaultId))
+						await expect(c.hub.connect(c.carol).settleAtExpiry(v.vaultId))
 							.to.emit(c.hub, "PhysicalFallbackExpired")
 							.withArgs(v.vaultId, weth(6))
 							.and.to.emit(c.hub, "Settled")
@@ -872,7 +872,7 @@ describe("physical fallback", () => {
 					context("once lapsed", () => {
 						beforeEach(async () => {
 							await networkHelpers.time.increaseTo(fallbackDeadline(v))
-							await c.hub.connect(c.carol).expire(v.vaultId)
+							await c.hub.connect(c.carol).settleAtExpiry(v.vaultId)
 						})
 
 						it("pays the LP the unexercised collateral and the strike proceeds, keeping the premium back", async () => {
@@ -903,11 +903,11 @@ describe("physical fallback", () => {
 							await networkHelpers.time.increaseTo(fallbackDeadline(v) + ONE_DAY)
 						})
 
-						it("stays due at the option expiry", async () => {
-							expect(await c.hub.expirationTimeOf(v.vaultId)).to.equal(v.bid.expiry)
+						it("still opens at the option expiry", async () => {
+							expect(await c.hub.settleAtExpiryTimeOf(v.vaultId)).to.equal(v.bid.expiry)
 						})
 
-						it("keeps the cash route and allows expiration", async () => {
+						it("keeps the cash route and allows settling", async () => {
 							expect(await c.hub.settlementStatus(v.vaultId)).to.deep.equal([
 								BigInt(SettlementRoute.Cash),
 								publicationDeadline(v),
@@ -924,7 +924,7 @@ describe("physical fallback", () => {
 						})
 
 						it("settles at the expiry price and reserves its payout", async () => {
-							await expect(c.hub.expire(v.vaultId)).to.emit(c.hub, "Settled").withArgs(v.vaultId, weth(10), weth(10), payout)
+							await expect(c.hub.settleAtExpiry(v.vaultId)).to.emit(c.hub, "Settled").withArgs(v.vaultId, weth(10), weth(10), payout)
 							expect(await v.vault.buyerReserved(isCall ? c.wethAddress : c.usdcAddress)).to.equal(payout)
 						})
 					})
@@ -943,14 +943,14 @@ describe("physical fallback", () => {
 			it("lapses at the fallback deadline without calling the recipient", async () => {
 				await at(c, fallbackDeadline(v))
 				// A bounded limit: any call into the gas-burning recipient would exhaust it and revert the expiry.
-				await expect(c.hub.connect(c.carol).expire(v.vaultId, { gasLimit: 300_000 })).to.not.emit(c.hub, "PayoutNotified")
+				await expect(c.hub.connect(c.carol).settleAtExpiry(v.vaultId, { gasLimit: 300_000 })).to.not.emit(c.hub, "PayoutNotified")
 				expect(await receiver.calls()).to.equal(0n)
 			})
 
 			context("once lapsed", () => {
 				beforeEach(async () => {
 					await networkHelpers.time.increaseTo(fallbackDeadline(v))
-					await c.hub.connect(c.carol).expire(v.vaultId)
+					await c.hub.connect(c.carol).settleAtExpiry(v.vaultId)
 				})
 
 				it("returns all collateral to the LPs", async () => {
@@ -964,8 +964,8 @@ describe("physical fallback", () => {
 				;({ c, v } = await physicalCall())
 			})
 
-			it("is due one exercise window after expiry", async () => {
-				expect(await c.hub.expirationTimeOf(v.vaultId)).to.equal(v.bid.expiry + EXERCISE_WINDOW)
+			it("opens one exercise window after expiry", async () => {
+				expect(await c.hub.settleAtExpiryTimeOf(v.vaultId)).to.equal(v.bid.expiry + EXERCISE_WINDOW)
 			})
 
 			context("after a physical exercise at expiry", () => {
@@ -976,7 +976,7 @@ describe("physical fallback", () => {
 
 				it("settles at the end of the exercise window", async () => {
 					await at(c, v.bid.expiry + EXERCISE_WINDOW)
-					await expect(c.hub.expire(v.vaultId)).not.to.be.revert(ethers)
+					await expect(c.hub.settleAtExpiry(v.vaultId)).not.to.be.revert(ethers)
 				})
 			})
 		})
@@ -1002,7 +1002,7 @@ describe("physical fallback", () => {
 					await networkHelpers.time.increaseTo(publicationDeadline(v))
 					await c.hub.connect(c.marketMaker).exercisePhysicalFallback(v.vaultId, weth(4))
 					await networkHelpers.time.increaseTo(fallbackDeadline(v))
-					await c.hub.connect(c.carol).expire(v.vaultId)
+					await c.hub.connect(c.carol).settleAtExpiry(v.vaultId)
 				})
 
 				it("pays an LP their share of the collateral and strike proceeds only", async () => {

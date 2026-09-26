@@ -253,7 +253,7 @@ describe("settlement prices", () => {
 
 			it("keeps the vault live at the expiry second", async () => {
 				await at(c, v.bid.expiry)
-				await expect(c.hub.expire(v.vaultId)).to.be.revertedWithCustomError(c.hub, "ExpirationNotReached")
+				await expect(c.hub.settleAtExpiry(v.vaultId)).to.be.revertedWithCustomError(c.hub, "TooEarlyToSettle")
 				expect(await c.hub.remainingNotional(v.vaultId)).to.equal(weth(10))
 				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 			})
@@ -273,7 +273,7 @@ describe("settlement prices", () => {
 					await c.hub.grantRole(role, c.carol.address)
 					await c.hub.revokeRole(role, c.admin.address)
 					await c.hub.connect(c.carol).publishExpiry(v.vaultId, usdc(2700), (await latest()) + 100n)
-					await c.hub.expire(v.vaultId)
+					await c.hub.settleAtExpiry(v.vaultId)
 				})
 
 				it("reserves only the market maker's payout", async () => {
@@ -660,7 +660,7 @@ describe("settlement prices", () => {
 					})
 
 					it("keeps the second vault from expiring until its own report", async () => {
-						await expect(c.hub.expire(second.vaultId)).to.be.revertedWithCustomError(c.hub, "ExpirationNotReached")
+						await expect(c.hub.settleAtExpiry(second.vaultId)).to.be.revertedWithCustomError(c.hub, "TooEarlyToSettle")
 					})
 
 					context("and the second vault's expiry report", () => {
@@ -676,8 +676,8 @@ describe("settlement prices", () => {
 						})
 
 						it("settles each vault at its own expiry price", async () => {
-							await c.hub.expire(first.vaultId)
-							await c.hub.expire(second.vaultId)
+							await c.hub.settleAtExpiry(first.vaultId)
+							await c.hub.settleAtExpiry(second.vaultId)
 							// 9 WETH left in each: × (6000 − 3000) / 6000 and × (4000 − 3000) / 4000.
 							expect((await c.hub.stateOf(first.vaultId)).pendingPayout).to.equal(weth(9) / 2n)
 							expect((await c.hub.stateOf(second.vaultId)).pendingPayout).to.equal(weth(9) / 4n)

@@ -17,7 +17,7 @@ const sharedCall = fixture(deployed, async c => ({
 }))
 const expiredCall = fixture(sharedCall, async ({ c, v }) => {
 	await networkHelpers.time.increaseTo(v.bid.expiry + EXERCISE_WINDOW + 1n)
-	await c.hub.expire(v.vaultId)
+	await c.hub.settleAtExpiry(v.vaultId)
 	return { c, v }
 })
 const exercisedCall = fixture(sharedCall, async ({ c, v }) => {
@@ -34,20 +34,20 @@ const partlyExercisedPut = fixture(deployed, async c => {
 	await fund(c, c.weth, c.marketMaker, v.vaultAddress, weth(4))
 	await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(4))
 	await networkHelpers.time.increaseTo(v.bid.expiry + EXERCISE_WINDOW + 1n)
-	await c.hub.expire(v.vaultId)
+	await c.hub.settleAtExpiry(v.vaultId)
 	return { c, v }
 })
 const settledCashCall = fixture(deployed, async c => {
 	const v = await goLive(c, { withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European })
 	await networkHelpers.time.increaseTo(v.bid.expiry - 2n)
 	await publishExpiryPrice(c, v.vaultId, usdc(3300))
-	await c.hub.expire(v.vaultId)
+	await c.hub.settleAtExpiry(v.vaultId)
 	return { c, v }
 })
 const settledCashPut = fixture(deployed, async c => {
 	const v = await goLive(c, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash, style: ExerciseStyle.European })
 	await publishExpiryPrice(c, v.vaultId, usdc(2700))
-	await c.hub.expire(v.vaultId)
+	await c.hub.settleAtExpiry(v.vaultId)
 	return { c, v }
 })
 

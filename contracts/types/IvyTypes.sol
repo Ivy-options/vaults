@@ -214,6 +214,7 @@ error StrikeAboveLimit();
 error StrikeBelowLimit();
 error StrikeOutsideSpotBand();
 error StyleNotAllowed();
+error TooEarlyToSettle();
 error UnknownRuleKind(bytes4 kind);
 error UnknownVault();
 error WrongPhase(Phase expected, Phase actual);

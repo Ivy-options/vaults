@@ -42,5 +42,6 @@ interface IIvyVaultsHubErrors {
 	error StrikeBelowLimit();
 	error StrikeOutsideSpotBand();
 	error StyleNotAllowed();
+	error TooEarlyToSettle();
 	error UnknownRuleKind(bytes4 kind);
 }

@@ -18,7 +18,7 @@ New vault
 
 Existing vault
   stored (chainId, hubAddress, vaultId)
-    -> original Hub.deposit/exercise/expire/claim(...)
+    -> original Hub.deposit/exercise/settleAtExpiry/claim(...)
 ```
 
 ## Addresses and release assets
@@ -222,7 +222,7 @@ Every wallet transaction must display and target the concrete contract that will
 | Action | Transaction target |
 | --- | --- |
 | Discover recommended release | Registry read |
-| Create, deposit, open auction, exercise, expire or claim | Original Hub |
+| Create, deposit, open auction, exercise, settle at expiry or claim | Original Hub |
 | Approve collateral or premium | ERC-20 token, with the clone as spender |
 | Direct deposit or platform-fee claim | Vault clone |
 | Read or transfer shares | Release-specific `IvyShares` contract |
@@ -238,15 +238,15 @@ A registry release ID is not an EIP-712 version. Never rebuild an existing bid o
 
 For this release, creation snapshots `expiryPricePublicationWindow` (`P`) and `exerciseWindow` (`W`). Show both to depositors before funding and to buyers before signing. The final-price publication deadline is `D = expiry + P`; the physical fallback deadline is `F = D + W`. Cash-capable vaults require positive values. Settings changes affect only new vaults. A signed bid binds the immutable fallback terms through its Hub and vault identity; no bid field or domain-version change is needed.
 
-Use `settlementStatus(vaultId)` to read `(route, publicationDeadline, fallbackDeadline, canExpire)` even if no one has transacted since expiry. Routes are `Physical = 0`, `Cash = 1`, `AwaitingExpiryPrice = 2`, `PhysicalFallback = 3`, `FallbackExpired = 4`, `Inactive = 5`. The last covers positions outside Live. `stateOf(vaultId).settlement` preserves the originally agreed settlement type. `expirationTimeOf(vaultId)` returns expiry for cash with an accepted final price, `F` for cash without one, and `expiry + W` for an originally physical position. Read `canExpire` as well as the timestamp; a settled vault cannot expire again.
+Use `settlementStatus(vaultId)` to read `(route, publicationDeadline, fallbackDeadline, canSettleAtExpiry)` even if no one has transacted since expiry. Routes are `Physical = 0`, `Cash = 1`, `AwaitingExpiryPrice = 2`, `PhysicalFallback = 3`, `FallbackExpired = 4`, `Inactive = 5`. The last covers positions outside Live. `stateOf(vaultId).settlement` preserves the originally agreed settlement type. `settleAtExpiryTimeOf(vaultId)` returns expiry for cash with an accepted final price, `F` for cash without one, and `expiry + W` for an originally physical position. Read `canSettleAtExpiry` as well as the timestamp; a settled vault cannot be settled again.
 
 | Time / report | Action |
 | --- | --- |
 | Before expiry | Existing exercise rules; missing American observations never enable fallback. |
 | Expiry through strictly before `D`, no final price | Wait for publication; cash settlement cannot calculate a payoff. |
-| Final price accepted before `D` | Cash exercise or expiration uses that price, including after `F`; no physical fallback. |
+| Final price accepted before `D` | Cash exercise or `settleAtExpiry` uses that price, including after `F`; no physical fallback. |
 | `D <= now < F`, no final price | Buyer or executor explicitly calls `exercisePhysicalFallback(vaultId, amount)`. |
-| `now >= F`, no final price | Anyone calls `expire(vaultId)`; unexercised notional lapses and LP claims open. |
+| `now >= F`, no final price | Anyone calls `settleAtExpiry(vaultId)`; unexercised notional lapses and LP claims open. |
 
 The same fallback applies to American and European cash options. It requires no separate activation transaction and never resets the deadlines. Ordinary `exercise` cannot turn into physical delivery while pending. Before explicit fallback, display the full payment: calls deliver quote at the strike (rounded up); puts deliver underlying and receive quote at the strike (rounded down). The exerciser approves the clone as spender. Inspect balance, allowance, authorized caller, recipient, remaining notional and the partial-exercise policy. Physical delivery does not require an oracle or an in-the-money check, and the buyer may decline it. LP recovery at `F` does not depend on buyer funding, a callback or publisher recovery.
 

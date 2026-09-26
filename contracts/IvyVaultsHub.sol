@@ -407,11 +407,11 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		_exercise(vaultId, amount, true);
 	}
 
-	/// @notice Finalize a live vault once its settlement deadline passes. Anyone may call.
+	/// @notice Settle a live vault once its settlement deadline passes. Anyone may call.
 	/// @dev A final cash price reserves the buyer payout; without one, remaining notional lapses after the fallback window.
-	function expire(uint256 vaultId) external nonReentrant {
+	function settleAtExpiry(uint256 vaultId) external nonReentrant {
 		_requirePhase(vaultId, Phase.Live);
-		IvyOptionSettlement.expire(_state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId);
+		IvyOptionSettlement.settleAtExpiry(_state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId);
 	}
 
 	/// @notice Send a reserved cash payout or unwind refund to the buyer's chosen recipient.
@@ -555,15 +555,15 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @notice Current settlement route and fallback deadlines. `Inactive` means the vault is not Live.
 	function settlementStatus(
 		uint256 vaultId
-	) external view returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canExpire) {
+	) external view returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canSettleAtExpiry) {
 		_requireExists(vaultId);
 		return IvyOptionSettlement.settlementStatus(_state[vaultId], _settlementPrices[vaultId]);
 	}
 
-	/// @notice Cash with an accepted price expires at expiry; otherwise LP recovery waits for both fallback windows.
-	function expirationTimeOf(uint256 vaultId) public view returns (uint256) {
+	/// @notice When `settleAtExpiry` opens: expiry for cash with a final price, otherwise after both fallback windows.
+	function settleAtExpiryTimeOf(uint256 vaultId) public view returns (uint256) {
 		_requireExists(vaultId);
-		return IvyOptionSettlement.expirationTime(_state[vaultId], _settlementPrices[vaultId]);
+		return IvyOptionSettlement.settleAtExpiryTime(_state[vaultId], _settlementPrices[vaultId]);
 	}
 
 	/// @notice Shares outstanding for a vault, equal to credited collateral units.

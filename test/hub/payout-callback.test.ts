@@ -215,13 +215,13 @@ describe("payout callback", () => {
 			;({ c, v, receiver, receiverAddress } = await cashEuropeanCallToReceiverInTheMoney())
 		})
 
-		it("does not notify on expire", async () => {
-			await expect(c.hub.expire(v.vaultId)).to.not.emit(c.hub, "PayoutNotified")
+		it("does not notify on settleAtExpiry", async () => {
+			await expect(c.hub.settleAtExpiry(v.vaultId)).to.not.emit(c.hub, "PayoutNotified")
 		})
 
 		context("once settled", () => {
 			beforeEach(async () => {
-				await c.hub.expire(v.vaultId)
+				await c.hub.settleAtExpiry(v.vaultId)
 			})
 
 			it("pays the claimed payout to the recipient", async () => {

@@ -46,7 +46,7 @@
 
 Existing vault
   stored (chainId, hubAddress, vaultId)
-    -&gt; original Hub.deposit/exercise/expire/claim(...)
+    -&gt; original Hub.deposit/exercise/settleAtExpiry/claim(...)
 </code></pre>
 <h2 id="addresses-and-release-assets">Addresses and release assets</h2>
 <p>Configure one trusted registry address for each supported chain. Do not discover the registry through another mutable service without verifying the result against the application&#39;s chain configuration.</p>
@@ -220,7 +220,7 @@ await (await hub.openAuction(reference.vaultId)).wait();
 <td>Registry read</td>
 </tr>
 <tr>
-<td>Create, deposit, open auction, exercise, expire or claim</td>
+<td>Create, deposit, open auction, exercise, settle at expiry or claim</td>
 <td>Original Hub</td>
 </tr>
 <tr>
@@ -245,7 +245,7 @@ await (await hub.openAuction(reference.vaultId)).wait();
 <p>A registry release ID is not an EIP-712 version. Never rebuild an existing bid or unwind signature against the current recommendation.</p>
 <h2 id="cash-expiry-fallback">Cash expiry fallback</h2>
 <p>For this release, creation snapshots <code>expiryPricePublicationWindow</code> (<code>P</code>) and <code>exerciseWindow</code> (<code>W</code>). Show both to depositors before funding and to buyers before signing. The final-price publication deadline is <code>D = expiry + P</code>; the physical fallback deadline is <code>F = D + W</code>. Cash-capable vaults require positive values. Settings changes affect only new vaults. A signed bid binds the immutable fallback terms through its Hub and vault identity; no bid field or domain-version change is needed.</p>
-<p>Use <code>settlementStatus(vaultId)</code> to read <code>(route, publicationDeadline, fallbackDeadline, canExpire)</code> even if no one has transacted since expiry. Routes are <code>Physical = 0</code>, <code>Cash = 1</code>, <code>AwaitingExpiryPrice = 2</code>, <code>PhysicalFallback = 3</code>, <code>FallbackExpired = 4</code>, <code>Inactive = 5</code>. The last covers positions outside Live. <code>stateOf(vaultId).settlement</code> preserves the originally agreed settlement type. <code>expirationTimeOf(vaultId)</code> returns expiry for cash with an accepted final price, <code>F</code> for cash without one, and <code>expiry + W</code> for an originally physical position. Read <code>canExpire</code> as well as the timestamp; a settled vault cannot expire again.</p>
+<p>Use <code>settlementStatus(vaultId)</code> to read <code>(route, publicationDeadline, fallbackDeadline, canSettleAtExpiry)</code> even if no one has transacted since expiry. Routes are <code>Physical = 0</code>, <code>Cash = 1</code>, <code>AwaitingExpiryPrice = 2</code>, <code>PhysicalFallback = 3</code>, <code>FallbackExpired = 4</code>, <code>Inactive = 5</code>. The last covers positions outside Live. <code>stateOf(vaultId).settlement</code> preserves the originally agreed settlement type. <code>settleAtExpiryTimeOf(vaultId)</code> returns expiry for cash with an accepted final price, <code>F</code> for cash without one, and <code>expiry + W</code> for an originally physical position. Read <code>canSettleAtExpiry</code> as well as the timestamp; a settled vault cannot be settled again.</p>
 <div class="tablewrap" tabindex="0" role="region" aria-label="Frontend integration reference table"><table>
 <thead>
 <tr>
@@ -263,7 +263,7 @@ await (await hub.openAuction(reference.vaultId)).wait();
 </tr>
 <tr>
 <td>Final price accepted before <code>D</code></td>
-<td>Cash exercise or expiration uses that price, including after <code>F</code>; no physical fallback.</td>
+<td>Cash exercise or <code>settleAtExpiry</code> uses that price, including after <code>F</code>; no physical fallback.</td>
 </tr>
 <tr>
 <td><code>D &lt;= now &lt; F</code>, no final price</td>
@@ -271,7 +271,7 @@ await (await hub.openAuction(reference.vaultId)).wait();
 </tr>
 <tr>
 <td><code>now &gt;= F</code>, no final price</td>
-<td>Anyone calls <code>expire(vaultId)</code>; unexercised notional lapses and LP claims open.</td>
+<td>Anyone calls <code>settleAtExpiry(vaultId)</code>; unexercised notional lapses and LP claims open.</td>
 </tr>
 </tbody></table>
 </div>

@@ -360,7 +360,7 @@
                 <div class="exit">
                   <p><b>Moving to Settled.</b> Full exercise settles the vault in
                   the exercise transaction. Otherwise, anyone can call
-                  <code>expire(vaultId)</code> once expiration is allowed.
+                  <code>settleAtExpiry(vaultId)</code> once settling is allowed.
                   Physical options must first finish their exercise window;
                   cash options use a timely final expiry price or finish the
                   fixed physical fallback window when that price is missing.</p>
@@ -420,7 +420,7 @@
             across the protocol or for one vault. This is called an admission
             pause. It blocks new creation where applicable, deposits, auction
             opening and activation. It does not stop withdrawals, transfers,
-            exercise, expiration, claims or agreed unwinds that otherwise meet
+            exercise, settling at expiry, claims or agreed unwinds that otherwise meet
             their normal rules. A pause does not extend any deadline.
           </div>
         </div>
@@ -1005,12 +1005,12 @@
             </div>
 
             <div class="reading-block reading-flow" id="exercise-and-expiration">
-              <h3>Exercise and expiration</h3>
+              <h3>Exercise and settling at expiry</h3>
             <p class="prose">When the buyer exercises a physical option, it uses
               the right it bought: the caller pays one asset and the vault
               delivers the other at the agreed strike. If the buyer leaves some
               or all of that right unused, anyone can close it after the exercise
-              window ends by submitting an expiration transaction. The two paths
+              window ends by calling <code>settleAtExpiry</code>. The two paths
               have different callers and payment requirements.</p>
               <div class="option-endings">
                 <div>
@@ -1057,16 +1057,16 @@
                   </p>
                 </div>
                 <div>
-                  <span class="sequence-number">EXPIRATION</span>
+                  <span class="sequence-number">SETTLE AT EXPIRY</span>
                   <h4>Close unused physical rights</h4>
                   <dl class="fact-rows">
                     <div>
                       <dt>Who calls?</dt>
-                      <dd>Anyone, at or after the expiration deadline.</dd>
+                      <dd>Anyone, once the exercise window has closed.</dd>
                     </div>
                     <div>
                       <dt>Entrypoint</dt>
-                      <dd><code>expire(vaultId)</code></dd>
+                      <dd><code>settleAtExpiry(vaultId)</code></dd>
                     </div>
                     <div>
                       <dt>What happens?</dt>
@@ -1078,19 +1078,19 @@
                     <div>
                       <dt>Price required?</dt>
                       <dd>
-                        No settlement price is needed for physical expiration.
+                        No settlement price is needed to settle a physical vault.
                       </dd>
                     </div>
                   </dl>
                   <p>
                     Being out of the money before the deadline does not permit
-                    expiration.
+                    settling early.
                   </p>
                 </div>
               </div>
-              <p class="prose">Reaching the deadline makes expiration possible,
+              <p class="prose">Reaching the deadline makes settling possible,
                 but it does not settle the vault automatically. Someone must
-                submit <code>expire(vaultId)</code> before shareholders can claim
+                call <code>settleAtExpiry(vaultId)</code> before shareholders can claim
                 the remaining assets.</p>
             </div>
 
@@ -1109,7 +1109,7 @@
                 keeps that duration. For example, with a one-hour
                 window and an expiry of 12:00 UTC, exercise remains possible
                 until just before 13:00 UTC. At 13:00 UTC it stops, and anyone
-                can submit expiration. In the rules below, <code>t</code> is
+                can settle the vault. In the rules below, <code>t</code> is
                 the current timestamp.
               </p>
               <div
@@ -1127,12 +1127,12 @@
                   ><span class="window-open window-before"
                     >Exercise allowed</span
                   ><span class="window-open window-after">Exercise allowed</span
-                  ><span>Anyone can expire</span>
+                  ><span>Anyone can settle</span>
                 </div>
                 <div class="window-row">
                   <strong>European</strong><span>Wait</span
                   ><span class="window-open">Exercise allowed</span
-                  ><span>Anyone can expire</span>
+                  ><span>Anyone can settle</span>
                 </div>
               </div>
               <dl class="fact-rows">
@@ -1145,7 +1145,7 @@
                   <dd><code>expiry ≤ t &lt; expiry + exerciseWindow</code></dd>
                 </div>
                 <div>
-                  <dt>Expiration · both styles</dt>
+                  <dt>Settling · both styles</dt>
                   <dd><code>t ≥ expiry + exerciseWindow</code></dd>
                 </div>
               </dl>
@@ -1266,7 +1266,7 @@
                 <dt>Existing obligations</dt>
                 <dd>
                   Physical vaults keep their delivery method. Existing cash
-                  positions retain publication, exercise, expiration, claims and
+                  positions retain publication, exercise, settling at expiry, claims and
                   agreed unwind; disabling removes none of their payment
                   obligations.
                 </dd>
@@ -1375,8 +1375,8 @@
           </div>
 
           <div class="deal-block reading-flow">
-            <h3>Cash exercise, expiration and claims</h3>
-            <p class="prose">Exercising sends the buyer's payoff immediately. Expiration instead sets aside the remaining payoff in a buyer reserve for a later claim. Both paths use the reported price, and the distinction determines when tokens leave the vault.</p>
+            <h3>Cash exercise, settling at expiry and claims</h3>
+            <p class="prose">Exercising sends the buyer's payoff immediately. Settling at expiry instead sets aside the remaining payoff in a buyer reserve for a later claim. Both paths use the reported price, and the distinction determines when tokens leave the vault.</p>
             <div class="settlement-branches">
               <div>
                 <span class="inscription">EXERCISE</span>
@@ -1395,26 +1395,26 @@
                 </p>
               </div>
               <div>
-                <span class="inscription">EXPIRATION</span>
+                <span class="inscription">SETTLE AT EXPIRY</span>
                 <h4>Vault → buyer reserve → recipient</h4>
                 <p>
-                  At or after expiry, anyone calls <code>expire(vaultId)</code>;
+                  At or after expiry, anyone calls <code>settleAtExpiry(vaultId)</code>;
                   buyer or executor later uses
                   <code>claimPayout(vaultId)</code>, which pays the recipient
                   and notifies it if it is a contract.
                 </p>
-                <strong>Expiration can settle the vault even when the buyer is owed nothing.</strong>
+                <strong>Anyone can settle the vault, even when the buyer is owed nothing.</strong>
                 <p>
-                  Expiration closes the remaining option and sets aside any
+                  Settling closes the remaining option and sets aside any
                   amount owed to the buyer. Shareholders can claim the assets
                   left after that reservation. Earned premium stays separate.
                 </p>
               </div>
             </div>
             <p class="boundary-note">
-              With a timely final price, cash expiration reserves remaining
+              With a timely final price, settling at expiry reserves remaining
               buyer value. Without one, the fixed physical fallback window
-              applies; anyone can expire its unexercised remainder afterward.
+              applies; anyone can settle the vault afterward and the unexercised remainder lapses.
               Both outcomes need an on-chain transaction.
             </p>
             <div
@@ -1429,7 +1429,7 @@
                   <tr>
                     <th>Style · settlement</th>
                     <th>exercise(vaultId, amount)</th>
-                    <th>expire(vaultId)</th>
+                    <th>settleAtExpiry(vaultId)</th>
                     <th>Price at exercise</th>
                   </tr>
                 </thead>
@@ -1457,8 +1457,8 @@
           </div>
 
           <div class="reading-block reading-flow" id="cash-outcomes">
-            <h3>Collateral after cash expiration</h3>
-            <p class="prose">With a timely final price, expiration divides backing assets between the buyer's reserved payoff and the shareholders' remaining pool. This calculator assumes an accepted final report; a missing report uses the fallback described below. Both calculated amounts stay in the collateral token until claimed.</p>
+            <h3>Collateral after cash settlement at expiry</h3>
+            <p class="prose">With a timely final price, settling at expiry divides backing assets between the buyer's reserved payoff and the shareholders' remaining pool. This calculator assumes an accepted final report; a missing report uses the fallback described below. Both calculated amounts stay in the collateral token until claimed.</p>
             <div class="cash-accounting interactive-example" data-lab="cashAmounts">
               <div class="cash-inputs">
                 <label for="cash-kind-demo">Cash vault example</label
@@ -1485,7 +1485,7 @@
                   <span>Vault collateral</span>
                   <strong id="cash-total-value">10 WETH</strong>
                 </div>
-                <p class="cash-split-label">Allocation after <code>expire()</code></p>
+                <p class="cash-split-label">Allocation after <code>settleAtExpiry()</code></p>
                 <div
                   class="cash-balance-bar"
                   role="img"
@@ -1580,7 +1580,7 @@
                 <h4>Fixed route to LP claims</h4>
                 <p>
                   With no final price, explicit physical exercise is available
-                  from D inclusive to F exclusive. At F, anyone can expire and
+                  from D inclusive to F exclusive. At F, anyone can settle the vault and
                   LPs can claim, even if the buyer has done nothing. Premium
                   claims remain available throughout.
                 </p>
@@ -1647,7 +1647,7 @@
                 <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts:
                 <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. It
                 does not impose a price requirement on physical exercise or
-                expiration.</span
+                settling at expiry.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip">immutable</span></span
@@ -1834,7 +1834,7 @@
             <div>
               <dt>Existing position</dt>
               <dd>
-                Exercise, expiration and claims use its original chain, Hub and
+                Exercise, settling at expiry and claims use its original chain, Hub and
                 local vault ID, regardless of the current recommendation. Vault
                 IDs may repeat across Hubs.
               </dd>
@@ -1878,8 +1878,8 @@
             <p class="section-intro">
               An unwind ends a Live option by agreement between the buyer and every
               current shareholder. They can negotiate a refund to the buyer, which current
-              LPs fund separately. This is an alternative to exercising or waiting for
-              expiration; the proposal, consent and funding must all be valid when it
+              LPs fund separately. This is an alternative to exercising or waiting to
+              settle at expiry; the proposal, consent and funding must all be valid when it
               executes.
             </p>
           </header>
@@ -2001,7 +2001,7 @@
               <div>
                 <dt>While the proposal is pending</dt>
                 <dd>
-                  Proposing an unwind does not pause exercise or expiration.
+                  Proposing an unwind does not pause exercise or settling at expiry.
                   The usual option rules keep applying until the agreement
                   executes, and any exercises already completed are not reversed.
                   Execution checks the buyer's signature again; a contract buyer

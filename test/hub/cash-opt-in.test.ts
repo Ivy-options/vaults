@@ -427,7 +427,7 @@ describe("cash settlement opt-in", () => {
 					context("once settled", () => {
 						beforeEach(async () => {
 							await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(1))
-							await c.hub.expire(v.vaultId)
+							await c.hub.settleAtExpiry(v.vaultId)
 						})
 
 						it("reserves the payout on the unexercised notional", async () => {
@@ -465,7 +465,7 @@ describe("cash settlement opt-in", () => {
 
 				it("keeps the vault live at the expiry second", async () => {
 					await at(c, v.bid.expiry)
-					await expect(c.hub.expire(v.vaultId)).to.be.revertedWithCustomError(c.hub, "ExpirationNotReached")
+					await expect(c.hub.settleAtExpiry(v.vaultId)).to.be.revertedWithCustomError(c.hub, "TooEarlyToSettle")
 					expect(await c.hub.remainingNotional(v.vaultId)).to.equal(weth(10))
 					expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 				})
@@ -502,14 +502,14 @@ describe("cash settlement opt-in", () => {
 						})
 
 						it("settles and pays the market maker after the LPs claim", async () => {
-							await c.hub.expire(v.vaultId)
+							await c.hub.settleAtExpiry(v.vaultId)
 							await c.hub.connect(c.alice).claim(v.vaultId, usdc(30_000))
 							// 10 WETH × (3000 − 2700) USDC.
 							await expect(c.hub.connect(c.marketMaker).claimPayout(v.vaultId)).to.changeTokenBalance(ethers, c.usdc, c.marketMaker, usdc(3000))
 						})
 
 						it("leaves cash disabled after settlement and claims", async () => {
-							await c.hub.expire(v.vaultId)
+							await c.hub.settleAtExpiry(v.vaultId)
 							await c.hub.connect(c.alice).claim(v.vaultId, usdc(30_000))
 							await c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
 							expect(await c.hub.cashSettlementEnabled()).to.equal(false)

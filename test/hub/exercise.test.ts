@@ -354,9 +354,9 @@ describe("exercise", () => {
 					await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(1))).to.changeTokenBalance(ethers, c.weth, c.marketMaker, weth(1) / 2n)
 				})
 
-				it("reserves the remainder at the expiry report on expiration", async () => {
+				it("reserves the remainder at the expiry report when settled at expiry", async () => {
 					await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(1))
-					await c.hub.expire(v.vaultId)
+					await c.hub.settleAtExpiry(v.vaultId)
 					// The last 8 WETH × (6000 − 3000) / 6000
 					expect(await v.vault.buyerReserved(c.wethAddress)).to.equal(weth(4))
 				})
@@ -400,15 +400,15 @@ describe("exercise", () => {
 					await expect(c.hub.connect(c.alice).exercise(v.vaultId, weth(1))).to.be.revertedWithCustomError(c.hub, "NotExecutor")
 				})
 
-				it("reserves the payout on the rest when anyone expires the vault", async () => {
-					await c.hub.connect(c.alice).expire(v.vaultId)
+				it("reserves the payout on the rest when anyone settles the vault at expiry", async () => {
+					await c.hub.connect(c.alice).settleAtExpiry(v.vaultId)
 					// The remaining 6 WETH × 300 USDC
 					expect((await c.hub.stateOf(v.vaultId)).pendingPayout).to.equal(usdc(1800))
 				})
 
 				context("after expiry and a full LP claim", () => {
 					beforeEach(async () => {
-						await c.hub.connect(c.alice).expire(v.vaultId)
+						await c.hub.connect(c.alice).settleAtExpiry(v.vaultId)
 						await c.hub.connect(c.alice).claim(v.vaultId, usdc(30_000))
 					})
 
@@ -532,8 +532,8 @@ describe("exercise", () => {
 								expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Settled)
 							})
 
-							it("rejects expire on the settled vault", async () => {
-								await expect(c.hub.expire(v.vaultId)).to.be.revertedWithCustomError(c.hub, "WrongPhase").withArgs(Phase.Live, Phase.Settled)
+							it("rejects settleAtExpiry on the settled vault", async () => {
+								await expect(c.hub.settleAtExpiry(v.vaultId)).to.be.revertedWithCustomError(c.hub, "WrongPhase").withArgs(Phase.Live, Phase.Settled)
 							})
 						})
 					})

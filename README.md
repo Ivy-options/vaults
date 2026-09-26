@@ -62,7 +62,7 @@ npm run format:check
 
 Tests live in `test/`, grouped by what they cover:
 
-- `test/hub/`: the Hub, one file per entrypoint or feature (`create-vault`, `activate`, `exercise`, `expire`, `claim`, `unwind`, `physical-fallback`, …).
+- `test/hub/`: the Hub, one file per entrypoint or feature (`create-vault`, `activate`, `exercise`, `settle-at-expiry`, `claim`, `unwind`, `physical-fallback`, …).
 - `test/contracts/`: contracts and libraries on their own (`IvyVault`, `IvyShares`, `IvyPremiums`, `IvyUnwind`, `IvyBidRules`, `IvyPriceFeed`, `IvyMath`, `BidHash`, `ExampleSettlementPublisher`).
 - `test/deployment/`: deployment plans, linked libraries and the release registry.
 - `test/properties/`: reentrancy, cross-module callbacks and stateful conservation.
@@ -78,7 +78,7 @@ const cashPut = fixture(deployed, async c => ({
 	v: await goLive(c, { isCall: false, withFeed: true }, { settlement: SettlementType.Cash }),
 }));
 
-describe("expire", () => {
+describe("settleAtExpiry", () => {
 	let c: IvyContext;
 	let v: LiveVault;
 

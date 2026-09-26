@@ -369,11 +369,11 @@ describe("platform fee", () => {
 						expect(await v.vault.reserved(c.usdcAddress)).to.equal(usdc(20))
 					})
 
-					context("once expired and the LP claims all collateral", () => {
+					context("once settled and the LP claims all collateral", () => {
 						beforeEach(async () => {
-							// Expires in the first second it is due.
+							// Settles in the first second it is allowed.
 							await at(c, v.bid.expiry + EXERCISE_WINDOW)
-							await c.hub.expire(v.vaultId)
+							await c.hub.settleAtExpiry(v.vaultId)
 							await c.hub.connect(c.alice).claim(v.vaultId, usdc(10_000))
 							await c.hub.connect(c.alice).claim(v.vaultId, usdc(20_000))
 						})
