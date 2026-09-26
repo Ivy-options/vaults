@@ -631,6 +631,10 @@
         return;
       }
       if (e.target.closest("input, textarea, select")) return;
+      const shortcuts = $("#shortcuts");
+      if (e.key === "?" && shortcuts) { e.preventDefault(); shortcuts.togglePopover(); return; }
+      // Escape closes the open shortcuts list before it moves the camera.
+      if (shortcuts?.matches(":popover-open")) return;
       if (e.key === "Escape") zoomOut();
       if (e.key === "+" || e.key === "=") zoomBy(ZOOM_STEP);
       if (e.key === "-") zoomBy(1 / ZOOM_STEP);
@@ -1235,6 +1239,7 @@
       theme.addEventListener("click", () => { root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark"; try { localStorage.setItem("ivy-theme", root.dataset.theme); } catch (_) {} label(); M.mapEl.dispatchEvent(new CustomEvent("map:theme")); });
       label();
     }
+    if (/Mac|iPhone|iPad/.test(navigator.platform)) $$("#shortcuts [data-mod]").forEach(k => (k.textContent = "⌘"));
   }
 
   const state = () => ({ scale: M.cam.s, lod: currentLod, path: here().map((n) => n.id), expanded: [...M.expanded] });

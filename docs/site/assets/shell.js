@@ -160,6 +160,8 @@
     if (!toMap) panelGuide.style.height = "";
     positionThumb();
     if (!toMap) ensureGuideFrame();
+    // The shortcuts list describes map keys only.
+    if (!toMap && $("#shortcuts")?.matches(":popover-open")) $("#shortcuts").hidePopover();
     if (toMap && window.IvyMap?.mounted) {
       window.IvyMap.paintZoom();
     }

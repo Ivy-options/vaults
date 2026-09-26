@@ -236,6 +236,23 @@ body.map-ready #document { display: none; }
 .toolbar .zoom button, .toolbar .tree-controls button { font: 13px var(--mono); background: none; border: 1px solid var(--line-strong); color: var(--ink); border-radius: 6px; min-width: 28px; height: 28px; padding: 0 8px; cursor: pointer; }
 .toolbar .zoom button:hover, .toolbar .zoom button[aria-pressed="true"], .toolbar .tree-controls button:hover { border-color: var(--accent); }
 .toolbar .tree-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#shortcuts-toggle { font: 13px var(--mono); background: none; border: 1px solid var(--line-strong); color: var(--ink); border-radius: 50%; width: 28px; height: 28px; padding: 0; cursor: pointer; }
+#shortcuts-toggle:hover, #shortcuts-toggle[aria-expanded="true"] { border-color: var(--accent); }
+#shortcuts-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: none) { #shortcuts-toggle { display: none; } }
+body[data-mode="guide"] #shortcuts-toggle { display: none; }
+#shortcuts { width: max-content; max-width: calc(100vw - 32px); margin: auto; padding: 14px 16px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); box-shadow: 0 10px 30px rgba(0,0,0,0.3); font: 12px var(--body); }
+@supports (anchor-name: --a) {
+  #shortcuts-toggle { anchor-name: --shortcuts; }
+  #shortcuts { position-anchor: --shortcuts; inset: auto; top: anchor(bottom); right: anchor(right); margin: 8px 0 0; }
+}
+#shortcuts h2 { margin: 0 0 10px; font: 600 13px var(--body); }
+#shortcuts h3 { margin: 12px 0 6px; font: 10px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+#shortcuts dl { display: grid; grid-template-columns: 80px auto; gap: 6px 14px; align-items: center; margin: 0; }
+#shortcuts dt { white-space: nowrap; }
+#shortcuts dd { margin: 0; color: var(--muted); }
+#shortcuts p { max-width: 32ch; margin: 12px 0 0; color: var(--faint); font-size: 11px; line-height: 1.5; }
+#shortcuts kbd { display: inline-block; min-width: 20px; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); font: 11px/16px var(--mono); text-align: center; color: var(--ink); }
 #zoom-level { width: 64px; min-width: 0; height: 28px; padding: 0 4px; text-align: center; font: 13px var(--mono); color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; }
 #zoom-level:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 760px) {

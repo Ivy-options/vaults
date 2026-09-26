@@ -36,6 +36,29 @@
       <button type="button" data-reset-zoom aria-label="Reset zoom to 100%">Reset</button>
       <button type="button" data-home>Fit</button>
     </div>
+    <button type="button" id="shortcuts-toggle" popovertarget="shortcuts" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+  </div>
+  <div id="shortcuts" popover role="dialog" aria-labelledby="shortcuts-title">
+    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+    <h3>Move between cards</h3>
+    <dl>
+      <dt><kbd>→</kbd></dt><dd>Open the card’s first detail</dd>
+      <dt><kbd>←</kbd></dt><dd>Fold the card and go back up</dd>
+      <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Previous or next card at this level</dd>
+      <dt><kbd>Home</kbd></dt><dd>Jump to the first topic</dd>
+      <dt><kbd>Enter</kbd></dt><dd>Centre the selected card</dd>
+      <dt><kbd>Tab</kbd></dt><dd>Step through a card’s buttons and links</dd>
+    </dl>
+    <h3>Zoom and pan</h3>
+    <dl>
+      <dt><kbd>Scroll</kbd></dt><dd>Move around the map</dd>
+      <dt><kbd data-mod>Ctrl</kbd> <kbd>Scroll</kbd></dt><dd>Zoom in or out at the pointer</dd>
+      <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom in or out</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Step back out one level</dd>
+      <dt><kbd>0</kbd></dt><dd>Fit the whole map</dd>
+      <dt><kbd data-mod>Ctrl</kbd> <kbd>0</kbd></dt><dd>Reset zoom to 100%</dd>
+    </dl>
+    <p>Arrow keys work once the map has focus. Click any card to start. Press <kbd>?</kbd> to show or hide this list.</p>
   </div>
   <div id="views">
     <div id="panel-map" class="view-panel" role="tabpanel" aria-labelledby="mode-tab-map" tabindex="-1">
