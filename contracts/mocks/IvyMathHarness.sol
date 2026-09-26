@@ -12,12 +12,12 @@ contract IvyMathHarness {
 		return IvyMath.premiumTotal(premiumPerUnit, notional, unit);
 	}
 
-	function quoteDueCeil(uint256 amount, uint256 strike, uint256 unit) external pure returns (uint256) {
-		return IvyMath.quoteDueCeil(amount, strike, unit);
+	function strikeValueRoundedUp(uint256 amount, uint256 strike, uint256 unit) external pure returns (uint256) {
+		return IvyMath.strikeValueRoundedUp(amount, strike, unit);
 	}
 
-	function quoteOutFloor(uint256 amount, uint256 strike, uint256 unit) external pure returns (uint256) {
-		return IvyMath.quoteOutFloor(amount, strike, unit);
+	function strikeValueRoundedDown(uint256 amount, uint256 strike, uint256 unit) external pure returns (uint256) {
+		return IvyMath.strikeValueRoundedDown(amount, strike, unit);
 	}
 
 	function callIntrinsic(uint256 amount, uint256 strike, uint256 spot) external pure returns (uint256) {

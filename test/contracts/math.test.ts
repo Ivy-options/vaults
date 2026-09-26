@@ -53,23 +53,23 @@ describe("IvyMath", () => {
 		})
 	})
 
-	describe("quoteDueCeil", () => {
+	describe("strikeValueRoundedUp", () => {
 		it("rounds a single wei of notional up to one quote unit", async () => {
-			expect(await math.quoteDueCeil(1n, STRIKE, WETH_UNIT)).to.equal(1n)
+			expect(await math.strikeValueRoundedUp(1n, STRIKE, WETH_UNIT)).to.equal(1n)
 		})
 
 		it("prices whole units at the strike", async () => {
-			expect(await math.quoteDueCeil(weth(4), STRIKE, WETH_UNIT)).to.equal(usdc(12_000))
+			expect(await math.strikeValueRoundedUp(weth(4), STRIKE, WETH_UNIT)).to.equal(usdc(12_000))
 		})
 	})
 
-	describe("quoteOutFloor", () => {
+	describe("strikeValueRoundedDown", () => {
 		it("rounds a single wei of notional down to zero", async () => {
-			expect(await math.quoteOutFloor(1n, STRIKE, WETH_UNIT)).to.equal(0n)
+			expect(await math.strikeValueRoundedDown(1n, STRIKE, WETH_UNIT)).to.equal(0n)
 		})
 
 		it("prices whole units at the strike", async () => {
-			expect(await math.quoteOutFloor(weth(4), STRIKE, WETH_UNIT)).to.equal(usdc(12_000))
+			expect(await math.strikeValueRoundedDown(weth(4), STRIKE, WETH_UNIT)).to.equal(usdc(12_000))
 		})
 	})
 

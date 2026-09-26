@@ -75,13 +75,13 @@ library IvyOptionSettlement {
 		uint256 paid;
 		uint256 got;
 		if (state.settlement == SettlementType.Physical || physicalFallback) {
-			(address payToken, uint256 due) = state.isCall
-				? (state.quoteToken, IvyMath.quoteDueCeil(amount, state.strike, state.underlyingUnit))
+			(address payToken, uint256 payAmount) = state.isCall
+				? (state.quoteToken, IvyMath.strikeValueRoundedUp(amount, state.strike, state.underlyingUnit))
 				: (terms.underlying, amount);
-			uint256 received = vault.pull(payToken, msg.sender, due);
-			if (received < due) revert ShortReceived(due, received);
-			paid = due;
-			got = state.isCall ? amount : IvyMath.quoteOutFloor(amount, state.strike, state.underlyingUnit);
+			uint256 received = vault.pull(payToken, msg.sender, payAmount);
+			if (received < payAmount) revert ShortReceived(payAmount, received);
+			paid = payAmount;
+			got = state.isCall ? amount : IvyMath.strikeValueRoundedDown(amount, state.strike, state.underlyingUnit);
 		} else {
 			uint256 spot = block.timestamp < state.expiry ? _readExercisePrice(terms, prices) : _readExpiryPrice(prices);
 			got =

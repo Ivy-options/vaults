@@ -35,9 +35,9 @@ async function walkShares(c: IvyContext, v: LiveVault, start: bigint[], afterSte
 		balances[to] += amount
 		if (step === 8 || step === 17) {
 			const claimer = step === 8 ? c.alice : c.bob
-			const due = await c.premiums.claimable(v.vaultId, claimer.address)
+			const claimable = await c.premiums.claimable(v.vaultId, claimer.address)
 			await c.hub.connect(claimer).claimPremium(v.vaultId)
-			walk.premiumClaimed += due
+			walk.premiumClaimed += claimable
 		}
 		if (afterStep) await afterStep(walk)
 	}

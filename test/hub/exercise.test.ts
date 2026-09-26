@@ -110,7 +110,7 @@ describe("exercise", () => {
 			expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 		})
 
-		it("rounds the quote due up", async () => {
+		it("rounds the quote payment up", async () => {
 			// 1 wei of WETH at 3000 USDC owes a fraction of a USDC unit, rounded up to 1.
 			await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, 1n)).to.emit(c.hub, "Exercised").withArgs(v.vaultId, 1n, 1n, 1n)
 		})
@@ -139,7 +139,7 @@ describe("exercise", () => {
 
 		it("reverts when the quote arrives short", async () => {
 			await c.usdc.setFeeBps(100n)
-			// A 1% transfer fee leaves the vault 11,880 of the 12,000 USDC due.
+			// A 1% transfer fee leaves the vault 11,880 of the 12,000 USDC paid.
 			await expect(c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(4)))
 				.to.be.revertedWithCustomError(v.vault, "ShortReceived")
 				.withArgs(usdc(12_000), usdc(11_880))

@@ -18,13 +18,13 @@ library IvyMath {
 		return (premiumPerUnit * notional) / underlyingUnit;
 	}
 
-	/// @dev Quote owed by the market maker, rounded up.
-	function quoteDueCeil(uint256 amount, uint256 strike, uint256 underlyingUnit) internal pure returns (uint256) {
+	/// @dev Quote value of `amount` at the strike, rounded up when the market maker pays it.
+	function strikeValueRoundedUp(uint256 amount, uint256 strike, uint256 underlyingUnit) internal pure returns (uint256) {
 		return Math.ceilDiv(amount * strike, underlyingUnit);
 	}
 
-	/// @dev Quote received by the market maker, rounded down.
-	function quoteOutFloor(uint256 amount, uint256 strike, uint256 underlyingUnit) internal pure returns (uint256) {
+	/// @dev Quote value of `amount` at the strike, rounded down when the market maker receives it.
+	function strikeValueRoundedDown(uint256 amount, uint256 strike, uint256 underlyingUnit) internal pure returns (uint256) {
 		return (amount * strike) / underlyingUnit;
 	}
 
