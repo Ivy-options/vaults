@@ -4,6 +4,13 @@ import { startServer } from "./_server.mjs";
 import { openPage, settle } from "./_browser.mjs";
 
 const waitGuideLoaded = (page) => page.waitForFunction(() => window.IvyShell && IvyShell.state().guideLoaded);
+// Once loaded, the guide re-aligns its scroll after web fonts are ready and one
+// animation frame (embed.js revealHeading). Scrolling before then gets reset to the top.
+const waitGuidePositioned = (page) =>
+  page.evaluate(() => {
+    const frame = document.querySelector("#panel-guide iframe").contentWindow;
+    return frame.document.fonts.ready.then(() => new Promise((done) => frame.requestAnimationFrame(() => frame.requestAnimationFrame(done))));
+  });
 
 test("switching Map ↔ Guide preserves the map's exact camera and the guide's scroll offset, with no re-fit and no re-mount", async () => {
   const server = await startServer();
@@ -28,8 +35,8 @@ test("switching Map ↔ Guide preserves the map's exact camera and the guide's s
     // Scroll the guide, then bounce back to Map and confirm the camera is
     // untouched to the pixel: no flyTo/home ran, because switching modes
     // never calls into IvyMap at all.
+    await waitGuidePositioned(page);
     await page.evaluate(() => document.querySelector("#panel-guide iframe").contentWindow.scrollTo(0, 1200));
-    await settle(page, 100);
     const scrollBefore = await page.evaluate(() => document.querySelector("#panel-guide iframe").contentWindow.scrollY);
     assert.ok(scrollBefore > 0, "the guide iframe actually scrolled");
 
