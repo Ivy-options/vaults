@@ -430,7 +430,7 @@ describe("physical fallback", () => {
 		context("full-only cash put with a delegated executor and recipient", () => {
 			beforeEach(async () => {
 				;({ c, v } = await fullOnlyCashPut())
-				await c.hub.connect(c.marketMaker).setExecution(v.vaultId, c.bob.address, c.carol.address)
+				await c.hub.connect(c.marketMaker).setExecutorAndRecipient(v.vaultId, c.bob.address, c.carol.address)
 				await fund(c, c.weth, c.bob, v.vaultAddress, weth(10))
 				await networkHelpers.time.increaseTo(publicationDeadline(v))
 			})

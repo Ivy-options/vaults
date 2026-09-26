@@ -169,7 +169,7 @@ const signedUnwind = fixture(liveContractBuyer, async s => {
 	const { c, v, wallet } = s
 	await wallet
 		.connect(c.marketMaker)
-		.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecution", [v.vaultId, ZeroAddress, c.carol.address]))
+		.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecutorAndRecipient", [v.vaultId, ZeroAddress, c.carol.address]))
 	const deadline = BigInt(await c.networkHelpers.time.latest()) + 1000n
 	const { agreement, signature } = await signUnwindProposal(c, v.vaultId, deadline, usdc(100))
 	return { ...s, deadline, agreement, signature }
@@ -801,7 +801,7 @@ describe("activate", () => {
 			it("lets the contract buyer clear its executor through the wallet", async () => {
 				await wallet
 					.connect(c.marketMaker)
-					.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecution", [v.vaultId, ZeroAddress, c.carol.address]))
+					.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecutorAndRecipient", [v.vaultId, ZeroAddress, c.carol.address]))
 				expect((await c.hub.stateOf(v.vaultId)).executor).to.equal(ZeroAddress)
 			})
 		})

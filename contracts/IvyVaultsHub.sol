@@ -426,14 +426,14 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		premiums.claimFor(vaultId, msg.sender);
 	}
 
-	function setExecution(uint256 vaultId, address executor, address recipient) external nonReentrant {
+	function setExecutorAndRecipient(uint256 vaultId, address executor, address recipient) external nonReentrant {
 		_requireExists(vaultId);
 		VaultState storage state = _state[vaultId];
 		if (msg.sender != state.marketMaker) revert NotMarketMaker();
 		if (recipient == address(0)) revert ZeroAddress();
 		state.executor = executor;
 		state.recipient = recipient;
-		emit ExecutionUpdated(vaultId, executor, recipient);
+		emit ExecutorAndRecipientUpdated(vaultId, executor, recipient);
 	}
 
 	function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund, bytes calldata buyerSignature) external nonReentrant {

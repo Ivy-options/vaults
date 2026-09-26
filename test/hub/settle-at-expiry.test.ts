@@ -268,7 +268,7 @@ describe("settleAtExpiry", () => {
 			await c.hub.connect(c.bob).settleAtExpiry(v.vaultId)
 			await expect(c.hub.connect(c.marketMaker).claimPayout(v.vaultId)).to.be.revertedWithCustomError(c.weth, "RecipientBlocked")
 			await c.hub.connect(c.alice).claim(v.vaultId, weth(10))
-			await c.hub.connect(c.marketMaker).setExecution(v.vaultId, c.bob.address, c.bob.address)
+			await c.hub.connect(c.marketMaker).setExecutorAndRecipient(v.vaultId, c.bob.address, c.bob.address)
 			await expect(c.hub.connect(c.bob).claimPayout(v.vaultId)).to.changeTokenBalances(ethers, c.weth, [c.bob, v.vaultAddress], [payout, -payout])
 		})
 	})

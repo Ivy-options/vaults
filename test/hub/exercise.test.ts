@@ -543,7 +543,7 @@ describe("exercise", () => {
 	})
 })
 
-describe("setExecution", () => {
+describe("setExecutorAndRecipient", () => {
 	let c: IvyContext
 	let v: LiveVault
 
@@ -553,25 +553,28 @@ describe("setExecution", () => {
 		})
 
 		it("rejects a redirect by the executor", async () => {
-			await expect(c.hub.connect(c.bob).setExecution(v.vaultId, c.bob.address, c.bob.address)).to.be.revertedWithCustomError(c.hub, "NotMarketMaker")
+			await expect(c.hub.connect(c.bob).setExecutorAndRecipient(v.vaultId, c.bob.address, c.bob.address)).to.be.revertedWithCustomError(
+				c.hub,
+				"NotMarketMaker",
+			)
 		})
 
 		it("rejects a zero recipient", async () => {
-			await expect(c.hub.connect(c.marketMaker).setExecution(v.vaultId, c.bob.address, ZeroAddress)).to.be.revertedWithCustomError(
+			await expect(c.hub.connect(c.marketMaker).setExecutorAndRecipient(v.vaultId, c.bob.address, ZeroAddress)).to.be.revertedWithCustomError(
 				c.hub,
 				"ZeroAddress",
 			)
 		})
 
-		it("emits ExecutionUpdated with the new executor and recipient", async () => {
-			await expect(c.hub.connect(c.marketMaker).setExecution(v.vaultId, c.alice.address, c.marketMaker.address))
-				.to.emit(c.hub, "ExecutionUpdated")
+		it("emits ExecutorAndRecipientUpdated with the new executor and recipient", async () => {
+			await expect(c.hub.connect(c.marketMaker).setExecutorAndRecipient(v.vaultId, c.alice.address, c.marketMaker.address))
+				.to.emit(c.hub, "ExecutorAndRecipientUpdated")
 				.withArgs(v.vaultId, c.alice.address, c.marketMaker.address)
 		})
 
 		context("after the market maker revokes the executor", () => {
 			beforeEach(async () => {
-				await c.hub.connect(c.marketMaker).setExecution(v.vaultId, ZeroAddress, c.marketMaker.address)
+				await c.hub.connect(c.marketMaker).setExecutorAndRecipient(v.vaultId, ZeroAddress, c.marketMaker.address)
 			})
 
 			it("rejects exercise from the former executor", async () => {

@@ -68,7 +68,7 @@ describe("payout callback", () => {
 
 		context("after the market maker redirects execution to bob and payouts to a receiver contract", () => {
 			beforeEach(async () => {
-				await c.hub.connect(c.marketMaker).setExecution(v.vaultId, c.bob.address, receiverAddress)
+				await c.hub.connect(c.marketMaker).setExecutorAndRecipient(v.vaultId, c.bob.address, receiverAddress)
 			})
 
 			it("notifies the new recipient when bob exercises", async () => {

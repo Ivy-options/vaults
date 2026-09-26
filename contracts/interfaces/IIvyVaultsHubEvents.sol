@@ -26,7 +26,7 @@ interface IIvyVaultsHubEvents {
 	event CashSettlementEnabledUpdated(bool enabled);
 	event Claimed(uint256 indexed vaultId, address indexed holder, uint256 shares);
 	event Deposited(uint256 indexed vaultId, address indexed depositor, uint256 amount);
-	event ExecutionUpdated(uint256 indexed vaultId, address executor, address recipient);
+	event ExecutorAndRecipientUpdated(uint256 indexed vaultId, address executor, address recipient);
 	event Exercised(uint256 indexed vaultId, uint256 amount, uint256 paidByMarketMaker, uint256 receivedByMarketMaker);
 	event ExercisePricePublished(
 		uint256 indexed vaultId,
