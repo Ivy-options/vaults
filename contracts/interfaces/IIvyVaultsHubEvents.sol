@@ -44,7 +44,7 @@ interface IIvyVaultsHubEvents {
 		uint256 price,
 		uint64 validUntil
 	);
-	event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 amount);
+	event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 collateralAmount, uint256 premiumAmount);
 	event PayoutNotified(uint256 indexed vaultId, address indexed recipient, address token, uint256 amount, bool acknowledged);
 	event PhysicalFallbackExercised(uint256 indexed vaultId, uint256 amount, uint256 paidByMarketMaker, uint256 receivedByMarketMaker);
 	event PhysicalFallbackExpired(uint256 indexed vaultId, uint256 lapsedNotional);

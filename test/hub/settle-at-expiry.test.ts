@@ -149,7 +149,7 @@ describe("settleAtExpiry", () => {
 
 				it("pays the reserved payout to the market maker", async () => {
 					const tx = c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
-					await expect(tx).to.emit(c.hub, "PayoutClaimed").withArgs(v.vaultId, c.marketMaker.address, CALL_PAYOUT_ALL)
+					await expect(tx).to.emit(c.hub, "PayoutClaimed").withArgs(v.vaultId, c.marketMaker.address, CALL_PAYOUT_ALL, 0n)
 					await expect(tx).to.changeTokenBalances(ethers, c.weth, [c.marketMaker], [CALL_PAYOUT_ALL])
 					expect((await c.hub.stateOf(v.vaultId)).pendingPayout).to.equal(0n)
 				})

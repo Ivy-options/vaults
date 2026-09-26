@@ -527,6 +527,13 @@ describe("executeUnwind", () => {
 			await c.hub.connect(c.alice).claimPremium(v.vaultId)
 			await expect(c.hub.connect(c.marketMaker).claimPayout(v.vaultId)).to.changeTokenBalance(ethers, c.usdc, c.marketMaker, usdc(100))
 		})
+
+		it("reports the refund as premium, not collateral", async () => {
+			await c.hub.connect(c.carol).executeUnwind(v.vaultId, p.agreement.nonce, p.signature)
+			await expect(c.hub.connect(c.marketMaker).claimPayout(v.vaultId))
+				.to.emit(c.hub, "PayoutClaimed")
+				.withArgs(v.vaultId, c.marketMaker.address, 0n, usdc(100))
+		})
 	})
 
 	context("after the vault settles at expiry first", () => {

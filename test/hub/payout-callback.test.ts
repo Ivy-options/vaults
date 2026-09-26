@@ -226,7 +226,7 @@ describe("payout callback", () => {
 
 			it("pays the claimed payout to the recipient", async () => {
 				const tx = c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
-				await expect(tx).to.emit(c.hub, "PayoutClaimed").withArgs(v.vaultId, c.marketMaker.address, CASH_PAYOUT)
+				await expect(tx).to.emit(c.hub, "PayoutClaimed").withArgs(v.vaultId, c.marketMaker.address, CASH_PAYOUT, 0n)
 				await expect(tx).to.changeTokenBalances(ethers, c.weth, [receiverAddress], [CASH_PAYOUT])
 				expect((await c.hub.stateOf(v.vaultId)).pendingPayout).to.equal(0n)
 			})

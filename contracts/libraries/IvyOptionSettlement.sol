@@ -124,10 +124,9 @@ library IvyOptionSettlement {
 		address premiumToken = state.premiumToken;
 		uint256 collateralAmount = vault.payBuyer(collateral, recipient);
 		uint256 premiumAmount = premiumToken == collateral ? 0 : vault.payBuyer(premiumToken, recipient);
-		uint256 amount = collateralAmount + premiumAmount;
-		if (amount == 0) revert NothingToClaim();
+		if (collateralAmount == 0 && premiumAmount == 0) revert NothingToClaim();
 		state.pendingPayout = 0;
-		emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, state.marketMaker, amount);
+		emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, state.marketMaker, collateralAmount, premiumAmount);
 		_notifyRecipient(vaultId, recipient, collateral, collateralAmount);
 		_notifyRecipient(vaultId, recipient, premiumToken, premiumAmount);
 	}
