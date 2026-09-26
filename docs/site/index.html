@@ -554,10 +554,13 @@
     <p>Once expiry arrives, the vault needs the <strong class="key-term">final expiry price</strong> instead. European cash options cannot exercise before expiry at all.</p>
     </section>
     <section data-kind="tile" id="missing-after-expiry"><h5>A missing price after expiry</h5>
-    <p>Define <strong>D = expiry + P</strong> and <strong>F = D + W</strong>. P is the saved expiry price publication window; W is the saved exercise window. A recent pre-expiry observation cannot replace a final price.</p>
-    <p>If a final price lands before D, normal cash settlement remains available even after F. Otherwise <strong>D ≤ now &lt; F</strong> permits explicit physical exercise of the remaining notional, for both American and European options.</p>
-    <p>Calls pay quote at the strike to receive underlying; puts deliver underlying to receive quote. The buyer or executor approves the clone and explicitly calls <code>exercisePhysicalFallback</code>. Ordinary cash exercise never pulls these assets.</p>
-    <p>At F, anyone can settle the vault without a prior fallback transaction. Unexercised notional lapses, opening LP claims without a new cash reserve. Settings or publisher changes never extend either deadline.</p>
+    <p>Two saved windows follow expiry: first the <strong class="key-term">price publication window</strong>, then the <strong class="key-term">exercise window</strong>. With one hour each and expiry at noon:</p>
+    <ul class="reading-list" role="list">
+      <li><strong class="key-term">12:00 to 13:00 · Waiting for the price.</strong> The publisher can record the final price. If it arrives, normal cash settlement applies with no later deadline. A price observed before expiry does not count.</li>
+      <li><strong class="key-term">13:00 to 14:00 · No price, physical fallback.</strong> The <strong class="role-buyer">buyer or executor</strong> can opt in with <code>exercisePhysicalFallback</code>. A call pays the strike to get the underlying; a put hands over the underlying to get the strike.</li>
+      <li><strong class="key-term">From 14:00 · Anyone can settle.</strong> Unexercised notional lapses with no cash payout, and <strong class="role-lp">LPs</strong> can claim.</li>
+    </ul>
+    <p>This works the same for American and European options. Changing settings or publishers never moves these times.</p>
     </section>
     </section></section>
     <section data-kind="moment" id="ending-the-live-option" data-when="Live → Settled"><h3>Close the remaining position</h3>
