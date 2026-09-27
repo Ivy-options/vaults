@@ -123,6 +123,18 @@ describe("claim", () => {
 			await expect(c.hub.connect(c.alice).claim(v.vaultId, 0n)).to.be.revertedWithCustomError(c.hub, "ZeroAmount")
 		})
 
+		it("rejects a zero claim recipient", async () => {
+			await expect(c.hub.connect(c.alice).claimTo(v.vaultId, weth(1), ethers.ZeroAddress, 1)).to.be.revertedWithCustomError(c.hub, "ZeroAddress")
+		})
+
+		it("rejects a claim with no selected tokens", async () => {
+			await expect(c.hub.connect(c.alice).claimTo(v.vaultId, weth(1), c.alice.address, 0)).to.be.revertedWithCustomError(c.hub, "ZeroAmount")
+		})
+
+		it("rejects a claim with an unknown token selection", async () => {
+			await expect(c.hub.connect(c.alice).claimTo(v.vaultId, weth(1), c.alice.address, 8)).to.be.revertedWithCustomError(c.hub, "ZeroAmount")
+		})
+
 		it("reverts with InsufficientShares for a caller without shares", async () => {
 			await expect(c.hub.connect(c.carol).claim(v.vaultId, 1n)).to.be.revertedWithCustomError(c.hub, "InsufficientShares")
 		})

@@ -95,6 +95,16 @@ describe("IvyStandardBidRules", () => {
 		bidAccepted = rules.interface.getFunction("validateBid").selector
 	})
 
+	describe("constructor", () => {
+		it("rejects a trusted price feed without code", async () => {
+			const [signer] = await ethers.getSigners()
+			await expect(ethers.deployContract("IvyStandardBidRules", [signer.address])).to.be.revertedWithCustomError(
+				{ interface: (await ethers.getContractFactory("IvyStandardBidRules")).interface },
+				"BindingMismatch",
+			)
+		})
+	})
+
 	it("names each rule kind by the first four bytes of its name hash", async () => {
 		expect(await rules.PAIR_LIMITS()).to.equal(kind("PairLimits"))
 		expect(await rules.SPOT_BAND()).to.equal(kind("SpotBand"))

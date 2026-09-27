@@ -8,6 +8,9 @@ const solcSettings = {
 
 export default defineConfig({
 	plugins: [hardhatToolboxMochaEthersPlugin],
+	coverage: {
+		skipFiles: ["contracts/mocks/**/*.sol"],
+	},
 	solidity: {
 		profiles: {
 			default: { version: "0.8.34", settings: solcSettings },
