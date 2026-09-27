@@ -16,6 +16,7 @@
 .DS_Store
 
 .diffstory/
+/deployments/local/
 
 # design-sync (Claude Design): staged converter, build output, machine state
 .ds-sync/

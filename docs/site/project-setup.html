@@ -42,6 +42,7 @@ npm run typecheck
 npm test -- --no-compile
 </code></pre>
 <p>Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.</p>
+<p>Deploy with <code>npx hardhat run scripts/deploy.ts --network &lt;network&gt;</code>. Rerun the same command to resume. This sets up Ivy and the fUSDC, fETH, and fBTC test tokens. See <code>docs/deployment.md</code> for configuration and recovery commands.</p>
 <p>To run one test file, or only the tests whose titles match a pattern:</p>
 <pre><code class="language-sh">npm test -- test/hub/physical-fallback.test.ts
 npm test -- --grep &quot;physical fallback&quot;

@@ -29,6 +29,8 @@ npm test -- --no-compile
 
 Compilation also checks deployed contract sizes. Tests run on a local simulated EVM.
 
+Deploy with `npx hardhat run scripts/deploy.ts --network <network>`. Rerun the same command to resume. This sets up Ivy and the fUSDC, fETH, and fBTC test tokens. See `docs/deployment.md` for configuration and recovery commands.
+
 To run one test file, or only the tests whose titles match a pattern:
 
 ```sh

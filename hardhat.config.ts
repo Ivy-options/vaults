@@ -1,9 +1,14 @@
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers"
 import { configVariable, defineConfig } from "hardhat/config"
+import { existsSync } from "node:fs"
+import { loadEnvFile } from "node:process"
+
+if (existsSync(".env")) loadEnvFile(".env")
 
 const solcSettings = {
 	optimizer: { enabled: true, runs: 200 },
 	viaIR: true,
+	evmVersion: "cancun",
 }
 
 export default defineConfig({
@@ -19,6 +24,13 @@ export default defineConfig({
 	},
 	networks: {
 		hardhatMainnet: { type: "edr-simulated", chainType: "l1" },
+		polygon: {
+			type: "http",
+			chainType: "l1",
+			chainId: 137,
+			url: configVariable("POLYGON_RPC_URL"),
+			accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
+		},
 		sepolia: {
 			type: "http",
 			chainType: "l1",
