@@ -77,8 +77,8 @@ const BID: Bid = {
 }
 
 const deployed = fixture(connection, async () => {
-	const rules = await ethers.deployContract("IvyBidRules")
 	const feed = await ethers.deployContract("MockPriceFeed")
+	const rules = await ethers.deployContract("IvyBidRules", [await feed.getAddress()])
 	return { rules, feed, feedAddress: await feed.getAddress() }
 })
 
@@ -110,7 +110,7 @@ describe("IvyBidRules", () => {
 
 		describe("PairLimits", () => {
 			it("accepts exactly one entry per pair", async () => {
-				expect(await rules.validateConfig(RuleKind.PairLimits, CALL, PREMIUM_IN_QUOTE, encodePairLimits([[QUOTE, 0n, 0n]]))).to.equal(configAccepted)
+				expect(await rules.validateConfig(RuleKind.PairLimits, CALL, PREMIUM_IN_QUOTE, encodePairLimits([[QUOTE, 1n, 1n]]))).to.equal(configAccepted)
 			})
 
 			it("rejects a pair without an entry", async () => {
@@ -121,8 +121,8 @@ describe("IvyBidRules", () => {
 
 			it("rejects an entry for a quote token the vault does not list", async () => {
 				const limits = encodePairLimits([
-					[QUOTE, 0n, 0n],
-					[UNDERLYING, 0n, 0n],
+					[QUOTE, 1n, 1n],
+					[UNDERLYING, 1n, 1n],
 				])
 				await expect(rules.validateConfig(RuleKind.PairLimits, CALL, PREMIUM_IN_QUOTE, limits))
 					.to.be.revertedWithCustomError(rules, "PairUnknown")
@@ -131,8 +131,8 @@ describe("IvyBidRules", () => {
 
 			it("rejects a second entry for the same pair", async () => {
 				const limits = encodePairLimits([
-					[QUOTE, 0n, 0n],
-					[QUOTE, 1n, 0n],
+					[QUOTE, 1n, 1n],
+					[QUOTE, 2n, 1n],
 				])
 				await expect(rules.validateConfig(RuleKind.PairLimits, CALL, PREMIUM_IN_QUOTE, limits))
 					.to.be.revertedWithCustomError(rules, "DuplicatePair")
@@ -141,8 +141,14 @@ describe("IvyBidRules", () => {
 
 			it("rejects a zero strike ceiling on a put", async () => {
 				await expect(
-					rules.validateConfig(RuleKind.PairLimits, PUT, PREMIUM_IN_QUOTE, encodePairLimits([[QUOTE, 0n, 0n]])),
+					rules.validateConfig(RuleKind.PairLimits, PUT, PREMIUM_IN_QUOTE, encodePairLimits([[QUOTE, 0n, 1n]])),
 				).to.be.revertedWithCustomError(rules, "InvalidStrikeLimit")
+			})
+
+			it("rejects a zero premium floor", async () => {
+				await expect(
+					rules.validateConfig(RuleKind.PairLimits, CALL, PREMIUM_IN_QUOTE, encodePairLimits([[QUOTE, 1n, 0n]])),
+				).to.be.revertedWithCustomError(rules, "PremiumTooLow")
 			})
 		})
 
@@ -154,6 +160,13 @@ describe("IvyBidRules", () => {
 			it("rejects a feed address without code", async () => {
 				await expect(
 					rules.validateConfig(RuleKind.SpotBand, CALL, PREMIUM_IN_QUOTE, encodeSpotBand(UNDERLYING, 60, 1000)),
+				).to.be.revertedWithCustomError(rules, "BindingMismatch")
+			})
+
+			it("rejects a deployed feed other than the release's trusted feed", async () => {
+				const other = await ethers.deployContract("MockPriceFeed")
+				await expect(
+					rules.validateConfig(RuleKind.SpotBand, CALL, PREMIUM_IN_QUOTE, encodeSpotBand(await other.getAddress(), 60, 1000)),
 				).to.be.revertedWithCustomError(rules, "BindingMismatch")
 			})
 

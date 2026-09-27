@@ -2,6 +2,7 @@ import { expect } from "chai"
 import { network } from "hardhat"
 
 import {
+	MAX_UINT,
 	Phase,
 	callPairs,
 	callTerms,
@@ -102,6 +103,23 @@ describe("deposit", () => {
 		it("rejects a zero amount from a non-owner before checking who may deposit", async () => {
 			await expect(c.hub.connect(c.bob).deposit(v.vaultId, 0n)).to.be.revertedWithCustomError(c.hub, "ZeroAmount")
 		})
+	})
+
+	it("keeps one vault's maximum supply from blocking deposits into another vault", async () => {
+		const c = await deployed()
+		const token = await ethers.deployContract("MockERC20", ["Large Supply", "MAX", 0])
+		const tokenAddress = await token.getAddress()
+		const first = await createVaultAs(c, c.alice, callTerms(c, { underlying: tokenAddress, collateral: tokenAddress }), callPairs(c))
+		await token.mint(c.alice.address, MAX_UINT)
+		await token.connect(c.alice).approve(first.vaultAddress, MAX_UINT)
+		await c.hub.connect(c.alice).deposit(first.vaultId, MAX_UINT)
+
+		const second = await createVaultAs(c, c.bob, callTerms(c), callPairs(c))
+		await fund(c, c.weth, c.bob, second.vaultAddress, 1n)
+		await c.hub.connect(c.bob).deposit(second.vaultId, 1n)
+
+		expect(await c.hub.totalShares(first.vaultId)).to.equal(MAX_UINT)
+		expect(await c.hub.totalShares(second.vaultId)).to.equal(1n)
 	})
 })
 

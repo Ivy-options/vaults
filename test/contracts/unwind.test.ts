@@ -21,6 +21,7 @@ const deployed = fixture(connection, async () => {
 // The hub records a buyer-signed agreement refunding 100 USDC on a 3 WETH supply.
 const proposed = fixture(deployed, async d => {
 	const deadline = BigInt(await networkHelpers.time.latest()) + 3600n
+	const optionExpiry = deadline + 1n
 	const agreement = {
 		vaultId: VAULT_ID,
 		nonce: 1n,
@@ -36,8 +37,8 @@ const proposed = fixture(deployed, async d => {
 		verifyingContract: await d.unwind.getAddress(),
 	}
 	const signature = await d.buyer.signTypedData(domain, UNWIND_TYPES, agreement)
-	await d.unwind.connect(d.hub).propose(VAULT_ID, deadline, 0n, SUPPLY, REFUND, d.buyer.address, signature)
-	return { ...d, signature }
+	await d.unwind.connect(d.hub).propose(VAULT_ID, deadline, optionExpiry, 0n, SUPPLY, REFUND, d.buyer.address, signature)
+	return { ...d, signature, optionExpiry }
 })
 // The holder of the whole supply approved and funded the entire refund.
 const funded = fixture(proposed, async p => {
@@ -73,7 +74,7 @@ describe("IvyUnwind", () => {
 			})
 
 			it("rejects proposing from anyone but the hub", async () => {
-				await expect(c.unwind.connect(c.stranger).propose(VAULT_ID, 0n, 0n, 0n, 0n, ZeroAddress, "0x")).to.be.revertedWithCustomError(
+				await expect(c.unwind.connect(c.stranger).propose(VAULT_ID, 0n, 0n, 0n, 0n, 0n, ZeroAddress, "0x")).to.be.revertedWithCustomError(
 					c.unwind,
 					"NotHub",
 				)
@@ -150,7 +151,10 @@ describe("IvyUnwind", () => {
 			})
 
 			it("rejects consuming from anyone but the hub", async () => {
-				await expect(c.unwind.connect(c.stranger).consume(VAULT_ID, 1n, 0n, 0n, ZeroAddress, "0x")).to.be.revertedWithCustomError(c.unwind, "NotHub")
+				await expect(c.unwind.connect(c.stranger).consume(VAULT_ID, 1n, 0n, 0n, 0n, ZeroAddress, "0x")).to.be.revertedWithCustomError(
+					c.unwind,
+					"NotHub",
+				)
 			})
 		})
 
@@ -159,14 +163,13 @@ describe("IvyUnwind", () => {
 
 			beforeEach(async () => {
 				p = await funded()
-				await p.unwind.connect(p.hub).consume(VAULT_ID, 1n, 0n, SUPPLY, p.buyer.address, p.signature)
+				await p.unwind.connect(p.hub).consume(VAULT_ID, 1n, p.optionExpiry, 0n, SUPPLY, p.buyer.address, p.signature)
 			})
 
 			it("rejects consuming it again", async () => {
-				await expect(p.unwind.connect(p.hub).consume(VAULT_ID, 1n, 0n, SUPPLY, p.buyer.address, p.signature)).to.be.revertedWithCustomError(
-					p.unwind,
-					"AgreementInvalid",
-				)
+				await expect(
+					p.unwind.connect(p.hub).consume(VAULT_ID, 1n, p.optionExpiry, 0n, SUPPLY, p.buyer.address, p.signature),
+				).to.be.revertedWithCustomError(p.unwind, "AgreementInvalid")
 			})
 		})
 	})

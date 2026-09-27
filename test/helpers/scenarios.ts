@@ -88,8 +88,7 @@ export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
 	const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms })
 	const pairs = isCall ? callPairs(ctx) : putPairs(ctx)
 	if (o.premiumToken) pairs[0].premiumToken = o.premiumToken
-	const rules: BidRuleInput[] = []
-	if (o.pair) rules.push(pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair)))
+	const rules: BidRuleInput[] = [pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair))]
 	if (o.withFeed) rules.push(spotBandRule(ctx, { maxPriceAge: 3600, maxInTheMoneyBps: 1000 }))
 	rules.push(...(o.rules ?? []))
 	const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs, rules)
@@ -151,10 +150,18 @@ export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = 
 	}
 }
 
-/** Funds the market maker with USDC (approved to the vault), signs as the market maker, activates as the bid master. */
+/** Funds the market maker for premium and exercise payments, signs, then activates as the bid master. */
 export async function activate(ctx: IvyContext, vaultId: bigint, vaultAddress: string, o: BidOptions = {}) {
 	const bid = await makeBid(ctx, vaultId, o)
+	// Keep the default quote-token bankroll: later physical exercise scenarios rely
+	// on this approval even when the vault collects its premium in another token.
 	await fund(ctx, ctx.usdc, ctx.marketMaker, vaultAddress, MM_BANKROLL)
+	const premiumTokenAddress = await ctx.hub.pairOf(vaultId, bid.quoteToken)
+	if (premiumTokenAddress !== ZeroAddress && premiumTokenAddress.toLowerCase() !== ctx.usdcAddress.toLowerCase()) {
+		const premiumToken = await ctx.ethers.getContractAt("MockERC20", premiumTokenAddress)
+		const bankroll = 1_000_000n * 10n ** BigInt(await premiumToken.decimals())
+		await fund(ctx, premiumToken, ctx.marketMaker, vaultAddress, bankroll)
+	}
 	const signature = await signBid(ctx.marketMaker, ctx.hubAddress, bid)
 	await (await ctx.hub.connect(ctx.bidMaster).activate(vaultId, bid, signature)).wait()
 	return { bid, signature }

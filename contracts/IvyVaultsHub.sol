@@ -34,6 +34,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	bytes32 public constant BID_MASTER_ROLE = keccak256("BID_MASTER_ROLE");
 	bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
 	bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
+	bytes32 private constant BID_VALIDATOR_ROLE = keccak256("BID_VALIDATOR_ROLE");
 	bytes32 public constant PLATFORM_FEE_MANAGER_ROLE = keccak256("PLATFORM_FEE_MANAGER_ROLE");
 	bytes32 public constant SETTLEMENT_PRICE_PUBLISHER_ROLE = keccak256("SETTLEMENT_PRICE_PUBLISHER_ROLE");
 
@@ -48,6 +49,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @notice Default premium fee rate for subsequently created vaults.
 	uint16 public platformFeeBps;
 	address public platformTreasury;
+	uint8 private constant CLAIM_ALL_TOKENS = 7;
 	mapping(uint256 => PlatformFee) public platformFees;
 	bool public globalPaused;
 	bool public transfersEnabled;
@@ -86,14 +88,22 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		address shares_,
 		address premiums_,
 		address unwind_,
+		address bidRules_,
 		uint64 exerciseWindow_,
 		uint64 auctionTimeout_,
 		uint64 expiryPricePublicationWindow_
 	) EIP712("IvyVaultsHub", "3") {
-		if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) {
+		if (
+			admin == address(0) ||
+			implementation == address(0) ||
+			shares_ == address(0) ||
+			premiums_ == address(0) ||
+			unwind_ == address(0) ||
+			bidRules_ == address(0)
+		) {
 			revert ZeroAddress();
 		}
-		if (implementation.code.length == 0) revert BindingMismatch();
+		if (implementation.code.length == 0 || bidRules_.code.length == 0) revert BindingMismatch();
 		if (expiryPricePublicationWindow_ == 0) revert InvalidSettlementWindow();
 		vaultImplementation = implementation;
 		shareToken = IIvyShares(shares_);
@@ -105,6 +115,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		_grantRole(DEFAULT_ADMIN_ROLE, admin);
 		_grantRole(GUARDIAN_ROLE, admin);
 		_grantRole(PLATFORM_FEE_MANAGER_ROLE, admin);
+		_grantRole(BID_VALIDATOR_ROLE, bidRules_);
 		platformTreasury = admin;
 	}
 
@@ -168,10 +179,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		BidRule[] calldata rules
 	) external nonReentrant returns (uint256 vaultId, address vault) {
 		_admission(0);
-		if (terms.allowedSettlement != SettlementPolicy.Physical) {
-			_requireCashSettlementEnabled();
-			if (exerciseWindow == 0) revert InvalidSettlementWindow();
-		}
 		if (
 			shareToken.hub() != address(this) ||
 			premiums.hub() != address(this) ||
@@ -183,7 +190,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		) {
 			revert BindingMismatch();
 		}
-		IvyVaultRules.validateTerms(terms, pairs);
+		IvyVaultRules.validateTerms(terms, pairs, cashSettlementEnabled, exerciseWindow);
 		bool isCall = terms.collateral == terms.underlying;
 
 		vaultId = ++vaultCount;
@@ -236,10 +243,11 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	/// @notice Burn shares for collateral while the vault is Open.
 	function withdraw(uint256 vaultId, uint256 shares) external nonReentrant {
-		_requirePhase(vaultId, Phase.Open);
+		VaultState storage state = _state[vaultId];
+		IvyVaultRules.checkWithdrawal(state, globalPaused || vaultPaused[vaultId]);
 		if (shares == 0) revert ZeroAmount();
 		shareToken.burn(msg.sender, vaultId, shares);
-		IIvyVault(_state[vaultId].vault).push(_terms[vaultId].collateral, msg.sender, shares);
+		IIvyVault(state.vault).push(_terms[vaultId].collateral, msg.sender, shares);
 		emit Withdrawn(vaultId, msg.sender, shares);
 	}
 
@@ -258,7 +266,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	}
 
 	/// @notice Freeze deposits and open the auction. The owner can act any time; others wait for `auctionStartsAt`.
-	function openAuction(uint256 vaultId) external {
+	function openAuction(uint256 vaultId) external nonReentrant {
 		_requirePhase(vaultId, Phase.Open);
 		_admission(vaultId);
 		VaultState storage state = _state[vaultId];
@@ -272,28 +280,16 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		++state.auctionId;
 		emit AuctionIdentity(vaultId, state.auctionId);
 		state.phase = Phase.Auction;
-		state.auctionOpenedAt = uint64(block.timestamp);
+		if (state.auctionOpenedAt == 0) state.auctionOpenedAt = uint64(block.timestamp);
 		emit AuctionOpened(vaultId, collateral);
 	}
 
 	/// @notice Cancel the auction and clear its schedule. The owner must wait for timeout, expiry, or a pause.
 	/// @dev The bid master can cancel any time.
 	function cancelAuction(uint256 vaultId) external {
-		_requirePhase(vaultId, Phase.Auction);
 		VaultState storage state = _state[vaultId];
-		if (!hasRole(BID_MASTER_ROLE, msg.sender)) {
-			if (msg.sender != state.owner) revert NotVaultOwner();
-			if (
-				!globalPaused &&
-				!vaultPaused[vaultId] &&
-				block.timestamp < state.expiry &&
-				block.timestamp < uint256(state.auctionOpenedAt) + state.auctionTimeout
-			) {
-				revert AuctionTimeoutNotReached();
-			}
-		}
+		IvyVaultRules.checkAuctionCancellation(state, globalPaused || vaultPaused[vaultId], hasRole(BID_MASTER_ROLE, msg.sender));
 		state.phase = Phase.Open;
-		state.auctionOpenedAt = 0;
 		_terms[vaultId].auctionStartsAt = 0;
 		emit AuctionCancelled(vaultId);
 	}
@@ -440,7 +436,16 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		_requirePhase(vaultId, Phase.Live);
 		VaultState storage state = _state[vaultId];
 		if (msg.sender != state.owner && msg.sender != state.marketMaker) revert NotVaultOwner();
-		unwind.propose(vaultId, deadline, state.exercisedNotional, shareToken.totalSupply(vaultId), refund, state.marketMaker, buyerSignature);
+		unwind.propose(
+			vaultId,
+			deadline,
+			state.expiry,
+			state.exercisedNotional,
+			shareToken.totalSupply(vaultId),
+			refund,
+			state.marketMaker,
+			buyerSignature
+		);
 	}
 
 	function approveUnwind(uint256 vaultId, uint256 nonce) external nonReentrant {
@@ -472,7 +477,15 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	function executeUnwind(uint256 vaultId, uint256 nonce, bytes calldata buyerSignature) external nonReentrant {
 		_requirePhase(vaultId, Phase.Live);
 		VaultState storage state = _state[vaultId];
-		uint256 refund = unwind.consume(vaultId, nonce, state.exercisedNotional, shareToken.totalSupply(vaultId), state.marketMaker, buyerSignature);
+		uint256 refund = unwind.consume(
+			vaultId,
+			nonce,
+			state.expiry,
+			state.exercisedNotional,
+			shareToken.totalSupply(vaultId),
+			state.marketMaker,
+			buyerSignature
+		);
 		IIvyVault(state.vault).consumeUnwind(refund);
 		_finalize(vaultId, state);
 		emit Unwound(vaultId, nonce, refund);
@@ -481,9 +494,13 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @notice Burn shares for proportional unreserved collateral and settlement proceeds.
 	/// @dev Unpaid premium, premium dust, and buyer obligations remain reserved.
 	function claim(uint256 vaultId, uint256 shares) external nonReentrant {
-		_requirePhase(vaultId, Phase.Settled);
-		IvyOptionSettlement.claim(_state[vaultId], _terms[vaultId], shareToken, vaultId, shares);
-		emit Claimed(vaultId, msg.sender, shares);
+		_claim(vaultId, shares, msg.sender, CLAIM_ALL_TOKENS);
+	}
+
+	/// @notice Burn shares and send selected claim tokens to `recipient`. A cleared bit explicitly forfeits that token.
+	/// @dev Bit 0 selects collateral, bit 1 premium, and bit 2 quote (calls) or underlying (puts).
+	function claimTo(uint256 vaultId, uint256 shares, address recipient, uint8 tokenMask) external nonReentrant {
+		_claim(vaultId, shares, recipient, tokenMask);
 	}
 
 	/// @notice Preview the next buyer agreement. A new proposal or exercise invalidates its signature.
@@ -493,7 +510,8 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		uint256 refund
 	) external view returns (UnwindAgreement memory agreement, bytes32 digest) {
 		_requirePhase(vaultId, Phase.Live);
-		return unwind.preview(vaultId, deadline, _state[vaultId].exercisedNotional, shareToken.totalSupply(vaultId), refund);
+		VaultState storage state = _state[vaultId];
+		return unwind.preview(vaultId, deadline, state.expiry, state.exercisedNotional, shareToken.totalSupply(vaultId), refund);
 	}
 
 	function exercisePrice(uint256 vaultId) external view returns (uint256 price, uint256 observedAt, uint256 validUntil) {
@@ -590,6 +608,11 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	function _finalize(uint256 vaultId, VaultState storage state) internal {
 		state.phase = Phase.Settled;
 		emit Settled(vaultId, state.exercisedNotional, state.totalNotional, state.pendingPayout);
+	}
+
+	function _claim(uint256 vaultId, uint256 shares, address recipient, uint8 tokenMask) internal {
+		IvyOptionSettlement.claim(_state[vaultId], _terms[vaultId], shareToken, vaultId, shares, msg.sender, recipient, tokenMask);
+		emit Claimed(vaultId, msg.sender, shares);
 	}
 
 	function _grantRole(bytes32 role, address account) internal override returns (bool changed) {

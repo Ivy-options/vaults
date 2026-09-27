@@ -8,9 +8,11 @@ import "./types/IvyTypes.sol";
 
 /// @notice Stateless validator for PairLimits, PremiumFloor, and SpotBand bid rules.
 contract IvyBidRules is IIvyBidValidator {
+	address public immutable trustedPriceFeed;
+
 	struct PairLimit {
 		address quoteToken;
-		uint256 strikeLimit; // calls: minimum strike, 0 = none. puts: maximum strike, must be > 0
+		uint256 strikeLimit; // calls: minimum strike; puts: maximum strike; always > 0
 		uint256 minPremiumPerUnit; // premium-token units per 1 whole underlying
 	}
 
@@ -30,11 +32,16 @@ contract IvyBidRules is IIvyBidValidator {
 	bytes4 public constant PREMIUM_FLOOR = bytes4(keccak256("PremiumFloor"));
 	bytes4 public constant SPOT_BAND = bytes4(keccak256("SpotBand"));
 
+	constructor(address trustedPriceFeed_) {
+		if (trustedPriceFeed_.code.length == 0) revert BindingMismatch();
+		trustedPriceFeed = trustedPriceFeed_;
+	}
+
 	/// @inheritdoc IIvyBidValidator
 	function validateConfig(bytes4 kind, VaultTerms calldata terms, PairConfig[] calldata pairs, bytes calldata data) external view returns (bytes4) {
 		bool isCall = terms.collateral == terms.underlying;
 		if (kind == PAIR_LIMITS) {
-			_checkPairLimits(isCall, pairs, abi.decode(data, (PairLimit[])));
+			_checkPairLimits(pairs, abi.decode(data, (PairLimit[])));
 		} else if (kind == SPOT_BAND) {
 			SpotBandRule memory rule = abi.decode(data, (SpotBandRule));
 			_checkFeed(rule.priceFeed, rule.maxPriceAge);
@@ -84,7 +91,7 @@ contract IvyBidRules is IIvyBidValidator {
 	}
 
 	function _checkFeed(address priceFeed, uint32 maxPriceAge) private view {
-		if (priceFeed.code.length == 0) revert BindingMismatch();
+		if (priceFeed != trustedPriceFeed) revert BindingMismatch();
 		if (maxPriceAge == 0) revert FeedNeedsMaxPriceAge();
 	}
 
@@ -95,7 +102,7 @@ contract IvyBidRules is IIvyBidValidator {
 		return price;
 	}
 
-	function _checkPairLimits(bool isCall, PairConfig[] calldata pairs, PairLimit[] memory limits) private pure {
+	function _checkPairLimits(PairConfig[] calldata pairs, PairLimit[] memory limits) private pure {
 		for (uint256 i = 0; i < pairs.length; ++i) {
 			bool found = false;
 			for (uint256 j = 0; j < limits.length; ++j) {
@@ -118,7 +125,8 @@ contract IvyBidRules is IIvyBidValidator {
 			for (uint256 j = 0; j < i; ++j) {
 				if (limits[j].quoteToken == limits[i].quoteToken) revert DuplicatePair(limits[i].quoteToken);
 			}
-			if (!isCall && limits[i].strikeLimit == 0) revert InvalidStrikeLimit();
+			if (limits[i].strikeLimit == 0) revert InvalidStrikeLimit();
+			if (limits[i].minPremiumPerUnit == 0) revert PremiumTooLow();
 		}
 	}
 

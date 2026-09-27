@@ -26,7 +26,7 @@ export const REGISTRY_ABI = [
 	"function setRecommendedVersion(uint256)",
 	"function hasRole(bytes32,address) view returns(bool)",
 ]
-export const RELEASE_FORMAT = "ivy-vaults-v4"
+export const RELEASE_FORMAT = "ivy-vaults-v5"
 
 /** JSON bundle commitment includes preserved interfaces, constructor evidence and runtime hashes. */
 export const releaseHash = (bundle: ReleaseBundle) => planHash(bundle)
@@ -34,7 +34,7 @@ export const releaseHash = (bundle: ReleaseBundle) => planHash(bundle)
 /** Read-only verifier. The caller supplies its supported ABI adapter, never one asserted by a manifest. */
 export async function verifyRelease(anyProvider: Provider | null, bundle: ReleaseBundle, supportedArtifacts: Artifacts) {
 	const provider = rpc(anyProvider)
-	if (bundle.format !== 1 || bundle.interfaceFormat !== RELEASE_FORMAT || bundle.manifest?.version !== 7)
+	if (bundle.format !== 1 || bundle.interfaceFormat !== RELEASE_FORMAT || bundle.manifest?.version !== 8)
 		throw new Error("Unsupported release format; historical releases require their preserved build")
 	const { manifest, journal, artifacts } = bundle
 	if (!manifest.addresses?.IvyBidRules || !manifest.steps?.some(s => s.name === "IvyBidRules")) throw new Error("Release manifest lacks IvyBidRules")

@@ -25,6 +25,12 @@ const exercisedCall = fixture(sharedCall, async ({ c, v }) => {
 	await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(10))
 	return { c, v }
 })
+const partlyExercisedCall = fixture(sharedCall, async ({ c, v }) => {
+	await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(5))
+	await networkHelpers.time.increaseTo(v.bid.expiry + EXERCISE_WINDOW + 1n)
+	await c.hub.settleAtExpiry(v.vaultId)
+	return { c, v }
+})
 const partlyExercisedPut = fixture(deployed, async c => {
 	const v = await goLive(c, {
 		isCall: false,
@@ -164,6 +170,23 @@ describe("claim", () => {
 			await c.hub.connect(c.alice).claim(v.vaultId, weth(6))
 			await c.hub.connect(c.bob).claim(v.vaultId, weth(4))
 			expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(usdc(1000))
+		})
+	})
+
+	context("when one proceeds token rejects the LP", () => {
+		beforeEach(async () => {
+			;({ c, v } = await partlyExercisedCall())
+			await c.usdc.setBlockedRecipient(c.bob.address, true)
+		})
+
+		it("lets the LP redirect the complete claim", async () => {
+			await expect(c.hub.connect(c.bob).claimTo(v.vaultId, weth(4), c.carol.address, 7)).to.changeTokenBalances(ethers, c.weth, [c.carol], [weth(2)])
+			expect(await c.shares.balanceOf(c.bob.address, v.vaultId)).to.equal(0n)
+		})
+
+		it("lets the LP forfeit the broken token and recover collateral", async () => {
+			await expect(c.hub.connect(c.bob).claimTo(v.vaultId, weth(4), c.bob.address, 1)).to.changeTokenBalances(ethers, c.weth, [c.bob], [weth(2)])
+			expect(await c.shares.balanceOf(c.bob.address, v.vaultId)).to.equal(0n)
 		})
 	})
 

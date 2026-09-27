@@ -72,8 +72,8 @@ const released = fixture(connection, async () => {
 	const registry = await ethers.deployContract("IvyVaultsRegistry", [admin.address])
 	return { admin, outsider, supported, bundle, registry }
 })
-const releaseSevenRegistered = fixture(released, async r => {
-	await r.registry.registerVersion(7, r.bundle.manifest.addresses.IvyVaultsHub, releaseHash(r.bundle))
+const releaseEightRegistered = fixture(released, async r => {
+	await r.registry.registerVersion(8, r.bundle.manifest.addresses.IvyVaultsHub, releaseHash(r.bundle))
 	return r
 })
 const releaseOneStaffed = fixture(released, async ({ admin, supported, bundle, registry }) => {
@@ -374,10 +374,10 @@ describe("release registry", () => {
 		let registry: Awaited<ReturnType<typeof released>>["registry"]
 		let request: ReleaseRequest
 
-		context("with release 7 registered", () => {
+		context("with release 8 registered", () => {
 			beforeEach(async () => {
-				;({ admin, outsider, supported, bundle, registry } = await releaseSevenRegistered())
-				request = { registry: await registry.getAddress(), releaseBundle: bundle, releaseId: 7 }
+				;({ admin, outsider, supported, bundle, registry } = await releaseEightRegistered())
+				request = { registry: await registry.getAddress(), releaseBundle: bundle, releaseId: 8 }
 			})
 
 			it("resolves the hub of an explicit release", async () => {
@@ -408,9 +408,9 @@ describe("release registry", () => {
 				expect((await resolveRelease(ethers.provider, request, supported)).hub).to.equal(bundle.manifest.addresses.IvyVaultsHub)
 			})
 
-			context("once release 7 is recommended", () => {
+			context("once release 8 is recommended", () => {
 				beforeEach(async () => {
-					await registry.setRecommendedVersion(7)
+					await registry.setRecommendedVersion(8)
 				})
 
 				it("resolves the recommendation when allowed", async () => {

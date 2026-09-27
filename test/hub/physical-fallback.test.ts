@@ -994,7 +994,7 @@ describe("physical fallback", () => {
 					;({ c, v } = await load())
 					// An unwind still open past F that only alice funds, with her 60% of its 100 USDC refund, so it
 					// never executes.
-					const { agreement } = await proposeUnwind(c, v.vaultId, fallbackDeadline(v) + 1000n, usdc(100))
+					const { agreement } = await proposeUnwind(c, v.vaultId, v.bid.expiry, usdc(100))
 					unwindNonce = agreement.nonce
 					await fund(c, c.usdc, c.alice, v.vaultAddress, usdc(60))
 					await c.hub.connect(c.alice).fundUnwind(v.vaultId, unwindNonce, usdc(60))

@@ -6,7 +6,6 @@ import { IvyUnwind } from "./IvyUnwind.sol";
 import { IIvyShares } from "./interfaces/IIvyShares.sol";
 import { NotHub, ZeroAddress } from "./types/IvyTypes.sol";
 import { ERC1155 } from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import { ERC1155Supply } from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 
 interface IShareTransferPolicy {
 	function transfersEnabled() external view returns (bool);
@@ -15,10 +14,11 @@ interface IShareTransferPolicy {
 /// @notice ERC-1155 LP shares. Each token ID is a vault ID; one share equals the smallest collateral unit.
 /// @dev Only the hub mints and burns. The hub also controls whether shares can transfer.
 ///      This separate contract keeps the Hub within the EIP-170 code size limit.
-contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
+contract IvyShares is ERC1155, IIvyShares {
 	address public immutable override hub;
 	address public immutable override premiums;
 	address public immutable override unwind;
+	mapping(uint256 id => uint256) private _totalSupply;
 
 	error TransfersDisabled();
 
@@ -50,11 +50,11 @@ contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
 		return super.balanceOf(account, id);
 	}
 
-	function totalSupply(uint256 id) public view override(ERC1155Supply, IIvyShares) returns (uint256) {
-		return super.totalSupply(id);
+	function totalSupply(uint256 id) public view override returns (uint256) {
+		return _totalSupply[id];
 	}
 
-	function _update(address from, address to, uint256[] memory ids, uint256[] memory values) internal override(ERC1155, ERC1155Supply) {
+	function _update(address from, address to, uint256[] memory ids, uint256[] memory values) internal override {
 		if (from != address(0) && to != address(0) && !IShareTransferPolicy(hub).transfersEnabled()) revert TransfersDisabled();
 		if (ids.length != values.length) revert ERC1155InvalidArrayLength(ids.length, values.length);
 		if (from != to) {
@@ -80,5 +80,16 @@ contract IvyShares is ERC1155, ERC1155Supply, IIvyShares {
 			}
 		}
 		super._update(from, to, ids, values);
+		if (from == address(0)) {
+			for (uint256 i; i < ids.length; ++i) {
+				_totalSupply[ids[i]] += values[i];
+			}
+		} else if (to == address(0)) {
+			for (uint256 i; i < ids.length; ++i) {
+				unchecked {
+					_totalSupply[ids[i]] -= values[i];
+				}
+			}
+		}
 	}
 }

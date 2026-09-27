@@ -284,10 +284,10 @@
                   <li>
                     <span class="chip lp">LPs</span
                     ><span
-                      >The committed collateral stays fixed during the auction,
-                      so LPs cannot deposit or withdraw. If the admin enables transfers, shares
-                      remain transferable even though collateral cannot leave
-                      through a withdrawal.</span
+                      >Deposits stop while bidding is active. LP withdrawals also
+                      wait unless the auction timeout, option expiry or an
+                      admission pause makes the auction cancellable. If the admin
+                      enables transfers, shares remain transferable.</span
                     >
                   </li>
                   <li>
@@ -305,15 +305,15 @@
                   <code>activate(vaultId, bid, signature)</code>. If the checks
                   pass, the buyer pays the premium and the option begins.</p>
                   <p><b>When can the auction be cancelled?</b> The bid master
-                  can cancel at any time. By default, the owner has to wait
-                  until the auction has been open for three days. This waiting
-                  period is called the auction timeout. The protocol admin can
-                  choose a different waiting period for new vaults; each vault
-                  copies the current setting at creation and keeps it. The clock
-                  starts when the auction opens, not when the vault is created.</p>
-                  <p>The owner can skip that wait if new deposits and auctions
-                  have been paused for this vault or across the protocol, or
-                  if the option's fixed expiry time has been reached.</p>
+                  can cancel at any time. Once the auction timeout elapses,
+                  the option expires, or admission is paused for this vault or
+                  across the protocol, anyone can cancel. An LP can also withdraw
+                  directly once one of those public conditions holds.</p>
+                  <p>By default the timeout is three days. The protocol admin can
+                  choose a different duration for new vaults; each vault copies
+                  the current setting at creation and keeps it. The clock starts
+                  at the first successful auction opening and cancellation plus
+                  reopening does not restart it.</p>
                   <p><b>What happens after cancellation?</b> The vault returns
                   to Open. Collateral stays in the vault until LPs choose to
                   withdraw it; cancellation does not send funds back
@@ -389,7 +389,10 @@
                       claimed. Reserved premium, platform fees and buyer payouts
                       are excluded from this pool. A reserve is an amount set
                       aside for a specific payment, so it is not available for
-                      this shareholder claim.</span
+                      this shareholder claim. If the holder cannot receive one
+                      token, <code>claimTo(vaultId, shares, recipient, tokenMask)</code>
+                      can redirect the payout. Clearing a mask bit explicitly
+                      forfeits that token share for the benefit of remaining LPs.</span
                     >
                   </li>
                   <li>
@@ -1610,7 +1613,11 @@
               activate. The owner also chooses the tokens, expiry and exercise
               rules. Price conditions are bid rules: a list of validator
               contracts and data the owner fixes at creation. The shipped
-              validator offers PairLimits, SpotBand and PremiumFloor. Nothing in
+              validator offers PairLimits, SpotBand and PremiumFloor and accepts
+              only the release's bound price feed. The Hub accepts only validators
+              that governance has explicitly granted the bid-validator role. Every
+              vault must include PairLimits with a nonzero strike bound and premium
+              floor for each pair. Nothing in
               the terms or rules can change after creation. The table below
               gives the rule for each term.
             </p>
@@ -1890,7 +1897,8 @@
                 shareholder approves. Replacing a proposal needs a new buyer signature.</li>
               <li>Current LPs separately fund any negotiated refund.</li>
               <li>Anyone can execute once the agreement is valid, while the vault
-                is Live and no later than the proposal deadline.</li>
+                is Live, no later than the proposal deadline and strictly before
+                the option expiry.</li>
             </ol>
             <p class="prose">In this example, LP A holds 60% of the shares and
               LP B holds 40%. A 100 USDC refund needs 60 USDC from A and 40 USDC
@@ -1964,7 +1972,8 @@
                   The proposal records how much of the option has already been
                   exercised, the total share supply and the agreed refund. It
                   also has a nonce identifying this agreement and a future
-                  deadline by which it must execute.
+                  deadline by which it must execute. That deadline cannot be
+                  later than the option expiry.
                 </dd>
               </div>
               <div>
@@ -1982,8 +1991,7 @@
                   A replacement proposal or further exercise requires fresh
                   agreement. If the proposal's deadline passes or the proposal
                   is replaced, propose again while the vault is Live with a
-                  new future deadline. This is the proposal's deadline, separate
-                  from the option's expiry. The contract assigns the
+                  new future deadline no later than expiry. The contract assigns the
                   next nonce, and old signatures and approvals cannot execute
                   it.
                 </dd>

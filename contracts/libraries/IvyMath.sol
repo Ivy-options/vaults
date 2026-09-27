@@ -31,7 +31,7 @@ library IvyMath {
 	/// @dev Cash call payout in underlying units, always less than `amount`.
 	function callIntrinsic(uint256 amount, uint256 strike, uint256 spot) internal pure returns (uint256) {
 		if (spot <= strike) return 0;
-		return (amount * (spot - strike)) / spot;
+		return Math.mulDiv(amount, spot - strike, spot);
 	}
 
 	/// @dev Cash put payout in quote units, below the quote locked for `amount`.

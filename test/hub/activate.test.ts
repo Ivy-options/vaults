@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { ZeroAddress } from "ethers"
+import { ZeroAddress, id } from "ethers"
 import { network } from "hardhat"
 
 import { signBid, type Bid } from "../helpers/bids.js"
@@ -24,6 +24,7 @@ import {
 	RuleKind,
 	SettlementType,
 	THIRTY_DAYS,
+	WETH_UNIT,
 	callPairs,
 	callTerms,
 	createVaultAs,
@@ -45,6 +46,7 @@ const { ethers, networkHelpers } = connection
 
 /** A rule whose kind and data only the given validator interprets. */
 const customRule = (validator: string, kind = "0x00000000") => ({ validator, kind, data: "0x" })
+const allowValidator = (c: IvyContext, validator: string) => c.hub.grantRole(id("BID_VALIDATOR_ROLE"), validator)
 
 /** The bid master submits `bid` on `vaultId`, signed by `signer`. */
 async function submit(c: IvyContext, vaultId: bigint, bid: Bid, signer = c.marketMaker) {
@@ -59,7 +61,10 @@ const livePhysicalPut = fixture(physicalPut, async ({ c, v }) => {
 	return { c, v }
 })
 const callWithFeed = fixture(deployed, async c => ({ c, v: await openVault(c, { withFeed: true }) }))
-const putWithFeed = fixture(deployed, async c => ({ c, v: await openVault(c, { isCall: false, withFeed: true }) }))
+const putWithFeed = fixture(deployed, async c => ({
+	c,
+	v: await openVault(c, { isCall: false, withFeed: true, pair: { strikeLimit: usdc(10_000) } }),
+}))
 const europeanOnlyCall = fixture(deployed, async c => ({
 	c,
 	v: await openVault(c, { terms: { allowedExercise: ExercisePolicy.European } }),
@@ -98,12 +103,14 @@ const callWithLimitsAndBand = fixture(deployed, async c => ({
 const approveThenReject = fixture(deployed, async c => {
 	const reject = await c.ethers.deployContract("RejectAllValidator")
 	const approve = await c.ethers.deployContract("ApproveAllValidator")
+	await allowValidator(c, await reject.getAddress())
+	await allowValidator(c, await approve.getAddress())
 	const rules = [customRule(await approve.getAddress(), RuleKind.PairLimits), customRule(await reject.getAddress(), RuleKind.PairLimits)]
 	return { c, v: await openVault(c, { rules }), reject }
 })
 const limitsThenPremiumFloor = fixture(deployed, async c => {
 	const v = await openVault(c, {
-		pair: { strikeLimit: usdc(3100), minPremiumPerUnit: 0n },
+		pair: { strikeLimit: usdc(3100), minPremiumPerUnit: 1n },
 		rules: [premiumFloorRule(c, { maxPriceAge: 3600, minPremiumBps: 500 })],
 	})
 	await setSpot(c, STRIKE)
@@ -118,6 +125,7 @@ const twinCalls = fixture(deployed, async c => {
 })
 const approvedEuropeanOnlyCall = fixture(deployed, async c => {
 	const approve = await c.ethers.deployContract("ApproveAllValidator")
+	await allowValidator(c, await approve.getAddress())
 	return {
 		c,
 		v: await openVault(c, {
@@ -128,22 +136,27 @@ const approvedEuropeanOnlyCall = fixture(deployed, async c => {
 })
 const stateWritingRule = fixture(deployed, async c => {
 	const writer = await c.ethers.deployContract("StateWritingValidator")
+	await allowValidator(c, await writer.getAddress())
 	return { c, v: await openVault(c, { rules: [customRule(await writer.getAddress())] }), writer }
 })
 const auctionAgeRule = fixture(deployed, async c => {
 	const validator = await c.ethers.deployContract("ContextAssertingValidator", [c.usdcAddress, CALL_DEPOSIT, 600])
+	await allowValidator(c, await validator.getAddress())
 	return { c, v: await openVault(c, { rules: [customRule(await validator.getAddress())] }), validator }
 })
 const wrongPremiumTokenRule = fixture(deployed, async c => {
 	const validator = await c.ethers.deployContract("ContextAssertingValidator", [c.daiAddress, CALL_DEPOSIT, 0])
+	await allowValidator(c, await validator.getAddress())
 	return { c, v: await openVault(c, { rules: [customRule(await validator.getAddress())] }), validator }
 })
 const putContextRule = fixture(deployed, async c => {
 	const validator = await c.ethers.deployContract("ContextAssertingValidator", [c.usdcAddress, weth(10), 0])
+	await allowValidator(c, await validator.getAddress())
 	return { c, v: await openVault(c, { isCall: false, rules: [customRule(await validator.getAddress())] }) }
 })
 const wrongBidSelectorRule = fixture(deployed, async c => {
 	const validator = await c.ethers.deployContract("WrongBidSelectorValidator")
+	await allowValidator(c, await validator.getAddress())
 	return { c, v: await openVault(c, { rules: [customRule(await validator.getAddress())] }) }
 })
 const wethPremiumFloor = fixture(deployed, async c => {
@@ -578,24 +591,41 @@ describe("activate", () => {
 			})
 		})
 
-		context("call without rules", () => {
+		context("call mandatory checks", () => {
 			beforeEach(async () => {
 				;({ c, v } = await physicalCall())
 			})
 
-			it("accepts a zero strike and a zero premium", async () => {
-				await activate(c, v.vaultId, v.vaultAddress, { strike: 0n, premiumPerUnit: 0n })
-				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
+			it("rejects a zero strike", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: 0n })).to.be.revertedWithCustomError(c.hub, "InvalidPrice")
+			})
+
+			it("rejects a zero total premium", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { premiumPerUnit: 0n })).to.be.revertedWithCustomError(c.hub, "PremiumTooLow")
 			})
 		})
 
-		context("put without rules", () => {
+		context("put mandatory checks and limits", () => {
 			beforeEach(async () => {
 				;({ c, v } = await physicalPut())
 			})
 
 			it("rejects a zero strike, whose notional is empty", async () => {
-				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: 0n })).to.be.revertedWithCustomError(c.hub, "EmptyNotional")
+				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: 0n })).to.be.revertedWithCustomError(c.hub, "InvalidPrice")
+			})
+
+			it("rejects a huge strike whose one-wei notional rounds the premium to zero", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: 3n * 10n ** 28n, premiumPerUnit: 1n })).to.be.revertedWithCustomError(
+					c.hub,
+					"PremiumTooLow",
+				)
+			})
+
+			it("rejects the huge strike even when its one-wei notional produces a nonzero premium", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { strike: 3n * 10n ** 28n, premiumPerUnit: WETH_UNIT })).to.be.revertedWithCustomError(
+					c.hub,
+					"StrikeAboveLimit",
+				)
 			})
 		})
 

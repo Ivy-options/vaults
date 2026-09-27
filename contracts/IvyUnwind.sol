@@ -65,13 +65,14 @@ contract IvyUnwind is EIP712 {
 	function propose(
 		uint256 id,
 		uint64 deadline,
+		uint64 optionExpiry,
 		uint256 exercised,
 		uint256 supply,
 		uint256 refund,
 		address buyer,
 		bytes calldata signature
 	) external onlyHub {
-		(UnwindAgreement memory agreement, bytes32 digest) = preview(id, deadline, exercised, supply, refund);
+		(UnwindAgreement memory agreement, bytes32 digest) = preview(id, deadline, optionExpiry, exercised, supply, refund);
 		if (!SignatureChecker.isValidSignatureNow(buyer, digest, signature)) revert BadSignature();
 		agreements[id] = agreement;
 		approvedShares[id] = 0;
@@ -148,6 +149,7 @@ contract IvyUnwind is EIP712 {
 	function consume(
 		uint256 id,
 		uint256 nonce,
+		uint64 optionExpiry,
 		uint256 exercised,
 		uint256 supply,
 		address buyer,
@@ -158,6 +160,7 @@ contract IvyUnwind is EIP712 {
 			nonce == 0 ||
 			nonce != agreement.nonce ||
 			block.timestamp > agreement.deadline ||
+			block.timestamp >= optionExpiry ||
 			agreement.exercisedNotional != exercised ||
 			agreement.supply != supply
 		) {
@@ -186,11 +189,12 @@ contract IvyUnwind is EIP712 {
 	function preview(
 		uint256 id,
 		uint64 deadline,
+		uint64 optionExpiry,
 		uint256 exercised,
 		uint256 supply,
 		uint256 refund
 	) public view returns (UnwindAgreement memory agreement, bytes32 digest) {
-		if (deadline <= block.timestamp || supply == 0) revert AgreementInvalid();
+		if (deadline <= block.timestamp || deadline > optionExpiry || supply == 0) revert AgreementInvalid();
 		agreement = UnwindAgreement(id, agreements[id].nonce + 1, deadline, exercised, supply, refund);
 		digest = hashAgreement(agreement);
 	}

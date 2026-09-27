@@ -80,7 +80,7 @@ export interface DeploymentInput {
 }
 
 export const LIBRARIES = ["IvyVaultRules", "IvyOptionSettlement"]
-export const CONTRACTS = [...LIBRARIES, "IvyVault", "IvyVaultsHub", "IvyShares", "IvyPremiums", "IvyUnwind", "IvyPriceFeed", "IvyBidRules"]
+export const CONTRACTS = [...LIBRARIES, "IvyVault", "IvyPriceFeed", "IvyBidRules", "IvyVaultsHub", "IvyShares", "IvyPremiums", "IvyUnwind"]
 export const artifactPath = (name: string) => `../artifacts/contracts/${LIBRARIES.includes(name) ? "libraries/" : ""}${name}.sol/${name}.json`
 export async function loadArtifacts(): Promise<Artifacts> {
 	return Object.fromEntries(
@@ -145,12 +145,12 @@ export async function buildDeploymentPlan({
 		[],
 		[],
 		[],
-		[admin, a.IvyVault, a.IvyShares, a.IvyPremiums, a.IvyUnwind, exerciseWindow, auctionTimeout, expiryPricePublicationWindow],
+		[reportSigner],
+		[a.IvyPriceFeed],
+		[admin, a.IvyVault, a.IvyShares, a.IvyPremiums, a.IvyUnwind, a.IvyBidRules, exerciseWindow, auctionTimeout, expiryPricePublicationWindow],
 		[a.IvyVaultsHub, a.IvyPremiums, a.IvyUnwind, uri],
 		[a.IvyVaultsHub, a.IvyShares],
 		[a.IvyVaultsHub, a.IvyShares],
-		[reportSigner],
-		[],
 	]
 	const steps: DeploymentStep[] = []
 	for (let i = 0; i < CONTRACTS.length; ++i) {
@@ -172,7 +172,7 @@ export async function buildDeploymentPlan({
 		})
 	}
 	return {
-		version: 7,
+		version: 8,
 		chainId: String(chainId),
 		genesisHash,
 		deployer,
@@ -243,6 +243,7 @@ export async function verifyBindings(anyProvider: Provider | null, plan: Deploym
 		["IvyUnwind", "hub", a.IvyVaultsHub],
 		["IvyUnwind", "shares", a.IvyShares],
 		["IvyPriceFeed", "signer", plan.reportSigner],
+		["IvyBidRules", "trustedPriceFeed", a.IvyPriceFeed],
 	]
 	for (const [name, field, value] of checks)
 		if ((await byName[name].getFunction(field)()).toLowerCase() !== value.toLowerCase()) throw new Error(`Binding mismatch: ${name}.${field}`)
@@ -261,6 +262,7 @@ export async function verifyBindings(anyProvider: Provider | null, plan: Deploym
 		}
 	}
 	const hub = byName.IvyVaultsHub
+	if (!(await hub.hasRole(keccak256(toUtf8Bytes("BID_VALIDATOR_ROLE")), a.IvyBidRules))) throw new Error("Bid validator role missing")
 	if (requireInitialAdmin && !(await hub.hasRole(await hub.DEFAULT_ADMIN_ROLE(), plan.admin))) throw new Error("Admin role missing")
 }
 
@@ -280,7 +282,7 @@ export async function openJournal(signer: Signer, plan: PlanIdentity, journal: J
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
 export async function resumeDeployment(signer: Signer, plan: DeploymentPlan, journal: Journal = {}, persist: Persist = async () => {}) {
-	if (plan.version !== 7) throw new Error("Unsupported deployment plan version; prepare a new plan for this build")
+	if (plan.version !== 8) throw new Error("Unsupported deployment plan version; prepare a new plan for this build")
 	const provider = rpc(signer.provider)
 	const { startBlock, steps } = await openJournal(signer, plan, journal)
 	await persist(journal)

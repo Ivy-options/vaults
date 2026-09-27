@@ -3,6 +3,7 @@ pragma solidity ^0.8.34;
 
 /// @notice Library and validator errors included in the Hub ABI for revert decoding.
 interface IIvyVaultsHubErrors {
+	error AuctionTimeoutNotReached();
 	error CashSettlementDisabled();
 	error CashSettlementNeedsMaxPriceAge();
 	error CommitmentMismatch();
@@ -20,6 +21,7 @@ interface IIvyVaultsHubErrors {
 	error InvalidPrice();
 	error InvalidStrikeLimit();
 	error InvalidValidator();
+	error MissingBidLimits();
 	error NoPairs();
 	error NotExecutor();
 	error NothingToClaim();

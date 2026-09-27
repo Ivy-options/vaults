@@ -49,6 +49,10 @@ const proposers = [
 
 const deployed = fixture(connection, () => deployIvy(connection, { transfersEnabled: true }))
 const physicalCall = fixture(deployed, async c => ({ c, v: await goLive(c) }))
+const sameTokenPremiumCall = fixture(deployed, async c => ({
+	c,
+	v: await goLive(c, { premiumToken: c.wethAddress }, { premiumPerUnit: weth(1) / 10n }),
+}))
 const splitCall = fixture(deployed, async c => ({
 	c,
 	v: await goLive(c, { deposit: weth(6), extraDeposits: [{ signer: c.bob, amount: weth(4) }] }),
@@ -284,8 +288,7 @@ describe("approveUnwind", () => {
 	context("after the vault settles at expiry with a proposal still open", () => {
 		beforeEach(async () => {
 			;({ c, v } = await physicalCall())
-			// The deadline outlives the exercise window, so only the phase stops approval.
-			p = await proposeUnwind(c, v.vaultId, v.bid.expiry + 2n * EXERCISE_WINDOW, 0n)
+			p = await proposeUnwind(c, v.vaultId, v.bid.expiry, 0n)
 			await at(c, v.bid.expiry + EXERCISE_WINDOW)
 			await c.hub.settleAtExpiry(v.vaultId)
 		})
@@ -536,11 +539,25 @@ describe("executeUnwind", () => {
 		})
 	})
 
+	context("when the unwind refund token is also collateral", () => {
+		it("reports the refund as premium rather than collateral", async () => {
+			const { c, v } = await sameTokenPremiumCall()
+			const refund = weth(1)
+			const p = await proposeUnwindForADay(c, v.vaultId, refund)
+			await c.hub.connect(c.alice).approveUnwind(v.vaultId, p.agreement.nonce)
+			await fund(c, c.weth, c.alice, v.vaultAddress, refund)
+			await c.hub.connect(c.alice).fundUnwind(v.vaultId, p.agreement.nonce, refund)
+			await c.hub.executeUnwind(v.vaultId, p.agreement.nonce, p.signature)
+			await expect(c.hub.connect(c.marketMaker).claimPayout(v.vaultId))
+				.to.emit(c.hub, "PayoutClaimed")
+				.withArgs(v.vaultId, c.marketMaker.address, 0n, refund)
+		})
+	})
+
 	context("after the vault settles at expiry first", () => {
 		beforeEach(async () => {
 			;({ c, v } = await physicalCall())
-			// The deadline outlives the exercise window, so only the phase stops execution.
-			await proposeUnwind(c, v.vaultId, v.bid.expiry + 2n * EXERCISE_WINDOW, usdc(100))
+			await proposeUnwind(c, v.vaultId, v.bid.expiry, usdc(100))
 			await c.hub.connect(c.alice).approveUnwind(v.vaultId, 1n)
 			await fund(c, c.usdc, c.carol, v.vaultAddress, usdc(100))
 			await at(c, v.bid.expiry + EXERCISE_WINDOW)

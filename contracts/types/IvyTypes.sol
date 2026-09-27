@@ -185,6 +185,7 @@ error InvalidPrice();
 error InvalidSettlementWindow();
 error InvalidStrikeLimit();
 error InvalidValidator();
+error MissingBidLimits();
 error NonceUsed();
 error NoPairs();
 error NotExecutor();

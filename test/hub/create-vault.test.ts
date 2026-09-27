@@ -1,6 +1,6 @@
 import { anyValue } from "@nomicfoundation/hardhat-ethers-chai-matchers/withArgs"
 import { expect } from "chai"
-import { AbiCoder, Interface, ZeroAddress, keccak256 } from "ethers"
+import { AbiCoder, Interface, ZeroAddress, id, keccak256 } from "ethers"
 import { network } from "hardhat"
 
 import { at, AUCTION_START } from "../helpers/scenarios.js"
@@ -16,6 +16,7 @@ import {
 	deployIvy,
 	fixture,
 	pairLimitsRule,
+	putLimits,
 	putPairs,
 	putTerms,
 	spotBandRule,
@@ -40,11 +41,13 @@ const cashSecuredPut = fixture(deployed, async c => ({
 	c,
 	v: await createVaultAs(c, c.alice, putTerms(c), putPairs(c)),
 }))
-const testValidators = fixture(deployed, async c => ({
-	c,
-	wrongSelector: await ethers.deployContract("WrongSelectorValidator"),
-	configRevert: await ethers.deployContract("ConfigRevertValidator"),
-}))
+const testValidators = fixture(deployed, async c => {
+	const wrongSelector = await ethers.deployContract("WrongSelectorValidator")
+	const configRevert = await ethers.deployContract("ConfigRevertValidator")
+	await c.hub.grantRole(id("BID_VALIDATOR_ROLE"), await wrongSelector.getAddress())
+	await c.hub.grantRole(id("BID_VALIDATOR_ROLE"), await configRevert.getAddress())
+	return { c, wrongSelector, configRevert }
+})
 const withPairLimits = fixture(deployed, async c => ({
 	c,
 	v: await createVaultAs(c, c.alice, callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))]),
@@ -62,19 +65,21 @@ describe("createVault", () => {
 		})
 
 		it("emits VaultCreated for a covered call with WETH as underlying and collateral", async () => {
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), []))
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))]))
 				.to.emit(c.hub, "VaultCreated")
 				.withArgs(1n, anyValue, c.alice.address, OptionKind.CoveredCall, c.wethAddress, c.wethAddress)
 		})
 
 		it("emits VaultCreated for a cash-secured put with USDC collateral", async () => {
-			await expect(c.hub.connect(c.alice).createVault(putTerms(c), putPairs(c), []))
+			await expect(c.hub.connect(c.alice).createVault(putTerms(c), putPairs(c), [pairLimitsRule(c, putLimits(c))]))
 				.to.emit(c.hub, "VaultCreated")
 				.withArgs(1n, anyValue, c.alice.address, OptionKind.CashSecuredPut, c.wethAddress, c.usdcAddress)
 		})
 
 		it("emits AuctionScheduled when a start time is given", async () => {
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c, { auctionStartsAt: AUCTION_START }), callPairs(c), []))
+			await expect(
+				c.hub.connect(c.alice).createVault(callTerms(c, { auctionStartsAt: AUCTION_START }), callPairs(c), [pairLimitsRule(c, callLimits(c))]),
+			)
 				.to.emit(c.hub, "AuctionScheduled")
 				.withArgs(1n, AUCTION_START)
 		})
@@ -100,12 +105,15 @@ describe("createVault", () => {
 		it("accepts an expiry one second after the creation time", async () => {
 			const createdAt = BigInt(await networkHelpers.time.latest()) + 10n
 			await at(c, createdAt)
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c, { expiry: createdAt + 1n }), callPairs(c), [])).not.to.be.revert(ethers)
+			await expect(
+				c.hub.connect(c.alice).createVault(callTerms(c, { expiry: createdAt + 1n }), callPairs(c), [pairLimitsRule(c, callLimits(c))]),
+			).not.to.be.revert(ethers)
 		})
 
 		it("accepts a call vault with several quote tokens", async () => {
 			const pairs = [...callPairs(c), { quoteToken: c.daiAddress, premiumToken: c.daiAddress }]
-			const { vaultId } = await createVaultAs(c, c.alice, callTerms(c), pairs)
+			const limits = [...callLimits(c), { quoteToken: c.daiAddress, strikeLimit: 1n, minPremiumPerUnit: 1n }]
+			const { vaultId } = await createVaultAs(c, c.alice, callTerms(c), pairs, [pairLimitsRule(c, limits)])
 			expect(await c.hub.quoteTokensOf(vaultId)).to.deep.equal([c.usdcAddress, c.daiAddress])
 		})
 	})
@@ -143,8 +151,10 @@ describe("createVault", () => {
 			expect(await c.hub.pairOf(v.vaultId, c.usdcAddress)).to.equal(c.usdcAddress)
 		})
 
-		it("stores no rules", async () => {
-			expect(await c.hub.rulesOf(v.vaultId)).to.deep.equal([])
+		it("stores mandatory bid limits", async () => {
+			const rules = await c.hub.rulesOf(v.vaultId)
+			expect(rules).to.have.length(1)
+			expect(rules[0].kind).to.equal(RuleKind.PairLimits)
 		})
 
 		it("stores the expiry", async () => {
@@ -253,7 +263,7 @@ describe("createVault", () => {
 				callPairs(c),
 			)
 			expect((await c.hub.termsOf(vaultId)).maxSettlementPriceAge).to.equal(60n)
-			expect(await c.hub.rulesOf(vaultId)).to.deep.equal([])
+			expect((await c.hub.rulesOf(vaultId))[0].kind).to.equal(RuleKind.PairLimits)
 		})
 	})
 
@@ -284,6 +294,18 @@ describe("createVault", () => {
 			const { configRevert } = validators
 			const rules = [rule(await configRevert.getAddress())]
 			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).to.be.revertedWithCustomError(configRevert, "BadConfig")
+		})
+
+		it("rejects a creator-selected validator that governance has not allowed", async () => {
+			const approve = await ethers.deployContract("ApproveAllValidator")
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [rule(await approve.getAddress())])).to.be.revertedWithCustomError(
+				c.hub,
+				"InvalidValidator",
+			)
+		})
+
+		it("rejects a vault without explicit per-pair bid limits", async () => {
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [])).to.be.revertedWithCustomError(c.hub, "MissingBidLimits")
 		})
 
 		it("rejects an unknown rule kind", async () => {
@@ -363,8 +385,8 @@ describe("createVault", () => {
 		})
 
 		it("changes with the rules", async () => {
-			const withoutRules = await createVaultAs(c, c.alice, callTerms(c), callPairs(c), [])
-			expect(await c.hub.termsHashOf(withoutRules.vaultId)).to.not.equal(hash)
+			const otherRules = await createVaultAs(c, c.alice, callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c, { minPremiumPerUnit: 2n }))])
+			expect(await c.hub.termsHashOf(otherRules.vaultId)).to.not.equal(hash)
 		})
 	})
 })

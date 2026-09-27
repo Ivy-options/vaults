@@ -92,6 +92,10 @@ describe("IvyMath", () => {
 		it("is zero at a zero strike and zero spot without dividing by the spot", async () => {
 			expect(await math.callIntrinsic(weth(4), 0n, 0n)).to.equal(0n)
 		})
+
+		it("handles an enormous final price without overflowing", async () => {
+			expect(await math.callIntrinsic(weth(10), STRIKE, 1n << 200n)).to.equal(weth(10) - 1n)
+		})
 	})
 
 	describe("putIntrinsic", () => {

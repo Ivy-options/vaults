@@ -9,12 +9,14 @@ import {
 	EXERCISE_WINDOW,
 	EXPIRY_PRICE_PUBLICATION_WINDOW,
 	SettlementPolicy,
+	callLimits,
 	callPairs,
 	callTerms,
 	createVaultAs,
 	deployIvy,
 	fixture,
 	fund,
+	pairLimitsRule,
 	spotBandRule,
 	usdc,
 	weth,
@@ -30,6 +32,7 @@ interface HubArgs {
 	shares?: string
 	premiums?: string
 	unwind?: string
+	bidRules?: string
 	exerciseWindow?: bigint
 	auctionTimeout?: bigint
 	publicationWindow?: bigint
@@ -48,6 +51,7 @@ async function deployHub(c: IvyContext, o: HubArgs = {}) {
 			o.shares ?? c.sharesAddress,
 			o.premiums ?? (await c.premiums.getAddress()),
 			o.unwind ?? (await c.unwind.getAddress()),
+			o.bidRules ?? (await c.bidRules.getAddress()),
 			o.exerciseWindow ?? 1n,
 			o.auctionTimeout ?? 1n,
 			o.publicationWindow ?? 1n,
@@ -168,6 +172,7 @@ describe("hub administration", () => {
 			{ name: "shares", arg: "shares" },
 			{ name: "premiums", arg: "premiums" },
 			{ name: "unwind", arg: "unwind" },
+			{ name: "bid rules", arg: "bidRules" },
 		] as const) {
 			it(`rejects a zero ${name} address`, async () => {
 				await expect(deployHub(c, { [arg]: ZeroAddress })).to.be.revertedWithCustomError(c.hub, "ZeroAddress")
@@ -187,6 +192,10 @@ describe("hub administration", () => {
 				await expect(deployHub(c, { vaultImplementation: c.alice.address })).to.be.revertedWithCustomError(c.hub, "BindingMismatch")
 			})
 
+			it("rejects deploying a hub whose initial bid validator has no code", async () => {
+				await expect(deployHub(c, { bidRules: c.alice.address })).to.be.revertedWithCustomError(c.hub, "BindingMismatch")
+			})
+
 			it("rejects creating a vault whose spot band price feed has no code", async () => {
 				const rule = spotBandRule(c, { priceFeed: c.alice.address, maxPriceAge: 100, maxInTheMoneyBps: 0 })
 				await expect(c.hub.createVault(callTerms(c), callPairs(c), [rule])).to.be.revertedWithCustomError(c.hub, "BindingMismatch")
@@ -201,7 +210,7 @@ describe("hub administration", () => {
 			})
 
 			it("accepts creating a vault", async () => {
-				await expect(ownHub.createVault(callTerms(c), callPairs(c), [])).not.to.be.revert(ethers)
+				await expect(ownHub.createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))])).not.to.be.revert(ethers)
 			})
 		})
 
@@ -287,8 +296,17 @@ describe("hub administration", () => {
 				})
 			}
 
-			it("still accepts a physical-only vault", async () => {
-				await expect(c.hub.createVault(callTerms(c), callPairs(c), [])).not.to.be.revert(ethers)
+			it("accepts a physical-only American vault", async () => {
+				await expect(c.hub.createVault(callTerms(c, { allowedExercise: 1 }), callPairs(c), [pairLimitsRule(c, callLimits(c))])).not.to.be.revert(
+					ethers,
+				)
+			})
+
+			it("rejects a physical-only European vault with no exercise opportunity", async () => {
+				await expect(c.hub.createVault(callTerms(c, { allowedExercise: 0 }), callPairs(c), [])).to.be.revertedWithCustomError(
+					c.hub,
+					"InvalidSettlementWindow",
+				)
 			})
 		})
 	})

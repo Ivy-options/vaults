@@ -3,7 +3,7 @@ import { network } from "hardhat"
 
 import { PUT_DEPOSIT, at, goLive, type LiveVault } from "../helpers/scenarios.js"
 import { EXERCISE_WINDOW, Phase, deployIvy, fixture, fund, usdc, weth, type IvyContext } from "../helpers/setup.js"
-import { contribute, proposeUnwindForADay } from "../helpers/unwind.js"
+import { contribute, proposeUnwind, proposeUnwindForADay } from "../helpers/unwind.js"
 
 const connection = await network.create()
 const { ethers } = connection
@@ -35,7 +35,7 @@ const dustCall = fixture(deployed, async c => ({
 				{ signer: c.carol, amount: 1n },
 			],
 		},
-		{ premiumPerUnit: 0n },
+		{ premiumPerUnit: 10n ** 18n },
 	),
 }))
 
@@ -267,6 +267,23 @@ describe("fundUnwind", () => {
 	})
 })
 
+describe("executeUnwind", () => {
+	it("rejects an agreement at the option expiry boundary", async () => {
+		const { c, v } = await physicalCall()
+		const refund = usdc(100)
+		const a = await proposeUnwind(c, v.vaultId, v.bid.expiry, refund)
+		await c.hub.connect(c.alice).approveUnwind(v.vaultId, a.agreement.nonce)
+		await contribute(c, v, c.alice, a.agreement.nonce, refund)
+		await at(c, v.bid.expiry)
+		await expect(c.hub.executeUnwind(v.vaultId, a.agreement.nonce, a.signature)).to.be.revertedWithCustomError(c.unwind, "AgreementInvalid")
+	})
+
+	it("rejects a proposal deadline after option expiry", async () => {
+		const { c, v } = await physicalCall()
+		await expect(proposeUnwind(c, v.vaultId, v.bid.expiry + 1n, usdc(100))).to.be.revertedWithCustomError(c.unwind, "AgreementInvalid")
+	})
+})
+
 describe("withdrawUnwindContribution", () => {
 	let c: IvyContext
 	let v: LiveVault
@@ -372,11 +389,11 @@ describe("withdrawUnwindContribution", () => {
 			await expect(c.hub.connect(c.carol).withdrawUnwindContribution(v.vaultId, a.nonce)).to.changeTokenBalance(ethers, c.usdc, c.carol, 1n)
 		})
 
-		it("leaves nothing reserved or held once every LP withdraws", async () => {
+		it("leaves only the nonzero activation premium once every LP withdraws", async () => {
 			await c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
 			for (const lp of [c.alice, c.bob, c.carol]) await c.hub.connect(lp).withdrawUnwindContribution(v.vaultId, a.nonce)
 			expect(await v.vault.unwindReserved()).to.equal(0n)
-			expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(0n)
+			expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(3n)
 		})
 	})
 

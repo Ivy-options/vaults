@@ -79,7 +79,7 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 	const usdc = await ethers.deployContract("MockERC20", ["USD Coin", "USDC", 6])
 	const dai = await ethers.deployContract("MockERC20", ["Dai", "DAI", 18])
 	const feed = await ethers.deployContract("MockPriceFeed")
-	const bidRules = await ethers.deployContract("IvyBidRules")
+	const bidRules = await ethers.deployContract("IvyBidRules", [await feed.getAddress()])
 	const vaultImpl = await ethers.deployContract("IvyVault")
 	const vaultImplAddress = await vaultImpl.getAddress()
 	const rules = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyVaultRules")).bytecode, admin).deploy()
@@ -97,6 +97,7 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 			sharesAddress,
 			premiumsAddress,
 			unwindAddress,
+			await bidRules.getAddress(),
 			EXERCISE_WINDOW,
 			AUCTION_TIMEOUT,
 			EXPIRY_PRICE_PUBLICATION_WINDOW,
@@ -253,14 +254,14 @@ export function putPairs(ctx: IvyContext): PairConfigInput[] {
 	return [{ quoteToken: ctx.usdcAddress, premiumToken: ctx.usdcAddress }]
 }
 
-/** Today's call default: no strike floor and no premium floor. */
+/** Test default: explicit one-raw-unit call strike and premium floors. */
 export function callLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
-	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 0n, minPremiumPerUnit: 0n, ...o }]
+	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 1n, minPremiumPerUnit: 1n, ...o }]
 }
 
-/** Today's put default: no ceiling (max uint) and no premium floor. */
+/** Test default: explicit 3,000 USDC put ceiling and one-raw-unit premium floor. */
 export function putLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
-	return [{ quoteToken: ctx.usdcAddress, strikeLimit: MAX_UINT, minPremiumPerUnit: 0n, ...o }]
+	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 3000n * USDC_UNIT, minPremiumPerUnit: 1n, ...o }]
 }
 
 export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRuleInput {
@@ -292,9 +293,10 @@ export async function createVaultAs(
 	signer: HardhatEthersSigner,
 	terms: VaultTermsInput,
 	pairs: PairConfigInput[],
-	rules: BidRuleInput[] = [],
+	rules?: BidRuleInput[],
 ) {
-	await (await ctx.hub.connect(signer).createVault(terms, pairs, rules)).wait()
+	const bidRules = rules ?? [pairLimitsRule(ctx, terms.collateral === terms.underlying ? callLimits(ctx) : putLimits(ctx))]
+	await (await ctx.hub.connect(signer).createVault(terms, pairs, bidRules)).wait()
 	const vaultId = await ctx.hub.vaultCount()
 	const vaultAddress = await ctx.hub.vaultOf(vaultId)
 	const vault = await ctx.ethers.getContractAt("IvyVault", vaultAddress)

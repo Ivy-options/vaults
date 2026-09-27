@@ -17,13 +17,16 @@ import {
 } from "../helpers/scenarios.js"
 import {
 	Phase,
+	RuleKind,
 	SettlementPolicy,
 	SettlementType,
+	callLimits,
 	callPairs,
 	callTerms,
 	deployIvy,
 	fixture,
 	fund,
+	pairLimitsRule,
 	usdc,
 	weth,
 	type IvyContext,
@@ -255,7 +258,7 @@ describe("cash settlement opt-in", () => {
 			}
 
 			it("creates a physical-only vault", async () => {
-				await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [])).not.to.be.revert(ethers)
+				await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))])).not.to.be.revert(ethers)
 			})
 		})
 
@@ -272,7 +275,9 @@ describe("cash settlement opt-in", () => {
 			for (const { name, policy } of cashPolicies) {
 				it(`accepts the ${name} settlement policy with a price age limit`, async () => {
 					await expect(
-						c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c), []),
+						c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c), [
+							pairLimitsRule(c, callLimits(c)),
+						]),
 					).not.to.be.revert(ethers)
 				})
 
@@ -308,8 +313,10 @@ describe("cash settlement opt-in", () => {
 						;({ c, v } = await load())
 					})
 
-					it("goes live without bid rules", async () => {
-						expect(await c.hub.rulesOf(v.vaultId)).to.deep.equal([])
+					it("goes live with explicit bid limits", async () => {
+						const rules = await c.hub.rulesOf(v.vaultId)
+						expect(rules).to.have.length(1)
+						expect(rules[0].kind).to.equal(RuleKind.PairLimits)
 					})
 
 					context("after full exercise", () => {

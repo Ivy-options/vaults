@@ -202,6 +202,24 @@ describe("cross-module callbacks", () => {
 					expect(await c.hub.totalShares(v.vaultId)).to.equal(100n)
 				})
 			})
+
+			context("when the collateral's transfer callback tries to open the auction", () => {
+				beforeEach(async () => {
+					;({ c, v, token } = await callbackCollateral())
+					await c.hub.connect(c.alice).deposit(v.vaultId, 100n)
+					await c.hub.connect(c.alice).scheduleAuction(v.vaultId, BigInt(await networkHelpers.time.latest()))
+					await token.arm(c.hubAddress, c.hub.interface.encodeFunctionData("openAuction", [v.vaultId]))
+					await token.mint(c.bob.address, 50n)
+					await token.connect(c.bob).approve(v.vaultAddress, 50n)
+				})
+
+				it("keeps the vault open until the deposit's shares are minted", async () => {
+					await c.hub.connect(c.bob).deposit(v.vaultId, 50n)
+					expect(await token.callbackSucceeded()).to.equal(false)
+					expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Open)
+					expect(await c.hub.totalShares(v.vaultId)).to.equal(150n)
+				})
+			})
 		})
 
 		context("with premium and collateral in the same token", () => {

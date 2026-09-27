@@ -198,10 +198,11 @@ describe("cancelAuction", () => {
 		})
 
 		it("lets the bid master cancel at once and returns the vault to Open", async () => {
+			const openedAt = (await c.hub.stateOf(v.vaultId)).auctionOpenedAt
 			await expect(c.hub.connect(c.bidMaster).cancelAuction(v.vaultId)).to.emit(c.hub, "AuctionCancelled").withArgs(v.vaultId)
 			const state = await c.hub.stateOf(v.vaultId)
 			expect(state.phase).to.equal(Phase.Open)
-			expect(state.auctionOpenedAt).to.equal(0n)
+			expect(state.auctionOpenedAt).to.equal(openedAt)
 		})
 
 		it("lets the owner reopen it after a bid master cancel", async () => {
@@ -226,7 +227,7 @@ describe("cancelAuction", () => {
 			await expect(c.hub.connect(c.alice).cancelAuction(v.vaultId)).to.emit(c.hub, "AuctionCancelled").withArgs(v.vaultId)
 		})
 
-		it("rejects anyone but the owner or the bid master", async () => {
+		it("rejects a non-owner before the timeout", async () => {
 			await expect(c.hub.connect(c.bob).cancelAuction(v.vaultId)).to.be.revertedWithCustomError(c.hub, "NotVaultOwner")
 		})
 
@@ -238,6 +239,15 @@ describe("cancelAuction", () => {
 			it("lets the owner cancel and clears the start time", async () => {
 				await c.hub.connect(c.alice).cancelAuction(v.vaultId)
 				expect((await c.hub.termsOf(v.vaultId)).auctionStartsAt).to.equal(0n)
+			})
+
+			it("lets any LP cancel and withdraw", async () => {
+				await c.hub.connect(c.bob).cancelAuction(v.vaultId)
+				await expect(c.hub.connect(c.alice).withdraw(v.vaultId, weth(6))).to.changeTokenBalance(ethers, c.weth, c.alice, weth(6))
+			})
+
+			it("lets an LP withdraw directly while the timed-out auction remains open", async () => {
+				await expect(c.hub.connect(c.alice).withdraw(v.vaultId, weth(6))).to.changeTokenBalance(ethers, c.weth, c.alice, weth(6))
 			})
 
 			it("leaves no schedule a stranger could reopen", async () => {
@@ -257,9 +267,9 @@ describe("cancelAuction", () => {
 			await expect(c.hub.connect(c.alice).cancelAuction(v.vaultId)).to.be.revertedWithCustomError(c.hub, "AuctionTimeoutNotReached")
 		})
 
-		it("lets the owner cancel at exactly the option expiry", async () => {
+		it("lets anyone cancel at exactly the option expiry", async () => {
 			await at(c, (await c.hub.stateOf(v.vaultId)).expiry)
-			await expect(c.hub.connect(c.alice).cancelAuction(v.vaultId)).to.emit(c.hub, "AuctionCancelled").withArgs(v.vaultId)
+			await expect(c.hub.connect(c.bob).cancelAuction(v.vaultId)).to.emit(c.hub, "AuctionCancelled").withArgs(v.vaultId)
 		})
 
 		context("once the owner cancels at the option expiry", () => {

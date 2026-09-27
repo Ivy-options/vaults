@@ -122,8 +122,16 @@ library IvyOptionSettlement {
 		address recipient = state.recipient;
 		address collateral = terms.collateral;
 		address premiumToken = state.premiumToken;
-		uint256 collateralAmount = vault.payBuyer(collateral, recipient);
-		uint256 premiumAmount = premiumToken == collateral ? 0 : vault.payBuyer(premiumToken, recipient);
+		uint256 collateralAmount;
+		uint256 premiumAmount;
+		if (premiumToken == collateral) {
+			uint256 combinedAmount = vault.payBuyer(collateral, recipient);
+			collateralAmount = state.pendingPayout;
+			premiumAmount = combinedAmount - collateralAmount;
+		} else {
+			collateralAmount = vault.payBuyer(collateral, recipient);
+			premiumAmount = vault.payBuyer(premiumToken, recipient);
+		}
 		if (collateralAmount == 0 && premiumAmount == 0) revert NothingToClaim();
 		state.pendingPayout = 0;
 		emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, state.marketMaker, collateralAmount, premiumAmount);
@@ -131,23 +139,35 @@ library IvyOptionSettlement {
 		_notifyRecipient(vaultId, recipient, premiumToken, premiumAmount);
 	}
 
-	function claim(VaultState storage state, VaultTerms storage terms, IIvyShares shareToken, uint256 vaultId, uint256 shares) external {
+	function claim(
+		VaultState storage state,
+		VaultTerms storage terms,
+		IIvyShares shareToken,
+		uint256 vaultId,
+		uint256 shares,
+		address holder,
+		address recipient,
+		uint8 tokenMask
+	) external {
+		if (state.phase != Phase.Settled) revert WrongPhase(Phase.Settled, state.phase);
 		if (shares == 0) revert ZeroAmount();
-		if (shareToken.balanceOf(msg.sender, vaultId) < shares) revert InsufficientShares();
+		if (recipient == address(0)) revert ZeroAddress();
+		if (tokenMask == 0 || tokenMask > 7) revert ZeroAmount();
+		if (shareToken.balanceOf(holder, vaultId) < shares) revert InsufficientShares();
 		uint256 supply = shareToken.totalSupply(vaultId);
 
 		IIvyVault vault = IIvyVault(state.vault);
 		address[3] memory tokens = [terms.collateral, state.premiumToken, state.isCall ? state.quoteToken : terms.underlying];
 		uint256[3] memory amounts;
 		for (uint256 i = 0; i < 3; ++i) {
-			if (_seenBefore(tokens, i)) continue;
+			if ((tokenMask & (1 << i)) == 0 || _seenSelectedBefore(tokens, tokenMask, i)) continue;
 			uint256 available = IERC20(tokens[i]).balanceOf(address(vault)) - vault.reserved(tokens[i]);
 			amounts[i] = (available * shares) / supply;
 		}
 
-		shareToken.burn(msg.sender, vaultId, shares);
+		shareToken.burn(holder, vaultId, shares);
 		for (uint256 i = 0; i < 3; ++i) {
-			if (amounts[i] > 0) vault.push(tokens[i], msg.sender, amounts[i]);
+			if (amounts[i] > 0) vault.push(tokens[i], recipient, amounts[i]);
 		}
 	}
 
@@ -224,9 +244,9 @@ library IvyOptionSettlement {
 		return observation.price;
 	}
 
-	function _seenBefore(address[3] memory tokens, uint256 i) private pure returns (bool) {
+	function _seenSelectedBefore(address[3] memory tokens, uint8 tokenMask, uint256 i) private pure returns (bool) {
 		for (uint256 j = 0; j < i; ++j) {
-			if (tokens[j] == tokens[i]) return true;
+			if ((tokenMask & (1 << j)) != 0 && tokens[j] == tokens[i]) return true;
 		}
 		return false;
 	}
