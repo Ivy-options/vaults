@@ -321,11 +321,11 @@ describe("release registry", () => {
 			;({ supported, bundle } = await released())
 		})
 
-		it("rejects a manifest without the IvyBidRules validator", async () => {
+		it("rejects a manifest without the IvyStandardBidRules validator", async () => {
 			const noValidator = structuredClone(bundle)
-			delete noValidator.manifest.addresses.IvyBidRules
-			noValidator.manifest.steps = noValidator.manifest.steps.filter(s => s.name !== "IvyBidRules")
-			await expect(verifyRelease(ethers.provider, noValidator, supported)).to.be.rejectedWith("lacks IvyBidRules")
+			delete noValidator.manifest.addresses.IvyStandardBidRules
+			noValidator.manifest.steps = noValidator.manifest.steps.filter(s => s.name !== "IvyStandardBidRules")
+			await expect(verifyRelease(ethers.provider, noValidator, supported)).to.be.rejectedWith("lacks IvyStandardBidRules")
 		})
 
 		it("rejects an unknown interface format", async () => {
@@ -385,10 +385,10 @@ describe("release registry", () => {
 				expect(resolved.hub).to.equal(bundle.manifest.addresses.IvyVaultsHub)
 			})
 
-			it("resolves the release's IvyBidRules validator", async () => {
-				expect(bundle.manifest.addresses.IvyBidRules).to.match(/^0x[0-9a-fA-F]{40}$/)
+			it("resolves the release's IvyStandardBidRules validator", async () => {
+				expect(bundle.manifest.addresses.IvyStandardBidRules).to.match(/^0x[0-9a-fA-F]{40}$/)
 				const resolved = await resolveRelease(ethers.provider, request, supported)
-				expect(resolved.addresses.IvyBidRules).to.equal(bundle.manifest.addresses.IvyBidRules)
+				expect(resolved.addresses.IvyStandardBidRules).to.equal(bundle.manifest.addresses.IvyStandardBidRules)
 			})
 
 			it("rejects a recommended lookup while nothing is recommended", async () => {
@@ -456,7 +456,7 @@ describe("release registry", () => {
 				}
 				const rules = [
 					{
-						validator: resolved.addresses.IvyBidRules,
+						validator: resolved.addresses.IvyStandardBidRules,
 						kind: RuleKind.PairLimits,
 						data: encodePairLimits([[usdcAddress, STRIKE, PREMIUM_PER_UNIT]]),
 					},

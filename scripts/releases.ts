@@ -37,7 +37,8 @@ export async function verifyRelease(anyProvider: Provider | null, bundle: Releas
 	if (bundle.format !== 1 || bundle.interfaceFormat !== RELEASE_FORMAT || bundle.manifest?.version !== 9)
 		throw new Error("Unsupported release format; historical releases require their preserved build")
 	const { manifest, journal, artifacts } = bundle
-	if (!manifest.addresses?.IvyBidRules || !manifest.steps?.some(s => s.name === "IvyBidRules")) throw new Error("Release manifest lacks IvyBidRules")
+	if (!manifest.addresses?.IvyStandardBidRules || !manifest.steps?.some(s => s.name === "IvyStandardBidRules"))
+		throw new Error("Release manifest lacks IvyStandardBidRules")
 	if (String((await provider.getNetwork()).chainId) !== manifest.chainId || (await provider.getBlock(0))?.hash !== manifest.genesisHash)
 		throw new Error("Wrong chain")
 	for (const name of CONTRACTS) {

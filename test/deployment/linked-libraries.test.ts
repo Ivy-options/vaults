@@ -114,15 +114,15 @@ describe("linked libraries", () => {
 		})
 
 		it("deploys the shipped validator as its own unlinked step", async () => {
-			const step = stepOf(plan, "IvyBidRules")
+			const step = stepOf(plan, "IvyStandardBidRules")
 			expect(step.libraryLinks).to.deep.equal([])
 			expect((await ethers.provider.getCode(step.address)).length).to.be.greaterThan(2)
 		})
 
 		it("allows the shipped validator and binds it to the shipped price feed", async () => {
 			const hub = await ethers.getContractAt("IvyVaultsHub", plan.addresses.IvyVaultsHub)
-			const validator = await ethers.getContractAt("IvyBidRules", plan.addresses.IvyBidRules)
-			expect(await hub.hasRole(id("BID_VALIDATOR_ROLE"), plan.addresses.IvyBidRules)).to.equal(true)
+			const validator = await ethers.getContractAt("IvyStandardBidRules", plan.addresses.IvyStandardBidRules)
+			expect(await hub.hasRole(id("BID_VALIDATOR_ROLE"), plan.addresses.IvyStandardBidRules)).to.equal(true)
 			expect(await validator.trustedPriceFeed()).to.equal(plan.addresses.IvyPriceFeed)
 		})
 	})
@@ -163,7 +163,7 @@ describe("linked libraries", () => {
 
 		it("rejects a deployment whose shipped validator lost its allowlist role", async () => {
 			const hub = await ethers.getContractAt("IvyVaultsHub", plan.addresses.IvyVaultsHub)
-			await hub.revokeRole(id("BID_VALIDATOR_ROLE"), plan.addresses.IvyBidRules)
+			await hub.revokeRole(id("BID_VALIDATOR_ROLE"), plan.addresses.IvyStandardBidRules)
 			await expect(verifyBindings(ethers.provider, plan)).to.be.rejectedWith(/Bid validator role missing/)
 		})
 	})

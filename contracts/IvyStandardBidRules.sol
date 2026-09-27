@@ -7,7 +7,7 @@ import { IvyMath } from "./libraries/IvyMath.sol";
 import "./types/IvyTypes.sol";
 
 /// @notice Stateless validator for PairLimits, PremiumFloor, and SpotBand bid rules.
-contract IvyBidRules is IIvyBidValidator {
+contract IvyStandardBidRules is IIvyBidValidator {
 	address public immutable trustedPriceFeed;
 
 	struct PairLimit {

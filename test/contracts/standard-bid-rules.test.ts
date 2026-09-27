@@ -78,11 +78,11 @@ const BID: Bid = {
 
 const deployed = fixture(connection, async () => {
 	const feed = await ethers.deployContract("MockPriceFeed")
-	const rules = await ethers.deployContract("IvyBidRules", [await feed.getAddress()])
+	const rules = await ethers.deployContract("IvyStandardBidRules", [await feed.getAddress()])
 	return { rules, feed, feedAddress: await feed.getAddress() }
 })
 
-describe("IvyBidRules", () => {
+describe("IvyStandardBidRules", () => {
 	let rules: Loaded<typeof deployed>["rules"]
 	let feed: Loaded<typeof deployed>["feed"]
 	let feedAddress: string
