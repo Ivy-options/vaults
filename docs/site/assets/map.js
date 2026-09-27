@@ -146,8 +146,8 @@
 
   /* ---------- Cast ---------- */
   const CROPS = { owner: "24 76 477 580", lp: "504 76 425 580", buyer: "931 76 461 580", bid: "1394 76 533 580" };
-  const ACTOR_NAMES = { owner: "Owner", lp: "LP", buyer: "Buyer", bid: "Bid master", anyone: "Anyone", publisher: "Price publisher", admin: "Admin", guardian: "Guardian", all: "All parties" };
-  const GLYPHS = { anyone: "?", publisher: "$", admin: "A", guardian: "G", all: "∀" };
+  const ACTOR_NAMES = { owner: "Owner", lp: "LP", buyer: "Buyer", bid: "Bid master", anyone: "Anyone", publisher: "Price publisher", admin: "Admin", guardian: "Guardian" };
+  const GLYPHS = { anyone: "?", publisher: "$", admin: "A", guardian: "G" };
   let clipSeq = 0;
   function portrait(key) {
     if (key === "bid") {
@@ -855,10 +855,6 @@
     "cash-missing-reports": "missing-report",
     "reports-exercise-and-expiration": "cash-the-vault-needs-a-price",
     "enable-cash-after-physical-launch": "cash-the-vault-needs-a-price",
-    "early-exit": "agreed-unwind",
-    "unwind-recovery": "agreed-unwind",
-    "prepare-and-execute-a-unanimous-unwind": "agreed-unwind",
-    "worked-unwind-scenarios": "agreed-unwind",
     "cash-outcomes": "claim-payout",
     "premium-treatment-and-emergency-boundaries": "settled",
     "terms": "set-the-terms",
@@ -950,7 +946,6 @@
     "exercise-assumption": "exercise",
     "rounding": "exercise",
     "income-is-not-total-return": "exercise",
-    "agreed-unwind-pointer": "buyer-may-now-exercise",
     "enable-cash": "cash-the-vault-needs-a-price",
     "two-separate-controls": "cash-the-vault-needs-a-price",
     "when-disabled": "cash-the-vault-needs-a-price",
@@ -1014,19 +1009,6 @@
     "expiration-result": "settle-at-expiry",
     "no-grace-for-cash": "settle-at-expiry",
     "too-late": "settle-at-expiry",
-    "ending-early-by-agreement": "agreed-unwind",
-    "four-steps": "agreed-unwind",
-    "what-the-proposal-records": "agreed-unwind",
-    "consent-changes": "agreed-unwind",
-    "new-agreement": "agreed-unwind",
-    "while-pending": "agreed-unwind",
-    "funding": "agreed-unwind",
-    "recover-before-execution": "agreed-unwind",
-    "original-funder": "agreed-unwind",
-    "recover-after-execution": "agreed-unwind",
-    "execute-unwind": "agreed-unwind",
-    "worked-scenarios": "agreed-unwind",
-    "consent-lab": "agreed-unwind",
     "settled-custody": "claim",
     "the-option-is-over": "settled",
     "nothing-moves-by-itself": "settled",
@@ -1040,7 +1022,6 @@
     "shares-are-burned": "claim",
     "reconciliation-getters": "claim",
     "cash-expiry-payout": "claim-payout",
-    "unwind-refund-claim": "claim-payout",
     "physical-already-paid": "claim-payout",
     "pendingPayout-scope": "claim-payout",
     "what-each-side-ends-up-with": "claim",

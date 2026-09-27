@@ -80,7 +80,7 @@ export interface DeploymentInput {
 }
 
 export const LIBRARIES = ["IvyVaultRules", "IvyOptionSettlement"]
-export const CONTRACTS = [...LIBRARIES, "IvyVault", "IvyPriceFeed", "IvyBidRules", "IvyVaultsHub", "IvyShares", "IvyPremiums", "IvyUnwind"]
+export const CONTRACTS = [...LIBRARIES, "IvyVault", "IvyPriceFeed", "IvyBidRules", "IvyVaultsHub", "IvyShares", "IvyPremiums"]
 export const artifactPath = (name: string) => `../artifacts/contracts/${LIBRARIES.includes(name) ? "libraries/" : ""}${name}.sol/${name}.json`
 export async function loadArtifacts(): Promise<Artifacts> {
 	return Object.fromEntries(
@@ -147,9 +147,8 @@ export async function buildDeploymentPlan({
 		[],
 		[reportSigner],
 		[a.IvyPriceFeed],
-		[admin, a.IvyVault, a.IvyShares, a.IvyPremiums, a.IvyUnwind, a.IvyBidRules, exerciseWindow, auctionTimeout, expiryPricePublicationWindow],
-		[a.IvyVaultsHub, a.IvyPremiums, a.IvyUnwind, uri],
-		[a.IvyVaultsHub, a.IvyShares],
+		[admin, a.IvyVault, a.IvyShares, a.IvyPremiums, a.IvyBidRules, exerciseWindow, auctionTimeout, expiryPricePublicationWindow],
+		[a.IvyVaultsHub, a.IvyPremiums, uri],
 		[a.IvyVaultsHub, a.IvyShares],
 	]
 	const steps: DeploymentStep[] = []
@@ -172,7 +171,7 @@ export async function buildDeploymentPlan({
 		})
 	}
 	return {
-		version: 8,
+		version: 9,
 		chainId: String(chainId),
 		genesisHash,
 		deployer,
@@ -234,14 +233,10 @@ export async function verifyBindings(anyProvider: Provider | null, plan: Deploym
 		["IvyVaultsHub", "vaultImplementation", a.IvyVault],
 		["IvyVaultsHub", "shareToken", a.IvyShares],
 		["IvyVaultsHub", "premiums", a.IvyPremiums],
-		["IvyVaultsHub", "unwind", a.IvyUnwind],
 		["IvyShares", "hub", a.IvyVaultsHub],
 		["IvyShares", "premiums", a.IvyPremiums],
-		["IvyShares", "unwind", a.IvyUnwind],
 		["IvyPremiums", "hub", a.IvyVaultsHub],
 		["IvyPremiums", "shares", a.IvyShares],
-		["IvyUnwind", "hub", a.IvyVaultsHub],
-		["IvyUnwind", "shares", a.IvyShares],
 		["IvyPriceFeed", "signer", plan.reportSigner],
 		["IvyBidRules", "trustedPriceFeed", a.IvyPriceFeed],
 	]
@@ -282,7 +277,7 @@ export async function openJournal(signer: Signer, plan: PlanIdentity, journal: J
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
 export async function resumeDeployment(signer: Signer, plan: DeploymentPlan, journal: Journal = {}, persist: Persist = async () => {}) {
-	if (plan.version !== 8) throw new Error("Unsupported deployment plan version; prepare a new plan for this build")
+	if (plan.version !== 9) throw new Error("Unsupported deployment plan version; prepare a new plan for this build")
 	const provider = rpc(signer.provider)
 	const { startBlock, steps } = await openJournal(signer, plan, journal)
 	await persist(journal)

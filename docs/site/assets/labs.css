@@ -66,14 +66,6 @@ input[type="range"] {
   min-height: 2.5em;
 }
 
-/* .field-label (atlas.css) */
-.field-label {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 9px;
-}
-
 /* .display-rounding (atlas.css) */
 .display-rounding {
   font-size: 11px;
@@ -81,31 +73,12 @@ input[type="range"] {
   text-align: start;
 }
 
-/* .consent-example, .consent-controls (atlas.css) */
-.consent-example {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  padding-block: 30px;
-  border-block: 1px solid var(--line-strong);
-}
-.consent-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  margin: 22px 0;
-}
-.consent-controls label,
+/* .registry-node label (atlas.css) */
 .registry-node label {
   font-size: 12px;
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-/* .consent-example (roman.css theme override) */
-.consent-example {
-  grid-template-columns: 1fr 1fr;
 }
 
 /* .fee-laboratory, .fee-controls, .large-amount (atlas.css) */
@@ -299,51 +272,6 @@ input[type="range"] {
   .cash-total strong {
     font-size: 20px;
   }
-}
-
-/* .ownership-bar (atlas.css) */
-.ownership-bar {
-  display: flex;
-  height: 38px;
-  border: 1px solid var(--line-strong);
-}
-.ownership-bar span {
-  display: grid;
-  place-items: center;
-  color: var(--ink);
-  font: 12px var(--mono);
-}
-.ownership-a {
-  width: 60%;
-  background: color-mix(in srgb, var(--guide-green) 25%, transparent);
-}
-.ownership-b {
-  width: 40%;
-  background: color-mix(in srgb, var(--guide-purple) 25%, transparent);
-}
-.ownership-bar span.is-missing {
-  background: transparent;
-  color: var(--faint);
-  text-decoration: line-through;
-}
-
-/* .refund-equation (atlas.css) */
-.refund-equation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-top: 22px;
-}
-.refund-equation span {
-  font-size: 11px;
-  color: var(--muted);
-}
-.refund-equation strong {
-  display: block;
-  font: 20px var(--atlas-serif);
-  color: var(--ink);
-  margin-top: 8px;
 }
 
 /* .fee-distribution .fee-bar (atlas.css) */
@@ -779,7 +707,6 @@ input[type="range"] {
 .card.lab .calc .inputs {
   grid-template-columns: 1fr;
 }
-.card.lab .consent-example,
 .card.lab .fee-laboratory,
 .card.lab .cash-accounting,
 .card.lab .release-branches {
@@ -894,7 +821,7 @@ input[type="range"] {
 /* The custody lab is sized from its first state, phase 0 with two compartments
    and no settlement-illustration picker (245px). Settled (phase 3) shows a
    third, buyer-payout compartment plus that picker; the tallest combination,
-   phase 3 with the unwind illustration, measures 483px at the 276px card
+   phase 3 with the cash illustration, fits within 483px at the 276px card
    width. Reserve that height so switching phase or illustration never grows
    the card. */
 .card.lab [data-lab="custody"] {

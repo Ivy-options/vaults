@@ -19,7 +19,6 @@ import {
 	PayoutReceiverMode,
 	type IvyContext,
 } from "../helpers/setup.js"
-import { proposeUnwind } from "../helpers/unwind.js"
 
 const connection = await network.create()
 const { ethers, networkHelpers } = connection
@@ -114,15 +113,6 @@ const finalizedCashCalls = [
 		load: fixture(cashCall, async ({ c, v }) => {
 			await setExercisePrice(c, v.vaultId, usdc(6000))
 			await c.hub.connect(c.marketMaker).exercise(v.vaultId, weth(10))
-			return { c, v }
-		}),
-	},
-	{
-		name: "unwind",
-		load: fixture(cashCall, async ({ c, v }) => {
-			const { agreement, signature } = await proposeUnwind(c, v.vaultId, v.bid.expiry, 0n)
-			await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce)
-			await c.hub.executeUnwind(v.vaultId, agreement.nonce, signature)
 			return { c, v }
 		}),
 	},
@@ -987,17 +977,9 @@ describe("physical fallback", () => {
 		let v: LiveVault
 
 		for (const { name, isCall, aliceShares, bobShares, aliceQuote, aliceUnderlying, load } of twoLpCashVaults) {
-			context(`cash ${name} shared by two LPs, with a 2% platform fee and a funded unwind, after a partial fallback lapses`, () => {
-				let unwindNonce: bigint
-
+			context(`cash ${name} shared by two LPs, with a 2% platform fee, after a partial fallback lapses`, () => {
 				beforeEach(async () => {
 					;({ c, v } = await load())
-					// An unwind still open past F that only alice funds, with her 60% of its 100 USDC refund, so it
-					// never executes.
-					const { agreement } = await proposeUnwind(c, v.vaultId, v.bid.expiry, usdc(100))
-					unwindNonce = agreement.nonce
-					await fund(c, c.usdc, c.alice, v.vaultAddress, usdc(60))
-					await c.hub.connect(c.alice).fundUnwind(v.vaultId, unwindNonce, usdc(60))
 					if (!isCall) await fund(c, c.weth, c.marketMaker, v.vaultAddress, weth(4))
 					await networkHelpers.time.increaseTo(publicationDeadline(v))
 					await c.hub.connect(c.marketMaker).exercisePhysicalFallback(v.vaultId, weth(4))
@@ -1017,9 +999,9 @@ describe("physical fallback", () => {
 						await c.hub.connect(c.bob).claim(v.vaultId, bobShares)
 					})
 
-					it("leaves only the premium, platform fee and unwind contribution in the vault", async () => {
-						// 1,000 USDC premium (980 for the LPs, 20 platform fee) plus the 60 USDC unwind contribution.
-						expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(usdc(1060))
+					it("leaves only the premium and platform fee in the vault", async () => {
+						// 1,000 USDC premium: 980 for the LPs and a 20 platform fee.
+						expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(usdc(1000))
 						expect(await c.weth.balanceOf(v.vaultAddress)).to.equal(0n)
 						expect(await v.vault.buyerReserved(c.usdcAddress)).to.equal(0n)
 					})
@@ -1033,20 +1015,10 @@ describe("physical fallback", () => {
 						await expect(v.vault.claimPlatformFee()).to.changeTokenBalance(ethers, c.usdc, c.admin, usdc(20))
 					})
 
-					it("returns the unwind contribution", async () => {
-						await expect(c.hub.connect(c.alice).withdrawUnwindContribution(v.vaultId, unwindNonce)).to.changeTokenBalance(
-							ethers,
-							c.usdc,
-							c.alice,
-							usdc(60),
-						)
-					})
-
-					it("empties the vault once the premium, fee and contribution are collected", async () => {
+					it("empties the vault once the premium and fee are collected", async () => {
 						await c.hub.connect(c.alice).claimPremium(v.vaultId)
 						await c.hub.connect(c.bob).claimPremium(v.vaultId)
 						await v.vault.claimPlatformFee()
-						await c.hub.connect(c.alice).withdrawUnwindContribution(v.vaultId, unwindNonce)
 						expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(0n)
 					})
 

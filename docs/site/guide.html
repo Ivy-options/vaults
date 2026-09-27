@@ -58,7 +58,6 @@
           <a href="#cash-settlement">Optional cash settlement</a>
           <a href="#terms">Vault terms</a>
           <a href="#versions">Versions and existing vaults</a>
-          <a href="#early-exit">Unwind by agreement</a>
         </nav>
       </details>
     </aside>
@@ -364,9 +363,6 @@
                   Physical options must first finish their exercise window;
                   cash options use a timely final expiry price or finish the
                   fixed physical fallback window when that price is missing.</p>
-                  <p>The parties can also end the option through an
-                  <a href="#early-exit">unwind signed by the buyer and approved
-                  by every current shareholder</a>.</p>
                 </div>
               </div>
             </div>
@@ -400,10 +396,9 @@
                     ><span
                       >The buyer or its executor calls
                       <code>claimPayout(vaultId)</code> if a payout is waiting in
-                      the buyer reserve. This can be a separately funded unwind
-                      refund or an owed
+                      the buyer reserve. This is an owed
                       <a href="#cash-exercise-windows">cash-expiry payout</a>
-                      for a cash-settled vault. The claim sends those assets to
+                      for a cash-settled vault. The claim sends it to
                       the configured recipient. Physical exercise already pays
                       the recipient in the exercise transaction, so it creates
                       no later buyer payout to claim.</span
@@ -423,7 +418,7 @@
             across the protocol or for one vault. This is called an admission
             pause. It blocks new creation where applicable, deposits, auction
             opening and activation. It does not stop withdrawals, transfers,
-            exercise, settling at expiry, claims or agreed unwinds that otherwise meet
+            exercise, settling at expiry or claims that otherwise meet
             their normal rules. A pause does not extend any deadline.
           </div>
         </div>
@@ -540,11 +535,10 @@
             <div>
               <dt id="premium-treatment">Earned payments</dt>
               <dd>
-                Once activation succeeds, exercise, expiry, a pause or an unwind
+                Once activation succeeds, exercise, expiry or a pause
                 does not take back the premium and fees already earned.
                 The vault tracks fees, LP premium and buyer obligations
                 separately, even if they are all owed in the same token.
-                <a href="#early-exit">Unwind refunds</a> are funded separately.
               </dd>
             </div>
           </dl>
@@ -1269,8 +1263,8 @@
                 <dt>Existing obligations</dt>
                 <dd>
                   Physical vaults keep their delivery method. Existing cash
-                  positions retain publication, exercise, settling at expiry, claims and
-                  agreed unwind; disabling removes none of their payment
+                  positions retain publication, exercise, settling at expiry and
+                  claims; disabling removes none of their payment
                   obligations.
                 </dd>
               </div>
@@ -1591,7 +1585,7 @@
             </div>
             <p class="prose">Before D, an authorized replacement can publish the verified price for the original expiry. A timely final price remains valid after F and prevents fallback. At or after D, publication is rejected even without an earlier fallback transaction. Only the remaining notional enters fallback; completed exercises stay final.</p>
             <p class="prose">The buyer or executor explicitly calls <code>exercisePhysicalFallback(vaultId, amount)</code>. For calls it delivers quote at the strike and receives underlying; for puts it delivers underlying and receives quote at the strike. Approve the vault clone for the required token first. An ordinary cash exercise never switches to these transfers. Full exercise settles immediately; partial exercise never extends F. At F the unexercised remainder lapses without a new buyer reserve. No publisher, buyer callback or prior fallback activation is needed for expiration.</p>
-            <p class="prose">The publication and fallback deadlines are visible through <code>settlementStatus</code>. The original Cash type remains in history. P and W are disclosed before deposits and bidding and cannot be changed for an existing vault. The parties may also follow the <a href="#early-exit">unwind procedure</a>.</p>
+            <p class="prose">The publication and fallback deadlines are visible through <code>settlementStatus</code>. The original Cash type remains in history. P and W are disclosed before deposits and bidding and cannot be changed for an existing vault.</p>
             <p class="boundary-note">
               Recovery remains available under the
               <a href="#cash-availability">cash admission rules</a> and
@@ -1868,182 +1862,12 @@
               <dd>
                 An existing vault keeps the code and Hub it was created with,
                 so a defect cannot be fixed by replacing that code in place.
-                Its original settlement and unwind rules still apply, along
+                Its original settlement rules still apply, along
                 with its existing admission-pause controls, share-transfer
                 controls and any cash-price publication requirements.
               </dd>
             </div>
           </dl>
-        </div>
-      </section>
-
-      <section id="early-exit">
-        <div class="main reading-flow">
-          <header class="chapter-heading">
-            <p class="chapter-eyebrow">Section 09</p>
-            <h2>Unwind by agreement</h2>
-            <p class="section-intro">
-              An unwind ends a Live option by agreement between the buyer and every
-              current shareholder. They can negotiate a refund to the buyer, which current
-              LPs fund separately. This is an alternative to exercising or waiting to
-              settle at expiry; the proposal, consent and funding must all be valid when it
-              executes.
-            </p>
-          </header>
-            <ol class="procedure-steps" aria-label="Unwind requirements">
-              <li>Preview the next agreement, including its nonce, exercised amount,
-                current share supply, refund and deadline, and obtain the buyer's signature.</li>
-              <li>The owner or buyer submits the signed proposal, and every current
-                shareholder approves. Replacing a proposal needs a new buyer signature.</li>
-              <li>Current LPs separately fund any negotiated refund.</li>
-              <li>Anyone can execute once the agreement is valid, while the vault
-                is Live, no later than the proposal deadline and strictly before
-                the option expiry.</li>
-            </ol>
-            <p class="prose">In this example, LP A holds 60% of the shares and
-              LP B holds 40%. A 100 USDC refund needs 60 USDC from A and 40 USDC
-              from B, as well as the buyer's signature and both LPs' consent.</p>
-            <div
-              class="consent-example interactive-example"
-              data-lab="consent"
-              aria-label="Illustrative unwind consent and refund"
-            >
-              <div>
-                <span class="inscription"
-                  >CONSENT EXAMPLE · 60 / 40 OWNERSHIP</span
-                >
-                <div class="consent-controls">
-                  <label
-                    ><input
-                      id="consent-buyer"
-                      type="checkbox"
-                      checked
-                      disabled
-                    />Buyer signature</label
-                  ><label
-                    ><input id="consent-a" type="checkbox" checked disabled />LP
-                    A · 60%</label
-                  ><label
-                    ><input id="consent-b" type="checkbox" checked disabled />LP
-                    B · 40%</label
-                  >
-                </div>
-                <div
-                  class="ownership-bar"
-                  role="img"
-                  aria-label="All current shares approve"
-                >
-                  <span class="ownership-a">60%</span
-                  ><span class="ownership-b">40%</span>
-                </div>
-                <p class="example-status" id="consent-status" role="status">
-                  Buyer signed · 100% of current shares approve
-                </p>
-              </div>
-              <div>
-                <label class="field-label" for="unwind-refund"
-                  >Agreed refund example</label
-                ><select id="unwind-refund" disabled>
-                  <option value="100">100 USDC</option>
-                  <option value="0">Zero refund</option>
-                </select>
-                <div class="refund-equation">
-                  <span>LP A<strong id="refund-a">60 USDC</strong></span
-                  ><span aria-hidden="true">+</span
-                  ><span>LP B<strong id="refund-b">40 USDC</strong></span
-                  ><span aria-hidden="true">→</span
-                  ><span
-                    >Buyer reserve<strong id="refund-total"
-                      >100 USDC</strong
-                    ></span
-                  >
-                </div>
-                <p id="refund-note">
-                  A 100 USDC refund is <code>100000000</code> raw units when USDC
-                  has six decimal places. The LPs fund it before execution;
-                  the caller who executes the agreement does not supply it.
-                </p>
-              </div>
-            </div>
-            <dl class="rule-ledger">
-              <div>
-                <dt>What the proposal records</dt>
-                <dd>
-                  The proposal records how much of the option has already been
-                  exercised, the total share supply and the agreed refund. It
-                  also has a nonce identifying this agreement and a future
-                  deadline by which it must execute. That deadline cannot be
-                  later than the option expiry.
-                </dd>
-              </div>
-              <div>
-                <dt>Consent changes</dt>
-                <dd>
-                  A shareholder can withdraw its approval. A nonzero share
-                  transfer to another holder
-                  invalidates both sender and recipient approvals. They approve
-                  again at their new balances.
-                </dd>
-              </div>
-              <div>
-                <dt>New agreement</dt>
-                <dd>
-                  A replacement proposal or further exercise requires fresh
-                  agreement. If the proposal's deadline passes or the proposal
-                  is replaced, propose again while the vault is Live with a
-                  new future deadline no later than expiry. The contract assigns the
-                  next nonce, and old signatures and approvals cannot execute
-                  it.
-                </dd>
-              </div>
-              <div>
-                <dt>Funding</dt>
-                <dd>
-                  Each current LP approves the individual vault contract and funds a
-                  proportional contribution in the premium token, rounded up to
-                  a raw unit. Extra funding from one LP cannot cover another
-                  LP's requirement. Zero refund needs the same consent but no
-                  refund funding.
-                </dd>
-              </div>
-              <div>
-                <dt>While the proposal is pending</dt>
-                <dd>
-                  Proposing an unwind does not pause exercise or settling at expiry.
-                  The usual option rules keep applying until the agreement
-                  executes, and any exercises already completed are not reversed.
-                  Execution checks the buyer's signature again; a contract buyer
-                  can revoke its validity before execution.
-                </dd>
-              </div>
-            </dl>
-            <h3 id="unwind-recovery">Recover refund contributions</h3>
-            <dl class="rule-ledger">
-              <div>
-                <dt>Before execution</dt>
-                <dd>A funder can take back its refund contribution before the
-                  unwind executes, including after withdrawing approval, after
-                  the proposal's deadline or after replacement. Taking back a
-                  contribution to the current proposal also withdraws that
-                  funder's approval. Recovering funds from a replaced proposal
-                  does not affect approval of its replacement.</dd>
-              </div>
-              <div>
-                <dt>After execution</dt>
-                <dd>The buyer receives exactly the agreed refund. A funder can
-                  recover any contribution above its required amount, plus its
-                  allocated share of extra units left because each LP's required
-                  contribution was rounded up. Any smallest-token units left
-                  when dividing that surplus go to the last participant to
-                  recover a share of it.</dd>
-              </div>
-              <div>
-                <dt>Original funder</dt>
-                <dd>Recovery stays attached to the funder after share transfers
-                  or burns. Already-claimed premium does not excuse a current
-                  LP from funding its contribution.</dd>
-              </div>
-            </dl>
         </div>
       </section>
     </main>

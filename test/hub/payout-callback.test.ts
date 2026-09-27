@@ -3,7 +3,6 @@ import { network } from "hardhat"
 
 import { goLive, publishExpiryPrice, setExercisePrice, type LiveVault } from "../helpers/scenarios.js"
 import { ExerciseStyle, Phase, SettlementType, deployIvy, fixture, fund, usdc, weth, PayoutReceiverMode, type IvyContext } from "../helpers/setup.js"
-import { proposeUnwind } from "../helpers/unwind.js"
 
 const connection = await network.create()
 const { ethers, networkHelpers } = connection
@@ -175,24 +174,6 @@ describe("payout callback", () => {
 				)
 			})
 		})
-
-		context("after an unwind with a refund to the market maker", () => {
-			beforeEach(async () => {
-				const deadline = BigInt(await networkHelpers.time.latest()) + 86_400n
-				const { agreement, signature } = await proposeUnwind(c, v.vaultId, deadline, usdc(100))
-				await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce)
-				await fund(c, c.usdc, c.alice, v.vaultAddress, usdc(100))
-				await c.hub.connect(c.alice).fundUnwind(v.vaultId, agreement.nonce, usdc(100))
-				await c.hub.executeUnwind(v.vaultId, agreement.nonce, signature)
-			})
-
-			it("notifies the refund claim in the premium token", async () => {
-				const tx = c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
-				await expect(tx).to.emit(c.hub, "PayoutNotified").withArgs(v.vaultId, receiverAddress, c.usdcAddress, usdc(100), true)
-				await expect(tx).to.changeTokenBalances(ethers, c.usdc, [receiverAddress], [usdc(100)])
-				expect(await receiver.calls()).to.equal(1n)
-			})
-		})
 	})
 
 	context("cash American call paying a receiver contract", () => {
@@ -226,7 +207,7 @@ describe("payout callback", () => {
 
 			it("pays the claimed payout to the recipient", async () => {
 				const tx = c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
-				await expect(tx).to.emit(c.hub, "PayoutClaimed").withArgs(v.vaultId, c.marketMaker.address, CASH_PAYOUT, 0n)
+				await expect(tx).to.emit(c.hub, "PayoutClaimed").withArgs(v.vaultId, c.marketMaker.address, CASH_PAYOUT)
 				await expect(tx).to.changeTokenBalances(ethers, c.weth, [receiverAddress], [CASH_PAYOUT])
 				expect((await c.hub.stateOf(v.vaultId)).pendingPayout).to.equal(0n)
 			})

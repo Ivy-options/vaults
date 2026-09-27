@@ -593,9 +593,9 @@ describe("release registry", () => {
 				).to.be.rejectedWith("lost library hash")
 				delete journal.steps!.IvyVaultRules.hash
 				expect((await resumeDeployment(signer, hubPlan, journal)).complete).to.equal(true)
-				// One registry creation plus the nine planned hub steps.
+				// One registry creation plus the eight planned hub steps.
 				const sent = await provider.send("eth_getTransactionCount", [await signer.getAddress(), "latest"])
-				expect(Number(BigInt(sent))).to.equal(10)
+				expect(Number(BigInt(sent))).to.equal(9)
 			})
 		})
 	})

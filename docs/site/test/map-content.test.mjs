@@ -134,7 +134,7 @@ test("the default Guide remains readable and scrollable without JavaScript", asy
     await page.goto(server.url + 'index.html');
     const frame = page.frameLocator('.shell-noscript iframe');
     assert.ok(await frame.locator('#overview').isVisible());
-    await frame.locator('#early-exit').scrollIntoViewIfNeeded();
+    await frame.locator('#versions').scrollIntoViewIfNeeded();
     assert.ok(await frame.locator('body').evaluate(() => scrollY > 500));
     assert.equal(await frame.locator('#modeToggle').count(), 0);
   } finally { await browser.close(); await server.close(); }
@@ -241,7 +241,6 @@ test('map references land on their exact headings after zoom and repeated visits
     ['set-the-terms', 'terms', 1.7],
     ['sign-a-bid', 'makers', 2],
     ['missing-report', 'cash-missing-reports', 2.5],
-    ['agreed-unwind', 'early-exit', 1.8],
     ['set-the-terms', 'terms', 2],
     ['set-the-terms', 'terms', 2],
   ]) {
@@ -265,7 +264,7 @@ test('map references land on their exact headings after zoom and repeated visits
 
 test('every Map explanation opens a section of the main Guide', () => withMap(async page => {
   const links = await page.locator('#document a[data-guide]').evaluateAll(links => links.map(link => ({path: new URL(link.href).pathname, hash: new URL(link.href).hash})));
-  assert.equal(links.length, 4);
+  assert.equal(links.length, 3);
   for (const link of links) {
     assert.equal(link.path, '/index.html');
     assert.ok(link.hash, 'each reference identifies a Guide section');

@@ -192,7 +192,7 @@ The current recommendation may point to a newer Hub. That has no effect on the e
 
 ## Show a vault's bid rules
 
-A vault stores a list of bid rules chosen by its creator and frozen at creation. Each rule is a validator address, a `bytes4` kind and opaque data. Read them with `rulesOf(vaultId)`. Release v5 accepts a validator only while it has the Hub's `keccak256("BID_VALIDATOR_ROLE")`; the initial deployment grants that role to the shipped `IvyBidRules` contract. Governance must review any additional validator before granting the role.
+A vault stores a list of bid rules chosen by its creator and frozen at creation. Each rule is a validator address, a `bytes4` kind and opaque data. Read them with `rulesOf(vaultId)`. Since `ivy-vaults-v5`, a Hub accepts a validator only while it has the Hub's `keccak256("BID_VALIDATOR_ROLE")`; the initial deployment grants that role to the shipped `IvyBidRules` contract. Governance must review any additional validator before granting the role.
 
 - Label each rule by `(validator, kind)`. The release manifest's `addresses.IvyBidRules` is the shipped validator; its kinds are `PairLimits`, `SpotBand` and `PremiumFloor`, with ids `bytes4(keccak256(name))`. Its SpotBand and quote-denominated PremiumFloor rules accept only the release's `IvyPriceFeed`.
 - Decode shipped data with these ABI types: PairLimits `tuple(address quoteToken,uint256 strikeLimit,uint256 minPremiumPerUnit)[]`; SpotBand `tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps)`; PremiumFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)`.
@@ -230,11 +230,8 @@ Every wallet transaction must display and target the concrete contract that will
 Typed signatures also bind to the concrete immutable deployment:
 
 - Bid domain: `name = IvyVaultsHub`, `version = 3` for this release (`2` for `ivy-vaults-v3` Hubs), connected `chainId`, `verifyingContract = hubAddress`.
-- Unwind domain: `name = IvyUnwind`, `version = 1`, connected `chainId`, `verifyingContract =` that Hub release's unwind-module address.
 
-A registry release ID is not an EIP-712 version. Never rebuild an existing bid or unwind signature against the current recommendation.
-
-An unwind proposal deadline cannot be later than the option expiry, and execution is rejected at or after expiry. Offer a deadline strictly before expiry so the transaction has room to land.
+A registry release ID is not an EIP-712 version. Never rebuild an existing bid signature against the current recommendation.
 
 ## Auction exits and final claims
 
@@ -260,7 +257,7 @@ The same fallback applies to American and European cash options. It requires no 
 
 Track `PhysicalFallbackExercised` and `PhysicalFallbackExpired` alongside normal exercise/settlement events. The expiration event reports lapsed notional; it must not be displayed as an exercised amount. Cash reserves already earned remain excluded from LP claims. Read `settlementStatus` for the route and deadlines before offering `exercisePhysicalFallback`.
 
-This build uses interface format `ivy-vaults-v5` and deployment manifest 8. Relative to `ivy-vaults-v4`, it adds `claimTo`, permissionless timed-out auction exits, expiry-bounded unwinds, per-vault-only share supply, validator allowlisting, a release-bound `IvyPriceFeed`, and stricter mandatory bid checks. The Hub constructor now receives the shipped `IvyBidRules` address. The signed Bid and EIP-712 domain version remain `3`. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fix is provided.
+This build uses interface format `ivy-vaults-v6` and deployment manifest 9. Relative to `ivy-vaults-v5`, it removes the consensual unwind (the `IvyUnwind` contract, the Hub's unwind proposal, approval, funding, execution and preview functions, the `unwind()` getters and the `Unwound` event), the Hub and `IvyShares` constructors drop the unwind address, and `PayoutClaimed` reports a single collateral amount. `ivy-vaults-v5` added, relative to `ivy-vaults-v4`, `claimTo`, permissionless timed-out auction exits, expiry-bounded unwinds, per-vault-only share supply, validator allowlisting, a release-bound `IvyPriceFeed`, stricter mandatory bid checks and the shipped `IvyBidRules` address in the Hub constructor. The signed Bid and EIP-712 domain version remain `3`. Preserve prior interfaces and adapters for old positions. No in-place upgrade, migration or retroactive fix is provided.
 
 ## Recommendation changes
 

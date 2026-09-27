@@ -18,7 +18,6 @@ import {
 	type CreatedVault,
 	type IvyContext,
 } from "../helpers/setup.js"
-import { proposeUnwind } from "../helpers/unwind.js"
 
 const connection = await network.create()
 const { ethers, networkHelpers } = connection
@@ -77,18 +76,6 @@ const putPayingCarol = fixture(deployed, async c => {
 	await c.hub.setPlatformTreasury(c.carol.address)
 	return { c, v: await goLive(c, { isCall: false }) }
 })
-const unwoundPutWithRefund = fixture(deployed, async c => {
-	await c.hub.setPlatformFeeBps(200)
-	const v = await goLive(c, { isCall: false })
-	const deadline = BigInt(await networkHelpers.time.latest()) + 86_400n
-	const { agreement, signature } = await proposeUnwind(c, v.vaultId, deadline, usdc(100))
-	await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce)
-	await fund(c, c.usdc, c.alice, v.vaultAddress, agreement.refund)
-	await c.hub.connect(c.alice).fundUnwind(v.vaultId, agreement.nonce, agreement.refund)
-	await c.hub.connect(c.carol).executeUnwind(v.vaultId, agreement.nonce, signature)
-	return { c, v }
-})
-
 describe("platform fee", () => {
 	describe("setPlatformFeeBps", () => {
 		let c: IvyContext
@@ -399,34 +386,6 @@ describe("platform fee", () => {
 								expect(await v.vault.reserved(c.usdcAddress)).to.equal(0n)
 							})
 						})
-					})
-				})
-			})
-
-			context("put vault charged 200 bps and unwound with a funded refund", () => {
-				beforeEach(async () => {
-					;({ c, v } = await unwoundPutWithRefund())
-				})
-
-				it("reserves the fee alongside the net premium and the refund", async () => {
-					// 980 net premium + 20 fee + 100 refund.
-					expect(await v.vault.reserved(c.usdcAddress)).to.equal(usdc(1100))
-				})
-
-				context("after the LP, premium and payout claims", () => {
-					beforeEach(async () => {
-						await c.hub.connect(c.alice).claim(v.vaultId, usdc(30_000))
-						await c.hub.connect(c.alice).claimPremium(v.vaultId)
-						await c.hub.connect(c.marketMaker).claimPayout(v.vaultId)
-					})
-
-					it("leaves exactly the fee in the vault", async () => {
-						expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(usdc(20))
-					})
-
-					it("empties the vault once the fee is claimed", async () => {
-						await v.vault.claimPlatformFee()
-						expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(0n)
 					})
 				})
 			})

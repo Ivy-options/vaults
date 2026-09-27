@@ -2,7 +2,6 @@
 pragma solidity ^0.8.34;
 
 import { IvyPremiums } from "./IvyPremiums.sol";
-import { IvyUnwind } from "./IvyUnwind.sol";
 import { IIvyShares } from "./interfaces/IIvyShares.sol";
 import { IIvyVault } from "./interfaces/IIvyVault.sol";
 import { IIvyVaultsHub } from "./interfaces/IIvyVaultsHub.sol";
@@ -22,7 +21,7 @@ import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/Sig
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice Creates option vaults and manages their lifecycle.
-/// @dev Vaults hold tokens; Shares tracks LP balances; Premiums and Unwind track their respective claims.
+/// @dev Vaults hold tokens; Shares tracks LP balances; Premiums tracks premium claims.
 ///      Linked libraries run in Hub storage through guarded entrypoints.
 contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl, EIP712, ReentrancyGuardTransient, IIvyVaultsHub {
 	struct PlatformFee {
@@ -40,7 +39,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 
 	address public immutable vaultImplementation;
 	IvyPremiums public immutable premiums;
-	IvyUnwind public immutable unwind;
 	IIvyShares public immutable shareToken;
 
 	bool public cashSettlementEnabled;
@@ -87,20 +85,12 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		address implementation,
 		address shares_,
 		address premiums_,
-		address unwind_,
 		address bidRules_,
 		uint64 exerciseWindow_,
 		uint64 auctionTimeout_,
 		uint64 expiryPricePublicationWindow_
 	) EIP712("IvyVaultsHub", "3") {
-		if (
-			admin == address(0) ||
-			implementation == address(0) ||
-			shares_ == address(0) ||
-			premiums_ == address(0) ||
-			unwind_ == address(0) ||
-			bidRules_ == address(0)
-		) {
+		if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || bidRules_ == address(0)) {
 			revert ZeroAddress();
 		}
 		if (implementation.code.length == 0 || bidRules_.code.length == 0) revert BindingMismatch();
@@ -108,7 +98,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		vaultImplementation = implementation;
 		shareToken = IIvyShares(shares_);
 		premiums = IvyPremiums(premiums_);
-		unwind = IvyUnwind(unwind_);
 		exerciseWindow = exerciseWindow_;
 		auctionTimeout = auctionTimeout_;
 		expiryPricePublicationWindow = expiryPricePublicationWindow_;
@@ -182,11 +171,8 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		if (
 			shareToken.hub() != address(this) ||
 			premiums.hub() != address(this) ||
-			unwind.hub() != address(this) ||
 			shareToken.premiums() != address(premiums) ||
-			shareToken.unwind() != address(unwind) ||
-			premiums.shares() != address(shareToken) ||
-			unwind.shares() != address(shareToken)
+			premiums.shares() != address(shareToken)
 		) {
 			revert BindingMismatch();
 		}
@@ -410,7 +396,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		IvyOptionSettlement.settleAtExpiry(_state[vaultId], _terms[vaultId], _settlementPrices[vaultId], vaultId);
 	}
 
-	/// @notice Send a reserved cash payout or unwind refund to the buyer's chosen recipient.
+	/// @notice Send a reserved cash payout to the buyer's chosen recipient.
 	/// @dev Only the buyer or executor may call. Contract recipients receive a best-effort `IIvyPayoutReceiver` callback.
 	function claimPayout(uint256 vaultId) external nonReentrant {
 		_requirePhase(vaultId, Phase.Settled);
@@ -432,65 +418,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		emit ExecutorAndRecipientUpdated(vaultId, executor, recipient);
 	}
 
-	function proposeUnwind(uint256 vaultId, uint64 deadline, uint256 refund, bytes calldata buyerSignature) external nonReentrant {
-		_requirePhase(vaultId, Phase.Live);
-		VaultState storage state = _state[vaultId];
-		if (msg.sender != state.owner && msg.sender != state.marketMaker) revert NotVaultOwner();
-		unwind.propose(
-			vaultId,
-			deadline,
-			state.expiry,
-			state.exercisedNotional,
-			shareToken.totalSupply(vaultId),
-			refund,
-			state.marketMaker,
-			buyerSignature
-		);
-	}
-
-	function approveUnwind(uint256 vaultId, uint256 nonce) external nonReentrant {
-		_requirePhase(vaultId, Phase.Live);
-		unwind.approve(vaultId, nonce, msg.sender, shareToken.balanceOf(msg.sender, vaultId));
-	}
-
-	function revokeUnwind(uint256 vaultId) external nonReentrant {
-		unwind.revoke(vaultId, msg.sender);
-	}
-
-	/// @notice Fund this vault's unwind refund reserve with premium tokens.
-	function fundUnwind(uint256 vaultId, uint256 nonce, uint256 amount) external nonReentrant {
-		_requirePhase(vaultId, Phase.Live);
-		VaultState storage state = _state[vaultId];
-		if (shareToken.balanceOf(msg.sender, vaultId) == 0) revert AgreementInvalid();
-		uint256 revision = unwind.revisions(vaultId, msg.sender);
-		uint256 received = IIvyVault(state.vault).fundUnwind(msg.sender, amount);
-		// A token callback that transfers shares, even away and back, invalidates this funding attempt.
-		unwind.fund(vaultId, nonce, msg.sender, received, state.exercisedNotional, revision);
-	}
-
-	function withdrawUnwindContribution(uint256 vaultId, uint256 nonce) external nonReentrant {
-		_requireExists(vaultId);
-		uint256 amount = unwind.withdraw(vaultId, nonce, msg.sender);
-		IIvyVault(_state[vaultId].vault).returnUnwind(msg.sender, amount);
-	}
-
-	function executeUnwind(uint256 vaultId, uint256 nonce, bytes calldata buyerSignature) external nonReentrant {
-		_requirePhase(vaultId, Phase.Live);
-		VaultState storage state = _state[vaultId];
-		uint256 refund = unwind.consume(
-			vaultId,
-			nonce,
-			state.expiry,
-			state.exercisedNotional,
-			shareToken.totalSupply(vaultId),
-			state.marketMaker,
-			buyerSignature
-		);
-		IIvyVault(state.vault).consumeUnwind(refund);
-		_finalize(vaultId, state);
-		emit Unwound(vaultId, nonce, refund);
-	}
-
 	/// @notice Burn shares for proportional unreserved collateral and settlement proceeds.
 	/// @dev Unpaid premium, premium dust, and buyer obligations remain reserved.
 	function claim(uint256 vaultId, uint256 shares) external nonReentrant {
@@ -501,17 +428,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @dev Bit 0 selects collateral, bit 1 premium, and bit 2 quote (calls) or underlying (puts).
 	function claimTo(uint256 vaultId, uint256 shares, address recipient, uint8 tokenMask) external nonReentrant {
 		_claim(vaultId, shares, recipient, tokenMask);
-	}
-
-	/// @notice Preview the next buyer agreement. A new proposal or exercise invalidates its signature.
-	function previewUnwind(
-		uint256 vaultId,
-		uint64 deadline,
-		uint256 refund
-	) external view returns (UnwindAgreement memory agreement, bytes32 digest) {
-		_requirePhase(vaultId, Phase.Live);
-		VaultState storage state = _state[vaultId];
-		return unwind.preview(vaultId, deadline, state.expiry, state.exercisedNotional, shareToken.totalSupply(vaultId), refund);
 	}
 
 	function exercisePrice(uint256 vaultId) external view returns (uint256 price, uint256 observedAt, uint256 validUntil) {
@@ -603,11 +519,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		if (received == 0) revert ZeroAmount();
 		shareToken.mint(depositor, vaultId, received);
 		emit Deposited(vaultId, depositor, received);
-	}
-
-	function _finalize(uint256 vaultId, VaultState storage state) internal {
-		state.phase = Phase.Settled;
-		emit Settled(vaultId, state.exercisedNotional, state.totalNotional, state.pendingPayout);
 	}
 
 	function _claim(uint256 vaultId, uint256 shares, address recipient, uint8 tokenMask) internal {

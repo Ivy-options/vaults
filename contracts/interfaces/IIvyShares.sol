@@ -12,8 +12,6 @@ interface IIvyShares {
 
 	function premiums() external view returns (address);
 
-	function unwind() external view returns (address);
-
 	function hub() external view returns (address);
 
 	function balanceOf(address account, uint256 id) external view returns (uint256);

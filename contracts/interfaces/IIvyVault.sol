@@ -14,12 +14,6 @@ interface IIvyVault {
 
 	function payPremium(address to, uint256 amount) external;
 
-	function fundUnwind(address from, uint256 amount) external returns (uint256);
-
-	function returnUnwind(address to, uint256 amount) external;
-
-	function consumeUnwind(uint256 amount) external;
-
 	function reserveBuyer(address token, uint256 amount) external;
 
 	function payBuyer(address token, address to) external returns (uint256);

@@ -137,10 +137,6 @@ h2 {
   padding: 24px 0;
 }
 
-.consent-example {
-  grid-template-columns: 1fr 1fr;
-}
-
 .fee-laboratory {
   grid-template-columns: 210px minmax(0, 1fr);
   gap: 32px;
@@ -188,7 +184,6 @@ h2 {
     font-size: 10px;
   }
 
-  .consent-example,
   .fee-laboratory {
     grid-template-columns: 1fr;
   }
@@ -1374,9 +1369,6 @@ h2 {
 .route-strip p {
   text-align: start;
 }
-#consent-status {
-  margin-top: 12px;
-}
 .fee-laboratory {
   border-bottom: 0;
 }
@@ -1543,22 +1535,6 @@ h2 {
   }
 }
 
-.protocol-guide .procedure-steps {
-  max-width: none;
-  padding-inline-start: 24px;
-  margin: 0 0 28px;
-  font-size: var(--text-body);
-  line-height: 1.7;
-}
-.protocol-guide .procedure-steps li {
-  padding-inline-start: 6px;
-  margin-bottom: 12px;
-}
-.protocol-guide .procedure-steps li::marker {
-  color: var(--accent);
-  font-family: var(--mono);
-}
-
 /* Reading roles: full-width prose, clear headings, compact example captions. */
 .protocol-guide {
   --text-caption: 0.8125rem;
@@ -1635,13 +1611,13 @@ h2 {
 .protocol-guide :is(code, .mono) {
   font-size: max(0.8125rem, 0.875em);
 }
-.protocol-guide :is(.hub-box > span, .box-connector > span, .vault-box-heading > span, .refund-equation span, .range-ends span, .assumption-strip span, .window-heading span, .window-row > span, .window-row > strong, .expiry-marker span, .cash-balance-labels span, .custody-compartments p, .custody-note, footer span),
+.protocol-guide :is(.hub-box > span, .box-connector > span, .vault-box-heading > span, .range-ends span, .assumption-strip span, .window-heading span, .window-row > span, .window-row > strong, .expiry-marker span, .cash-balance-labels span, .custody-compartments p, .custody-note, footer span),
 .protocol-guide .fee-labels span,
 .protocol-guide #cash-calculation {
   font-size: var(--text-caption);
   line-height: 1.6;
 }
-.protocol-guide :is(.content input, .content select, output, .num, .derived, .consent-meter, .fee-labels, .refund-equation, .cash-allocation-labels) {
+.protocol-guide :is(.content input, .content select, output, .num, .derived, .fee-labels, .cash-allocation-labels) {
   font-variant-numeric: tabular-nums;
 }
 .protocol-guide .content a {

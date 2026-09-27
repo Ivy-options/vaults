@@ -39,7 +39,6 @@ import {
 	type IvyContext,
 	type Loaded,
 } from "../helpers/setup.js"
-import { signUnwindProposal } from "../helpers/unwind.js"
 
 const connection = await network.create()
 const { ethers, networkHelpers } = connection
@@ -178,33 +177,6 @@ const liveContractBuyer = fixture(contractBuyer, async s => {
 	await submit(s.c, s.v.vaultId, s.bid)
 	return s
 })
-const signedUnwind = fixture(liveContractBuyer, async s => {
-	const { c, v, wallet } = s
-	await wallet
-		.connect(c.marketMaker)
-		.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecutorAndRecipient", [v.vaultId, ZeroAddress, c.carol.address]))
-	const deadline = BigInt(await c.networkHelpers.time.latest()) + 1000n
-	const { agreement, signature } = await signUnwindProposal(c, v.vaultId, deadline, usdc(100))
-	return { ...s, deadline, agreement, signature }
-})
-const fundedUnwind = fixture(signedUnwind, async s => {
-	const { c, v, deadline, agreement, signature } = s
-	await c.hub.connect(c.alice).proposeUnwind(v.vaultId, deadline, agreement.refund, signature)
-	await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce)
-	await fund(c, c.usdc, c.alice, v.vaultAddress, agreement.refund)
-	await c.hub.connect(c.alice).fundUnwind(v.vaultId, agreement.nonce, agreement.refund)
-	return s
-})
-const refundedUnwindExecuted = fixture(fundedUnwind, async s => {
-	const { c, v, agreement, signature } = s
-	await c.hub.connect(c.alice).withdrawUnwindContribution(v.vaultId, agreement.nonce)
-	await c.usdc.connect(c.alice).approve(v.vaultAddress, agreement.refund)
-	await c.hub.connect(c.alice).fundUnwind(v.vaultId, agreement.nonce, agreement.refund)
-	await c.hub.connect(c.alice).approveUnwind(v.vaultId, agreement.nonce)
-	await c.hub.connect(c.carol).executeUnwind(v.vaultId, agreement.nonce, signature)
-	return s
-})
-
 describe("activate", () => {
 	let c: IvyContext
 	let v: OpenedVault
@@ -807,8 +779,6 @@ describe("activate", () => {
 
 	context("with an ERC-1271 contract market maker", () => {
 		let wallet: Loaded<typeof contractBuyer>["wallet"]
-		let agreement: Loaded<typeof signedUnwind>["agreement"]
-		let signature: string
 
 		context("during the auction", () => {
 			let bid: Bid
@@ -833,64 +803,6 @@ describe("activate", () => {
 					.connect(c.marketMaker)
 					.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecutorAndRecipient", [v.vaultId, ZeroAddress, c.carol.address]))
 				expect((await c.hub.stateOf(v.vaultId)).executor).to.equal(ZeroAddress)
-			})
-		})
-
-		context("with an unwind proposal the wallet's owner signed", () => {
-			let deadline: bigint
-
-			beforeEach(async () => {
-				;({ c, v, wallet, deadline, agreement, signature } = await signedUnwind())
-			})
-
-			it("rejects the proposal while the wallet refuses signatures", async () => {
-				await wallet.connect(c.marketMaker).setSignaturesEnabled(false)
-				await expect(c.hub.connect(c.alice).proposeUnwind(v.vaultId, deadline, agreement.refund, signature)).to.be.revertedWithCustomError(
-					c.unwind,
-					"BadSignature",
-				)
-			})
-		})
-
-		context("with an approved, funded unwind while the wallet refuses signatures", () => {
-			beforeEach(async () => {
-				;({ c, v, wallet, agreement, signature } = await fundedUnwind())
-				await wallet.connect(c.marketMaker).setSignaturesEnabled(false)
-			})
-
-			it("rejects execution", async () => {
-				await expect(c.hub.connect(c.carol).executeUnwind(v.vaultId, agreement.nonce, signature)).to.be.revertedWithCustomError(
-					c.unwind,
-					"BadSignature",
-				)
-			})
-
-			it("still returns the sponsor's contribution on withdrawal", async () => {
-				await expect(c.hub.connect(c.alice).withdrawUnwindContribution(v.vaultId, agreement.nonce)).to.changeTokenBalance(
-					ethers,
-					c.usdc,
-					c.alice,
-					agreement.refund,
-				)
-			})
-		})
-
-		context("once the unwind executes after the sponsor withdraws and re-funds", () => {
-			beforeEach(async () => {
-				;({ c, v, wallet, agreement } = await refundedUnwindExecuted())
-			})
-
-			it("pays the refund to the recipient when the contract buyer claims", async () => {
-				await wallet.connect(c.marketMaker).execute(c.hubAddress, c.hub.interface.encodeFunctionData("claimPayout", [v.vaultId]))
-				expect(await c.usdc.balanceOf(c.carol.address)).to.equal(agreement.refund)
-			})
-
-			it("leaves the vault empty once the LP also claims", async () => {
-				await wallet.connect(c.marketMaker).execute(c.hubAddress, c.hub.interface.encodeFunctionData("claimPayout", [v.vaultId]))
-				await c.hub.connect(c.alice).claim(v.vaultId, weth(10))
-				await c.hub.connect(c.alice).claimPremium(v.vaultId)
-				expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(0n)
-				expect(await c.weth.balanceOf(v.vaultAddress)).to.equal(0n)
 			})
 		})
 	})

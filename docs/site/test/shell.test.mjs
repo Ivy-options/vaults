@@ -268,11 +268,11 @@ test("old Map and direct Guide URLs redirect into the single index", async () =>
 
 test("retired runbook bookmarks open the matching Guide section without nesting a shell", async () => {
   const server = await startServer();
-  const { page, errors, close } = await openPage(server.url + 'operations.html#prepare-and-execute-a-unanimous-unwind');
+  const { page, errors, close } = await openPage(server.url + 'operations.html#premium-treatment-and-emergency-boundaries');
   try {
     await page.waitForFunction(() => window.IvyShell?.state().guideLoaded);
     assert.equal(new URL(page.url()).pathname, '/index.html');
-    assert.equal(new URL(page.url()).hash, '#early-exit');
+    assert.equal(new URL(page.url()).hash, '#premium-treatment');
     await page.goto(server.url + 'index.html?doc=operations.html#publisher-rotation-and-incidents');
     await page.waitForFunction(() => window.IvyShell?.state().guideLoaded && location.hash === '#cash-missing-reports' && !location.search);
     const frame = page.frames().find(f => f.parentFrame());

@@ -62,8 +62,8 @@ npm run format:check
 
 Tests live in `test/`, grouped by what they cover:
 
-- `test/hub/`: the Hub, one file per entrypoint or feature (`create-vault`, `activate`, `exercise`, `settle-at-expiry`, `claim`, `unwind`, `physical-fallback`, …).
-- `test/contracts/`: contracts and libraries on their own (`IvyVault`, `IvyShares`, `IvyPremiums`, `IvyUnwind`, `IvyBidRules`, `IvyPriceFeed`, `IvyMath`, `BidHash`, `ExampleSettlementPublisher`).
+- `test/hub/`: the Hub, one file per entrypoint or feature (`create-vault`, `activate`, `exercise`, `settle-at-expiry`, `claim`, `physical-fallback`, …).
+- `test/contracts/`: contracts and libraries on their own (`IvyVault`, `IvyShares`, `IvyPremiums`, `IvyBidRules`, `IvyPriceFeed`, `IvyMath`, `BidHash`, `ExampleSettlementPublisher`).
 - `test/deployment/`: deployment plans, linked libraries and the release registry.
 - `test/properties/`: reentrancy, cross-module callbacks and stateful conservation.
 - `test/helpers/`: deployment, fixtures, scenarios and signing.

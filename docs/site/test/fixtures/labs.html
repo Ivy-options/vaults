@@ -208,69 +208,6 @@
           </div>
         </div>
 
-        <div
-          class="consent-example interactive-example"
-          aria-label="Illustrative unwind consent and refund"
-          data-lab="consent"
-        >
-          <div>
-            <span class="inscription"
-              >CONSENT EXAMPLE · 60 / 40 OWNERSHIP</span
-            >
-            <div class="consent-controls">
-              <label
-                ><input
-                  id="consent-buyer"
-                  type="checkbox"
-                  checked
-                  disabled
-                />Buyer signature</label
-              ><label
-                ><input id="consent-a" type="checkbox" checked disabled />LP
-                A · 60%</label
-              ><label
-                ><input id="consent-b" type="checkbox" checked disabled />LP
-                B · 40%</label
-              >
-            </div>
-            <div
-              class="ownership-bar"
-              role="img"
-              aria-label="All current shares approve"
-            >
-              <span class="ownership-a">60%</span
-              ><span class="ownership-b">40%</span>
-            </div>
-            <p class="example-status" id="consent-status" role="status">
-              Buyer signed · 100% of current shares approve
-            </p>
-          </div>
-          <div>
-            <label class="field-label" for="unwind-refund"
-              >Agreed refund example</label
-            ><select id="unwind-refund" disabled>
-              <option value="100">100 USDC</option>
-              <option value="0">Zero refund</option>
-            </select>
-            <div class="refund-equation">
-              <span>LP A<strong id="refund-a">60 USDC</strong></span
-              ><span aria-hidden="true">+</span
-              ><span>LP B<strong id="refund-b">40 USDC</strong></span
-              ><span aria-hidden="true">→</span
-              ><span
-                >Buyer reserve<strong id="refund-total"
-                  >100 USDC</strong
-                ></span
-              >
-            </div>
-            <p id="refund-note">
-              A 100 USDC refund is <code>100000000</code> raw units when USDC
-              has six decimal places. The LPs fund it before execution;
-              the caller who executes the agreement does not supply it.
-            </p>
-          </div>
-        </div>
-
         <div class="release-atlas interactive-example" data-lab="releases">
           <div class="registry-node">
             <span class="inscription">PERMANENT DISCOVERY ADDRESS</span>
@@ -332,7 +269,6 @@
             <select aria-label="Settlement illustration">
               <option value="physical">Physical exercise / expiry</option>
               <option value="cash">Cash expiry</option>
-              <option value="unwind">Unwind with a refund</option>
             </select>
           </label>
           <div class="custody-compartments">

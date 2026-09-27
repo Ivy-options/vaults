@@ -2,7 +2,6 @@
 pragma solidity ^0.8.34;
 
 import { IvyPremiums } from "./IvyPremiums.sol";
-import { IvyUnwind } from "./IvyUnwind.sol";
 import { IIvyShares } from "./interfaces/IIvyShares.sol";
 import { NotHub, ZeroAddress } from "./types/IvyTypes.sol";
 import { ERC1155 } from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
@@ -17,7 +16,6 @@ interface IShareTransferPolicy {
 contract IvyShares is ERC1155, IIvyShares {
 	address public immutable override hub;
 	address public immutable override premiums;
-	address public immutable override unwind;
 	mapping(uint256 id => uint256) private _totalSupply;
 
 	error TransfersDisabled();
@@ -27,11 +25,10 @@ contract IvyShares is ERC1155, IIvyShares {
 		_;
 	}
 
-	constructor(address hub_, address premiums_, address unwind_, string memory uri_) ERC1155(uri_) {
-		if (hub_ == address(0) || premiums_ == address(0) || unwind_ == address(0)) revert ZeroAddress();
+	constructor(address hub_, address premiums_, string memory uri_) ERC1155(uri_) {
+		if (hub_ == address(0) || premiums_ == address(0)) revert ZeroAddress();
 		hub = hub_;
 		premiums = premiums_;
-		unwind = unwind_;
 	}
 
 	function mint(address to, uint256 id, uint256 amount) external onlyHub {
@@ -75,8 +72,6 @@ contract IvyShares is ERC1155, IIvyShares {
 				uint256 fromBalance = from == address(0) ? 0 : balanceOf(from, ids[i]);
 				if (from != address(0) && amount > fromBalance) revert ERC1155InsufficientBalance(from, fromBalance, amount, ids[i]);
 				IvyPremiums(premiums).beforeShareUpdate(ids[i], from, to, amount, fromBalance, to == address(0) ? 0 : balanceOf(to, ids[i]));
-				if (from != address(0)) IvyUnwind(unwind).beforeShareUpdate(ids[i], from);
-				if (to != address(0)) IvyUnwind(unwind).beforeShareUpdate(ids[i], to);
 			}
 		}
 		super._update(from, to, ids, values);

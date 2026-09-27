@@ -9,7 +9,7 @@ test("every lab computes the documented worked examples inside its own scope", a
   try {
     await page.evaluate(() => IvyLabs.mountAll(document));
     // Checkbox/radio rows sit inline (label wraps the input and its text), not stacked.
-    for (const selector of [".consent-controls label", ".registry-node label"]) {
+    for (const selector of [".registry-node label"]) {
       const style = await page.evaluate((s) => {
         const cs = getComputedStyle(document.querySelector(s));
         return { display: cs.display, columnGap: cs.columnGap };
@@ -43,9 +43,6 @@ test("every lab computes the documented worked examples inside its own scope", a
     // Cash accounting default 3,300 on a 10 WETH call at 3,000.
     assert.equal(await page.textContent("#cash-buyer-value"), "0.9091 WETH");
     assert.equal(await page.textContent("#cash-pool-percent"), "90.91% of collateral");
-    // Consent: unticking LP B leaves 60% approving.
-    await page.uncheck("#consent-b");
-    assert.match(await page.textContent("#consent-status"), /60% of current shares approve · consent incomplete/);
     // Releases: choose B.
     await page.check('input[name="recommended-release"][value="B"]');
     assert.equal(await page.textContent("#release-status"), "Recommended for new creation: Hub B. Existing position stays on Hub A.");
@@ -82,7 +79,7 @@ test("every lab fits a 276px-wide map card without horizontal overflow", async (
     });
     for (const [lab, scrollWidth, clientWidth] of overflow)
       assert.ok(scrollWidth <= clientWidth + 1, `${lab}: scrollWidth ${scrollWidth} > clientWidth ${clientWidth}`);
-    assert.equal(overflow.length, 7, "all seven labs were measured");
+    assert.equal(overflow.length, 6, "all six labs were measured");
     assert.deepEqual(errors, []);
   } finally {
     await close();
@@ -104,7 +101,7 @@ test("the guide's examples respond to input and the payoff chart follows a theme
     }, [selector, value, event]);
     const text = (selector) => guide.textContent(selector);
 
-    for (const id of ["fee-rate", "cash-kind-demo", "cash-price-demo", "consent-a", "unwind-refund"]) {
+    for (const id of ["fee-rate", "cash-kind-demo", "cash-price-demo"]) {
       assert.equal(await guide.locator(`#${id}`).isDisabled(), false, `${id} is enabled`);
     }
     await set("#fee-rate", "500");
@@ -114,8 +111,6 @@ test("the guide's examples respond to input and the payoff chart follows a theme
 
     await set("#cash-price-demo", "3300");
     assert.equal(await text("#cash-buyer-value"), "0.9091 WETH");
-    await set("#consent-b", false, "change");
-    assert.match(await text("#consent-status"), /60% of current shares approve · consent incomplete/);
     await set('input[name="recommended-release"][value="B"]', true, "change");
     assert.match(await text("#release-status"), /Hub B/);
 

@@ -303,20 +303,6 @@ h4 {
   border-color: var(--line);
   background: transparent;
 }
-.consent-example {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  padding-block: 30px;
-  border-block: 1px solid var(--line-strong);
-}
-.consent-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  margin: 22px 0;
-}
-.consent-controls label,
 .registry-node label {
   font-size: 12px;
   display: flex;
@@ -343,65 +329,12 @@ h4 {
   accent-color: var(--bronze);
   width: 100%;
 }
-.ownership-bar {
-  display: flex;
-  height: 38px;
-  border: 1px solid var(--line-strong);
-}
-.ownership-bar span {
-  display: grid;
-  place-items: center;
-  color: var(--ink);
-  font: 12px var(--mono);
-}
-.ownership-a {
-  width: 60%;
-  background: color-mix(in srgb, var(--guide-green) 25%, transparent);
-}
-.ownership-b {
-  width: 40%;
-  background: color-mix(in srgb, var(--guide-purple) 25%, transparent);
-}
-.ownership-bar span.is-missing {
-  background: transparent;
-  color: var(--faint);
-  text-decoration: line-through;
-}
 .example-status {
   font-size: 12px;
   line-height: 1.6;
   text-align: start;
   color: var(--muted);
   min-height: 2.5em;
-}
-.field-label {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 9px;
-}
-.refund-equation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-top: 22px;
-}
-.refund-equation span {
-  font-size: 11px;
-  color: var(--muted);
-}
-.refund-equation strong {
-  display: block;
-  font: 20px var(--atlas-serif);
-  color: var(--ink);
-  margin-top: 8px;
-}
-#refund-note {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 20px;
-  text-align: start;
 }
 .fee-laboratory {
   display: grid;
@@ -902,9 +835,6 @@ h4 {
   .map-spine span:last-child {
     grid-column: 2;
   }
-  .consent-example {
-    gap: 25px;
-  }
 }
 @media (max-width: 760px) {
   .hero {
@@ -957,7 +887,6 @@ h4 {
   .route-strip h4 {
     margin: 8px 0;
   }
-  .consent-example,
   .fee-laboratory,
   .cash-accounting,
   .formula-pair,

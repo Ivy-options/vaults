@@ -44,13 +44,12 @@ interface IIvyVaultsHubEvents {
 		uint256 price,
 		uint64 validUntil
 	);
-	event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 collateralAmount, uint256 premiumAmount);
+	event PayoutClaimed(uint256 indexed vaultId, address indexed marketMaker, uint256 amount);
 	event PayoutNotified(uint256 indexed vaultId, address indexed recipient, address token, uint256 amount, bool acknowledged);
 	event PhysicalFallbackExercised(uint256 indexed vaultId, uint256 amount, uint256 paidByMarketMaker, uint256 receivedByMarketMaker);
 	event PhysicalFallbackExpired(uint256 indexed vaultId, uint256 lapsedNotional);
 	event VaultWindowDefaultsUpdated(uint64 exerciseWindow, uint64 auctionTimeout, uint64 expiryPricePublicationWindow);
 	event Settled(uint256 indexed vaultId, uint256 exercisedNotional, uint256 totalNotional, uint256 pendingPayout);
-	event Unwound(uint256 indexed vaultId, uint256 nonce, uint256 refund);
 	event VaultCreated(
 		uint256 indexed vaultId,
 		address indexed vault,

@@ -144,17 +144,7 @@ struct VaultState {
     uint64 expiryPricePublicationWindow; // fixed at creation; physical fallback uses exerciseWindow
 }
 
-struct UnwindAgreement {
-    uint256 vaultId;
-    uint256 nonce;
-    uint64 deadline;
-    uint256 exercisedNotional;
-    uint256 supply;
-    uint256 refund;
-}
-
 error AdmissionPaused();
-error AgreementInvalid();
 error AlreadyInitialized();
 error AuctionNotStartable();
 error AuctionTimeoutNotReached();
@@ -166,7 +156,6 @@ error BindingMismatch();
 error CashSettlementDisabled();
 error CashSettlementNeedsMaxPriceAge();
 error CommitmentMismatch();
-error ConsentMissing();
 error DepositsNotPublic();
 error DeviationTooLarge();
 error DuplicatePair(address quoteToken);

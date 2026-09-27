@@ -86,9 +86,7 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 	const settlement = await new ethers.ContractFactory([], (await artifacts.readArtifact("IvyOptionSettlement")).bytecode, admin).deploy()
 	const libraries = { IvyVaultRules: await rules.getAddress(), IvyOptionSettlement: await settlement.getAddress() }
 	const nonce = await admin.getNonce()
-	const [hubAddress, sharesAddress, premiumsAddress, unwindAddress] = [0, 1, 2, 3].map(i =>
-		getCreateAddress({ from: admin.address, nonce: nonce + i }),
-	)
+	const [hubAddress, sharesAddress, premiumsAddress] = [0, 1, 2].map(i => getCreateAddress({ from: admin.address, nonce: nonce + i }))
 	const hub = await ethers.deployContract(
 		"IvyVaultsHub",
 		[
@@ -96,7 +94,6 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 			vaultImplAddress,
 			sharesAddress,
 			premiumsAddress,
-			unwindAddress,
 			await bidRules.getAddress(),
 			EXERCISE_WINDOW,
 			AUCTION_TIMEOUT,
@@ -104,9 +101,8 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 		],
 		{ libraries },
 	)
-	const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, unwindAddress, "ipfs://ivy/{id}.json"])
+	const shares = await ethers.deployContract("IvyShares", [hubAddress, premiumsAddress, "ipfs://ivy/{id}.json"])
 	const premiums = await ethers.deployContract("IvyPremiums", [hubAddress, sharesAddress])
-	const unwind = await ethers.deployContract("IvyUnwind", [hubAddress, sharesAddress])
 	const defaultExpiry = BigInt(await networkHelpers.time.latest()) + THIRTY_DAYS
 
 	await (await hub.grantRole(await hub.BID_MASTER_ROLE(), bidMaster.address)).wait()
@@ -127,7 +123,6 @@ export async function deployIvy(connection: Connection, { enableCashSettlement =
 		hub,
 		hubAddress,
 		premiums,
-		unwind,
 		defaultExpiry,
 		shares,
 		sharesAddress,

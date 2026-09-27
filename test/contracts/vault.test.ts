@@ -48,11 +48,6 @@ const signerHub = fixture(cloned, async c => {
 	await (await vault.initialize(c.hubSigner.address, 1n, c.tokenAddress, c.hubSigner.address)).wait()
 	return { ...c, vault, vaultAddress: await vault.getAddress() }
 })
-// Collecting a zero premium binds the vault's premium token without moving any.
-const premiumTokenBound = fixture(signerHub, async c => {
-	await (await c.vault.connect(c.hubSigner).collectPremium(c.tokenAddress, c.alice.address, 0n, 0n, c.treasury.address)).wait()
-	return c
-})
 // A 4 WETH premium with a 1 WETH platform fee leaves 3 WETH for the LPs.
 const premiumCollected = fixture(signerHub, async c => {
 	await (await c.token.mint(c.alice.address, weth(4))).wait()
@@ -263,34 +258,6 @@ describe("IvyVault", () => {
 
 			it("moves no tokens for a zero payment", async () => {
 				await expect(c.vault.connect(c.hubSigner).payPremium(c.alice.address, 0n)).not.to.emit(c.token, "Transfer")
-			})
-		})
-	})
-
-	describe("fundUnwind", () => {
-		context("when the premium token burns a 1% fee on transfer", () => {
-			beforeEach(async () => {
-				c = await premiumTokenBound()
-				await approveVault(1000n)
-				await c.token.setFeeBps(100n)
-			})
-
-			it("reverts with ShortReceived for the amount the vault received", async () => {
-				await expect(c.vault.connect(c.hubSigner).fundUnwind(c.alice.address, 1000n))
-					.to.be.revertedWithCustomError(c.vault, "ShortReceived")
-					.withArgs(1000n, 990n)
-			})
-		})
-	})
-
-	describe("returnUnwind", () => {
-		context("with the premium token bound", () => {
-			beforeEach(async () => {
-				c = await premiumTokenBound()
-			})
-
-			it("moves no tokens for a zero amount", async () => {
-				await expect(c.vault.connect(c.hubSigner).returnUnwind(c.alice.address, 0n)).not.to.emit(c.token, "Transfer")
 			})
 		})
 	})

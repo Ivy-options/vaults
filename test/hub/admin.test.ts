@@ -31,7 +31,6 @@ interface HubArgs {
 	vaultImplementation?: string
 	shares?: string
 	premiums?: string
-	unwind?: string
 	bidRules?: string
 	exerciseWindow?: bigint
 	auctionTimeout?: bigint
@@ -39,7 +38,7 @@ interface HubArgs {
 }
 
 /**
- * Deploys another hub on `c`'s shares, premiums and unwind modules, which are already bound to `c.hub`.
+ * Deploys another hub on `c`'s shares and premiums modules, which are already bound to `c.hub`.
  * `o` overrides any constructor argument.
  */
 async function deployHub(c: IvyContext, o: HubArgs = {}) {
@@ -50,7 +49,6 @@ async function deployHub(c: IvyContext, o: HubArgs = {}) {
 			o.vaultImplementation ?? c.vaultImplAddress,
 			o.shares ?? c.sharesAddress,
 			o.premiums ?? (await c.premiums.getAddress()),
-			o.unwind ?? (await c.unwind.getAddress()),
 			o.bidRules ?? (await c.bidRules.getAddress()),
 			o.exerciseWindow ?? 1n,
 			o.auctionTimeout ?? 1n,
@@ -63,21 +61,17 @@ async function deployHub(c: IvyContext, o: HubArgs = {}) {
 interface PeerBindings {
 	sharesHub?: string
 	sharesPremiums?: string
-	sharesUnwind?: string
 	premiumsHub?: string
 	premiumsShares?: string
-	unwindHub?: string
-	unwindShares?: string
 }
 
-/** Deploys another hub with fresh shares, premiums and unwind modules bound to it. `o` points any binding elsewhere. */
+/** Deploys another hub with fresh shares and premiums modules bound to it. `o` points any binding elsewhere. */
 async function deployHubWithOwnPeers(c: IvyContext, o: PeerBindings = {}) {
 	const nonce = await c.admin.getNonce()
-	const [hub, shares, premiums, unwind] = [0, 1, 2, 3].map(i => getCreateAddress({ from: c.admin.address, nonce: nonce + i }))
-	const ownHub = await deployHub(c, { shares, premiums, unwind })
-	await ethers.deployContract("IvyShares", [o.sharesHub ?? hub, o.sharesPremiums ?? premiums, o.sharesUnwind ?? unwind, "ipfs://ivy/{id}.json"])
+	const [hub, shares, premiums] = [0, 1, 2].map(i => getCreateAddress({ from: c.admin.address, nonce: nonce + i }))
+	const ownHub = await deployHub(c, { shares, premiums })
+	await ethers.deployContract("IvyShares", [o.sharesHub ?? hub, o.sharesPremiums ?? premiums, "ipfs://ivy/{id}.json"])
 	await ethers.deployContract("IvyPremiums", [o.premiumsHub ?? hub, o.premiumsShares ?? shares])
-	await ethers.deployContract("IvyUnwind", [o.unwindHub ?? hub, o.unwindShares ?? shares])
 	return ownHub
 }
 
@@ -85,17 +79,11 @@ async function deployHubWithOwnPeers(c: IvyContext, o: PeerBindings = {}) {
 const MISBOUND_PEERS: Array<{ name: string; bind: (c: IvyContext) => Promise<PeerBindings> }> = [
 	{ name: "shares answering to another hub", bind: async c => ({ sharesHub: c.hubAddress }) },
 	{ name: "premiums answering to another hub", bind: async c => ({ premiumsHub: c.hubAddress }) },
-	{ name: "unwind answering to another hub", bind: async c => ({ unwindHub: c.hubAddress }) },
 	{
 		name: "shares naming another premiums module",
 		bind: async c => ({ sharesPremiums: await c.premiums.getAddress() }),
 	},
-	{
-		name: "shares naming another unwind module",
-		bind: async c => ({ sharesUnwind: await c.unwind.getAddress() }),
-	},
 	{ name: "premiums naming another share token", bind: async c => ({ premiumsShares: c.sharesAddress }) },
-	{ name: "unwind naming another share token", bind: async c => ({ unwindShares: c.sharesAddress }) },
 ]
 
 const deployed = fixture(connection, () => deployIvy(connection))
@@ -129,15 +117,13 @@ describe("hub administration", () => {
 			expect(await c.hub.vaultImplementation()).to.equal(c.vaultImplAddress)
 		})
 
-		it("binds shares to the hub and to the premiums and unwind modules", async () => {
+		it("binds shares to the hub and to the premiums module", async () => {
 			expect(await c.shares.hub()).to.equal(c.hubAddress)
 			expect(await c.shares.premiums()).to.equal(await c.premiums.getAddress())
-			expect(await c.shares.unwind()).to.equal(await c.unwind.getAddress())
 		})
 
-		it("binds the premiums and unwind modules to shares", async () => {
+		it("binds the premiums module to shares", async () => {
 			expect(await c.premiums.shares()).to.equal(c.sharesAddress)
-			expect(await c.unwind.shares()).to.equal(c.sharesAddress)
 		})
 
 		it("issues shares as ERC-1155 tokens", async () => {
@@ -171,7 +157,6 @@ describe("hub administration", () => {
 			{ name: "vault implementation", arg: "vaultImplementation" },
 			{ name: "shares", arg: "shares" },
 			{ name: "premiums", arg: "premiums" },
-			{ name: "unwind", arg: "unwind" },
 			{ name: "bid rules", arg: "bidRules" },
 		] as const) {
 			it(`rejects a zero ${name} address`, async () => {
@@ -485,12 +470,6 @@ describe("hub administration", () => {
 					c.premiums,
 					"NotShares",
 				)
-			})
-		})
-
-		describe("IvyUnwind", () => {
-			it("rejects share update hooks from anyone but shares", async () => {
-				await expect(c.unwind.beforeShareUpdate(1n, c.alice.address)).to.be.revertedWithCustomError(c.unwind, "NotShares")
 			})
 		})
 	})

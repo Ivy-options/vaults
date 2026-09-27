@@ -2,7 +2,7 @@ import { AbiCoder, id } from "ethers"
 import type { AddressLike, BigNumberish, TypedDataField } from "ethers"
 
 const fields = (entries: [name: string, type: string][]): TypedDataField[] => entries.map(([name, type]) => ({ name, type }))
-/** EIP-712 types signed by market makers, buyers and the indicative feed signer. */
+/** EIP-712 types signed by market makers and the indicative feed signer. */
 export const BID_TYPES = {
 	Bid: fields([
 		["vaultId", "uint256"],
@@ -20,16 +20,6 @@ export const BID_TYPES = {
 		["termsHash", "bytes32"],
 		["executor", "address"],
 		["recipient", "address"],
-	]),
-}
-export const UNWIND_TYPES = {
-	UnwindAgreement: fields([
-		["vaultId", "uint256"],
-		["nonce", "uint256"],
-		["deadline", "uint64"],
-		["exercisedNotional", "uint256"],
-		["supply", "uint256"],
-		["refund", "uint256"],
 	]),
 }
 export const REPORT_TYPES = {

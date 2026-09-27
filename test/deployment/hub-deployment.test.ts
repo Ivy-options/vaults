@@ -64,8 +64,8 @@ describe("hub deployment", () => {
 			await expect(buildDeploymentPlan({ ...baseInput, expiryPricePublicationWindow: 0 })).to.be.rejectedWith(/expiryPricePublicationWindow/)
 		})
 
-		it("plans version 8 without cash settlement configuration when none is given", () => {
-			expect(plan.version).to.equal(8)
+		it("plans version 9 without cash settlement configuration when none is given", () => {
+			expect(plan.version).to.equal(9)
 			expect(plan).to.not.have.property("settlementPublisher")
 			expect(plan.settlementMethodology).to.equal(undefined)
 		})

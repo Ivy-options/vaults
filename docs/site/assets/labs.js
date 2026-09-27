@@ -339,40 +339,6 @@
     sync();
   }
 
-  function consent(scope) {
-    enable(scope);
-    const sync = () => {
-      const a = byId("consent-a", scope).checked,
-        b = byId("consent-b", scope).checked,
-        buyer = byId("consent-buyer", scope).checked;
-      const percent = (a ? 60 : 0) + (b ? 40 : 0);
-      $(".ownership-a", scope).classList.toggle("is-missing", !a);
-      $(".ownership-b", scope).classList.toggle("is-missing", !b);
-      $(".ownership-bar", scope).setAttribute(
-        "aria-label",
-        `${percent}% of current shares approve`
-      );
-      byId("consent-status", scope).textContent = `${
-        buyer ? "Buyer signed" : "Buyer signature missing"
-      } · ${percent}% of current shares approve${
-        buyer && percent === 100
-          ? " · consent complete; funding and execution checks still apply"
-          : " · consent incomplete"
-      }`;
-      const total = Number(byId("unwind-refund", scope).value);
-      byId("refund-a", scope).textContent = `${total * 0.6} USDC`;
-      byId("refund-b", scope).textContent = `${total * 0.4} USDC`;
-      byId("refund-total", scope).textContent = `${total} USDC`;
-      byId("refund-note", scope).textContent = total
-        ? "A 100 USDC refund is 100000000 raw units when USDC has six decimal places. The LPs fund it before execution; the caller who executes the agreement does not supply it."
-        : "Zero refund needs no funding. Buyer signature and all current-shareholder approvals are still required.";
-    };
-    ["consent-a", "consent-b", "consent-buyer", "unwind-refund"].forEach(
-      (id) => byId(id, scope).addEventListener("change", sync)
-    );
-    sync();
-  }
-
   function releases(scope) {
     enable(scope);
     $$('input[name="recommended-release"]', scope).forEach((e) =>
@@ -401,7 +367,7 @@
       ["Backing & proceeds", "Remaining backing assets, plus any tokens received from physical exercise.", "Premium & fee reserves", "Premium owed to LPs and fees owed to the treasury that have not yet been paid.", false],
       ["Shareholder pool", "Remaining collateral and exercise proceeds after unpaid obligations are set aside.", "Premium & fee reserves", "Premium owed to LPs and fees owed to the treasury that have not yet been paid.", false],
     ];
-    const reserves = { physical: null, cash: "Any payoff from a timely final price still owed to the buyer. Missing-price fallback expiration creates no new cash reserve.", unwind: "The refund contributed separately by LPs and set aside for the buyer." };
+    const reserves = { physical: null, cash: "Any payoff from a timely final price still owed to the buyer. Missing-price fallback expiration creates no new cash reserve." };
     const sync = () => {
       const i = Number(phase.value), s = states[i];
       $(".custody-backing h4", scope).textContent = s[0]; $(".custody-backing p", scope).textContent = s[1];
@@ -434,7 +400,7 @@
     pick(0);
   }
 
-  const LABS = { fees, payoff, cashAmounts, consent, releases, custody, actorRoutes: actorRoutes, "actor-routes": actorRoutes };
+  const LABS = { fees, payoff, cashAmounts, releases, custody, actorRoutes: actorRoutes, "actor-routes": actorRoutes };
   function mountAll(root) { $$("[data-lab]", root).forEach((el) => { const fn = LABS[el.dataset.lab]; if (fn && !el.dataset.mounted) { el.dataset.mounted = "1"; fn(el); } }); }
   window.IvyLabs = { ...LABS, mountAll };
 })();

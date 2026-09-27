@@ -55,7 +55,7 @@ Final publication at exactly `D` is rejected; physical exercise may start at `D`
 6. No price or in-the-money check is required for physical exercise. Exercise is voluntary; the buyer decides whether to deliver the assets.
 7. Full exercise finalizes the vault immediately. Partial exercise leaves the remainder available until `F` without extending the window.
 8. At or after `F`, anyone may expire the vault without a publisher, admin, buyer signature, buyer funding or buyer callback. Any unexercised remainder lapses without a new buyer cash reserve. Expiration must not pretend that lapsed notional was physically exercised.
-9. Once Settled, LPs claim their share of available assets through the existing claim mechanism, including unexercised collateral and strike-payment assets received during physical exercise. Preserve existing premium, fee, reserve and unwind accounting.
+9. Once Settled, LPs claim their share of available assets through the existing claim mechanism, including unexercised collateral and strike-payment assets received during physical exercise. Preserve existing premium, fee and reserve accounting.
 10. Publisher outages, publisher role changes, admission pauses and disabling new cash admissions must not block the fallback or its finalization. An unresponsive buyer must not prevent LP claims after `F` and a successful expiration transaction.
 
 ## Agreement and integration requirements
@@ -82,9 +82,9 @@ Verify through public contract and operator interfaces:
 - Calls and puts deliver the correct assets at the original strike. Cover differing token decimals, rounding, insufficient balances/allowances, unauthorized callers and atomic rollback on transfer failure.
 - Cover partial exercise allowed/disallowed, full exercise before `F`, partially cash-exercised American options entering fallback for only the remainder, and prior full cash exercise leaving nothing to fall back on.
 - Cash exercise transactions cannot silently execute physical transfers across the deadline. Failed exercise cannot consume notional or change reserves.
-- After fallback finalization, LP claims correctly distribute retained collateral and received counter-assets; premiums, platform fees, buyer reserves and unwind recovery retain their intended accounting. Preserve reserve exclusion and token deduplication in claims.
+- After fallback finalization, LP claims correctly distribute retained collateral and received counter-assets; premiums, platform fees and buyer reserves retain their intended accounting. Preserve reserve exclusion and token deduplication in claims.
 - Admission pauses, disabling cash admissions and publisher removal do not prevent fallback exercise or expiration. Global settings changes do not alter existing vault deadlines.
-- A completed consensual unwind or any other prior finalization prevents subsequent fallback exercise or double claims. Originally physical options retain their existing timing and transfers.
+- Any prior finalization prevents subsequent fallback exercise or double claims. Originally physical options retain their existing timing and transfers.
 - Operator inspection accurately reports the current route, required exercise assets and the permissionless expiration time, including when no one has interacted since expiry.
 
 During implementation run focused settlement and accounting tests, then the full contract suite, TypeScript checks, Solidity formatting checks, contract bytecode-size checks and documentation checks/tests. Task drafting alone does not require contract execution.

@@ -11,9 +11,9 @@ const URI = "ipfs://ivy/{id}.json"
 
 // Signers stand in for the hub and the peer modules.
 const deployed = fixture(connection, async () => {
-	const [hub, premiums, unwind] = await ethers.getSigners()
-	const shares = await ethers.deployContract("IvyShares", [hub.address, premiums.address, unwind.address, URI])
-	return { hub, premiums, unwind, shares }
+	const [hub, premiums] = await ethers.getSigners()
+	const shares = await ethers.deployContract("IvyShares", [hub.address, premiums.address, URI])
+	return { hub, premiums, shares }
 })
 
 describe("IvyShares", () => {
@@ -24,25 +24,19 @@ describe("IvyShares", () => {
 			c = await deployed()
 		})
 
-		it("binds the hub, premiums and unwind peers", async () => {
+		it("binds the hub and premiums peers", async () => {
 			expect(await c.shares.hub()).to.equal(c.hub.address)
 			expect(await c.shares.premiums()).to.equal(c.premiums.address)
-			expect(await c.shares.unwind()).to.equal(c.unwind.address)
 		})
 
 		it("rejects a zero hub", async () => {
 			const factory = await ethers.getContractFactory("IvyShares")
-			await expect(factory.deploy(ZeroAddress, c.premiums.address, c.unwind.address, URI)).to.be.revertedWithCustomError(factory, "ZeroAddress")
+			await expect(factory.deploy(ZeroAddress, c.premiums.address, URI)).to.be.revertedWithCustomError(factory, "ZeroAddress")
 		})
 
 		it("rejects a zero premiums module", async () => {
 			const factory = await ethers.getContractFactory("IvyShares")
-			await expect(factory.deploy(c.hub.address, ZeroAddress, c.unwind.address, URI)).to.be.revertedWithCustomError(factory, "ZeroAddress")
-		})
-
-		it("rejects a zero unwind module", async () => {
-			const factory = await ethers.getContractFactory("IvyShares")
-			await expect(factory.deploy(c.hub.address, c.premiums.address, ZeroAddress, URI)).to.be.revertedWithCustomError(factory, "ZeroAddress")
+			await expect(factory.deploy(c.hub.address, ZeroAddress, URI)).to.be.revertedWithCustomError(factory, "ZeroAddress")
 		})
 	})
 })

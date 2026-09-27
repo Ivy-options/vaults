@@ -115,28 +115,15 @@ library IvyOptionSettlement {
 		_finalize(state, vaultId);
 	}
 
-	/// @dev Pays reserved collateral and premium tokens, then notifies the recipient for each token delivered.
+	/// @dev Pays the reserved collateral, then notifies the recipient.
 	function claimPayout(VaultState storage state, VaultTerms storage terms, uint256 vaultId) external {
 		if (msg.sender != state.marketMaker && msg.sender != state.executor) revert NotExecutor();
-		IIvyVault vault = IIvyVault(state.vault);
 		address recipient = state.recipient;
-		address collateral = terms.collateral;
-		address premiumToken = state.premiumToken;
-		uint256 collateralAmount;
-		uint256 premiumAmount;
-		if (premiumToken == collateral) {
-			uint256 combinedAmount = vault.payBuyer(collateral, recipient);
-			collateralAmount = state.pendingPayout;
-			premiumAmount = combinedAmount - collateralAmount;
-		} else {
-			collateralAmount = vault.payBuyer(collateral, recipient);
-			premiumAmount = vault.payBuyer(premiumToken, recipient);
-		}
-		if (collateralAmount == 0 && premiumAmount == 0) revert NothingToClaim();
+		uint256 amount = IIvyVault(state.vault).payBuyer(terms.collateral, recipient);
+		if (amount == 0) revert NothingToClaim();
 		state.pendingPayout = 0;
-		emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, state.marketMaker, collateralAmount, premiumAmount);
-		_notifyRecipient(vaultId, recipient, collateral, collateralAmount);
-		_notifyRecipient(vaultId, recipient, premiumToken, premiumAmount);
+		emit IIvyVaultsHubEvents.PayoutClaimed(vaultId, state.marketMaker, amount);
+		_notifyRecipient(vaultId, recipient, terms.collateral, amount);
 	}
 
 	function claim(

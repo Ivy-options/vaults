@@ -143,7 +143,7 @@
   function mountLifecycle(root) {
     const host = document.createElement("div");
     host.className = "lifecycle-map";
-    host.innerHTML = `<div class="custody-heading"><span class="inscription">WHAT THE VAULT HOLDS IN THIS PHASE</span><label class="settled-example" hidden>Settlement illustration<select aria-label="Settlement illustration"><option value="physical">Physical exercise / expiry</option><option value="cash">Cash expiry</option><option value="unwind">Unwind with a refund</option></select></label></div><div class="custody-compartments"><div class="custody-backing"><span class="compartment-index" aria-hidden="true">I</span><h4></h4><p></p></div><div class="custody-premium"><span class="compartment-index" aria-hidden="true">II</span><h4></h4><p></p></div><div class="custody-buyer" hidden><span class="compartment-index" aria-hidden="true">III</span><h4>Buyer payout reserve</h4><p></p></div></div>`;
+    host.innerHTML = `<div class="custody-heading"><span class="inscription">WHAT THE VAULT HOLDS IN THIS PHASE</span><label class="settled-example" hidden>Settlement illustration<select aria-label="Settlement illustration"><option value="physical">Physical exercise / expiry</option><option value="cash">Cash expiry</option></select></label></div><div class="custody-compartments"><div class="custody-backing"><span class="compartment-index" aria-hidden="true">I</span><h4></h4><p></p></div><div class="custody-premium"><span class="compartment-index" aria-hidden="true">II</span><h4></h4><p></p></div><div class="custody-buyer" hidden><span class="compartment-index" aria-hidden="true">III</span><h4>Buyer payout reserve</h4><p></p></div></div>`;
     root.querySelector(".phase-buttons").after(host);
     const states = [
       [
@@ -191,9 +191,7 @@
         .querySelector(".custody-compartments")
         .classList.toggle("with-buyer-reserve", outcome !== "physical");
       reserve.querySelector("p").textContent =
-        outcome === "cash"
-          ? "Any payoff from a timely final price still owed to the buyer. Missing-price fallback expiration creates no new cash reserve."
-          : "The refund contributed separately by LPs and set aside for the buyer.";
+        "Any payoff from a timely final price still owed to the buyer. Missing-price fallback expiration creates no new cash reserve.";
     }
     choice.addEventListener("change", sync);
     root.addEventListener("phase-state", sync);
