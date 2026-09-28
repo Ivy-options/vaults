@@ -14,6 +14,33 @@ async function withMap(run, width=1440, reduced=true) {
   } finally {await close();await server.close();}
 }
 const card=(page,id)=>page.locator(`.card[data-id="${id}"]`);
+
+for (const width of [1440, 2212, 390]) test(`edge branches stay centered at the current zoom at ${width}px`, () => withMap(async page => {
+  for (const [parent, child] of [
+    ['settled', 'buyer-claims-any-payout'],
+    ['before-the-vault', 'who-is-around-a-vault'],
+  ]) {
+    await select(page, parent);
+    await page.evaluate(() => IvyMap.zoomTo(1));
+    await page.locator(`[data-expand="${child}"]`).evaluate(el => el.click());
+    await selected(page, child, 1);
+    const assertCentered = async id => {
+      const box = await card(page, id).boundingBox(), view = await page.locator('#map').boundingBox();
+      assert.ok(Math.abs(box.x + box.width / 2 - view.x - view.width / 2) < 1, `${id} is horizontally centered: ${JSON.stringify({box, view})}`);
+      if (box.height <= view.height - 24) {
+        assert.ok(Math.abs(box.y + box.height / 2 - view.y - view.height / 2) < 1, `${id} is vertically centered`);
+      } else assert.ok(Math.abs(box.y - view.y - 12) < 1, `${id} starts at its heading`);
+    };
+    await assertCentered(child);
+    // A subsequent camera update must not snap back to the old pan boundary.
+    await page.evaluate(() => IvyMap.zoomBy(1));
+    await assertCentered(child);
+    await page.keyboard.press('ArrowLeft');
+    await selected(page, parent, 1);
+    await assertCentered(parent);
+  }
+}, width));
+
 async function select(page,id) {
   await page.evaluate(id=>IvyMap.flyTo(id,false),id);
   await card(page,id).focus();

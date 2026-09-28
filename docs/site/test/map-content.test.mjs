@@ -336,6 +336,7 @@ test("bookmarks to merged explanations resolve to their surviving topic", () => 
     ['expire-the-vault', 'settle-at-expiry'],
     ['buyer-reserve-sources', 'buyer-claims-any-payout'],
     ['buyer-claim-recipient', 'claim-payout'],
+    ['residual-put-assets', 'residual-call-assets'],
   ]) {
     await page.evaluate(id => { location.hash = id; }, old);
     await page.waitForFunction(id => IvyMap.here().at(-1)?.id === id, current);

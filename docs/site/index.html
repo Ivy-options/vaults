@@ -653,12 +653,24 @@
     <section data-kind="moment" id="shareholders-claim-what-is-left" data-when="residual claims open"><h3>LPs collect the remainder</h3>
     <p>Settlement opens the final collateral exit. The assets left for <strong class="role-lp">LPs</strong> depend on how the option ended.</p>
     <section data-kind="action" id="claim" data-actor="lp"><h4>Redeem the remaining pool</h4>
-    <p>Current shareholders burn shares to receive the same proportion of the <strong>unreserved assets</strong>. Holding 20% of remaining shares means receiving 20% of the remaining pool.</p>
-    <p><code>claim</code> sends the tokens to you. With <code>claimTo</code>, you burn your own shares and choose the address that receives the tokens. Use it, for example, if a token rejects transfers to your address but accepts another recipient.</p>
-    <p>Request every token with <strong class="key-term">tokenMask = 7</strong>. You can also skip a token, but you <strong>permanently give up its payout for the shares you burn</strong>.</p>
+    <p>Burn your shares to collect your share of the <strong>unreserved assets</strong>. Redeeming 20% of the remaining shares gives you 20% of that pool.</p>
 
+    <section data-kind="tile" id="residual-call-assets"><h5>What you receive</h5>
+    <ul class="reading-list" role="list">
+      <li><strong class="key-term">Call:</strong> underlying if unexercised; quote tokens paid by the buyer after full physical exercise.</li>
+      <li><strong class="key-term">Put:</strong> quote collateral if unexercised; underlying paid by the buyer after full physical exercise.</li>
+      <li><strong class="key-term">Partial physical exercise:</strong> either pool can hold both tokens.</li>
+      <li><strong class="key-term">Cash settlement:</strong> collateral remains after the buyer’s payout is reserved.</li>
+    </ul>
+    </section>
+    <section data-kind="tile" id="residual-protected-reserves"><h5>Protected reserves</h5>
+    <p>Unpaid premium, treasury obligations and buyer payouts are set aside. Your redemption cannot spend those reserves.</p>
+    </section>
+    <section data-kind="tile" id="claim-options"><h5>Claim options</h5>
+    <p><code>claim</code> pays every claimable token to you. Use <code>claimTo</code> to choose another recipient or select tokens.</p>
+    <p>Skipping a token <strong>permanently gives up its payout for the shares you burn</strong>.</p>
     <section data-kind="tile" id="claim-to-recipient"><h5>Send your claim to another address</h5>
-    <p>After settlement, call <code>claimTo(vaultId, shares, recipient, 7)</code> from the address holding the shares. All claimable tokens go to that one nonzero <code>recipient</code>; the shares are burned from your balance.</p>
+    <p>Use another recipient if a token rejects transfers to your address but accepts theirs. After settlement, call <code>claimTo(vaultId, shares, recipient, 7)</code> from the address holding the shares. All claimable tokens go to that one nonzero <code>recipient</code>; the shares are burned from your balance.</p>
     <p>For example, if the shares you redeem entitle you to <strong class="key-term">2 WETH and 6,000 USDC</strong>, both amounts go to the chosen recipient. This does not swap tokens or change your entitlement.</p>
     <p>If either transfer fails, the whole transaction reverts, including the share burn. Try a recipient that can receive both tokens before considering forfeiture.</p>
     </section>
@@ -676,28 +688,6 @@
     <p><code>claimTo(vaultId, shares, recipient, 1)</code> requests only WETH. If it succeeds, you receive 2 WETH at <code>recipient</code> and <strong>give up the 6,000 USDC</strong>. Both USDC roles are omitted.</p>
     <p>The requested shares are still burned in full. You cannot use those burned shares to collect the skipped USDC later. It stays in the vault for any remaining shares; if no shares remain, no LP can claim it through this function.</p>
     </section>
-    <section data-kind="tile" id="residual-call-assets"><h5>What a call leaves</h5>
-    <ul class="reading-list" role="list">
-      <li><strong class="key-term">No exercise:</strong> the pool holds underlying.</li>
-      <li><strong class="key-term">Full physical exercise:</strong> the pool holds quote tokens paid by the buyer.</li>
-      <li><strong class="key-term">Partial physical exercise:</strong> the pool can hold both.</li>
-    </ul>
-    </section>
-    <section data-kind="tile" id="residual-put-assets"><h5>What a put leaves</h5>
-    <ul class="reading-list" role="list">
-      <li><strong class="key-term">No exercise:</strong> the pool holds quote collateral.</li>
-      <li><strong class="key-term">Physical exercise:</strong> underlying comes in from the buyer; quote goes out.</li>
-      <li><strong class="key-term">Partial exercise:</strong> the pool can hold both.</li>
-    </ul>
-    </section>
-    <section data-kind="tile" id="residual-protected-reserves"><h5>What LP claims exclude</h5>
-    <p>These payments stay protected:</p>
-    <ul class="reading-list" role="list">
-      <li><strong class="key-term">Unpaid premium.</strong></li>
-      <li><strong class="key-term">Treasury obligations.</strong></li>
-      <li><strong class="role-buyer">Buyer payouts.</strong></li>
-    </ul>
-    <p>An <strong class="role-lp">LP residual claim</strong> cannot spend those reserves.</p>
     </section>
     </section>
     </section>

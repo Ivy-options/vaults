@@ -328,8 +328,10 @@
   const homeScale = () => Math.min(vw() / (M.W + 160), vh() / (M.H + 160));
   const clampCam = () => {
     const { cam, W, H } = M;
-    cam.x = clamp(cam.x, Math.min(0, vw() - W * cam.s) - 200, Math.max(0, vw() - W * cam.s) + 200);
-    cam.y = clamp(cam.y, Math.min(0, vh() - H * cam.s) - 200, Math.max(0, vh() - H * cam.s) + 200);
+    // Edge cards need half a viewport of pan space to reach the centre.
+    const padX = Math.max(200, vw() / 2), padY = Math.max(200, vh() / 2);
+    cam.x = clamp(cam.x, Math.min(0, vw() - W * cam.s) - padX, Math.max(0, vw() - W * cam.s) + padX);
+    cam.y = clamp(cam.y, Math.min(0, vh() - H * cam.s) - padY, Math.max(0, vh() - H * cam.s) + padY);
   };
   const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
   function apply(animate) {
@@ -833,6 +835,7 @@
     "expire-the-vault": "settle-at-expiry",
     "buyer-reserve-sources": "buyer-claims-any-payout",
     "buyer-claim-recipient": "claim-payout",
+    "residual-put-assets": "residual-call-assets",
     "overview": "before-the-vault",
     "participants": "who-is-around-a-vault",
     "execution-permissions": "executor-and-recipient",
