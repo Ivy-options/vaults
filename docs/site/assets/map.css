@@ -172,7 +172,7 @@ body.map-ready #document { display: none; }
 .portrait svg { display: block; width: 100%; height: 100%; }
 .portrait.generic { display: grid; place-items: center; }
 .portrait.generic i { width: 60%; aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed var(--line-strong); display: grid; place-items: center; font: 700 200% var(--mono); color: var(--faint); font-style: normal; }
-.badge { display: inline-block; flex: 0 0 auto; font-family: var(--roman-font, "Cinzel", Georgia, serif); font-size: 11px; letter-spacing: 0.08em; line-height: 1; color: var(--actor); border: 1px solid color-mix(in oklab, var(--actor) 45%, transparent); background: color-mix(in oklab, var(--actor) 12%, transparent); border-radius: 999px; padding: 4px 10px 3px; white-space: nowrap; }
+.badge { display: inline-block; flex: 0 0 auto; font-family: var(--roman-font); font-size: 11px; letter-spacing: 0.08em; line-height: 1; color: var(--actor); border: 1px solid color-mix(in oklab, var(--actor) 45%, transparent); background: color-mix(in oklab, var(--actor) 12%, transparent); border-radius: 999px; padding: 4px 10px 3px; white-space: nowrap; }
 .card.action h4 { flex: 1 1 100px; align-self: center; margin: 0; font: 600 20px/1.15 var(--roman-font, Georgia, serif); }
 .card.action [data-tier="0"], .card.action [data-tier="1"], .card.action [data-tier="3"] { flex-direction: column; flex-wrap: nowrap; row-gap: 4px; align-items: center; justify-content: center; text-align: center; }
 .card.action [data-tier="0"] .badge { font-size: 20px; padding: 8px 18px 6px; }

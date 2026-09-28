@@ -1,9 +1,9 @@
 /* Ivy: charcoal, terracotta, ashlar masonry and Roman inscriptions. */
 @font-face {
-  font-family: "Cinzel";
-  src: url("fonts/cinzel.woff2") format("woff2");
+  font-family: "Belleza";
+  src: url("fonts/belleza/belleza-latin-400.woff2") format("woff2");
   font-style: normal;
-  font-weight: 400 900;
+  font-weight: 400;
   font-display: swap;
 }
 :root {
@@ -18,7 +18,7 @@
   --accent: #e4764d;
   --guide-green: #d4b58a;
   --guide-purple: #b8a3bd;
-  --roman-font: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --roman-font: "Belleza", var(--body);
 }
 :root[data-theme="light"] {
   --paper: #f3ede1;
