@@ -237,7 +237,25 @@ A registry release ID is not an EIP-712 version. Never rebuild an existing bid s
 
 An auction becomes cancellable by anyone when the saved auction timeout elapses, the option expires, or admission is paused for the vault or globally. The bid master may cancel sooner. Once any public cancel condition holds, an LP may also call `withdraw(vaultId, shares)` directly while the vault remains in Auction. Cancelling and reopening does not restart the original timeout clock, so an owner cannot hide the LP exit window inside one block.
 
-The legacy `claim(vaultId, shares)` sends every claimable token to the holder. If one token cannot be received, use `claimTo(vaultId, shares, recipient, tokenMask)`: bit 0 selects collateral, bit 1 premium, and bit 2 quote for calls or underlying for puts. A cleared bit is an explicit and irreversible forfeiture of that token share; it remains for the other shareholders. Prefer redirecting all tokens with mask `7` before offering forfeiture.
+### Choosing tokens with claimTo
+
+After settlement, `claim(vaultId, shares)` burns the caller's shares and sends their proportional share of every claimable token to the caller. `claimTo(vaultId, shares, recipient, tokenMask)` burns the caller's shares and sends the selected tokens to one nonzero `recipient`. The recipient does not need to hold shares. Each payout uses the token's vault balance minus its reserves, multiplied by `shares / totalSupply` before the burn, rounded down.
+
+If a token rejects transfers to the holder's address, first try `claimTo(vaultId, shares, recipient, 7)` with a recipient that can receive all the tokens. Mask `7` requests every token. It changes the destination without changing the entitlement or swapping tokens. A failed transfer reverts the entire transaction, including the share burn.
+
+Build `tokenMask` by adding the values for the token roles to include:
+
+| Value | Bit | Token selected |
+| --- | --- | --- |
+| `1` | 0 | Collateral: underlying for calls, quote for puts. |
+| `2` | 1 | Premium token: only the unreserved balance. Earned premium remains a separate `claimPremium` claim. |
+| `4` | 2 | Physical-exercise proceeds: quote for calls, underlying for puts. |
+
+For example, `7 = 1 + 2 + 4` selects all roles; `1` selects only collateral. Valid masks are `1` through `7`. Roles can share a token address. Selecting any role for an address includes the holder's proportional share of that token's entire unreserved balance, paid once. To skip a token, omit every role that uses its address.
+
+Suppose a call uses WETH collateral and USDC for both premium and quote. The shares being redeemed entitle the holder to 2 WETH and 6,000 USDC. Mask `7` sends both amounts to the recipient. If USDC cannot be transferred, mask `1` requests only the 2 WETH and omits both USDC roles. On success, all the requested shares are burned and the holder permanently gives up the 6,000 USDC attributable to those shares. That USDC stays in the vault for any remaining shares. If no shares remain, no LP can recover it through this function.
+
+Show forfeiture as an explicit choice with the skipped token and amount. It does not defer payment: burned shares cannot be used to claim the skipped tokens later. Reserved premium, treasury obligations and buyer payouts remain protected under every mask.
 
 ## Cash expiry fallback
 

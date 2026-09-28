@@ -385,10 +385,17 @@
                       claimed. Reserved premium, platform fees and buyer payouts
                       are excluded from this pool. A reserve is an amount set
                       aside for a specific payment, so it is not available for
-                      this shareholder claim. If the holder cannot receive one
-                      token, <code>claimTo(vaultId, shares, recipient, tokenMask)</code>
-                      can redirect the payout. Clearing a mask bit explicitly
-                      forfeits that token share for the benefit of remaining LPs.</span
+                      this shareholder claim. To send all claimable tokens to
+                      another address, call
+                      <code>claimTo(vaultId, shares, recipient, 7)</code> from
+                      the address holding the shares. Your shares are burned;
+                      the chosen recipient receives the tokens. If a selected
+                      token transfer fails, the entire transaction reverts,
+                      including the share burn. You may select fewer tokens,
+                      but doing so permanently gives up the skipped token
+                      payout for the shares burned. See
+                      <a href="#claim-to">token selection and a worked example</a>
+                      before using a mask other than <code>7</code>.</span
                     >
                   </li>
                   <li>
@@ -411,6 +418,29 @@
                 </div>
               </div>
             </div>
+          </div>
+          <div class="callout" id="claim-to">
+            <p><b>Selecting tokens with claimTo.</b> Add the values for the
+            tokens you want to receive: <code>1</code> for collateral,
+            <code>2</code> for the premium token, and <code>4</code> for the
+            token received through physical exercise. For calls, collateral
+            is underlying and exercise proceeds are quote. For puts, these
+            are reversed. <code>7 = 1 + 2 + 4</code> requests all three.
+            Only unreserved balances are available; earned premium is
+            claimed separately.</p>
+            <p>Suppose a call uses WETH collateral and USDC for both premium
+            and quote. The shares you redeem entitle you to 2 WETH and
+            6,000 USDC. Mask <code>7</code> sends both amounts to your chosen
+            recipient. If USDC cannot be transferred, mask <code>1</code>
+            requests only the 2 WETH. On success, all the requested shares
+            are burned and you permanently give up the 6,000 USDC for those
+            shares. It stays in the vault for any remaining shares. If no
+            shares remain, no LP can claim it through this function.</p>
+            <p>When roles share a token address, selecting any of them includes
+            your share of that token's entire unreserved balance, paid once.
+            To skip USDC in this example, omit both its premium and quote
+            roles. Skipping a token does not defer payment: you cannot use
+            burned shares to collect it later.</p>
           </div>
           <div class="callout" id="admission-pause">
             <b>What a pause means.</b> The guardian, an address with permission

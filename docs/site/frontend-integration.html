@@ -27,6 +27,7 @@
 <a href="#discover-every-historical-vault">Discover every historical vault</a>
 <a href="#transactions-and-signatures">Transactions and signatures</a>
 <a href="#auction-exits-and-final-claims">Auction exits and final claims</a>
+<a href="#choosing-tokens-with-claimto" class="subsection-link">Choosing tokens with claimTo</a>
 <a href="#cash-expiry-fallback">Cash expiry fallback</a>
 <a href="#recommendation-changes">Recommendation changes</a>
 <a href="#failure-handling">Failure handling</a>
@@ -245,7 +246,38 @@ await (await hub.openAuction(reference.vaultId)).wait();
 <p>A registry release ID is not an EIP-712 version. Never rebuild an existing bid signature against the current recommendation.</p>
 <h2 id="auction-exits-and-final-claims">Auction exits and final claims</h2>
 <p>An auction becomes cancellable by anyone when the saved auction timeout elapses, the option expires, or admission is paused for the vault or globally. The bid master may cancel sooner. Once any public cancel condition holds, an LP may also call <code>withdraw(vaultId, shares)</code> directly while the vault remains in Auction. Cancelling and reopening does not restart the original timeout clock, so an owner cannot hide the LP exit window inside one block.</p>
-<p>The legacy <code>claim(vaultId, shares)</code> sends every claimable token to the holder. If one token cannot be received, use <code>claimTo(vaultId, shares, recipient, tokenMask)</code>: bit 0 selects collateral, bit 1 premium, and bit 2 quote for calls or underlying for puts. A cleared bit is an explicit and irreversible forfeiture of that token share; it remains for the other shareholders. Prefer redirecting all tokens with mask <code>7</code> before offering forfeiture.</p>
+<h3 id="choosing-tokens-with-claimto">Choosing tokens with claimTo</h3>
+<p>After settlement, <code>claim(vaultId, shares)</code> burns the caller&#39;s shares and sends their proportional share of every claimable token to the caller. <code>claimTo(vaultId, shares, recipient, tokenMask)</code> burns the caller&#39;s shares and sends the selected tokens to one nonzero <code>recipient</code>. The recipient does not need to hold shares. Each payout uses the token&#39;s vault balance minus its reserves, multiplied by <code>shares / totalSupply</code> before the burn, rounded down.</p>
+<p>If a token rejects transfers to the holder&#39;s address, first try <code>claimTo(vaultId, shares, recipient, 7)</code> with a recipient that can receive all the tokens. Mask <code>7</code> requests every token. It changes the destination without changing the entitlement or swapping tokens. A failed transfer reverts the entire transaction, including the share burn.</p>
+<p>Build <code>tokenMask</code> by adding the values for the token roles to include:</p>
+<div class="tablewrap" tabindex="0" role="region" aria-label="Frontend integration reference table"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Bit</th>
+<th>Token selected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>1</code></td>
+<td>0</td>
+<td>Collateral: underlying for calls, quote for puts.</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>1</td>
+<td>Premium token: only the unreserved balance. Earned premium remains a separate <code>claimPremium</code> claim.</td>
+</tr>
+<tr>
+<td><code>4</code></td>
+<td>2</td>
+<td>Physical-exercise proceeds: quote for calls, underlying for puts.</td>
+</tr>
+</tbody></table>
+</div>
+<p>For example, <code>7 = 1 + 2 + 4</code> selects all roles; <code>1</code> selects only collateral. Valid masks are <code>1</code> through <code>7</code>. Roles can share a token address. Selecting any role for an address includes the holder&#39;s proportional share of that token&#39;s entire unreserved balance, paid once. To skip a token, omit every role that uses its address.</p>
+<p>Suppose a call uses WETH collateral and USDC for both premium and quote. The shares being redeemed entitle the holder to 2 WETH and 6,000 USDC. Mask <code>7</code> sends both amounts to the recipient. If USDC cannot be transferred, mask <code>1</code> requests only the 2 WETH and omits both USDC roles. On success, all the requested shares are burned and the holder permanently gives up the 6,000 USDC attributable to those shares. That USDC stays in the vault for any remaining shares. If no shares remain, no LP can recover it through this function.</p>
+<p>Show forfeiture as an explicit choice with the skipped token and amount. It does not defer payment: burned shares cannot be used to claim the skipped tokens later. Reserved premium, treasury obligations and buyer payouts remain protected under every mask.</p>
 <h2 id="cash-expiry-fallback">Cash expiry fallback</h2>
 <p>For this release, creation snapshots <code>expiryPricePublicationWindow</code> (<code>P</code>) and <code>exerciseWindow</code> (<code>W</code>). Show both to depositors before funding and to buyers before signing. The final-price publication deadline is <code>D = expiry + P</code>; the physical fallback deadline is <code>F = D + W</code>. Cash-capable vaults require positive values. Settings changes affect only new vaults. A signed bid binds the immutable fallback terms through its Hub and vault identity; no bid field or domain-version change is needed.</p>
 <p>Use <code>settlementStatus(vaultId)</code> to read <code>(route, publicationDeadline, fallbackDeadline, canSettleAtExpiry)</code> even if no one has transacted since expiry. Routes are <code>Physical = 0</code>, <code>Cash = 1</code>, <code>AwaitingExpiryPrice = 2</code>, <code>PhysicalFallback = 3</code>, <code>FallbackExpired = 4</code>, <code>Inactive = 5</code>. The last covers positions outside Live. <code>stateOf(vaultId).settlement</code> preserves the originally agreed settlement type. <code>settleAtExpiryTimeOf(vaultId)</code> returns expiry for cash with an accepted final price, <code>F</code> for cash without one, and <code>expiry + W</code> for an originally physical position. Read <code>canSettleAtExpiry</code> as well as the timestamp; a settled vault cannot be settled again.</p>
