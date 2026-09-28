@@ -1,4 +1,4 @@
-import { Transaction, getAddress, keccak256 } from "ethers"
+import { Transaction, formatUnits, getAddress, keccak256 } from "ethers"
 import type { Signer, TransactionReceipt } from "ethers"
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises"
 import { hostname } from "node:os"
@@ -91,6 +91,7 @@ export class Transactions {
 	readonly state: State
 	readonly persist: (state: State) => Promise<void>
 	readonly options: RunOptions
+	private lastConfirmedNonce?: number
 
 	constructor(signer: Signer, identity: PlanIdentity, state: State, persist: (state: State) => Promise<void>, options: RunOptions) {
 		this.signer = signer
@@ -142,9 +143,12 @@ export class Transactions {
 			const confirmed = await provider.waitForTransaction(receipt.hash, this.options.confirmations, this.options.timeoutMs)
 			if (!confirmed) throw new Error(`Confirmation timeout: ${id}; run resume again`)
 			if (confirmed.status !== 1) throw new Error(`Transaction reverted: ${id} (${confirmed.hash}). Stop and inspect; its nonce was consumed.`)
+			const confirmedRaw = entry.attempts.find(raw => keccak256(raw) === confirmed.hash)
+			if (!confirmedRaw) throw new Error(`Confirmed transaction missing from journal: ${id}`)
 			entry.hash = confirmed.hash
 			entry.blockNumber = confirmed.blockNumber
 			await this.persist(this.state)
+			this.lastConfirmedNonce = Math.max(this.lastConfirmedNonce ?? -1, Transaction.from(confirmedRaw).nonce)
 			this.options.log?.(`${id}: confirmed ${confirmed.hash}`)
 			return confirmed
 		}
@@ -157,8 +161,10 @@ export class Transactions {
 			const previous = raw ? validate(raw) : undefined
 			const latest = Number(BigInt(await provider.send("eth_getTransactionCount", [this.identity.deployer, "latest"])))
 			const pending = Number(BigInt(await provider.send("eth_getTransactionCount", [this.identity.deployer, "pending"])))
-			const nonce = previous?.nonce ?? intent.nonce ?? latest
-			if (latest !== nonce || (!previous && pending !== nonce))
+			const nonce = previous?.nonce ?? intent.nonce ?? (this.lastConfirmedNonce === undefined ? latest : this.lastConfirmedNonce + 1)
+			// An RPC can expose a confirmed receipt before its "latest" account nonce catches up.
+			const journalCoversLag = this.lastConfirmedNonce !== undefined && this.lastConfirmedNonce + 1 === nonce
+			if (latest > nonce || (!previous && (pending !== nonce || (latest < nonce && !journalCoversLag))))
 				throw new Error(`Nonce conflict: ${id}, expected ${nonce}, latest ${latest}, pending ${pending}`)
 			const fees = await provider.getFeeData()
 			const bump = (value: bigint) => (value * 125n + 99n) / 100n
@@ -167,7 +173,9 @@ export class Transactions {
 			const fee = maximum(fees.maxFeePerGas ?? 0n, tip, previous ? bump(previous.maxFeePerGas!) : 0n)
 			if (fee === 0n || tip === 0n) throw new Error("RPC did not return EIP-1559 fees")
 			if (fee > this.options.maxFeePerGas || tip > this.options.maxPriorityFeePerGas)
-				throw new Error("Gas fee exceeds configured cap; adjust fee caps and resume")
+				throw new Error(
+					`Gas fee quote for ${id} exceeds configured cap: max ${formatUnits(fee, "gwei")} gwei (cap ${formatUnits(this.options.maxFeePerGas, "gwei")}), priority ${formatUnits(tip, "gwei")} gwei (cap ${formatUnits(this.options.maxPriorityFeePerGas, "gwei")}). Adjust DEPLOY_MAX_FEE_GWEI or DEPLOY_MAX_PRIORITY_FEE_GWEI and resume.`,
+				)
 			const request = {
 				to: intent.to,
 				data: intent.data,

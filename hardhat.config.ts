@@ -28,14 +28,8 @@ export default defineConfig({
 			type: "http",
 			chainType: "l1",
 			chainId: 137,
-			url: configVariable("POLYGON_RPC_URL"),
-			accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
-		},
-		sepolia: {
-			type: "http",
-			chainType: "l1",
-			url: configVariable("SEPOLIA_RPC_URL"),
-			accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+			url: configVariable("POLYGON_RPC"),
+			accounts: [configVariable("IVY_DEPLOYER")],
 		},
 	},
 })

@@ -1,5 +1,6 @@
+import { verifyContract } from "@nomicfoundation/hardhat-verify/verify"
 import { formatEther, getAddress, keccak256, parseUnits } from "ethers"
-import { artifacts as hardhatArtifacts, network } from "hardhat"
+import hre, { artifacts as hardhatArtifacts, network } from "hardhat"
 import { readFile } from "node:fs/promises"
 import { resolve, join } from "node:path"
 
@@ -9,6 +10,7 @@ import type { Config, Plan } from "./deployment.ts"
 import { deploymentSigner } from "./signer.ts"
 import { Transactions, atomicJson, readJson, withLock } from "./transactions.ts"
 import type { State } from "./transactions.ts"
+import { verifyAllContracts } from "./verification.ts"
 
 const positive = (name: string, fallback: number) => {
 	const value = Number(process.env[name] || fallback)
@@ -126,6 +128,14 @@ export async function runDeployment(command: "plan" | "deploy" | "status" | "bum
 			await executePlan(plan, runner, bundle => atomicJson(join(directory, "release.json"), bundle))
 			await atomicJson(join(directory, "addresses.json"), { chainId, ...plan.addresses })
 			console.log(`Deployment and setup verified. Addresses: ${join(directory, "addresses.json")}`)
+			for (const step of plan.steps) {
+				const name = step.name in plan.artifacts ? step.name : step.name === "IvyVaultsRegistry" ? step.name : "FakeToken"
+				const saved = name === "IvyVaultsRegistry" ? plan.registryArtifact : name === "FakeToken" ? plan.tokenArtifact : plan.artifacts[name]
+				const current = await hardhatArtifacts.readArtifact(name)
+				if (saved.bytecode !== current.bytecode || saved.deployedBytecode !== current.deployedBytecode)
+					throw new Error(`Local build differs from saved deployment plan: ${name}; restore the deployed source before verification`)
+			}
+			await verifyAllContracts(plan, state, target => verifyContract(target, hre))
 		})
 	} catch (error) {
 		// RPC errors may contain authenticated URLs or raw transactions. Print a short message only.

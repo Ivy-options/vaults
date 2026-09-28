@@ -6,11 +6,11 @@ The deployment scripts use the network and accounts selected by Hardhat. Configu
 npx hardhat run scripts/deploy.ts --network polygon
 ```
 
-Rerun the same command to resume. On the first run it saves a deployment plan, then deploys and configures Ivy, its release registry, and fUSDC, fETH, and fBTC. Subsequent runs recover recorded transactions and continue without repeating deployments or initial mints.
+Rerun the same command to resume. On the first run it saves a deployment plan, then deploys and configures Ivy, its release registry, and fUSDC, fETH, and fBTC. Subsequent runs recover recorded transactions and continue without repeating deployments or initial mints. After setup, it checks the saved build against local artifacts and submits all 12 contracts and libraries for source verification on Sourcify. If source verification fails, rerun the same command; confirmed transactions are not repeated.
 
 ## Configuration
 
-The config includes a `polygon` network using `POLYGON_RPC_URL` and `DEPLOYER_PRIVATE_KEY`. Set them in your environment, Hardhat keystore, or `.env`. `hardhat.config.ts` loads `.env` when present. `.env.example` lists the deployment settings; Git ignores `.env`.
+The config includes a `polygon` network using `POLYGON_RPC` and `IVY_DEPLOYER`. Set them in your environment, Hardhat keystore, or `.env`. `hardhat.config.ts` loads `.env` when present. `.env.example` lists the deployment settings; Git ignores `.env`.
 
 For another chain, add its network entry and pass its name to `--network`. There is no chain allowlist in the scripts. The configured `chainId`, when present, must match the RPC. The compiler targets Cancun; the selected chain must support those opcodes, including the transient storage used by the contracts. The network must accept EIP-1559 transactions, and its RPC must return positive maximum and priority fee estimates.
 
@@ -58,11 +58,15 @@ Replace `polygon` with any configured network name. Standard Hardhat options suc
 
 Each signed transaction is flushed to `state.json` before broadcast. After an RPC outage, timeout, dropped transaction, or lost response, rerun `deploy.ts`. It checks receipts and can rebroadcast the exact saved transaction. The fee-bump script keeps all replacement hashes and raises fees by at least 25%, subject to `DEPLOY_MAX_FEE_GWEI` and `DEPLOY_MAX_PRIORITY_FEE_GWEI`. Raising those caps alone does not change an already-signed transaction.
 
+If a new transaction's RPC fee quote exceeds either configured cap, the runner stops before signing it and prints the quote, both caps, and the blocked step. Set higher `DEPLOY_MAX_FEE_GWEI` and/or `DEPLOY_MAX_PRIORITY_FEE_GWEI` only if those prices are acceptable, then rerun `deploy.ts` with the same network and deployment directory. The saved plan and confirmed transactions remain usable.
+
 If a process is killed and leaves `.lock`, confirm that no runner remains active, remove only that lock from the deployment directory, and rerun. Insufficient gas balance can be resolved by funding the same deployer. Nonce conflicts, mismatched identities, missing confirmed receipts, and mined reverts stop execution for inspection. A reverted creation consumes its nonce and can invalidate remaining predicted addresses; it may require a new plan in a new directory.
 
 Keep `plan.json` and `state.json` intact and backed up. State contains signed transactions but no private key. Do not delete it to retry. The lock protects a single directory; it does not coordinate separate deployments using the same account.
 
 After setup verification, `addresses.json` contains deployed addresses. Predicted addresses in `plan.json` are not evidence of deployment. `release.json` contains the core ABIs and deployment evidence used by the release resolver; registry release `1` is registered and recommended. Token and registry ABIs are in `plan.json`, under `tokenArtifact.abi` and `registryArtifact.abi`. The release bundle is written after core verification, before registry setup finishes.
+
+Source verification uses Sourcify and requires the local build to match the artifacts frozen in `plan.json`. It runs only after on-chain setup verification and `addresses.json` are complete. An explorer outage can therefore leave a fully deployed setup with a nonzero script exit; rerunning the command retries source verification. Sourcify verification does not imply that PolygonScan has separately verified the contracts.
 
 ## Verification
 

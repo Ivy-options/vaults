@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { Contract, Transaction, Wallet, keccak256, parseUnits } from "ethers"
+import { Contract, ContractFactory, Transaction, Wallet, keccak256, parseUnits } from "ethers"
 import { artifacts, network } from "hardhat"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -9,7 +9,8 @@ import { TOKENS, buildPlan, executePlan } from "../../scripts/deploy/deployment.
 import type { Config } from "../../scripts/deploy/deployment.ts"
 import { Transactions, atomicJson, readJson, withLock } from "../../scripts/deploy/transactions.ts"
 import type { RunOptions, State } from "../../scripts/deploy/transactions.ts"
-import { loadArtifacts, planHash } from "../../scripts/deployment.ts"
+import { verificationTargets, verifyAllContracts } from "../../scripts/deploy/verification.ts"
+import { linkBytecode, loadArtifacts, planHash } from "../../scripts/deployment.ts"
 import { verifyRelease } from "../../scripts/releases.ts"
 import type { ReleaseBundle } from "../../scripts/releases.ts"
 import { skipUnderCoverage } from "../helpers/setup.ts"
@@ -221,7 +222,118 @@ describe("Test environment resumable deployment", function () {
 		await expect(wrongChain.checkIdentity(plan)).to.be.rejectedWith("Wrong chain")
 		await expect(runner.run("nonce", { to: wallet.address, data: "0x", nonce: 3 })).to.be.rejectedWith("Nonce conflict")
 		const lowCap = new Transactions(wallet, plan.core, state, async () => {}, { ...options, maxFeePerGas: 1n })
-		await expect(lowCap.run("cap", { to: wallet.address, data: "0x" })).to.be.rejectedWith("fee exceeds")
+		await expect(lowCap.run("cap", { to: wallet.address, data: "0x" })).to.be.rejectedWith("exceeds configured cap")
+	})
+
+	it("reports the fee quote, configured caps, and blocked step", async () => {
+		const { wallet, runner } = await context()
+		const restore = interceptProvider("getFeeData", async () => ({
+			maxFeePerGas: parseUnits("800", "gwei"),
+			maxPriorityFeePerGas: parseUnits("150", "gwei"),
+		}))
+		try {
+			await expect(runner.run("deploy:IvyShares", { data: "0x", nonce: 0 })).to.be.rejectedWith(
+				"deploy:IvyShares exceeds configured cap: max 800.0 gwei (cap 500.0), priority 150.0 gwei (cap 100.0)",
+			)
+		} finally {
+			restore()
+		}
+	})
+
+	it("continues after a confirmed transaction when the RPC latest nonce lags behind pending", async () => {
+		const { wallet, plan, runner, state } = await context()
+		const intent = { to: wallet.address, data: "0x" }
+		await runner.run("first", intent)
+		const resumed = new Transactions(wallet, plan.core, state, async () => {}, options)
+		await resumed.run("first", intent)
+		const original = provider.send.bind(provider)
+		const restore = interceptProvider("send", async (method, params) => {
+			if (method === "eth_getTransactionCount" && params[0] === wallet.address) return params[1] === "latest" ? "0x0" : "0x1"
+			return original(method, params)
+		})
+		try {
+			await resumed.run("second", intent)
+		} finally {
+			restore()
+		}
+		expect(Transaction.from(state.entries.second.attempts[0]).nonce).to.equal(1)
+	})
+
+	it("rejects a pending nonce without a confirmed journal predecessor", async () => {
+		const { wallet, runner } = await context()
+		const original = provider.send.bind(provider)
+		const restore = interceptProvider("send", async (method, params) => {
+			if (method === "eth_getTransactionCount" && params[0] === wallet.address) return params[1] === "latest" ? "0x0" : "0x1"
+			return original(method, params)
+		})
+		try {
+			await expect(runner.run("unrecorded", { to: wallet.address, data: "0x" })).to.be.rejectedWith(
+				"Nonce conflict: unrecorded, expected 0, latest 0, pending 1",
+			)
+		} finally {
+			restore()
+		}
+	})
+
+	it("prepares and attempts source verification for all twelve creations", async () => {
+		const { plan, state } = await context()
+		for (const step of plan.steps)
+			state.entries[`deploy:${step.name}`] = { intent: { data: step.data, nonce: step.nonce }, attempts: [], hash: `0x${"ab".repeat(32)}` }
+		const targets = verificationTargets(plan, state)
+		expect(targets).to.have.length(12)
+		for (const [index, step] of plan.steps.entries()) {
+			const target = targets[index]
+			const name = step.name in plan.artifacts ? step.name : step.name === "IvyVaultsRegistry" ? step.name : "FakeToken"
+			const artifact = name === "IvyVaultsRegistry" ? plan.registryArtifact : name === "FakeToken" ? plan.tokenArtifact : plan.artifacts[name]
+			const local = await artifacts.readArtifact(name)
+			expect(target.contract).to.equal(`${local.sourceName}:${local.contractName}`)
+			const deployment = await new ContractFactory(step.abi, linkBytecode(artifact, plan.addresses)).getDeployTransaction(
+				...(target.constructorArgs ?? []),
+			)
+			expect(deployment.data).to.equal(step.data)
+		}
+		expect(targets.find(target => target.name === "IvyVaultsHub")?.constructorArgs).to.deep.equal([
+			plan.core.admin,
+			plan.addresses.IvyVault,
+			plan.addresses.IvyShares,
+			plan.addresses.IvyPremiums,
+			plan.addresses.IvyStandardBidRules,
+			plan.core.exerciseWindow,
+			plan.core.auctionTimeout,
+			plan.core.expiryPricePublicationWindow,
+		])
+		expect(targets.find(target => target.name === "fBTC")?.contract).to.equal("contracts/mocks/FakeToken.sol:FakeToken")
+		const seen: string[] = []
+		await verifyAllContracts(
+			plan,
+			state,
+			async target => {
+				seen.push(target.address)
+				return true
+			},
+			() => {},
+		)
+		expect(seen).to.deep.equal(plan.steps.map(step => step.address))
+	})
+
+	it("reports every source verification failure after trying the remaining contracts", async () => {
+		const { plan, state } = await context()
+		for (const step of plan.steps)
+			state.entries[`deploy:${step.name}`] = { intent: { data: step.data, nonce: step.nonce }, attempts: [], hash: `0x${"ab".repeat(32)}` }
+		const seen: string[] = []
+		await expect(
+			verifyAllContracts(
+				plan,
+				state,
+				async target => {
+					seen.push(target.address)
+					if ([plan.addresses.fUSDC, plan.addresses.fETH].includes(target.address)) throw new Error("Explorer unavailable")
+					return true
+				},
+				() => {},
+			),
+		).to.be.rejectedWith("Source verification incomplete for fUSDC, fETH")
+		expect(seen).to.have.length(12)
 	})
 
 	it("stops on a mined revert instead of changing the nonce and duplicating later steps", async () => {
