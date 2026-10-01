@@ -264,7 +264,7 @@ test('map references land on their exact headings after zoom and repeated visits
 
 test('every Map explanation opens a section of the main Guide', () => withMap(async page => {
   const links = await page.locator('#document a[data-guide]').evaluateAll(links => links.map(link => ({path: new URL(link.href).pathname, hash: new URL(link.href).hash})));
-  assert.equal(links.length, 3);
+  assert.equal(links.length, 4);
   for (const link of links) {
     assert.equal(link.path, '/index.html');
     assert.ok(link.hash, 'each reference identifies a Guide section');

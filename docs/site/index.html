@@ -163,6 +163,7 @@
     </ul>
     <p>The shipped validator is bound to the release price feed. Rules from another allowlisted validator are custom. Every vault must include PairLimits with a nonzero strike range and premium floor for every pair, and a TenorRange or ExpiryWindow rule. Activation also enforces a nonzero strike, notional and total premium, and an expiry in the future.</p>
     <p>A rule’s id is its position in the list. At activation the <strong class="role-buyer">buyer</strong> (signed) and the <strong class="role-bid">bid master</strong> (unsigned) may each pass one data slot per rule, and each rule sees only its own.</p>
+    <p class="reference"><a href="index.html#bid-rules" data-guide>Every rule, its options and what can be added later ↗</a></p>
     <section data-kind="tile" id="activation-price-guard"><h5>Optional activation price check</h5>
     <p>A strike far into the money sells the option too cheaply. If the <strong class="role-owner">owner</strong> listed a SpotBand rule, activation also checks the strike against spot:</p>
     <ul class="reading-list" role="list">

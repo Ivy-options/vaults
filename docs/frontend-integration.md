@@ -208,6 +208,8 @@ A vault stores a list of bid rules chosen by its creator and frozen at creation.
 - A vault has no expiry until activation. `stateOf(vaultId).expiry` is zero before then, `settlementStatus` returns zero deadlines and `settleAtExpiryTimeOf` returns zero. Show the expiry rules instead, and read the chosen expiry from `Activated` or `stateOf` once Live. An auction never unlocks at an expiry: LPs exit through the auction timeout, an admission pause or a bid master cancellation, even after an `ExpiryWindow` has closed.
 - Flag `MinImpliedVol`, and any custom rule documented as reading `bidMasterData`, as trusting the bid master: that check is only as good as the bid master's attestation.
 
+The guide's [Bid rules](site/index.html#bid-rules) section explains what each kind checks, its errors, common combinations and what future validators can add.
+
 Bids commit to `termsHashOf(vaultId)`, the hash of the creator's terms, pairs and rules. Fill `termsHash` from that view when building a bid to sign. Protocol settings snapshotted at creation are not in the hash: read `exerciseWindow`, `auctionTimeout` and `expiryPricePublicationWindow` from `stateOf(vaultId)`, and the fee rate from `vaultPlatformFeeBps(vaultId)`, before quoting.
 
 ## Pass rule data at activation

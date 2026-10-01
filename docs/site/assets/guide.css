@@ -1890,3 +1890,14 @@ footer {
 }
 
 #physical-delivery-example > p { grid-column: 1 / -1; }
+
+/* Bid rules: one short labelled line per fact, and rule names that never break mid-word. */
+.bid-rule-cards dd p {
+  margin: 0;
+}
+.bid-rule-cards dd p + p {
+  margin-top: 6px;
+}
+#bid-rules td.k code {
+  white-space: nowrap;
+}
