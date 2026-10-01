@@ -9,7 +9,7 @@ contract ApproveAllValidator is IIvyBidValidator {
 		return IIvyBidValidator.validateConfig.selector;
 	}
 
-	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external pure returns (bytes4) {
+	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata, bytes calldata, bytes calldata) external pure returns (bytes4) {
 		return IIvyBidValidator.validateBid.selector;
 	}
 }
@@ -21,7 +21,7 @@ contract RejectAllValidator is IIvyBidValidator {
 		return IIvyBidValidator.validateConfig.selector;
 	}
 
-	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external pure returns (bytes4) {
+	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata, bytes calldata, bytes calldata) external pure returns (bytes4) {
 		revert Rejected();
 	}
 }
@@ -31,7 +31,7 @@ contract WrongSelectorValidator is IIvyBidValidator {
 		return 0x00000000;
 	}
 
-	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external pure returns (bytes4) {
+	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata, bytes calldata, bytes calldata) external pure returns (bytes4) {
 		return 0x00000000;
 	}
 }
@@ -43,7 +43,7 @@ contract ConfigRevertValidator is IIvyBidValidator {
 		revert BadConfig();
 	}
 
-	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external pure returns (bytes4) {
+	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata, bytes calldata, bytes calldata) external pure returns (bytes4) {
 		return IIvyBidValidator.validateBid.selector;
 	}
 }
@@ -52,7 +52,7 @@ contract ConfigRevertValidator is IIvyBidValidator {
 contract StateWritingValidator {
 	uint256 public calls;
 
-	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external returns (bytes4) {
+	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata, bytes calldata, bytes calldata) external returns (bytes4) {
 		++calls;
 		return IIvyBidValidator.validateBid.selector;
 	}
@@ -81,7 +81,14 @@ contract ContextAssertingValidator is IIvyBidValidator {
 		return IIvyBidValidator.validateConfig.selector;
 	}
 
-	function validateBid(bytes4, BidContext calldata context, Bid calldata bid, bytes calldata) external view returns (bytes4) {
+	function validateBid(
+		bytes4,
+		BidContext calldata context,
+		Bid calldata bid,
+		bytes calldata,
+		bytes calldata,
+		bytes calldata
+	) external view returns (bytes4) {
 		if (
 			context.premiumToken != expectedPremiumToken ||
 			context.totalNotional != expectedTotalNotional ||
@@ -102,7 +109,33 @@ contract WrongBidSelectorValidator is IIvyBidValidator {
 		return IIvyBidValidator.validateConfig.selector;
 	}
 
-	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata) external pure returns (bytes4) {
+	function validateBid(bytes4, BidContext calldata, Bid calldata, bytes calldata, bytes calldata, bytes calldata) external pure returns (bytes4) {
 		return IIvyBidValidator.validateConfig.selector;
+	}
+}
+
+/// @dev Config is `abi.encode(bytes expectedMarketMakerData, bytes expectedBidMasterData)`. Accepts only when its own slots match,
+///      which proves the hub routes slot `i` to rule `i` and to nobody else.
+contract SlotEchoValidator is IIvyBidValidator {
+	error UnexpectedSlot(bytes marketMakerData, bytes bidMasterData);
+
+	function validateConfig(bytes4, VaultTerms calldata, PairConfig[] calldata, bytes calldata data) external pure returns (bytes4) {
+		abi.decode(data, (bytes, bytes));
+		return IIvyBidValidator.validateConfig.selector;
+	}
+
+	function validateBid(
+		bytes4,
+		BidContext calldata,
+		Bid calldata,
+		bytes calldata config,
+		bytes calldata marketMakerData,
+		bytes calldata bidMasterData
+	) external pure returns (bytes4) {
+		(bytes memory expectedMarketMaker, bytes memory expectedBidMaster) = abi.decode(config, (bytes, bytes));
+		if (keccak256(marketMakerData) != keccak256(expectedMarketMaker) || keccak256(bidMasterData) != keccak256(expectedBidMaster)) {
+			revert UnexpectedSlot(marketMakerData, bidMasterData);
+		}
+		return IIvyBidValidator.validateBid.selector;
 	}
 }

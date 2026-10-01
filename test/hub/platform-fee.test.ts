@@ -127,7 +127,7 @@ describe("platform fee", () => {
 		let bid: Bid
 		let signature: string
 
-		const activateBid = () => c.hub.connect(c.bidMaster).activate(o.vaultId, bid, signature)
+		const activateBid = () => c.hub.connect(c.bidMaster).activate(o.vaultId, bid, [], signature, [])
 
 		describe("rate", () => {
 			for (const { name, creationRate, activationRate, fee } of RATE_CHANGES) {

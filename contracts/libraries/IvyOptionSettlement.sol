@@ -159,10 +159,12 @@ library IvyOptionSettlement {
 	}
 
 	/// @notice Availability is derived from immutable deadlines, even if no fallback transaction has occurred.
+	/// @dev Before activation there is no expiry, so every deadline reads zero.
 	function settlementStatus(
 		VaultState storage state,
 		SettlementPrices storage prices
 	) external view returns (SettlementRoute route, uint256 publicationDeadline, uint256 fallbackDeadline, bool canSettleAtExpiry) {
+		if (state.expiry == 0) return (SettlementRoute.Inactive, 0, 0, false);
 		publicationDeadline = uint256(state.expiry) + state.expiryPricePublicationWindow;
 		fallbackDeadline = publicationDeadline + state.exerciseWindow;
 		if (state.phase != Phase.Live) return (SettlementRoute.Inactive, publicationDeadline, fallbackDeadline, false);
@@ -178,7 +180,9 @@ library IvyOptionSettlement {
 		}
 	}
 
+	/// @dev Zero before activation, when the winning bid has not yet chosen the expiry.
 	function settleAtExpiryTime(VaultState storage state, SettlementPrices storage prices) public view returns (uint256) {
+		if (state.expiry == 0) return 0;
 		if (state.settlement == SettlementType.Cash) {
 			return prices.expiry != 0 ? uint256(state.expiry) : uint256(state.expiry) + state.expiryPricePublicationWindow + state.exerciseWindow;
 		}

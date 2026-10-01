@@ -1,7 +1,8 @@
 import { expect } from "chai"
-import { ZeroAddress, id } from "ethers"
+import { AbiCoder, ZeroAddress, id } from "ethers"
 import { network } from "hardhat"
 
+import { encodeImpliedVolAttestation, hashMarketMakerData } from "../../scripts/encoding.ts"
 import { signBid, type Bid } from "../helpers/bids.js"
 import {
 	CALL_DEPOSIT,
@@ -23,17 +24,19 @@ import {
 	Phase,
 	RuleKind,
 	SettlementType,
-	THIRTY_DAYS,
 	WETH_UNIT,
 	callPairs,
 	callTerms,
 	createVaultAs,
 	deployIvy,
+	expiryWindowRule,
 	fixture,
 	fund,
+	minImpliedVolRule,
 	premiumFloorRule,
 	putPairs,
 	putTerms,
+	tenorRangeRule,
 	usdc,
 	weth,
 	type IvyContext,
@@ -47,10 +50,23 @@ const { ethers, networkHelpers } = connection
 const customRule = (validator: string, kind = "0x00000000") => ({ validator, kind, data: "0x" })
 const allowValidator = (c: IvyContext, validator: string) => c.hub.grantRole(id("BID_VALIDATOR_ROLE"), validator)
 
-/** The bid master submits `bid` on `vaultId`, signed by `signer`. */
-async function submit(c: IvyContext, vaultId: bigint, bid: Bid, signer = c.marketMaker) {
-	return c.hub.connect(c.bidMaster).activate(vaultId, bid, await signBid(signer, c.hubAddress, bid))
+const DAY = 24n * 3600n
+
+/** The bid master submits `bid` on `vaultId`, signed by `signer`, with any per-rule data slots. */
+async function submit(
+	c: IvyContext,
+	vaultId: bigint,
+	bid: Bid,
+	signer = c.marketMaker,
+	data: { marketMakerData?: string[]; bidMasterData?: string[] } = {},
+) {
+	const signature = await signBid(signer, c.hubAddress, bid)
+	return c.hub.connect(c.bidMaster).activate(vaultId, bid, data.marketMakerData ?? [], signature, data.bidMasterData ?? [])
 }
+
+/** SlotEchoValidator config: the only market-maker and bid-master slots it accepts. */
+const echoes = (marketMakerData: string, bidMasterData: string) =>
+	AbiCoder.defaultAbiCoder().encode(["bytes", "bytes"], [marketMakerData, bidMasterData])
 
 const deployed = fixture(connection, () => deployIvy(connection))
 const physicalCall = fixture(deployed, async c => ({ c, v: await openVault(c) }))
@@ -62,7 +78,7 @@ const livePhysicalPut = fixture(physicalPut, async ({ c, v }) => {
 const callWithFeed = fixture(deployed, async c => ({ c, v: await openVault(c, { withFeed: true }) }))
 const putWithFeed = fixture(deployed, async c => ({
 	c,
-	v: await openVault(c, { isCall: false, withFeed: true, pair: { strikeLimit: usdc(10_000) } }),
+	v: await openVault(c, { isCall: false, withFeed: true, pair: { maxStrike: usdc(10_000) } }),
 }))
 const europeanOnlyCall = fixture(deployed, async c => ({
 	c,
@@ -85,11 +101,11 @@ const dustPut = fixture(deployed, async c => {
 
 const callWithStrikeLimit = fixture(deployed, async c => ({
 	c,
-	v: await openVault(c, { pair: { strikeLimit: usdc(3100) } }),
+	v: await openVault(c, { pair: { minStrike: usdc(3100) } }),
 }))
 const putWithStrikeLimit = fixture(deployed, async c => ({
 	c,
-	v: await openVault(c, { isCall: false, pair: { strikeLimit: usdc(2900) } }),
+	v: await openVault(c, { isCall: false, pair: { maxStrike: usdc(2900) } }),
 }))
 const callWithMinPremium = fixture(deployed, async c => ({
 	c,
@@ -97,7 +113,7 @@ const callWithMinPremium = fixture(deployed, async c => ({
 }))
 const callWithLimitsAndBand = fixture(deployed, async c => ({
 	c,
-	v: await openVault(c, { pair: { strikeLimit: usdc(3100), minPremiumPerUnit: usdc(50) }, withFeed: true }),
+	v: await openVault(c, { pair: { minStrike: usdc(3100), minPremiumPerUnit: usdc(50) }, withFeed: true }),
 }))
 const approveThenReject = fixture(deployed, async c => {
 	const reject = await c.ethers.deployContract("RejectAllValidator")
@@ -109,19 +125,45 @@ const approveThenReject = fixture(deployed, async c => {
 })
 const limitsThenPremiumFloor = fixture(deployed, async c => {
 	const v = await openVault(c, {
-		pair: { strikeLimit: usdc(3100), minPremiumPerUnit: 1n },
+		pair: { minStrike: usdc(3100), minPremiumPerUnit: 1n },
 		rules: [premiumFloorRule(c, { maxPriceAge: 3600, minPremiumBps: 500 })],
 	})
 	await setSpot(c, STRIKE)
 	return { c, v }
 })
 const twinCalls = fixture(deployed, async c => {
-	const expiry = BigInt(await c.networkHelpers.time.latest()) + TENOR
-	const v = await openVault(c, { terms: { expiry }, pair: { minPremiumPerUnit: 1n } })
+	const v = await openVault(c, { pair: { minPremiumPerUnit: 1n } })
 	// The terms hash excludes the auction schedule, so only this start time differs.
-	const twin = await openVault(c, { terms: { expiry, auctionStartsAt: 1_900_000_000n }, pair: { minPremiumPerUnit: 1n } })
+	const twin = await openVault(c, { terms: { auctionStartsAt: 1_900_000_000n }, pair: { minPremiumPerUnit: 1n } })
 	return { c, v, twin }
 })
+const tenorCall = fixture(deployed, async c => ({ c, v: await openVault(c, { expiryRules: [tenorRangeRule(c, 10n * DAY, 30n * DAY)] }) }))
+/** A window from 20 to 40 days out, and a 10 to 30 day tenor: together, 20 to 30 days. */
+const windowedTenorCall = fixture(deployed, async c => {
+	const now = BigInt(await c.networkHelpers.time.latest())
+	const window = { notBefore: now + 20n * DAY, notAfter: now + 40n * DAY }
+	const v = await openVault(c, { expiryRules: [tenorRangeRule(c, 10n * DAY, 30n * DAY), expiryWindowRule(c, window.notBefore, window.notAfter)] })
+	return { c, v, window }
+})
+/** Rules 0 and 1 are PairLimits and TenorRange; rules 2 and 3 each accept only their own slots. */
+const echoCall = fixture(deployed, async c => {
+	const echo = await c.ethers.deployContract("SlotEchoValidator")
+	const address = await echo.getAddress()
+	await allowValidator(c, address)
+	const rules = [
+		{ validator: address, kind: "0x00000000", data: echoes("0xaa02", "0xbb02") },
+		{ validator: address, kind: "0x00000000", data: echoes("0xaa03", "0xbb03") },
+	]
+	return { c, v: await openVault(c, { rules }), echo }
+})
+/** Rule 2 accepts only empty slots. */
+const emptyEchoCall = fixture(deployed, async c => {
+	const echo = await c.ethers.deployContract("SlotEchoValidator")
+	await allowValidator(c, await echo.getAddress())
+	return { c, v: await openVault(c, { rules: [{ validator: await echo.getAddress(), kind: "0x00000000", data: echoes("0x", "0x") }] }) }
+})
+/** Rule 2 is MinImpliedVol at 60%. */
+const volCall = fixture(deployed, async c => ({ c, v: await openVault(c, { rules: [minImpliedVolRule(c, 6000)] }) }))
 const approvedEuropeanOnlyCall = fixture(deployed, async c => {
 	const approve = await c.ethers.deployContract("ApproveAllValidator")
 	await allowValidator(c, await approve.getAddress())
@@ -255,7 +297,7 @@ describe("activate", () => {
 
 			it("rejects a caller without the bid master role", async () => {
 				const signature = await signBid(c.marketMaker, c.hubAddress, bid)
-				await expect(c.hub.connect(c.alice).activate(v.vaultId, bid, signature)).to.be.revertedWithCustomError(
+				await expect(c.hub.connect(c.alice).activate(v.vaultId, bid, [], signature, [])).to.be.revertedWithCustomError(
 					c.hub,
 					"AccessControlUnauthorizedAccount",
 				)
@@ -283,6 +325,7 @@ describe("activate", () => {
 				},
 				{ name: "a zero terms hash", change: (b: Bid) => ({ ...b, termsHash: "0x" + "00".repeat(32) }) },
 				{ name: "another terms hash", change: (b: Bid) => ({ ...b, termsHash: "0x" + "22".repeat(32) }) },
+				{ name: "market-maker data it does not carry", change: (b: Bid) => ({ ...b, marketMakerDataHash: hashMarketMakerData(["0x01"]) }) },
 			]
 			for (const { name, change } of commitments) {
 				it(`rejects a bid committing to ${name}`, async () => {
@@ -333,10 +376,6 @@ describe("activate", () => {
 				await at(c, bid.expiry)
 				await expect(submit(c, v.vaultId, bid)).to.be.revertedWithCustomError(c.hub, "ExpiryInPast")
 			})
-		})
-
-		it("rejects an expiry other than the one the LPs committed to", async () => {
-			await expect(activate(c, v.vaultId, v.vaultAddress, { tenor: THIRTY_DAYS + 60n })).to.be.revertedWithCustomError(c.hub, "CommitmentMismatch")
 		})
 
 		it("rejects cash settlement when the vault allows only physical", async () => {
@@ -619,7 +658,7 @@ describe("activate", () => {
 			})
 
 			it("lists the validator once per rule", async () => {
-				expect((await c.hub.rulesOf(v.vaultId)).map(r => r.validator)).to.deep.equal([c.bidRulesAddress, c.bidRulesAddress])
+				expect((await c.hub.rulesOf(v.vaultId)).map(r => r.validator)).to.deep.equal([c.bidRulesAddress, c.bidRulesAddress, c.bidRulesAddress])
 			})
 
 			it("rejects a strike below the limit even with a premium on the floor", async () => {
@@ -803,6 +842,191 @@ describe("activate", () => {
 					.connect(c.marketMaker)
 					.execute(c.hubAddress, c.hub.interface.encodeFunctionData("setExecutorAndRecipient", [v.vaultId, ZeroAddress, c.carol.address]))
 				expect((await c.hub.stateOf(v.vaultId)).executor).to.equal(ZeroAddress)
+			})
+		})
+	})
+
+	describe("expiry rules", () => {
+		context("call with a 10 to 30 day tenor", () => {
+			beforeEach(async () => {
+				;({ c, v } = await tenorCall())
+			})
+
+			it("takes the expiry from the winning bid", async () => {
+				const { bid } = await activate(c, v.vaultId, v.vaultAddress, { tenor: 20n * DAY })
+				expect((await c.hub.stateOf(v.vaultId)).expiry).to.equal(bid.expiry)
+			})
+
+			it("leaves the expiry unset until activation", async () => {
+				expect((await c.hub.stateOf(v.vaultId)).expiry).to.equal(0n)
+			})
+
+			it("rejects a tenor shorter than 10 days", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { tenor: 9n * DAY })).to.be.revertedWithCustomError(c.hub, "TenorOutOfRange")
+			})
+
+			it("rejects a tenor longer than 30 days", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { tenor: 31n * DAY })).to.be.revertedWithCustomError(c.hub, "TenorOutOfRange")
+			})
+
+			context("with a 30-day bid signed now", () => {
+				let bid: Bid
+
+				beforeEach(async () => {
+					bid = await makeBid(c, v.vaultId, { tenor: 30n * DAY, validFor: DAY })
+					await fund(c, c.usdc, c.marketMaker, v.vaultAddress, PREMIUM_TOTAL)
+				})
+
+				it("measures the tenor from activation, so the same expiry fits a day later", async () => {
+					await networkHelpers.time.increase(DAY - 10n)
+					await submit(c, v.vaultId, bid)
+					expect((await c.hub.stateOf(v.vaultId)).expiry).to.equal(bid.expiry)
+				})
+			})
+
+			context("with a 10-day bid valid for a day", () => {
+				let bid: Bid
+
+				beforeEach(async () => {
+					bid = await makeBid(c, v.vaultId, { tenor: 10n * DAY, validFor: DAY })
+					await fund(c, c.usdc, c.marketMaker, v.vaultAddress, PREMIUM_TOTAL)
+				})
+
+				it("rejects it once its remaining tenor falls under 10 days", async () => {
+					await networkHelpers.time.increase(60n)
+					await expect(submit(c, v.vaultId, bid)).to.be.revertedWithCustomError(c.hub, "TenorOutOfRange")
+				})
+			})
+		})
+
+		context("call with both a tenor range and an absolute window", () => {
+			let window: Loaded<typeof windowedTenorCall>["window"]
+
+			beforeEach(async () => {
+				;({ c, v, window } = await windowedTenorCall())
+			})
+
+			it("accepts an expiry both rules allow", async () => {
+				await activate(c, v.vaultId, v.vaultAddress, { expiry: window.notBefore + DAY })
+				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
+			})
+
+			it("rejects an expiry inside the tenor range but before the window", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { tenor: 15n * DAY })).to.be.revertedWithCustomError(c.hub, "ExpiryOutsideWindow")
+			})
+
+			it("rejects an expiry inside the window but past the tenor range", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { expiry: window.notAfter })).to.be.revertedWithCustomError(c.hub, "TenorOutOfRange")
+			})
+		})
+	})
+
+	describe("rule data", () => {
+		context("with two rules that each accept only their own slots", () => {
+			const marketMakerData = ["0x", "0x", "0xaa02", "0xaa03"]
+			const bidMasterData = ["0x", "0x", "0xbb02", "0xbb03"]
+			let echo: Loaded<typeof echoCall>["echo"]
+
+			beforeEach(async () => {
+				;({ c, v, echo } = await echoCall())
+			})
+
+			it("hands each rule the slot at its own index", async () => {
+				await activate(c, v.vaultId, v.vaultAddress, { marketMakerData, bidMasterData })
+				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
+			})
+
+			it("emits both arrays for anyone auditing the bid master's input", async () => {
+				const bid = await makeBid(c, v.vaultId, { marketMakerData })
+				await fund(c, c.usdc, c.marketMaker, v.vaultAddress, PREMIUM_TOTAL)
+				await expect(submit(c, v.vaultId, bid, c.marketMaker, { marketMakerData, bidMasterData }))
+					.to.emit(c.hub, "RuleDataProvided")
+					.withArgs(v.vaultId, marketMakerData, bidMasterData)
+			})
+
+			it("rejects bid-master slots in the wrong order", async () => {
+				const swapped = ["0x", "0x", "0xbb03", "0xbb02"]
+				await expect(activate(c, v.vaultId, v.vaultAddress, { marketMakerData, bidMasterData: swapped }))
+					.to.be.revertedWithCustomError(echo, "UnexpectedSlot")
+					.withArgs("0xaa02", "0xbb03")
+			})
+
+			it("rejects a bid-master array with one slot missing", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { marketMakerData, bidMasterData: bidMasterData.slice(0, 3) }))
+					.to.be.revertedWithCustomError(c.hub, "RuleDataLengthMismatch")
+					.withArgs(4, 3)
+			})
+
+			it("rejects a market-maker array with an extra slot", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { marketMakerData: [...marketMakerData, "0x"], bidMasterData }))
+					.to.be.revertedWithCustomError(c.hub, "RuleDataLengthMismatch")
+					.withArgs(4, 5)
+			})
+
+			context("with a bid signed over the market maker's slots", () => {
+				let bid: Bid
+
+				beforeEach(async () => {
+					bid = await makeBid(c, v.vaultId, { marketMakerData })
+					await fund(c, c.usdc, c.marketMaker, v.vaultAddress, PREMIUM_TOTAL)
+				})
+
+				it("rejects the bid master substituting other market-maker slots", async () => {
+					const substituted = ["0x", "0x", "0xaa02", "0xcc03"]
+					await expect(submit(c, v.vaultId, bid, c.marketMaker, { marketMakerData: substituted, bidMasterData })).to.be.revertedWithCustomError(
+						c.hub,
+						"CommitmentMismatch",
+					)
+				})
+
+				it("rejects the bid master dropping the market maker's slots", async () => {
+					await expect(submit(c, v.vaultId, bid, c.marketMaker, { bidMasterData })).to.be.revertedWithCustomError(c.hub, "CommitmentMismatch")
+				})
+			})
+		})
+
+		context("with a rule that accepts only empty slots", () => {
+			beforeEach(async () => {
+				;({ c, v } = await emptyEchoCall())
+			})
+
+			it("treats empty arrays as an empty slot for every rule", async () => {
+				await activate(c, v.vaultId, v.vaultAddress)
+				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
+			})
+
+			it("emits no RuleDataProvided when neither party supplies data", async () => {
+				const bid = await makeBid(c, v.vaultId)
+				await fund(c, c.usdc, c.marketMaker, v.vaultAddress, PREMIUM_TOTAL)
+				await expect(submit(c, v.vaultId, bid)).to.not.emit(c.hub, "RuleDataProvided")
+			})
+		})
+
+		context("call requiring a 60% implied volatility", () => {
+			const attest = (volBps: number) => ["0x", "0x", encodeImpliedVolAttestation(volBps)]
+
+			beforeEach(async () => {
+				;({ c, v } = await volCall())
+			})
+
+			it("accepts a bid the bid master attests at 65%", async () => {
+				await activate(c, v.vaultId, v.vaultAddress, { bidMasterData: attest(6500) })
+				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
+			})
+
+			it("rejects a bid the bid master attests at 50%", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { bidMasterData: attest(5000) })).to.be.revertedWithCustomError(c.hub, "VolTooLow")
+			})
+
+			it("rejects a bid without an attestation", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress)).to.be.revertedWithCustomError(c.hub, "MissingAttestation")
+			})
+
+			it("does not take the market maker's word for it", async () => {
+				await expect(activate(c, v.vaultId, v.vaultAddress, { marketMakerData: attest(9000) })).to.be.revertedWithCustomError(
+					c.hub,
+					"MissingAttestation",
+				)
 			})
 		})
 	})

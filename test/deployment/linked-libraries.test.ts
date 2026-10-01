@@ -41,12 +41,12 @@ const deployed = fixture(connection, async () => {
 
 const stepOf = (plan: DeploymentPlan, name: string) => plan.steps.find(s => s.name === name)!
 
-const TERMS_TUPLE = "tuple(address,address,bool,bool,uint8,uint8,uint64,uint64,uint256,uint32)"
+const TERMS_TUPLE = "tuple(address,address,bool,bool,uint8,uint8,uint64,uint256,uint32)"
 
 // Solidity library selectors use named storage types. These bodies would succeed on zeroed storage
 // without the compiler's direct-call guard, so their rejection tests that guard. The values are just
 // plausible passing inputs: an expiry just past with its hour-long publication window still open,
-// observations just made and valid for an hour, and terms expiring an hour out.
+// and observations just made and valid for an hour.
 const directCalls = [
 	{
 		name: "IvyOptionSettlement.settleAtExpiry",
@@ -74,7 +74,7 @@ const directCalls = [
 		library: "IvyVaultRules",
 		signature: "adoptRules(BidRule[] storage,VaultTerms,PairConfig[],BidRule[])",
 		types: ["uint256", TERMS_TUPLE, "tuple(address,address)[]", "tuple(address,bytes4,bytes)[]"],
-		values: (admin: string, now: bigint): unknown[] => [0, [admin, admin, false, false, 0, 0, now + 3600n, 0, 0, 0], [], []],
+		values: (admin: string): unknown[] => [0, [admin, admin, false, false, 0, 0, 0, 0, 0], [], []],
 	},
 ]
 

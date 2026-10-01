@@ -25,6 +25,7 @@ const sample: Bid = {
 	auctionId: 1n,
 	collateralAmount: 100n,
 	termsHash: "0x" + "11".repeat(32),
+	marketMakerDataHash: "0x" + "22".repeat(32),
 	executor: "0x3333333333333333333333333333333333333333",
 	recipient: "0x1111111111111111111111111111111111111111",
 }
@@ -48,6 +49,8 @@ describe("BidHash", () => {
 	const changes = [
 		{ name: "nonce", bid: { ...sample, nonce: 43n } },
 		{ name: "style", bid: { ...sample, style: ExerciseStyle.European } },
+		{ name: "expiry", bid: { ...sample, expiry: sample.expiry + 1n } },
+		{ name: "market-maker data hash", bid: { ...sample, marketMakerDataHash: "0x" + "33".repeat(32) } },
 	]
 	for (const change of changes) {
 		it(`changes when the ${change.name} changes`, async () => {

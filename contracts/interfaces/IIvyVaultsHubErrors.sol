@@ -14,14 +14,21 @@ interface IIvyVaultsHubErrors {
 	error ExerciseNotOpenYet();
 	error ExerciseWindowClosed();
 	error ExpirationNotReached();
+	error ExpiryInPast();
+	error ExpiryOutsideWindow();
 	error ExpiryPricePublicationClosed();
 	error FeedNeedsMaxPriceAge();
 	error InsufficientShares();
+	error InvalidExpiryWindow();
 	error InvalidPremiumFloor();
 	error InvalidPrice();
 	error InvalidStrikeLimit();
+	error InvalidTenorRange();
 	error InvalidValidator();
+	error InvalidVolFloor();
+	error MissingAttestation();
 	error MissingBidLimits();
+	error MissingExpiryBounds();
 	error NoPairs();
 	error NotExecutor();
 	error NothingToClaim();
@@ -36,6 +43,7 @@ interface IIvyVaultsHubErrors {
 	error QuoteIsUnderlying();
 	error ReportFinalized();
 	error ReportUnavailable();
+	error RuleDataLengthMismatch(uint256 expected, uint256 actual);
 	error RuleMissingPair(address quoteToken);
 	error SettlementNotAllowed();
 	error ShortReceived(uint256 expected, uint256 received);
@@ -44,6 +52,8 @@ interface IIvyVaultsHubErrors {
 	error StrikeBelowLimit();
 	error StrikeOutsideSpotBand();
 	error StyleNotAllowed();
+	error TenorOutOfRange();
 	error TooEarlyToSettle();
 	error UnknownRuleKind(bytes4 kind);
+	error VolTooLow();
 }

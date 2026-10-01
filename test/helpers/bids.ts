@@ -18,12 +18,13 @@ export interface Bid {
 	auctionId: bigint
 	collateralAmount: bigint
 	termsHash: string
+	marketMakerDataHash: string
 	executor: string
 	recipient: string
 }
 
 export async function signBid(signer: HardhatEthersSigner, hubAddress: string, bid: Bid): Promise<string> {
 	const { chainId } = await signer.provider!.getNetwork()
-	const domain = { name: "IvyVaultsHub", version: "3", chainId, verifyingContract: hubAddress }
+	const domain = { name: "IvyVaultsHub", version: "4", chainId, verifyingContract: hubAddress }
 	return signer.signTypedData(domain, BID_TYPES, bid)
 }

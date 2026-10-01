@@ -1,6 +1,7 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types"
 import { ZeroAddress } from "ethers"
 
+import { hashMarketMakerData } from "../../scripts/encoding.ts"
 import { signBid, type Bid } from "./bids.js"
 import {
 	ExerciseStyle,
@@ -18,6 +19,7 @@ import {
 	putPairs,
 	putTerms,
 	spotBandRule,
+	tenorRangeRule,
 	type BidRuleInput,
 	type IvyContext,
 	type PairLimitInput,
@@ -76,6 +78,8 @@ export interface VaultOptions {
 	pair?: Partial<PairLimitInput>
 	/** Extra rules appended after the generated ones. */
 	rules?: BidRuleInput[]
+	/** Replaces the default TenorRange rule (0 to DEFAULT_MAX_TENOR); pass [] to rely on `rules` alone. */
+	expiryRules?: BidRuleInput[]
 	/** Premium token for the USDC pair. Defaults to USDC. */
 	premiumToken?: string
 }
@@ -84,12 +88,12 @@ export interface VaultOptions {
 export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
 	const isCall = o.isCall ?? true
 	const feedTerms: Partial<VaultTermsInput> = o.withFeed ? { maxSettlementPriceAge: 3600, allowedSettlement: SettlementPolicy.Either } : {}
-	const expiry = BigInt(await ctx.networkHelpers.time.latest()) + TENOR
-	const terms = isCall ? callTerms(ctx, { expiry, ...feedTerms, ...o.terms }) : putTerms(ctx, { expiry, ...feedTerms, ...o.terms })
+	const terms = isCall ? callTerms(ctx, { ...feedTerms, ...o.terms }) : putTerms(ctx, { ...feedTerms, ...o.terms })
 	const pairs = isCall ? callPairs(ctx) : putPairs(ctx)
 	if (o.premiumToken) pairs[0].premiumToken = o.premiumToken
 	const rules: BidRuleInput[] = [pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair))]
 	if (o.withFeed) rules.push(spotBandRule(ctx, { maxPriceAge: 3600, maxInTheMoneyBps: 1000 }))
+	rules.push(...(o.expiryRules ?? [tenorRangeRule(ctx)]))
 	rules.push(...(o.rules ?? []))
 	const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs, rules)
 
@@ -120,6 +124,12 @@ export interface BidOptions {
 	nonce?: bigint
 	executor?: string
 	recipient?: string
+	/** Per-rule slots the market maker signs. Defaults to none. */
+	marketMakerData?: string[]
+	/** Overrides the signed hash, to test a mismatch with `marketMakerData`. */
+	marketMakerDataHash?: string
+	/** Per-rule slots the bid master passes unsigned at activation. Defaults to none. */
+	bidMasterData?: string[]
 }
 
 /** Physical American bid at STRIKE / PREMIUM_PER_UNIT expiring in TENOR, valid for one hour, fresh nonce. */
@@ -139,12 +149,13 @@ export async function makeBid(ctx: IvyContext, vaultId: bigint, o: BidOptions = 
 		premiumPerUnit: o.premiumPerUnit ?? PREMIUM_PER_UNIT,
 		style: o.style ?? ExerciseStyle.American,
 		settlement: o.settlement ?? SettlementType.Physical,
-		expiry: o.expiry ?? (o.tenor ? now + o.tenor : state.expiry),
+		expiry: o.expiry ?? now + (o.tenor ?? TENOR),
 		validUntil: now + (o.validFor ?? 3600n),
 		nonce: o.nonce ?? nonceCounter++,
 		auctionId: state.auctionId,
 		collateralAmount,
 		termsHash,
+		marketMakerDataHash: o.marketMakerDataHash ?? hashMarketMakerData(o.marketMakerData ?? []),
 		executor: o.executor ?? ZeroAddress,
 		recipient: o.recipient ?? ctx.marketMaker.address,
 	}
@@ -163,7 +174,7 @@ export async function activate(ctx: IvyContext, vaultId: bigint, vaultAddress: s
 		await fund(ctx, premiumToken, ctx.marketMaker, vaultAddress, bankroll)
 	}
 	const signature = await signBid(ctx.marketMaker, ctx.hubAddress, bid)
-	await (await ctx.hub.connect(ctx.bidMaster).activate(vaultId, bid, signature)).wait()
+	await (await ctx.hub.connect(ctx.bidMaster).activate(vaultId, bid, o.marketMakerData ?? [], signature, o.bidMasterData ?? [])).wait()
 	return { bid, signature }
 }
 

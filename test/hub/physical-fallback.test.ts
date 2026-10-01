@@ -2,7 +2,7 @@ import { expect } from "chai"
 import type { ContractTransactionResponse, TransactionReceipt } from "ethers"
 import { network } from "hardhat"
 
-import { at, goLive, setExercisePrice, type LiveVault } from "../helpers/scenarios.js"
+import { at, goLive, openVault, setExercisePrice, type LiveVault } from "../helpers/scenarios.js"
 import {
 	AUCTION_TIMEOUT,
 	EXERCISE_WINDOW,
@@ -32,6 +32,7 @@ const fallbackDeadline = (v: LiveVault) => publicationDeadline(v) + EXERCISE_WIN
 
 const deployed = fixture(connection, () => deployIvy(connection))
 const physicalCall = fixture(deployed, async c => ({ c, v: await goLive(c) }))
+const cashCapableAuction = fixture(deployed, async c => ({ c, vaultId: (await openVault(c, { withFeed: true })).vaultId }))
 const cashCall = fixture(deployed, async c => ({
 	c,
 	v: await goLive(c, { withFeed: true }, { settlement: SettlementType.Cash }),
@@ -715,6 +716,22 @@ describe("physical fallback", () => {
 
 			it("reports the Physical route", async () => {
 				expect((await c.hub.settlementStatus(v.vaultId)).route).to.equal(SettlementRoute.Physical)
+			})
+		})
+
+		context("cash-capable call in auction, before any bid chose its expiry", () => {
+			let vaultId: bigint
+
+			beforeEach(async () => {
+				;({ c, vaultId } = await cashCapableAuction())
+			})
+
+			it("reports the Inactive route with no deadlines", async () => {
+				expect(await c.hub.settlementStatus(vaultId)).to.deep.equal([SettlementRoute.Inactive, 0n, 0n, false])
+			})
+
+			it("reports no settlement time", async () => {
+				expect(await c.hub.settleAtExpiryTimeOf(vaultId)).to.equal(0n)
 			})
 		})
 	})

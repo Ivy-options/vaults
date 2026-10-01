@@ -17,6 +17,7 @@ import {
 	fixture,
 	fund,
 	pairLimitsRule,
+	tenorRangeRule,
 	spotBandRule,
 	usdc,
 	weth,
@@ -130,12 +131,12 @@ describe("hub administration", () => {
 			expect(await c.shares.supportsInterface("0xd9b67a26")).to.equal(true)
 		})
 
-		it("signs bids under EIP-712 domain version 3", async () => {
-			expect((await c.hub.eip712Domain()).version).to.equal("3")
+		it("signs bids under EIP-712 domain version 4", async () => {
+			expect((await c.hub.eip712Domain()).version).to.equal("4")
 		})
 
-		it("reports version 3", async () => {
-			expect(await c.hub.version()).to.equal("3")
+		it("reports version 4", async () => {
+			expect(await c.hub.version()).to.equal("4")
 		})
 
 		for (const { name } of [{ name: "upgradeToAndCall" }, { name: "initialize" }, { name: "setShares" }, { name: "setVaultImplementation" }]) {
@@ -195,7 +196,7 @@ describe("hub administration", () => {
 			})
 
 			it("accepts creating a vault", async () => {
-				await expect(ownHub.createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))])).not.to.be.revert(ethers)
+				await expect(ownHub.createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)])).not.to.be.revert(ethers)
 			})
 		})
 
@@ -282,9 +283,9 @@ describe("hub administration", () => {
 			}
 
 			it("accepts a physical-only American vault", async () => {
-				await expect(c.hub.createVault(callTerms(c, { allowedExercise: 1 }), callPairs(c), [pairLimitsRule(c, callLimits(c))])).not.to.be.revert(
-					ethers,
-				)
+				await expect(
+					c.hub.createVault(callTerms(c, { allowedExercise: 1 }), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]),
+				).not.to.be.revert(ethers)
 			})
 
 			it("rejects a physical-only European vault with no exercise opportunity", async () => {
@@ -409,7 +410,7 @@ describe("hub administration", () => {
 				const bid = await makeBid(c, other.vaultId)
 				await fund(c, c.usdc, c.marketMaker, other.vaultAddress, usdc(1000))
 				const signature = await signBid(c.marketMaker, c.hubAddress, bid)
-				await expect(c.hub.connect(c.bidMaster).activate(other.vaultId, bid, signature)).not.to.be.revert(ethers)
+				await expect(c.hub.connect(c.bidMaster).activate(other.vaultId, bid, [], signature, [])).not.to.be.revert(ethers)
 			})
 
 			context("after the paused auction is cancelled", () => {

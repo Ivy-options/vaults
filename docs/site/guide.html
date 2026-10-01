@@ -208,8 +208,11 @@
               phase. Once a bid activates, the vault can only move forward
               to Settled.
             </p>
-            <p>Every vault has a fixed expiry date and time set at creation.
-              The exercise window is the period when the buyer may use its
+            <p>A vault does not fix its expiry at creation. The owner's
+              bid rules say which expiries are acceptable, for example
+              10 to 30 days after activation, and the winning bid chooses
+              the exact date and time. From activation on, that expiry is
+              fixed. The exercise window is the period when the buyer may use its
               option. Its boundaries depend on the agreed rules, so expiry
               does not always mean exercise must stop immediately. The
               <a href="#exercise-windows">physical timing rules</a> and
@@ -248,7 +251,8 @@
                     ><span class="phase-actions"
                       ><span
                         ><b>Fix the bid rules.</b><span>The owner chooses the
-                        rules a buyer's offer must pass when creating the vault.
+                        rules a buyer's offer must pass when creating the vault,
+                        including the range of strikes and expiries it accepts.
                         They cannot change afterwards, so LPs deposit against
                         exactly what they read.</span></span
                       ><span
@@ -267,8 +271,7 @@
                   A schedule does not submit it automatically.</p>
                   <p>Auction opening must not be paused. The vault
                   needs a nonzero collateral balance that meets the configured
-                  minimum, <code>minCollateral</code>, and expiry must still
-                  be in the future.</p>
+                  minimum, <code>minCollateral</code>.</p>
                 </div>
               </div>
             </div>
@@ -284,8 +287,8 @@
                     <span class="chip lp">LPs</span
                     ><span
                       >Deposits stop while bidding is active. LP withdrawals also
-                      wait unless the auction timeout, option expiry or an
-                      admission pause makes the auction cancellable. If the admin
+                      wait unless the auction timeout or an admission pause
+                      makes the auction cancellable. If the admin
                       enables transfers, shares remain transferable.</span
                     >
                   </li>
@@ -301,12 +304,16 @@
                 </ul>
                 <div class="exit">
                   <p><b>Moving to Live.</b> The bid master calls
-                  <code>activate(vaultId, bid, signature)</code>. If the checks
-                  pass, the buyer pays the premium and the option begins.</p>
+                  <code>activate(vaultId, bid, marketMakerData, signature, bidMasterData)</code>.
+                  The two data arrays carry optional inputs for individual bid
+                  rules, one slot per rule. If the checks pass, the buyer pays
+                  the premium, the bid's strike and expiry become the
+                  option's, and the option begins.</p>
                   <p><b>When can the auction be cancelled?</b> The bid master
-                  can cancel at any time. Once the auction timeout elapses,
-                  the option expires, or admission is paused for this vault or
-                  across the protocol, anyone can cancel. An LP can also withdraw
+                  can cancel at any time. Once the auction timeout elapses, or
+                  admission is paused for this vault or across the protocol,
+                  anyone can cancel. The expiry rules do not unlock an
+                  auction: before activation there is no expiry. An LP can also withdraw
                   directly once one of those public conditions holds.</p>
                   <p>By default the timeout is three days. The protocol admin can
                   choose a different duration for new vaults; each vault copies
@@ -318,10 +325,8 @@
                   withdraw it; cancellation does not send funds back
                   automatically. Deposits are possible again if they are not
                   paused and the vault's deposit rules allow them.</p>
-                  <p>The scheduled auction start is cleared. Before expiry,
-                  the owner can schedule another auction or open one manually.
-                  If expiry has already passed, no new auction can open, but
-                  LPs can still withdraw. No premium or platform fee was
+                  <p>The scheduled auction start is cleared. The owner can
+                  schedule another auction or open one manually. No premium or platform fee was
                   collected during the cancelled auction, so neither needs
                   to be refunded.</p>
                 </div>
@@ -852,8 +857,8 @@
                 <span class="sequence-number">03 · BID MASTER</span>
                 <h3>Submit for activation</h3>
                 <p>
-                  Submit the signed bid. The vault checks it and collects
-                  premium in the same transaction.
+                  Submit the signed bid with any per-rule data. The vault
+                  checks it and collects premium in the same transaction.
                 </p>
               </li>
             </ol>
@@ -882,6 +887,26 @@
               </div>
             </div>
 
+            <div class="reading-block reading-flow" id="rule-data">
+              <h3>Some bid rules take inputs at activation.</h3>
+              <p>
+                A rule's id is its position in <code>rulesOf(vaultId)</code>.
+                Activation carries two arrays, each empty or holding one slot
+                per rule, and slot <code>i</code> reaches rule <code>i</code>
+                only. Adding a rule never changes what another rule reads.
+              </p>
+              <p>
+                <code>marketMakerData</code> is the buyer's: the bid signs its
+                hash as <code>marketMakerDataHash</code>, so the bid master
+                cannot alter or drop it. A rule treats it as the buyer's
+                claim, never as a market fact. <code>bidMasterData</code> is
+                the bid master's, unsigned: an attestation such as a bid's
+                implied volatility. A rule that reads it lets the bid master
+                decide that check, so LPs trust the bid master for it. Both
+                arrays are published in a <code>RuleDataProvided</code> event.
+              </p>
+            </div>
+
             <div class="reading-block reading-flow">
               <div class="illustrated-heading" data-illustration="bid">
                 <img src="assets/roman-bid-signing.webp" alt="" width="724" height="543" loading="lazy" decoding="async" />
@@ -889,7 +914,7 @@
               </div>
               <div class="signature-domain" aria-label="EIP-712 signing domain">
                 <div><span>Domain</span><code>IvyVaultsHub</code></div>
-                <div><span>Version</span><code>2</code></div>
+                <div><span>Version</span><code>4</code></div>
                 <div><span>Network</span><strong>Chain ID</strong></div>
                 <div>
                   <span>Contract</span><strong>Deployed hub address</strong>
@@ -948,6 +973,14 @@
                       </dd>
                     </div>
                     <div>
+                      <dt><code>marketMakerDataHash</code><small>bytes32</small></dt>
+                      <dd>
+                        <code>keccak256(abi.encode(marketMakerData))</code>: the
+                        buyer's per-rule inputs, one slot per bid rule or none.
+                        The bid master must pass exactly these at activation.
+                      </dd>
+                    </div>
+                    <div>
                       <dt><code>strike</code><small>uint256</small></dt>
                       <dd>Raw quote-token units per whole underlying.</dd>
                     </div>
@@ -977,8 +1010,10 @@
                     </div>
                     <div>
                       <dt><code>expiry</code><small>uint64</small></dt>
-                      <dd>The option's fixed expiry time, expressed as seconds
-                        since 1 January 1970 UTC, the Unix timestamp format.</dd>
+                      <dd>The expiry the buyer chooses, expressed as seconds
+                        since 1 January 1970 UTC, the Unix timestamp format. It
+                        must be in the future and pass the vault's expiry
+                        rules; activation fixes it as the option's expiry.</dd>
                     </div>
                     <div>
                       <dt><code>validUntil</code><small>uint64</small></dt>
@@ -1357,8 +1392,8 @@
                 <dd>
                   Every cash vault needs independent transactions keyed by
                   <code>vaultId</code>, even with matching pairs and expiries.
-                  The Hub derives underlying, selected quote and fixed expiry
-                  from the Live position.
+                  The Hub derives underlying, selected quote and the expiry the
+                  winning bid fixed from the Live position.
                 </dd>
               </div>
               <div>
@@ -1632,18 +1667,22 @@
             <h2>Vault terms</h2>
             <p class="section-intro">
               Before LPs deposit, the owner defines which trades the vault may
-              accept. For example, a call vault can require a minimum strike and
-              a minimum premium. A buyer's offer must satisfy every limit to
-              activate. The owner also chooses the tokens, expiry and exercise
-              rules. Price conditions are bid rules: a list of validator
-              contracts and data the owner fixes at creation. The shipped
-              validator offers PairLimits, SpotBand and PremiumFloor and accepts
-              only the release's bound price feed. The Hub accepts only validators
-              that governance has explicitly granted the bid-validator role. Every
-              vault must include PairLimits with a nonzero strike bound and premium
-              floor for each pair. Nothing in
-              the terms or rules can change after creation. The table below
-              gives the rule for each term.
+              accept. For example, a call vault can require a strike between
+              3,100 and 3,500 USDC, an expiry 10 to 30 days after activation,
+              and a minimum premium. A buyer's offer picks an exact strike and
+              expiry and must satisfy every limit to activate. The owner also
+              chooses the tokens and exercise rules. Strike, expiry and price
+              conditions are bid rules: a list of validator contracts and data
+              the owner fixes at creation. The shipped validator offers
+              PairLimits, SpotBand, PremiumFloor, YieldFloor, TenorRange,
+              ExpiryWindow and MinImpliedVol, and accepts only the release's
+              bound price feed. The Hub accepts only validators that governance
+              has explicitly granted the bid-validator role. Every vault must
+              include PairLimits with a nonzero strike range and premium floor
+              for each pair, and at least one expiry rule: TenorRange or
+              ExpiryWindow. The Hub itself only requires the expiry to be in
+              the future. Nothing in the terms or rules can change after
+              creation. The table below gives the rule for each term.
             </p>
           </header>
           <div class="terms">
@@ -1654,11 +1693,11 @@
             <div class="row">
               <span class="mono">PairLimits rule</span
               ><span
-                >Per quote token: a strike limit and a minimum gross premium
-                per whole underlying token. Calls:
-                <span class="mono">strike ≥ limit</span>, and 0 means no
-                limit. Puts: <span class="mono">strike ≤ limit</span>, and
-                the limit must be nonzero. The buyer's premium must meet or
+                >Per quote token: a strike range and a minimum gross premium
+                per whole underlying token.
+                <span class="mono">minStrike ≤ strike ≤ maxStrike</span>,
+                with <span class="mono">0 &lt; minStrike ≤ maxStrike</span>,
+                for calls and puts alike. The buyer's premium must meet or
                 exceed the minimum.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
@@ -1676,9 +1715,13 @@
                 <span class="mono">bps</span> is the permitted difference
                 in basis points. Calls:
                 <span class="mono">strike ≥ spot·(10000−bps)/10000</span>. Puts:
-                <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. It
-                does not impose a price requirement on physical exercise or
-                settling at expiry.</span
+                <span class="mono">strike ≤ spot·(10000+bps)/10000</span>. Its
+                <span class="mono">maxOutOfTheMoneyBps</span> bounds the other
+                side, making a moneyness range. Calls:
+                <span class="mono">strike ≤ spot·(10000+otm)/10000</span>. Puts:
+                <span class="mono">strike ≥ spot·(10000−otm)/10000</span>, with
+                no floor from 10,000. It does not impose a price requirement on
+                physical exercise or settling at expiry.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip">immutable</span></span
@@ -1697,20 +1740,65 @@
               >
             </div>
             <div class="row">
-              <span class="mono">minCollateral</span
-              ><span>The minimum total share supply required to open the
-                auction. While Open, those shares correspond to the deposited
-                collateral.</span
+              <span class="mono">YieldFloor rule</span
+              ><span
+                >A premium floor that grows with the option's length:
+                <span class="mono">premium ≥ spot·minAprBps/10000·tenor/365 days</span>,
+                where <span class="mono">tenor</span> is the time from
+                activation to the bid's expiry. It stops a buyer from choosing
+                the longest allowed expiry for a flat minimum premium. Spot is
+                read as for PremiumFloor.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip">immutable</span></span
               >
             </div>
             <div class="row">
-              <span class="mono">expiry</span
+              <span class="mono">TenorRange rule</span
               ><span
-                >Exact timestamp fixed at creation; opening and activation must
-                occur before it.</span
+                >Expiry measured from activation:
+                <span class="mono">now + minTenor ≤ expiry ≤ now + maxTenor</span>,
+                for example 10 to 30 days. A bid's remaining tenor shrinks
+                while it waits for activation.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">ExpiryWindow rule</span
+              ><span
+                >Absolute dates:
+                <span class="mono">notBefore ≤ expiry ≤ notAfter</span>.
+                <span class="mono">notAfter</span> must be in the future at
+                creation. With TenorRange too, a bid must pass both. If the
+                window closes during an auction, no bid can pass; LPs wait
+                for the auction timeout or a bid master cancellation.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">MinImpliedVol rule</span
+              ><span
+                >The bid's implied volatility must be at least
+                <span class="mono">minVolBps</span> (10,000 is 100%). The
+                bid master computes it off-chain and attests it in this rule's
+                <span class="mono">bidMasterData</span> slot at activation;
+                a buyer's own claim is ignored. It prices every strike and
+                expiry pair consistently, but LPs trust the bid master's
+                figure.</span
+              ><span class="term-rule"
+                ><span class="term-rule-label">Owner changes</span
+                ><span class="chip">immutable</span></span
+              >
+            </div>
+            <div class="row">
+              <span class="mono">minCollateral</span
+              ><span>The minimum total share supply required to open the
+                auction. While Open, those shares correspond to the deposited
+                collateral.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip">immutable</span></span

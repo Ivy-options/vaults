@@ -10,6 +10,7 @@ import {
 	callTerms,
 	createVaultAs,
 	deployIvy,
+	expiryWindowRule,
 	fixture,
 	fund,
 	weth,
@@ -47,9 +48,11 @@ const scheduledAuctionOpen = fixture(sixDeposited, async ({ c, v }) => {
 	await c.hub.connect(c.alice).openAuction(v.vaultId)
 	return { c, v }
 })
-const auctionNearExpiry = fixture(deployed, async c => {
-	const expiry = BigInt(await networkHelpers.time.latest()) + 100n
-	return { c, v: await openVault(c, { terms: { expiry } }) }
+/** An open auction whose only expiry rule accepts nothing later than 100 seconds from now. */
+const auctionNearWindowEnd = fixture(deployed, async c => {
+	const now = BigInt(await networkHelpers.time.latest())
+	const notAfter = now + 100n
+	return { c, v: await openVault(c, { expiryRules: [expiryWindowRule(c, now, notAfter)] }), notAfter }
 })
 
 describe("openAuction", () => {
@@ -72,14 +75,9 @@ describe("openAuction", () => {
 			await expect(c.hub.connect(c.alice).openAuction(v.vaultId)).to.emit(c.hub, "AuctionIdentity").withArgs(v.vaultId, 1n)
 		})
 
-		it("opens one second before the option expiry", async () => {
-			await at(c, (await c.hub.termsOf(v.vaultId)).expiry - 1n)
-			await expect(c.hub.connect(c.alice).openAuction(v.vaultId)).to.emit(c.hub, "AuctionOpened").withArgs(v.vaultId, weth(6))
-		})
-
-		it("rejects opening at exactly the option expiry", async () => {
-			await at(c, (await c.hub.termsOf(v.vaultId)).expiry)
-			await expect(c.hub.connect(c.alice).openAuction(v.vaultId)).to.be.revertedWithCustomError(c.hub, "ExpiryInPast")
+		it("leaves the expiry unset, since only the winning bid chooses it", async () => {
+			await c.hub.connect(c.alice).openAuction(v.vaultId)
+			expect((await c.hub.stateOf(v.vaultId)).expiry).to.equal(0n)
 		})
 
 		it("rejects a stranger while no start time is set", async () => {
@@ -257,29 +255,37 @@ describe("cancelAuction", () => {
 		})
 	})
 
-	context("while an auction is open shortly before the option expiry", () => {
+	// Before activation the hub has no expiry, so the zero in state.expiry must never unlock an auction.
+	context("while an auction is open past the last expiry its rules accept", () => {
+		let notAfter: bigint
+
 		beforeEach(async () => {
-			;({ c, v } = await auctionNearExpiry())
+			;({ c, v, notAfter } = await auctionNearWindowEnd())
+			await at(c, notAfter + 1n)
 		})
 
-		it("rejects the owner one second before the option expiry", async () => {
-			await at(c, (await c.hub.stateOf(v.vaultId)).expiry - 1n)
+		it("still rejects the owner's cancellation before the timeout", async () => {
 			await expect(c.hub.connect(c.alice).cancelAuction(v.vaultId)).to.be.revertedWithCustomError(c.hub, "AuctionTimeoutNotReached")
 		})
 
-		it("lets anyone cancel at exactly the option expiry", async () => {
-			await at(c, (await c.hub.stateOf(v.vaultId)).expiry)
-			await expect(c.hub.connect(c.bob).cancelAuction(v.vaultId)).to.emit(c.hub, "AuctionCancelled").withArgs(v.vaultId)
+		it("still rejects a stranger's cancellation before the timeout", async () => {
+			await expect(c.hub.connect(c.bob).cancelAuction(v.vaultId)).to.be.revertedWithCustomError(c.hub, "NotVaultOwner")
 		})
 
-		context("once the owner cancels at the option expiry", () => {
-			beforeEach(async () => {
-				await at(c, (await c.hub.stateOf(v.vaultId)).expiry)
-				await c.hub.connect(c.alice).cancelAuction(v.vaultId)
-			})
+		it("still rejects withdrawals before the timeout", async () => {
+			await expect(c.hub.connect(c.alice).withdraw(v.vaultId, weth(10)))
+				.to.be.revertedWithCustomError(c.hub, "WrongPhase")
+				.withArgs(Phase.Open, Phase.Auction)
+		})
 
-			it("rejects reopening the auction", async () => {
-				await expect(c.hub.connect(c.alice).openAuction(v.vaultId)).to.be.revertedWithCustomError(c.hub, "ExpiryInPast")
+		it("lets the bid master cancel at once", async () => {
+			await expect(c.hub.connect(c.bidMaster).cancelAuction(v.vaultId)).to.emit(c.hub, "AuctionCancelled").withArgs(v.vaultId)
+		})
+
+		context("once the auction times out", () => {
+			beforeEach(async () => {
+				await at(c, (await c.hub.stateOf(v.vaultId)).auctionOpenedAt + AUCTION_TIMEOUT)
+				await c.hub.connect(c.bob).cancelAuction(v.vaultId)
 			})
 
 			it("lets the owner withdraw the collateral", async () => {

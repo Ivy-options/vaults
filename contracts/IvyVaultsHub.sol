@@ -89,7 +89,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		uint64 exerciseWindow_,
 		uint64 auctionTimeout_,
 		uint64 expiryPricePublicationWindow_
-	) EIP712("IvyVaultsHub", "3") {
+	) EIP712("IvyVaultsHub", "4") {
 		if (admin == address(0) || implementation == address(0) || shares_ == address(0) || premiums_ == address(0) || bidRules_ == address(0)) {
 			revert ZeroAddress();
 		}
@@ -188,7 +188,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		VaultState storage state = _state[vaultId];
 		state.vault = vault;
 		state.owner = msg.sender;
-		state.expiry = terms.expiry;
 		state.exerciseWindow = exerciseWindow;
 		state.auctionTimeout = auctionTimeout;
 		state.expiryPricePublicationWindow = expiryPricePublicationWindow;
@@ -257,7 +256,6 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		_admission(vaultId);
 		VaultState storage state = _state[vaultId];
 		VaultTerms storage terms = _terms[vaultId];
-		if (block.timestamp >= terms.expiry) revert ExpiryInPast();
 		bool scheduled = terms.auctionStartsAt != 0 && block.timestamp >= terms.auctionStartsAt;
 		if (msg.sender != state.owner && !scheduled) revert AuctionNotStartable();
 		uint256 collateral = shareToken.totalSupply(vaultId);
@@ -270,7 +268,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		emit AuctionOpened(vaultId, collateral);
 	}
 
-	/// @notice Cancel the auction and clear its schedule. The owner must wait for timeout, expiry, or a pause.
+	/// @notice Cancel the auction and clear its schedule. The owner must wait for the timeout or a pause.
 	/// @dev The bid master can cancel any time.
 	function cancelAuction(uint256 vaultId) external {
 		VaultState storage state = _state[vaultId];
@@ -281,7 +279,16 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	}
 
 	/// @notice Activate the market maker's signed bid. Only the bid master may submit it.
-	function activate(uint256 vaultId, Bid calldata bid, bytes calldata signature) external nonReentrant onlyRole(BID_MASTER_ROLE) {
+	/// @dev Slot `i` of each data array goes to rule `i` only; pass an empty array when no rule needs data.
+	/// @param marketMakerData Per-rule data the market maker signed through `bid.marketMakerDataHash`.
+	/// @param bidMasterData Per-rule data from the bid master, unsigned. Rules that read it trust the bid master.
+	function activate(
+		uint256 vaultId,
+		Bid calldata bid,
+		bytes[] calldata marketMakerData,
+		bytes calldata signature,
+		bytes[] calldata bidMasterData
+	) external nonReentrant onlyRole(BID_MASTER_ROLE) {
 		_admission(vaultId);
 		_requirePhase(vaultId, Phase.Auction);
 		if (bid.settlement == SettlementType.Cash) _requireCashSettlementEnabled();
@@ -297,7 +304,17 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		VaultTerms storage terms = _terms[vaultId];
 		address premiumToken = _premiumTokens[vaultId][bid.quoteToken];
 		uint256 supply = shareToken.totalSupply(vaultId);
-		uint256 totalNotional = IvyVaultRules.checkBid(state, terms, _rules[vaultId], premiumToken, _termsHash[vaultId], bid, supply);
+		uint256 totalNotional = IvyVaultRules.checkBid(
+			state,
+			terms,
+			_rules[vaultId],
+			premiumToken,
+			_termsHash[vaultId],
+			bid,
+			supply,
+			marketMakerData,
+			bidMasterData
+		);
 		uint256 totalPremium = IvyMath.premiumTotal(bid.premiumPerUnit, totalNotional, state.underlyingUnit);
 
 		state.marketMaker = bid.marketMaker;
@@ -309,6 +326,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		state.premiumPerUnit = bid.premiumPerUnit;
 		state.style = bid.style;
 		state.settlement = bid.settlement;
+		state.expiry = bid.expiry;
 		state.totalNotional = totalNotional;
 		state.phase = Phase.Live;
 
@@ -483,7 +501,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	}
 
 	function version() external pure returns (string memory) {
-		return "3";
+		return "4";
 	}
 
 	/// @notice Current settlement route and fallback deadlines. `Inactive` means the vault is not Live.

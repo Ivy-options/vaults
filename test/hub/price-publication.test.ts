@@ -33,24 +33,25 @@ const openCashVault = fixture(deployed, async c => {
 })
 const auctionVault = fixture(deployed, async c => ({ c, vaultId: (await openVault(c, { withFeed: true })).vaultId }))
 const physicalVault = fixture(deployed, async c => ({ c, vaultId: (await goLive(c)).vaultId }))
+/** Both winning bids chose the same expiry. */
 const twoCashCalls = fixture(deployed, async c => {
-	const terms = { ...CASH_TERMS, expiry: c.defaultExpiry }
+	const bid = { settlement: SettlementType.Cash, expiry: c.defaultExpiry }
 	return {
 		c,
-		first: await goLive(c, { terms }, { settlement: SettlementType.Cash }),
-		second: await goLive(c, { terms }, { settlement: SettlementType.Cash }),
+		first: await goLive(c, { terms: CASH_TERMS }, bid),
+		second: await goLive(c, { terms: CASH_TERMS }, bid),
 	}
 })
 const twoHubs = fixture(connection, async () => {
 	const c = await deployIvy(connection)
 	const other = await deployIvy(connection)
-	const terms = { ...CASH_TERMS, expiry: other.defaultExpiry }
+	const bid = { settlement: SettlementType.Cash, expiry: other.defaultExpiry }
 	return {
 		c,
 		other,
-		expiry: terms.expiry,
-		first: await goLive(c, { terms }, { settlement: SettlementType.Cash }),
-		second: await goLive(other, { terms }, { settlement: SettlementType.Cash }),
+		expiry: bid.expiry,
+		first: await goLive(c, { terms: CASH_TERMS }, bid),
+		second: await goLive(other, { terms: CASH_TERMS }, bid),
 	}
 })
 

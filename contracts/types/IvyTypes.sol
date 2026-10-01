@@ -55,7 +55,6 @@ struct VaultTerms {
     bool publicDeposits; // false = only the vault owner may deposit
     ExercisePolicy allowedExercise;
     SettlementPolicy allowedSettlement; // not Physical requires maxSettlementPriceAge > 0
-    uint64 expiry; // fixed absolute Unix timestamp, future at creation
     uint64 auctionStartsAt; // 0 = manual only; else anyone may open the auction from this time. Mutable; outside termsHash.
     uint256 minCollateral; // shares required to open the auction
     uint32 maxSettlementPriceAge; // immutable exercise observation age limit
@@ -80,6 +79,7 @@ struct PairConfig {
 }
 
 /// @notice One creator-supplied acceptance condition. Frozen at creation and covered by termsHash.
+/// @dev A rule's id is its index in the vault's rule list. Activation data for rule `i` is slot `i`.
 struct BidRule {
     address validator;
     bytes4 kind; // meaningful only to the validator; lets one contract serve several rule types
@@ -113,6 +113,7 @@ struct Bid {
     uint256 auctionId;
     uint256 collateralAmount;
     bytes32 termsHash; // creator inputs: terms, pairs, rules; excludes auctionStartsAt
+    bytes32 marketMakerDataHash; // keccak256(abi.encode(marketMakerData)) passed to activate
     address executor;
     address recipient;
 }
@@ -137,7 +138,7 @@ struct VaultState {
     uint256 premiumPerUnit;
     ExerciseStyle style;
     SettlementType settlement;
-    uint64 expiry;
+    uint64 expiry; // zero until activation copies it from the bid
     uint256 totalNotional; // underlying units
     uint256 exercisedNotional; // underlying units
     uint256 pendingPayout; // collateral units reserved for the market maker
@@ -165,16 +166,22 @@ error ExerciseNotOpenYet();
 error ExerciseWindowClosed();
 error ExpirationNotReached();
 error ExpiryInPast();
+error ExpiryOutsideWindow();
 error ExpiryPricePublicationClosed();
 error FeedNeedsMaxPriceAge();
 error InsufficientAvailable();
 error InsufficientShares();
+error InvalidExpiryWindow();
 error InvalidPremiumFloor();
 error InvalidPrice();
 error InvalidSettlementWindow();
 error InvalidStrikeLimit();
+error InvalidTenorRange();
 error InvalidValidator();
+error InvalidVolFloor();
+error MissingAttestation();
 error MissingBidLimits();
+error MissingExpiryBounds();
 error NonceUsed();
 error NoPairs();
 error NotExecutor();
@@ -196,6 +203,7 @@ error PutRequiresSinglePair();
 error QuoteIsUnderlying();
 error ReportFinalized();
 error ReportUnavailable();
+error RuleDataLengthMismatch(uint256 expected, uint256 actual);
 error RuleMissingPair(address quoteToken);
 error SettlementNotAllowed();
 error ShortReceived(uint256 expected, uint256 received);
@@ -204,9 +212,11 @@ error StrikeAboveLimit();
 error StrikeBelowLimit();
 error StrikeOutsideSpotBand();
 error StyleNotAllowed();
+error TenorOutOfRange();
 error TooEarlyToSettle();
 error UnknownRuleKind(bytes4 kind);
 error UnknownVault();
+error VolTooLow();
 error WrongPhase(Phase expected, Phase actual);
 error ZeroAddress();
 error ZeroAmount();

@@ -27,6 +27,7 @@ import {
 	fixture,
 	fund,
 	pairLimitsRule,
+	tenorRangeRule,
 	usdc,
 	weth,
 	type IvyContext,
@@ -258,7 +259,9 @@ describe("cash settlement opt-in", () => {
 			}
 
 			it("creates a physical-only vault", async () => {
-				await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))])).not.to.be.revert(ethers)
+				await expect(
+					c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]),
+				).not.to.be.revert(ethers)
 			})
 		})
 
@@ -277,6 +280,7 @@ describe("cash settlement opt-in", () => {
 					await expect(
 						c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c), [
 							pairLimitsRule(c, callLimits(c)),
+							tenorRangeRule(c),
 						]),
 					).not.to.be.revert(ethers)
 				})
@@ -313,10 +317,9 @@ describe("cash settlement opt-in", () => {
 						;({ c, v } = await load())
 					})
 
-					it("goes live with explicit bid limits", async () => {
+					it("goes live with explicit bid limits and an expiry rule", async () => {
 						const rules = await c.hub.rulesOf(v.vaultId)
-						expect(rules).to.have.length(1)
-						expect(rules[0].kind).to.equal(RuleKind.PairLimits)
+						expect(rules.map(r => r.kind)).to.deep.equal([RuleKind.PairLimits, RuleKind.TenorRange])
 					})
 
 					context("after full exercise", () => {
@@ -362,7 +365,10 @@ describe("cash settlement opt-in", () => {
 			})
 
 			it("rejects the bid without consuming it", async () => {
-				await expect(c.hub.connect(c.bidMaster).activate(v.vaultId, bid, signature)).to.be.revertedWithCustomError(c.hub, "CashSettlementDisabled")
+				await expect(c.hub.connect(c.bidMaster).activate(v.vaultId, bid, [], signature, [])).to.be.revertedWithCustomError(
+					c.hub,
+					"CashSettlementDisabled",
+				)
 				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Auction)
 				expect(await c.hub.usedBidNonces(c.marketMaker.address, bid.nonce)).to.equal(false)
 				expect(await c.usdc.balanceOf(v.vaultAddress)).to.equal(0n)
@@ -371,7 +377,7 @@ describe("cash settlement opt-in", () => {
 			it("accepts the same bid once a publisher is granted and cash is re-enabled", async () => {
 				await c.hub.grantRole(role, c.bob.address)
 				await c.hub.setCashSettlementEnabled(true)
-				await c.hub.connect(c.bidMaster).activate(v.vaultId, bid, signature)
+				await c.hub.connect(c.bidMaster).activate(v.vaultId, bid, [], signature, [])
 				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 			})
 		})

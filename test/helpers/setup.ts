@@ -2,7 +2,16 @@ import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types"
 import { getCreateAddress } from "ethers"
 import hre, { artifacts, type network } from "hardhat"
 
-import { RULE_KIND, encodePairLimits, encodePremiumFloor, encodeSpotBand } from "../../scripts/encoding.ts"
+import {
+	RULE_KIND,
+	encodeExpiryWindow,
+	encodeMinImpliedVol,
+	encodePairLimits,
+	encodePremiumFloor,
+	encodeSpotBand,
+	encodeTenorRange,
+	encodeYieldFloor,
+} from "../../scripts/encoding.ts"
 
 export type Connection = Awaited<ReturnType<typeof network.create>>
 
@@ -10,6 +19,10 @@ export const EXERCISE_WINDOW = 3600n
 export const AUCTION_TIMEOUT = 3n * 24n * 3600n
 export const EXPIRY_PRICE_PUBLICATION_WINDOW = 3600n
 export const THIRTY_DAYS = 30n * 24n * 3600n
+/** Upper tenor bound of the default TenorRange rule: loose enough that only expiry tests meet it. */
+export const DEFAULT_MAX_TENOR = 365n * 24n * 3600n
+/** SpotBand out-of-the-money bound that never binds: no ceiling for calls, no floor for puts. */
+export const NO_OTM_LIMIT = 2 ** 32 - 1
 export const WETH_UNIT = 10n ** 18n
 export const USDC_UNIT = 10n ** 6n
 export const MAX_UINT = (1n << 256n) - 1n
@@ -45,7 +58,6 @@ export interface VaultTermsInput {
 	publicDeposits: boolean
 	allowedExercise: number
 	allowedSettlement: number
-	expiry: bigint
 	auctionStartsAt: bigint
 	minCollateral: bigint
 	maxSettlementPriceAge: number
@@ -64,7 +76,8 @@ export interface BidRuleInput {
 
 export interface PairLimitInput {
 	quoteToken: string
-	strikeLimit: bigint
+	minStrike: bigint
+	maxStrike: bigint
 	minPremiumPerUnit: bigint
 }
 
@@ -228,7 +241,6 @@ export function callTerms(ctx: IvyContext, o: Partial<VaultTermsInput> = {}): Va
 		publicDeposits: true,
 		allowedExercise: ExercisePolicy.Either,
 		allowedSettlement: SettlementPolicy.Physical,
-		expiry: ctx.defaultExpiry,
 		auctionStartsAt: 0n,
 		minCollateral: 0n,
 		maxSettlementPriceAge: 0,
@@ -249,30 +261,53 @@ export function putPairs(ctx: IvyContext): PairConfigInput[] {
 	return [{ quoteToken: ctx.usdcAddress, premiumToken: ctx.usdcAddress }]
 }
 
-/** Test default: explicit one-raw-unit call strike and premium floors. */
+/** Test default: explicit one-raw-unit call strike and premium floors, no strike ceiling. */
 export function callLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
-	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 1n, minPremiumPerUnit: 1n, ...o }]
+	return [{ quoteToken: ctx.usdcAddress, minStrike: 1n, maxStrike: MAX_UINT, minPremiumPerUnit: 1n, ...o }]
 }
 
-/** Test default: explicit 3,000 USDC put ceiling and one-raw-unit premium floor. */
+/** Test default: explicit 3,000 USDC put ceiling and one-raw-unit strike and premium floors. */
 export function putLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
-	return [{ quoteToken: ctx.usdcAddress, strikeLimit: 3000n * USDC_UNIT, minPremiumPerUnit: 1n, ...o }]
+	return [{ quoteToken: ctx.usdcAddress, minStrike: 1n, maxStrike: 3000n * USDC_UNIT, minPremiumPerUnit: 1n, ...o }]
 }
 
 export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
 		kind: RuleKind.PairLimits,
-		data: encodePairLimits(limits.map(l => [l.quoteToken, l.strikeLimit, l.minPremiumPerUnit])),
+		data: encodePairLimits(limits.map(l => [l.quoteToken, l.minStrike, l.maxStrike, l.minPremiumPerUnit])),
 	}
 }
 
-export function spotBandRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number }): BidRuleInput {
+export function spotBandRule(
+	ctx: IvyContext,
+	o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number; maxOutOfTheMoneyBps?: number },
+): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
 		kind: RuleKind.SpotBand,
-		data: encodeSpotBand(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps),
+		data: encodeSpotBand(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps, o.maxOutOfTheMoneyBps ?? NO_OTM_LIMIT),
 	}
+}
+
+export function yieldFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minAprBps: number }): BidRuleInput {
+	return {
+		validator: ctx.bidRulesAddress,
+		kind: RuleKind.YieldFloor,
+		data: encodeYieldFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minAprBps),
+	}
+}
+
+export function tenorRangeRule(ctx: IvyContext, minTenor = 0n, maxTenor = DEFAULT_MAX_TENOR): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.TenorRange, data: encodeTenorRange(minTenor, maxTenor) }
+}
+
+export function expiryWindowRule(ctx: IvyContext, notBefore: bigint, notAfter: bigint): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.ExpiryWindow, data: encodeExpiryWindow(notBefore, notAfter) }
+}
+
+export function minImpliedVolRule(ctx: IvyContext, minVolBps: number): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.MinImpliedVol, data: encodeMinImpliedVol(minVolBps) }
 }
 
 export function premiumFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minPremiumBps: number }): BidRuleInput {
@@ -290,7 +325,7 @@ export async function createVaultAs(
 	pairs: PairConfigInput[],
 	rules?: BidRuleInput[],
 ) {
-	const bidRules = rules ?? [pairLimitsRule(ctx, terms.collateral === terms.underlying ? callLimits(ctx) : putLimits(ctx))]
+	const bidRules = rules ?? [pairLimitsRule(ctx, terms.collateral === terms.underlying ? callLimits(ctx) : putLimits(ctx)), tenorRangeRule(ctx)]
 	await (await ctx.hub.connect(signer).createVault(terms, pairs, bidRules)).wait()
 	const vaultId = await ctx.hub.vaultCount()
 	const vaultAddress = await ctx.hub.vaultOf(vaultId)

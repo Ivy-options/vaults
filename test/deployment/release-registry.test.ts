@@ -13,7 +13,7 @@ import {
 	type DeploymentPlan,
 	type Journal,
 } from "../../scripts/deployment.ts"
-import { encodePairLimits } from "../../scripts/encoding.ts"
+import { encodePairLimits, encodeTenorRange, hashMarketMakerData } from "../../scripts/encoding.ts"
 import { buildRegistryDeploymentPlan, resumeRegistryDeployment, type RegistryPlan } from "../../scripts/registry-deployment.ts"
 import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease, type ReleaseBundle, type ReleaseRequest } from "../../scripts/releases.ts"
 import { signBid, type Bid } from "../helpers/bids.js"
@@ -440,7 +440,7 @@ describe("release registry", () => {
 			it("activates a vault gated by the release's validator from a bid signed for the resolved hub", async () => {
 				const { admin, resolved, hub, wethToken, usdcToken } = staffed
 				const [wethAddress, usdcAddress] = [await wethToken.getAddress(), await usdcToken.getAddress()]
-				// Two hours out: any future expiry works, since the vault only has to activate before it.
+				// Two hours out: any expiry the vault's one-day tenor range allows.
 				const expiry = BigInt(await networkHelpers.time.latest()) + 7200n
 				const terms: VaultTermsInput = {
 					underlying: wethAddress,
@@ -449,7 +449,6 @@ describe("release registry", () => {
 					publicDeposits: false,
 					allowedExercise: ExercisePolicy.Either,
 					allowedSettlement: SettlementPolicy.Physical,
-					expiry,
 					auctionStartsAt: 0n,
 					minCollateral: 0n,
 					maxSettlementPriceAge: 0,
@@ -458,8 +457,9 @@ describe("release registry", () => {
 					{
 						validator: resolved.addresses.IvyStandardBidRules,
 						kind: RuleKind.PairLimits,
-						data: encodePairLimits([[usdcAddress, STRIKE, PREMIUM_PER_UNIT]]),
+						data: encodePairLimits([[usdcAddress, STRIKE, STRIKE, PREMIUM_PER_UNIT]]),
 					},
+					{ validator: resolved.addresses.IvyStandardBidRules, kind: RuleKind.TenorRange, data: encodeTenorRange(0n, 24n * 3600n) },
 				]
 				await hub.createVault(terms, [{ quoteToken: usdcAddress, premiumToken: usdcAddress }], rules)
 				const vaultId = await hub.vaultCount()
@@ -482,13 +482,14 @@ describe("release registry", () => {
 					auctionId: (await hub.stateOf(vaultId)).auctionId,
 					collateralAmount: await hub.totalShares(vaultId),
 					termsHash: await hub.termsHashOf(vaultId),
+					marketMakerDataHash: hashMarketMakerData([]),
 					executor: ZeroAddress,
 					recipient: admin.address,
 				}
 				// Premium on 1 WETH of notional.
 				await usdcToken.mint(admin.address, PREMIUM_PER_UNIT)
 				await usdcToken.approve(vault, PREMIUM_PER_UNIT)
-				await hub.activate(vaultId, bid, await signBid(admin, resolved.hub, bid))
+				await hub.activate(vaultId, bid, [], await signBid(admin, resolved.hub, bid), [])
 				expect((await hub.stateOf(vaultId)).phase).to.equal(Phase.Live)
 			})
 		})

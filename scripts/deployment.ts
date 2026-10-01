@@ -171,7 +171,7 @@ export async function buildDeploymentPlan({
 		})
 	}
 	return {
-		version: 9,
+		version: 10,
 		chainId: String(chainId),
 		genesisHash,
 		deployer,
@@ -277,7 +277,7 @@ export async function openJournal(signer: Signer, plan: PlanIdentity, journal: J
 
 /** Explicitly invoked executor. Persist before sending, after submission, and after verified inclusion. */
 export async function resumeDeployment(signer: Signer, plan: DeploymentPlan, journal: Journal = {}, persist: Persist = async () => {}) {
-	if (plan.version !== 9) throw new Error("Unsupported deployment plan version; prepare a new plan for this build")
+	if (plan.version !== 10) throw new Error("Unsupported deployment plan version; prepare a new plan for this build")
 	const provider = rpc(signer.provider)
 	const { startBlock, steps } = await openJournal(signer, plan, journal)
 	await persist(journal)
