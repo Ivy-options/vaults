@@ -12,9 +12,10 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
 ///      The hub places no limit on expiry beyond "in the future"; creators bound it with an expiry rule.
 library IvyVaultRules {
 	bytes32 private constant BID_VALIDATOR_ROLE = keccak256("BID_VALIDATOR_ROLE");
-	bytes4 private constant EXPIRY_WINDOW = bytes4(keccak256("ExpiryWindow"));
-	bytes4 private constant PAIR_LIMITS = bytes4(keccak256("PairLimits"));
-	bytes4 private constant TENOR_RANGE = bytes4(keccak256("TenorRange"));
+	bytes4 private constant EXPIRY_DATES = bytes4(keccak256("ExpiryDates"));
+	bytes4 private constant EXPIRY_TENOR = bytes4(keccak256("ExpiryTenor"));
+	bytes4 private constant PREMIUM_MIN = bytes4(keccak256("PremiumMin"));
+	bytes4 private constant STRIKE_RANGE = bytes4(keccak256("StrikeRange"));
 
 	/// @dev Expiry is unknown until activation, so an auction exits only by pause or timeout.
 	function checkWithdrawal(VaultState storage state, bool paused) external view {
@@ -32,15 +33,16 @@ library IvyVaultRules {
 	}
 
 	/// @dev Validates and stores each rule before deposits are possible. Returns the terms hash signed bids must carry.
-	///      Requires a PairLimits rule and an expiry rule (TenorRange or ExpiryWindow), matched by kind; their values are the validator's.
+	///      Requires a StrikeRange, a PremiumMin and an expiry rule (ExpiryTenor or ExpiryDates), matched by kind; their values are the validator's.
 	function adoptRules(
 		BidRule[] storage stored,
 		VaultTerms calldata terms,
 		PairConfig[] calldata pairs,
 		BidRule[] calldata rules
 	) external returns (bytes32) {
-		bool hasBidLimits;
-		bool hasExpiryBounds;
+		bool hasStrikeRange;
+		bool hasPremiumMin;
+		bool hasExpiryRule;
 		for (uint256 i = 0; i < rules.length; ++i) {
 			BidRule calldata rule = rules[i];
 			if (!IAccessControl(address(this)).hasRole(BID_VALIDATOR_ROLE, rule.validator) || rule.validator.code.length == 0) {
@@ -52,11 +54,13 @@ library IvyVaultRules {
 			slot.validator = rule.validator;
 			slot.kind = rule.kind;
 			slot.data = rule.data;
-			if (rule.kind == PAIR_LIMITS) hasBidLimits = true;
-			if (rule.kind == TENOR_RANGE || rule.kind == EXPIRY_WINDOW) hasExpiryBounds = true;
+			if (rule.kind == STRIKE_RANGE) hasStrikeRange = true;
+			if (rule.kind == PREMIUM_MIN) hasPremiumMin = true;
+			if (rule.kind == EXPIRY_TENOR || rule.kind == EXPIRY_DATES) hasExpiryRule = true;
 		}
-		if (!hasBidLimits) revert MissingBidLimits();
-		if (!hasExpiryBounds) revert MissingExpiryBounds();
+		if (!hasStrikeRange) revert MissingStrikeRange();
+		if (!hasPremiumMin) revert MissingPremiumMin();
+		if (!hasExpiryRule) revert MissingExpiryRule();
 		return _termsHash(terms, pairs, rules);
 	}
 

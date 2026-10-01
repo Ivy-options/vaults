@@ -9,16 +9,16 @@ import {
 	EXERCISE_WINDOW,
 	EXPIRY_PRICE_PUBLICATION_WINDOW,
 	SettlementPolicy,
-	callLimits,
+	callBounds,
 	callPairs,
 	callTerms,
 	createVaultAs,
 	deployIvy,
 	fixture,
 	fund,
-	pairLimitsRule,
-	tenorRangeRule,
-	spotBandRule,
+	pairBoundsRules,
+	expiryTenorRule,
+	strikeSpotBandRule,
 	usdc,
 	weth,
 	type IvyContext,
@@ -183,7 +183,7 @@ describe("hub administration", () => {
 			})
 
 			it("rejects creating a vault whose spot band price feed has no code", async () => {
-				const rule = spotBandRule(c, { priceFeed: c.alice.address, maxPriceAge: 100, maxInTheMoneyBps: 0 })
+				const rule = strikeSpotBandRule(c, { priceFeed: c.alice.address, maxPriceAge: 100, maxInTheMoneyBps: 0 })
 				await expect(c.hub.createVault(callTerms(c), callPairs(c), [rule])).to.be.revertedWithCustomError(c.hub, "BindingMismatch")
 			})
 		})
@@ -196,7 +196,9 @@ describe("hub administration", () => {
 			})
 
 			it("accepts creating a vault", async () => {
-				await expect(ownHub.createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)])).not.to.be.revert(ethers)
+				await expect(ownHub.createVault(callTerms(c), callPairs(c), [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)])).not.to.be.revert(
+					ethers,
+				)
 			})
 		})
 
@@ -284,7 +286,7 @@ describe("hub administration", () => {
 
 			it("accepts a physical-only American vault", async () => {
 				await expect(
-					c.hub.createVault(callTerms(c, { allowedExercise: 1 }), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]),
+					c.hub.createVault(callTerms(c, { allowedExercise: 1 }), callPairs(c), [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)]),
 				).not.to.be.revert(ethers)
 			})
 

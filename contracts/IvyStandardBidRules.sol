@@ -7,54 +7,60 @@ import { IvyMath } from "./libraries/IvyMath.sol";
 import "./types/IvyTypes.sol";
 
 /// @notice Stateless validator for the standard bid rule kinds.
-/// @dev Strike and premium: PairLimits, SpotBand, PremiumFloor, YieldFloor. Expiry: TenorRange, ExpiryWindow.
-///      MinImpliedVol trusts the bid master's attestation. No kind reads market-maker data.
+/// @dev Each kind is named for the bid field it bounds. Strike: StrikeRange, StrikeSpotBand.
+///      Premium: PremiumMin, PremiumSpotFloor, PremiumYieldFloor, PremiumVolFloor. Expiry: ExpiryTenor, ExpiryDates.
+///      PremiumVolFloor trusts the bid master's attestation. No kind reads market-maker data.
 contract IvyStandardBidRules is IIvyBidValidator {
 	address public immutable trustedPriceFeed;
 
-	struct PairLimit {
+	struct StrikeRange {
 		address quoteToken;
 		uint256 minStrike; // quote units per whole underlying; 0 < minStrike <= maxStrike
 		uint256 maxStrike;
-		uint256 minPremiumPerUnit; // premium-token units per 1 whole underlying
 	}
 
-	struct SpotBandRule {
+	struct PremiumMin {
+		address quoteToken;
+		uint256 minPremiumPerUnit; // premium-token units per 1 whole underlying, > 0
+	}
+
+	struct StrikeSpotBandRule {
 		address priceFeed;
 		uint32 maxPriceAge; // seconds, > 0
 		uint16 maxInTheMoneyBps; // calls: strike >= spot * (1 - bps); puts: strike <= spot * (1 + bps)
 		uint32 maxOutOfTheMoneyBps; // calls: strike <= spot * (1 + bps); puts: strike >= spot * (1 - bps), no floor from 10_000
 	}
 
-	struct PremiumFloorRule {
+	struct PremiumSpotFloorRule {
 		address priceFeed; // may be zero when every pair pays premium in the underlying
 		uint32 maxPriceAge;
 		uint16 minPremiumBps; // premiumPerUnit >= spot * minPremiumBps / 10_000, in (0, 10_000]
 	}
 
-	struct YieldFloorRule {
+	struct PremiumYieldFloorRule {
 		address priceFeed; // may be zero when every pair pays premium in the underlying
 		uint32 maxPriceAge;
 		uint16 minAprBps; // premiumPerUnit >= spot * minAprBps / 10_000 * tenor / 365 days, > 0
 	}
 
-	struct TenorRangeRule {
+	struct ExpiryTenorRule {
 		uint64 minTenor; // seconds from activation to expiry
 		uint64 maxTenor; // > 0 and >= minTenor
 	}
 
-	struct ExpiryWindowRule {
+	struct ExpiryDatesRule {
 		uint64 notBefore; // absolute Unix time
 		uint64 notAfter; // absolute Unix time, >= notBefore and in the future at creation
 	}
 
-	bytes4 public constant EXPIRY_WINDOW = bytes4(keccak256("ExpiryWindow"));
-	bytes4 public constant MIN_IMPLIED_VOL = bytes4(keccak256("MinImpliedVol"));
-	bytes4 public constant PAIR_LIMITS = bytes4(keccak256("PairLimits"));
-	bytes4 public constant PREMIUM_FLOOR = bytes4(keccak256("PremiumFloor"));
-	bytes4 public constant SPOT_BAND = bytes4(keccak256("SpotBand"));
-	bytes4 public constant TENOR_RANGE = bytes4(keccak256("TenorRange"));
-	bytes4 public constant YIELD_FLOOR = bytes4(keccak256("YieldFloor"));
+	bytes4 public constant EXPIRY_DATES = bytes4(keccak256("ExpiryDates"));
+	bytes4 public constant EXPIRY_TENOR = bytes4(keccak256("ExpiryTenor"));
+	bytes4 public constant PREMIUM_MIN = bytes4(keccak256("PremiumMin"));
+	bytes4 public constant PREMIUM_SPOT_FLOOR = bytes4(keccak256("PremiumSpotFloor"));
+	bytes4 public constant PREMIUM_VOL_FLOOR = bytes4(keccak256("PremiumVolFloor"));
+	bytes4 public constant PREMIUM_YIELD_FLOOR = bytes4(keccak256("PremiumYieldFloor"));
+	bytes4 public constant STRIKE_RANGE = bytes4(keccak256("StrikeRange"));
+	bytes4 public constant STRIKE_SPOT_BAND = bytes4(keccak256("StrikeSpotBand"));
 	uint256 private constant YEAR = 365 days;
 
 	constructor(address trustedPriceFeed_) {
@@ -65,27 +71,41 @@ contract IvyStandardBidRules is IIvyBidValidator {
 	/// @inheritdoc IIvyBidValidator
 	function validateConfig(bytes4 kind, VaultTerms calldata terms, PairConfig[] calldata pairs, bytes calldata data) external view returns (bytes4) {
 		bool isCall = terms.collateral == terms.underlying;
-		if (kind == PAIR_LIMITS) {
-			_checkPairLimits(pairs, abi.decode(data, (PairLimit[])));
-		} else if (kind == SPOT_BAND) {
-			SpotBandRule memory rule = abi.decode(data, (SpotBandRule));
+		if (kind == STRIKE_RANGE) {
+			StrikeRange[] memory ranges = abi.decode(data, (StrikeRange[]));
+			address[] memory quoteTokens = new address[](ranges.length);
+			for (uint256 i = 0; i < ranges.length; ++i) {
+				if (ranges[i].minStrike == 0 || ranges[i].minStrike > ranges[i].maxStrike) revert InvalidStrikeRange();
+				quoteTokens[i] = ranges[i].quoteToken;
+			}
+			_checkCoversPairs(pairs, quoteTokens);
+		} else if (kind == PREMIUM_MIN) {
+			PremiumMin[] memory mins = abi.decode(data, (PremiumMin[]));
+			address[] memory quoteTokens = new address[](mins.length);
+			for (uint256 i = 0; i < mins.length; ++i) {
+				if (mins[i].minPremiumPerUnit == 0) revert PremiumTooLow();
+				quoteTokens[i] = mins[i].quoteToken;
+			}
+			_checkCoversPairs(pairs, quoteTokens);
+		} else if (kind == STRIKE_SPOT_BAND) {
+			StrikeSpotBandRule memory rule = abi.decode(data, (StrikeSpotBandRule));
 			_checkFeed(rule.priceFeed, rule.maxPriceAge);
 			if (isCall && rule.maxInTheMoneyBps > IvyMath.BPS) revert DeviationTooLarge();
-		} else if (kind == PREMIUM_FLOOR) {
-			PremiumFloorRule memory rule = abi.decode(data, (PremiumFloorRule));
+		} else if (kind == PREMIUM_SPOT_FLOOR) {
+			PremiumSpotFloorRule memory rule = abi.decode(data, (PremiumSpotFloorRule));
 			if (rule.minPremiumBps == 0 || rule.minPremiumBps > IvyMath.BPS) revert InvalidPremiumFloor();
 			_checkPremiumFeed(terms, pairs, rule.priceFeed, rule.maxPriceAge);
-		} else if (kind == YIELD_FLOOR) {
-			YieldFloorRule memory rule = abi.decode(data, (YieldFloorRule));
+		} else if (kind == PREMIUM_YIELD_FLOOR) {
+			PremiumYieldFloorRule memory rule = abi.decode(data, (PremiumYieldFloorRule));
 			if (rule.minAprBps == 0) revert InvalidPremiumFloor();
 			_checkPremiumFeed(terms, pairs, rule.priceFeed, rule.maxPriceAge);
-		} else if (kind == TENOR_RANGE) {
-			TenorRangeRule memory rule = abi.decode(data, (TenorRangeRule));
-			if (rule.maxTenor == 0 || rule.minTenor > rule.maxTenor) revert InvalidTenorRange();
-		} else if (kind == EXPIRY_WINDOW) {
-			ExpiryWindowRule memory rule = abi.decode(data, (ExpiryWindowRule));
-			if (rule.notBefore > rule.notAfter || rule.notAfter <= block.timestamp) revert InvalidExpiryWindow();
-		} else if (kind == MIN_IMPLIED_VOL) {
+		} else if (kind == EXPIRY_TENOR) {
+			ExpiryTenorRule memory rule = abi.decode(data, (ExpiryTenorRule));
+			if (rule.maxTenor == 0 || rule.minTenor > rule.maxTenor) revert InvalidExpiryTenor();
+		} else if (kind == EXPIRY_DATES) {
+			ExpiryDatesRule memory rule = abi.decode(data, (ExpiryDatesRule));
+			if (rule.notBefore > rule.notAfter || rule.notAfter <= block.timestamp) revert InvalidExpiryDates();
+		} else if (kind == PREMIUM_VOL_FLOOR) {
 			if (abi.decode(data, (uint32)) == 0) revert InvalidVolFloor();
 		} else {
 			revert UnknownRuleKind(kind);
@@ -102,30 +122,31 @@ contract IvyStandardBidRules is IIvyBidValidator {
 		bytes calldata,
 		bytes calldata bidMasterData
 	) external view returns (bytes4) {
-		if (kind == PAIR_LIMITS) {
-			PairLimit memory limit = _limitFor(abi.decode(config, (PairLimit[])), bid.quoteToken);
-			if (bid.strike < limit.minStrike) revert StrikeBelowLimit();
-			if (bid.strike > limit.maxStrike) revert StrikeAboveLimit();
-			if (bid.premiumPerUnit < limit.minPremiumPerUnit) revert PremiumTooLow();
-		} else if (kind == SPOT_BAND) {
-			_checkSpotBand(context, bid, abi.decode(config, (SpotBandRule)));
-		} else if (kind == PREMIUM_FLOOR) {
-			PremiumFloorRule memory rule = abi.decode(config, (PremiumFloorRule));
+		if (kind == STRIKE_RANGE) {
+			StrikeRange memory range = _strikeRangeFor(abi.decode(config, (StrikeRange[])), bid.quoteToken);
+			if (bid.strike < range.minStrike) revert StrikeBelowRange();
+			if (bid.strike > range.maxStrike) revert StrikeAboveRange();
+		} else if (kind == PREMIUM_MIN) {
+			if (bid.premiumPerUnit < _premiumMinFor(abi.decode(config, (PremiumMin[])), bid.quoteToken)) revert PremiumTooLow();
+		} else if (kind == STRIKE_SPOT_BAND) {
+			_checkStrikeSpotBand(context, bid, abi.decode(config, (StrikeSpotBandRule)));
+		} else if (kind == PREMIUM_SPOT_FLOOR) {
+			PremiumSpotFloorRule memory rule = abi.decode(config, (PremiumSpotFloorRule));
 			uint256 spot = _premiumSpot(context, rule.priceFeed, rule.maxPriceAge);
 			if (bid.premiumPerUnit * IvyMath.BPS < spot * rule.minPremiumBps) revert PremiumTooLow();
-		} else if (kind == YIELD_FLOOR) {
-			YieldFloorRule memory rule = abi.decode(config, (YieldFloorRule));
+		} else if (kind == PREMIUM_YIELD_FLOOR) {
+			PremiumYieldFloorRule memory rule = abi.decode(config, (PremiumYieldFloorRule));
 			uint256 spot = _premiumSpot(context, rule.priceFeed, rule.maxPriceAge);
 			// The Hub has already required expiry > block.timestamp.
 			uint256 tenor = bid.expiry - block.timestamp;
 			if (bid.premiumPerUnit * IvyMath.BPS * YEAR < spot * rule.minAprBps * tenor) revert PremiumTooLow();
-		} else if (kind == TENOR_RANGE) {
-			TenorRangeRule memory rule = abi.decode(config, (TenorRangeRule));
-			if (bid.expiry < block.timestamp + rule.minTenor || bid.expiry > block.timestamp + rule.maxTenor) revert TenorOutOfRange();
-		} else if (kind == EXPIRY_WINDOW) {
-			ExpiryWindowRule memory rule = abi.decode(config, (ExpiryWindowRule));
-			if (bid.expiry < rule.notBefore || bid.expiry > rule.notAfter) revert ExpiryOutsideWindow();
-		} else if (kind == MIN_IMPLIED_VOL) {
+		} else if (kind == EXPIRY_TENOR) {
+			ExpiryTenorRule memory rule = abi.decode(config, (ExpiryTenorRule));
+			if (bid.expiry < block.timestamp + rule.minTenor || bid.expiry > block.timestamp + rule.maxTenor) revert ExpiryOutsideTenor();
+		} else if (kind == EXPIRY_DATES) {
+			ExpiryDatesRule memory rule = abi.decode(config, (ExpiryDatesRule));
+			if (bid.expiry < rule.notBefore || bid.expiry > rule.notAfter) revert ExpiryOutsideDates();
+		} else if (kind == PREMIUM_VOL_FLOOR) {
 			// The bid master attests the bid's annualized implied volatility; this rule trusts it.
 			if (bidMasterData.length != 32) revert MissingAttestation();
 			if (abi.decode(bidMasterData, (uint32)) < abi.decode(config, (uint32))) revert VolTooLow();
@@ -150,7 +171,7 @@ contract IvyStandardBidRules is IIvyBidValidator {
 		}
 	}
 
-	function _checkSpotBand(BidContext calldata context, Bid calldata bid, SpotBandRule memory rule) private view {
+	function _checkStrikeSpotBand(BidContext calldata context, Bid calldata bid, StrikeSpotBandRule memory rule) private view {
 		uint256 spot = _readSpot(rule.priceFeed, rule.maxPriceAge, context.underlying, bid.quoteToken);
 		uint256 inner = IvyMath.spotBound(context.isCall, spot, rule.maxInTheMoneyBps);
 		if (context.isCall ? bid.strike < inner : bid.strike > inner) revert StrikeOutsideSpotBand();
@@ -174,37 +195,43 @@ contract IvyStandardBidRules is IIvyBidValidator {
 		return price;
 	}
 
-	function _checkPairLimits(PairConfig[] calldata pairs, PairLimit[] memory limits) private pure {
+	/// @dev Requires exactly one entry per vault pair, so a per-pair rule can never leave a pair unbounded.
+	function _checkCoversPairs(PairConfig[] calldata pairs, address[] memory quoteTokens) private pure {
 		for (uint256 i = 0; i < pairs.length; ++i) {
 			bool found = false;
-			for (uint256 j = 0; j < limits.length; ++j) {
-				if (limits[j].quoteToken == pairs[i].quoteToken) {
+			for (uint256 j = 0; j < quoteTokens.length; ++j) {
+				if (quoteTokens[j] == pairs[i].quoteToken) {
 					found = true;
 					break;
 				}
 			}
 			if (!found) revert RuleMissingPair(pairs[i].quoteToken);
 		}
-		for (uint256 i = 0; i < limits.length; ++i) {
+		for (uint256 i = 0; i < quoteTokens.length; ++i) {
 			bool known = false;
 			for (uint256 j = 0; j < pairs.length; ++j) {
-				if (pairs[j].quoteToken == limits[i].quoteToken) {
+				if (pairs[j].quoteToken == quoteTokens[i]) {
 					known = true;
 					break;
 				}
 			}
-			if (!known) revert PairUnknown(limits[i].quoteToken);
+			if (!known) revert PairUnknown(quoteTokens[i]);
 			for (uint256 j = 0; j < i; ++j) {
-				if (limits[j].quoteToken == limits[i].quoteToken) revert DuplicatePair(limits[i].quoteToken);
+				if (quoteTokens[j] == quoteTokens[i]) revert DuplicatePair(quoteTokens[i]);
 			}
-			if (limits[i].minStrike == 0 || limits[i].minStrike > limits[i].maxStrike) revert InvalidStrikeLimit();
-			if (limits[i].minPremiumPerUnit == 0) revert PremiumTooLow();
 		}
 	}
 
-	function _limitFor(PairLimit[] memory limits, address quoteToken) private pure returns (PairLimit memory) {
-		for (uint256 i = 0; i < limits.length; ++i) {
-			if (limits[i].quoteToken == quoteToken) return limits[i];
+	function _strikeRangeFor(StrikeRange[] memory ranges, address quoteToken) private pure returns (StrikeRange memory) {
+		for (uint256 i = 0; i < ranges.length; ++i) {
+			if (ranges[i].quoteToken == quoteToken) return ranges[i];
+		}
+		revert PairUnknown(quoteToken);
+	}
+
+	function _premiumMinFor(PremiumMin[] memory mins, address quoteToken) private pure returns (uint256) {
+		for (uint256 i = 0; i < mins.length; ++i) {
+			if (mins[i].quoteToken == quoteToken) return mins[i].minPremiumPerUnit;
 		}
 		revert PairUnknown(quoteToken);
 	}

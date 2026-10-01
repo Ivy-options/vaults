@@ -4,13 +4,14 @@ import hre, { artifacts, type network } from "hardhat"
 
 import {
 	RULE_KIND,
-	encodeExpiryWindow,
-	encodeMinImpliedVol,
-	encodePairLimits,
-	encodePremiumFloor,
-	encodeSpotBand,
-	encodeTenorRange,
-	encodeYieldFloor,
+	encodeExpiryDates,
+	encodePremiumVolFloor,
+	encodePremiumMin,
+	encodePremiumSpotFloor,
+	encodeStrikeRange,
+	encodeStrikeSpotBand,
+	encodeExpiryTenor,
+	encodePremiumYieldFloor,
 } from "../../scripts/encoding.ts"
 
 export type Connection = Awaited<ReturnType<typeof network.create>>
@@ -19,9 +20,9 @@ export const EXERCISE_WINDOW = 3600n
 export const AUCTION_TIMEOUT = 3n * 24n * 3600n
 export const EXPIRY_PRICE_PUBLICATION_WINDOW = 3600n
 export const THIRTY_DAYS = 30n * 24n * 3600n
-/** Upper tenor bound of the default TenorRange rule: loose enough that only expiry tests meet it. */
+/** Upper tenor bound of the default ExpiryTenor rule: loose enough that only expiry tests meet it. */
 export const DEFAULT_MAX_TENOR = 365n * 24n * 3600n
-/** SpotBand out-of-the-money bound that never binds: no ceiling for calls, no floor for puts. */
+/** StrikeSpotBand out-of-the-money bound that never binds: no ceiling for calls, no floor for puts. */
 export const NO_OTM_LIMIT = 2 ** 32 - 1
 export const WETH_UNIT = 10n ** 18n
 export const USDC_UNIT = 10n ** 6n
@@ -74,7 +75,8 @@ export interface BidRuleInput {
 	data: string
 }
 
-export interface PairLimitInput {
+/** One pair's StrikeRange and PremiumMin values, which tests usually set together. */
+export interface PairBoundsInput {
 	quoteToken: string
 	minStrike: bigint
 	maxStrike: bigint
@@ -262,59 +264,68 @@ export function putPairs(ctx: IvyContext): PairConfigInput[] {
 }
 
 /** Test default: explicit one-raw-unit call strike and premium floors, no strike ceiling. */
-export function callLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
+export function callBounds(ctx: IvyContext, o: Partial<PairBoundsInput> = {}): PairBoundsInput[] {
 	return [{ quoteToken: ctx.usdcAddress, minStrike: 1n, maxStrike: MAX_UINT, minPremiumPerUnit: 1n, ...o }]
 }
 
 /** Test default: explicit 3,000 USDC put ceiling and one-raw-unit strike and premium floors. */
-export function putLimits(ctx: IvyContext, o: Partial<PairLimitInput> = {}): PairLimitInput[] {
+export function putBounds(ctx: IvyContext, o: Partial<PairBoundsInput> = {}): PairBoundsInput[] {
 	return [{ quoteToken: ctx.usdcAddress, minStrike: 1n, maxStrike: 3000n * USDC_UNIT, minPremiumPerUnit: 1n, ...o }]
 }
 
-export function pairLimitsRule(ctx: IvyContext, limits: PairLimitInput[]): BidRuleInput {
+export function strikeRangeRule(ctx: IvyContext, bounds: PairBoundsInput[]): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
-		kind: RuleKind.PairLimits,
-		data: encodePairLimits(limits.map(l => [l.quoteToken, l.minStrike, l.maxStrike, l.minPremiumPerUnit])),
+		kind: RuleKind.StrikeRange,
+		data: encodeStrikeRange(bounds.map(b => [b.quoteToken, b.minStrike, b.maxStrike])),
 	}
 }
 
-export function spotBandRule(
+export function premiumMinRule(ctx: IvyContext, bounds: PairBoundsInput[]): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.PremiumMin, data: encodePremiumMin(bounds.map(b => [b.quoteToken, b.minPremiumPerUnit])) }
+}
+
+/** The two required per-pair rules: StrikeRange then PremiumMin. */
+export function pairBoundsRules(ctx: IvyContext, bounds: PairBoundsInput[]): BidRuleInput[] {
+	return [strikeRangeRule(ctx, bounds), premiumMinRule(ctx, bounds)]
+}
+
+export function strikeSpotBandRule(
 	ctx: IvyContext,
 	o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number; maxOutOfTheMoneyBps?: number },
 ): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
-		kind: RuleKind.SpotBand,
-		data: encodeSpotBand(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps, o.maxOutOfTheMoneyBps ?? NO_OTM_LIMIT),
+		kind: RuleKind.StrikeSpotBand,
+		data: encodeStrikeSpotBand(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps, o.maxOutOfTheMoneyBps ?? NO_OTM_LIMIT),
 	}
 }
 
-export function yieldFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minAprBps: number }): BidRuleInput {
+export function premiumYieldFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minAprBps: number }): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
-		kind: RuleKind.YieldFloor,
-		data: encodeYieldFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minAprBps),
+		kind: RuleKind.PremiumYieldFloor,
+		data: encodePremiumYieldFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minAprBps),
 	}
 }
 
-export function tenorRangeRule(ctx: IvyContext, minTenor = 0n, maxTenor = DEFAULT_MAX_TENOR): BidRuleInput {
-	return { validator: ctx.bidRulesAddress, kind: RuleKind.TenorRange, data: encodeTenorRange(minTenor, maxTenor) }
+export function expiryTenorRule(ctx: IvyContext, minTenor = 0n, maxTenor = DEFAULT_MAX_TENOR): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.ExpiryTenor, data: encodeExpiryTenor(minTenor, maxTenor) }
 }
 
-export function expiryWindowRule(ctx: IvyContext, notBefore: bigint, notAfter: bigint): BidRuleInput {
-	return { validator: ctx.bidRulesAddress, kind: RuleKind.ExpiryWindow, data: encodeExpiryWindow(notBefore, notAfter) }
+export function expiryDatesRule(ctx: IvyContext, notBefore: bigint, notAfter: bigint): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.ExpiryDates, data: encodeExpiryDates(notBefore, notAfter) }
 }
 
-export function minImpliedVolRule(ctx: IvyContext, minVolBps: number): BidRuleInput {
-	return { validator: ctx.bidRulesAddress, kind: RuleKind.MinImpliedVol, data: encodeMinImpliedVol(minVolBps) }
+export function premiumVolFloorRule(ctx: IvyContext, minVolBps: number): BidRuleInput {
+	return { validator: ctx.bidRulesAddress, kind: RuleKind.PremiumVolFloor, data: encodePremiumVolFloor(minVolBps) }
 }
 
-export function premiumFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minPremiumBps: number }): BidRuleInput {
+export function premiumSpotFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minPremiumBps: number }): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
-		kind: RuleKind.PremiumFloor,
-		data: encodePremiumFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minPremiumBps),
+		kind: RuleKind.PremiumSpotFloor,
+		data: encodePremiumSpotFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minPremiumBps),
 	}
 }
 
@@ -325,7 +336,7 @@ export async function createVaultAs(
 	pairs: PairConfigInput[],
 	rules?: BidRuleInput[],
 ) {
-	const bidRules = rules ?? [pairLimitsRule(ctx, terms.collateral === terms.underlying ? callLimits(ctx) : putLimits(ctx)), tenorRangeRule(ctx)]
+	const bidRules = rules ?? [...pairBoundsRules(ctx, terms.collateral === terms.underlying ? callBounds(ctx) : putBounds(ctx)), expiryTenorRule(ctx)]
 	await (await ctx.hub.connect(signer).createVault(terms, pairs, bidRules)).wait()
 	const vaultId = await ctx.hub.vaultCount()
 	const vaultAddress = await ctx.hub.vaultOf(vaultId)

@@ -20,14 +20,14 @@ import {
 	RuleKind,
 	SettlementPolicy,
 	SettlementType,
-	callLimits,
+	callBounds,
 	callPairs,
 	callTerms,
 	deployIvy,
 	fixture,
 	fund,
-	pairLimitsRule,
-	tenorRangeRule,
+	pairBoundsRules,
+	expiryTenorRule,
 	usdc,
 	weth,
 	type IvyContext,
@@ -260,7 +260,7 @@ describe("cash settlement opt-in", () => {
 
 			it("creates a physical-only vault", async () => {
 				await expect(
-					c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]),
+					c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)]),
 				).not.to.be.revert(ethers)
 			})
 		})
@@ -279,8 +279,8 @@ describe("cash settlement opt-in", () => {
 				it(`accepts the ${name} settlement policy with a price age limit`, async () => {
 					await expect(
 						c.hub.createVault(callTerms(c, { allowedSettlement: policy, maxSettlementPriceAge: 3600 }), callPairs(c), [
-							pairLimitsRule(c, callLimits(c)),
-							tenorRangeRule(c),
+							...pairBoundsRules(c, callBounds(c)),
+							expiryTenorRule(c),
 						]),
 					).not.to.be.revert(ethers)
 				})
@@ -319,7 +319,7 @@ describe("cash settlement opt-in", () => {
 
 					it("goes live with explicit bid limits and an expiry rule", async () => {
 						const rules = await c.hub.rulesOf(v.vaultId)
-						expect(rules.map(r => r.kind)).to.deep.equal([RuleKind.PairLimits, RuleKind.TenorRange])
+						expect(rules.map(r => r.kind)).to.deep.equal([RuleKind.StrikeRange, RuleKind.PremiumMin, RuleKind.ExpiryTenor])
 					})
 
 					context("after full exercise", () => {

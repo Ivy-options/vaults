@@ -13,7 +13,7 @@ import {
 	type DeploymentPlan,
 	type Journal,
 } from "../../scripts/deployment.ts"
-import { encodePairLimits, encodeTenorRange, hashMarketMakerData } from "../../scripts/encoding.ts"
+import { encodeExpiryTenor, encodePremiumMin, encodeStrikeRange, hashMarketMakerData } from "../../scripts/encoding.ts"
 import { buildRegistryDeploymentPlan, resumeRegistryDeployment, type RegistryPlan } from "../../scripts/registry-deployment.ts"
 import { RELEASE_FORMAT, releaseHash, resolveRelease, verifyRelease, type ReleaseBundle, type ReleaseRequest } from "../../scripts/releases.ts"
 import { signBid, type Bid } from "../helpers/bids.js"
@@ -454,12 +454,9 @@ describe("release registry", () => {
 					maxSettlementPriceAge: 0,
 				}
 				const rules = [
-					{
-						validator: resolved.addresses.IvyStandardBidRules,
-						kind: RuleKind.PairLimits,
-						data: encodePairLimits([[usdcAddress, STRIKE, STRIKE, PREMIUM_PER_UNIT]]),
-					},
-					{ validator: resolved.addresses.IvyStandardBidRules, kind: RuleKind.TenorRange, data: encodeTenorRange(0n, 24n * 3600n) },
+					{ validator: resolved.addresses.IvyStandardBidRules, kind: RuleKind.StrikeRange, data: encodeStrikeRange([[usdcAddress, STRIKE, STRIKE]]) },
+					{ validator: resolved.addresses.IvyStandardBidRules, kind: RuleKind.PremiumMin, data: encodePremiumMin([[usdcAddress, PREMIUM_PER_UNIT]]) },
+					{ validator: resolved.addresses.IvyStandardBidRules, kind: RuleKind.ExpiryTenor, data: encodeExpiryTenor(0n, 24n * 3600n) },
 				]
 				await hub.createVault(terms, [{ quoteToken: usdcAddress, premiumToken: usdcAddress }], rules)
 				const vaultId = await hub.vaultCount()

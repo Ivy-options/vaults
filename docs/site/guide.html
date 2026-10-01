@@ -540,7 +540,7 @@
               <dd>
                 <code>floor(grossPremium × feeBps / 10,000)</code> in premium
                 tokens. The fee rounds down to a whole raw token unit, leaving
-                the rounding remainder for LPs. The owner's PairLimits rule's
+                the rounding remainder for LPs. The owner's PremiumMin rule's
                 <code>minPremiumPerUnit</code> is the gross premium per whole
                 underlying token, before the platform fee is deducted. The
                 total payment scales that per-token premium by the option's
@@ -1412,7 +1412,7 @@
                 <dt>Units & authority</dt>
                 <dd>
                   Prices use raw quote-token units per whole underlying token.
-                  A SpotBand bid rule's <code>priceFeed</code> is a separate
+                  A StrikeSpotBand bid rule's <code>priceFeed</code> is a separate
                   source used to check whether a bid's strike is acceptable at
                   activation.
                   Its price cannot replace a missing cash-settlement report,
@@ -1688,9 +1688,10 @@
               ><span
                 >The strike, premium and expiry limits a bid must meet, chosen
                 from the kinds in <a href="#bid-rules">Bid rules</a>. Every
-                vault needs <span class="mono">PairLimits</span> and a
-                <span class="mono">TenorRange</span> or
-                <span class="mono">ExpiryWindow</span> rule.</span
+                vault needs <span class="mono">StrikeRange</span>,
+                <span class="mono">PremiumMin</span> and an
+                <span class="mono">ExpiryTenor</span> or
+                <span class="mono">ExpiryDates</span> rule.</span
               ><span class="term-rule"
                 ><span class="term-rule-label">Owner changes</span
                 ><span class="chip">immutable</span></span
@@ -1814,14 +1815,15 @@
             </p>
             <dl class="rule-ledger">
               <div>
-                <dt>Two rules are required</dt>
+                <dt>Three rules are required</dt>
                 <dd>
-                  Every vault needs a <code>PairLimits</code> rule and at least
-                  one expiry rule, <code>TenorRange</code> or
-                  <code>ExpiryWindow</code>. Without them
-                  <code>createVault</code> reverts with
-                  <code>MissingBidLimits</code> or
-                  <code>MissingExpiryBounds</code>. The Hub only checks that
+                  Every vault needs a <code>StrikeRange</code> rule, a
+                  <code>PremiumMin</code> rule and at least one expiry rule,
+                  <code>ExpiryTenor</code> or <code>ExpiryDates</code>. Without
+                  them <code>createVault</code> reverts with
+                  <code>MissingStrikeRange</code>,
+                  <code>MissingPremiumMin</code> or
+                  <code>MissingExpiryRule</code>. The Hub only checks that
                   these kinds are listed. The values are yours to choose.
                 </dd>
               </div>
@@ -1829,8 +1831,8 @@
                 <dt>Rules stack</dt>
                 <dd>
                   You can list the same kind more than once and every copy
-                  applies. With a <code>TenorRange</code> and an
-                  <code>ExpiryWindow</code>, the expiry has to satisfy both.
+                  applies. With an <code>ExpiryTenor</code> and an
+                  <code>ExpiryDates</code>, the expiry has to satisfy both.
                 </dd>
               </div>
               <div>
@@ -1864,7 +1866,7 @@
                 <dd>
                   A rule may use only a validator that governance has granted
                   the bid-validator role. Each release grants it to
-                  <code>IvyStandardBidRules</code>, which provides the seven
+                  <code>IvyStandardBidRules</code>, which provides the eight
                   kinds below. <code>createVault</code> reverts with
                   <code>InvalidValidator</code> for any other address and
                   <code>UnknownRuleKind</code> for a kind the validator does
@@ -1887,10 +1889,10 @@
           <div class="reading-block reading-flow" id="bid-rules-overview">
             <h3>What you can control today</h3>
             <p>
-              The shipped validator offers seven kinds in three groups: strike,
-              premium and expiry. The "Depends on" column is also what you
+              The shipped validator offers eight kinds. Each name starts with
+              the bid field it bounds: strike, premium or expiry. The "Depends on" column is also what you
               trust. A rule that reads the price feed is only as good as that
-              feed. <code>MinImpliedVol</code> is only as good as the bid
+              feed. <code>PremiumVolFloor</code> is only as good as the bid
               master's figure.
             </p>
             <div
@@ -1910,46 +1912,52 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="k"><code>PairLimits</code></td>
-                    <td>An absolute strike range and a flat premium floor, per quote token</td>
+                    <td class="k"><code>StrikeRange</code></td>
+                    <td>An absolute strike range, per quote token</td>
                     <td>Its own data only</td>
                     <td>Yes</td>
                   </tr>
                   <tr>
-                    <td class="k"><code>SpotBand</code></td>
+                    <td class="k"><code>StrikeSpotBand</code></td>
                     <td>How far the strike may sit from the current market price</td>
                     <td>The release price feed</td>
                     <td>No</td>
                   </tr>
                   <tr>
-                    <td class="k"><code>PremiumFloor</code></td>
+                    <td class="k"><code>PremiumMin</code></td>
+                    <td>A flat premium minimum, per quote token</td>
+                    <td>Its own data only</td>
+                    <td>Yes</td>
+                  </tr>
+                  <tr>
+                    <td class="k"><code>PremiumSpotFloor</code></td>
                     <td>Premium as a share of spot</td>
                     <td>The release price feed, unless premium is paid in the underlying</td>
                     <td>No</td>
                   </tr>
                   <tr>
-                    <td class="k"><code>YieldFloor</code></td>
+                    <td class="k"><code>PremiumYieldFloor</code></td>
                     <td>Premium as an annual rate of spot, scaled by the option's length</td>
                     <td>The release price feed, unless premium is paid in the underlying</td>
                     <td>No</td>
                   </tr>
                   <tr>
-                    <td class="k"><code>TenorRange</code></td>
-                    <td>Time from activation to expiry</td>
-                    <td>Its own data only</td>
-                    <td>This or <code>ExpiryWindow</code></td>
-                  </tr>
-                  <tr>
-                    <td class="k"><code>ExpiryWindow</code></td>
-                    <td>Expiry between two dates</td>
-                    <td>Its own data only</td>
-                    <td>This or <code>TenorRange</code></td>
-                  </tr>
-                  <tr>
-                    <td class="k"><code>MinImpliedVol</code></td>
+                    <td class="k"><code>PremiumVolFloor</code></td>
                     <td>The bid's implied volatility</td>
                     <td>The bid master's attestation</td>
                     <td>No</td>
+                  </tr>
+                  <tr>
+                    <td class="k"><code>ExpiryTenor</code></td>
+                    <td>Time from activation to expiry</td>
+                    <td>Its own data only</td>
+                    <td>This or <code>ExpiryDates</code></td>
+                  </tr>
+                  <tr>
+                    <td class="k"><code>ExpiryDates</code></td>
+                    <td>Expiry between two dates</td>
+                    <td>Its own data only</td>
+                    <td>This or <code>ExpiryTenor</code></td>
                   </tr>
                 </tbody>
               </table>
@@ -1966,19 +1974,18 @@
             </p>
             <dl class="rule-ledger bid-rule-cards">
               <div>
-                <dt><code>PairLimits</code></dt>
+                <dt><code>StrikeRange</code></dt>
                 <dd>
-                  <p><strong>You set.</strong> One entry per pair: <code>quoteToken</code>, <code>minStrike</code>, <code>maxStrike</code> and <code>minPremiumPerUnit</code>.</p>
+                  <p><strong>You set.</strong> One entry per pair: <code>quoteToken</code>, <code>minStrike</code> and <code>maxStrike</code>.</p>
                   <p><strong>Passes when.</strong> <code>minStrike ≤ strike ≤ maxStrike</code>, both ends included, for calls and puts alike.</p>
                   <p><strong>Example.</strong> With a range of 3,100 to 3,500 USDC, both 3,100 and 3,500 pass. One raw unit below 3,100 fails.</p>
                   <p><strong>Only one side.</strong> For a floor only, set <code>maxStrike</code> to the largest <code>uint256</code>. For a ceiling only, set <code>minStrike</code> to 1.</p>
-                  <p><strong>Rejects with.</strong> <code>StrikeBelowLimit</code> or <code>StrikeAboveLimit</code>.</p>
-                  <p><strong>At creation.</strong> Exactly one entry for each pair the vault lists, and <code>0 &lt; minStrike ≤ maxStrike</code>. Otherwise <code>RuleMissingPair</code>, <code>PairUnknown</code>, <code>DuplicatePair</code> or <code>InvalidStrikeLimit</code>.</p>
-                  <p><strong>Also sets.</strong> A flat premium floor, covered with the premium rules.</p>
+                  <p><strong>Rejects with.</strong> <code>StrikeBelowRange</code> or <code>StrikeAboveRange</code>.</p>
+                  <p><strong>At creation.</strong> Exactly one entry for each pair the vault lists, and <code>0 &lt; minStrike ≤ maxStrike</code>. Otherwise <code>RuleMissingPair</code>, <code>PairUnknown</code>, <code>DuplicatePair</code> or <code>InvalidStrikeRange</code>.</p>
                 </dd>
               </div>
               <div>
-                <dt><code>SpotBand</code></dt>
+                <dt><code>StrikeSpotBand</code></dt>
                 <dd>
                   <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> in seconds, <code>maxInTheMoneyBps</code> and <code>maxOutOfTheMoneyBps</code>.</p>
                   <p><strong>Passes when.</strong> For a call, <code>spot × (1 − ITM) ≤ strike ≤ spot × (1 + OTM)</code>. For a put, <code>spot × (1 − OTM) ≤ strike ≤ spot × (1 + ITM)</code>. Spot is the underlying's price in the bid's quote token.</p>
@@ -1998,21 +2005,21 @@
               in the pair's premium token, before the platform fee. Flat floors
               do not grow with the option's length. If your expiry rule allows
               a range, expect buyers to pick the longest expiry it allows at
-              the lowest premium that passes. <code>YieldFloor</code> and
-              <code>MinImpliedVol</code> make the floor grow with tenor.
+              the lowest premium that passes. <code>PremiumYieldFloor</code> and
+              <code>PremiumVolFloor</code> make the floor grow with tenor.
             </p>
             <dl class="rule-ledger bid-rule-cards">
               <div>
-                <dt><code>PairLimits</code> floor</dt>
+                <dt><code>PremiumMin</code></dt>
                 <dd>
-                  <p><strong>You set.</strong> <code>minPremiumPerUnit</code> in each pair's entry, a flat amount such as 30 USDC per WETH.</p>
+                  <p><strong>You set.</strong> One entry per pair: <code>quoteToken</code> and <code>minPremiumPerUnit</code>, a flat amount such as 30 USDC per WETH.</p>
                   <p><strong>Passes when.</strong> <code>premiumPerUnit ≥ minPremiumPerUnit</code>. No price feed is read.</p>
                   <p><strong>Rejects with.</strong> <code>PremiumTooLow</code>.</p>
-                  <p><strong>At creation.</strong> The floor must be positive.</p>
+                  <p><strong>At creation.</strong> Exactly one entry for each pair the vault lists, and a positive minimum. Otherwise <code>RuleMissingPair</code>, <code>PairUnknown</code>, <code>DuplicatePair</code> or <code>PremiumTooLow</code>.</p>
                 </dd>
               </div>
               <div>
-                <dt><code>PremiumFloor</code></dt>
+                <dt><code>PremiumSpotFloor</code></dt>
                 <dd>
                   <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> and <code>minPremiumBps</code> from 1 to 10,000.</p>
                   <p><strong>Passes when.</strong> <code>premiumPerUnit ≥ spot × minPremiumBps ÷ 10,000</code>, with spot priced in the premium token.</p>
@@ -2023,18 +2030,18 @@
                 </dd>
               </div>
               <div>
-                <dt><code>YieldFloor</code></dt>
+                <dt><code>PremiumYieldFloor</code></dt>
                 <dd>
                   <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> and <code>minAprBps</code> from 1 to 65,535.</p>
                   <p><strong>Passes when.</strong> <code>premiumPerUnit ≥ spot × minAprBps ÷ 10,000 × tenor ÷ 365 days</code>. Tenor is the time from activation to the bid's expiry.</p>
                   <p><strong>Example.</strong> With spot at 3,000 USDC and 1,000 bps, which is 10% a year, a 36.5-day option needs 30 USDC per WETH and a 73-day option needs 60.</p>
-                  <p><strong>No feed needed.</strong> The same as <code>PremiumFloor</code>: premium paid in the underlying is priced without the feed.</p>
+                  <p><strong>No feed needed.</strong> The same as <code>PremiumSpotFloor</code>: premium paid in the underlying is priced without the feed.</p>
                   <p><strong>Rejects with.</strong> <code>PremiumTooLow</code>, <code>InvalidPrice</code> or <code>StalePrice</code>.</p>
                   <p><strong>At creation.</strong> <code>InvalidPremiumFloor</code> for a zero rate.</p>
                 </dd>
               </div>
               <div>
-                <dt><code>MinImpliedVol</code></dt>
+                <dt><code>PremiumVolFloor</code></dt>
                 <dd>
                   <p><strong>You set.</strong> <code>minVolBps</code>, annualized, where 10,000 is 100%.</p>
                   <p><strong>Passes when.</strong> The bid master puts the bid's implied volatility in this rule's <code>bidMasterData</code> slot, as one ABI-encoded <code>uint32</code> in bps, and it is at least <code>minVolBps</code>.</p>
@@ -2055,25 +2062,25 @@
             </p>
             <dl class="rule-ledger bid-rule-cards">
               <div>
-                <dt><code>TenorRange</code></dt>
+                <dt><code>ExpiryTenor</code></dt>
                 <dd>
                   <p><strong>You set.</strong> <code>minTenor</code> and <code>maxTenor</code> in seconds.</p>
                   <p><strong>Passes when.</strong> The expiry falls between activation time plus <code>minTenor</code> and activation time plus <code>maxTenor</code>, both ends included.</p>
                   <p><strong>Example.</strong> 10 to 30 days is 864,000 to 2,592,000. A <code>minTenor</code> of 0 accepts any future expiry up to the maximum.</p>
                   <p><strong>Timing.</strong> The range is measured when the bid activates, not when the buyer signed it, so a waiting bid's remaining tenor shrinks.</p>
-                  <p><strong>Rejects with.</strong> <code>TenorOutOfRange</code>.</p>
-                  <p><strong>At creation.</strong> <code>maxTenor</code> must be positive and at least <code>minTenor</code>, or <code>InvalidTenorRange</code>.</p>
+                  <p><strong>Rejects with.</strong> <code>ExpiryOutsideTenor</code>.</p>
+                  <p><strong>At creation.</strong> <code>maxTenor</code> must be positive and at least <code>minTenor</code>, or <code>InvalidExpiryTenor</code>.</p>
                 </dd>
               </div>
               <div>
-                <dt><code>ExpiryWindow</code></dt>
+                <dt><code>ExpiryDates</code></dt>
                 <dd>
                   <p><strong>You set.</strong> <code>notBefore</code> and <code>notAfter</code> as Unix timestamps.</p>
                   <p><strong>Passes when.</strong> <code>notBefore ≤ expiry ≤ notAfter</code>.</p>
                   <p><strong>Example.</strong> Set both to the same time to require one exact expiry, as vaults had before this release.</p>
-                  <p><strong>Timing.</strong> If the window closes while the auction is open, no bid can pass. LPs then wait for the auction timeout or a cancellation by the bid master.</p>
-                  <p><strong>Rejects with.</strong> <code>ExpiryOutsideWindow</code>.</p>
-                  <p><strong>At creation.</strong> <code>notBefore</code> cannot be later than <code>notAfter</code>, and <code>notAfter</code> must be after the creation block, or <code>InvalidExpiryWindow</code>.</p>
+                  <p><strong>Timing.</strong> If <code>notAfter</code> passes while the auction is open, no bid can pass. LPs then wait for the auction timeout or a cancellation by the bid master.</p>
+                  <p><strong>Rejects with.</strong> <code>ExpiryOutsideDates</code>.</p>
+                  <p><strong>At creation.</strong> <code>notBefore</code> cannot be later than <code>notAfter</code>, and <code>notAfter</code> must be after the creation block, or <code>InvalidExpiryDates</code>.</p>
                 </dd>
               </div>
             </dl>
@@ -2101,39 +2108,39 @@
                 <tbody>
                   <tr>
                     <td class="k">One fixed expiry time, as vaults had before</td>
-                    <td><code>ExpiryWindow</code> with <code>notBefore</code> and <code>notAfter</code> both set to that time</td>
+                    <td><code>ExpiryDates</code> with <code>notBefore</code> and <code>notAfter</code> both set to that time</td>
                   </tr>
                   <tr>
                     <td class="k">Any expiry 10 to 30 days after the sale</td>
-                    <td><code>TenorRange</code> from 864,000 to 2,592,000</td>
+                    <td><code>ExpiryTenor</code> from 864,000 to 2,592,000</td>
                   </tr>
                   <tr>
                     <td class="k">An expiry in the first half of November, at least 7 days out</td>
-                    <td><code>ExpiryWindow</code> from 1 to 15 November, plus <code>TenorRange</code> with a <code>minTenor</code> of 604,800</td>
+                    <td><code>ExpiryDates</code> from 1 to 15 November, plus <code>ExpiryTenor</code> with a <code>minTenor</code> of 604,800</td>
                   </tr>
                   <tr>
                     <td class="k">A strike between 3,100 and 3,500 USDC</td>
-                    <td><code>PairLimits</code> with that range</td>
+                    <td><code>StrikeRange</code> with that range</td>
                   </tr>
                   <tr>
                     <td class="k">A strike floor only</td>
-                    <td><code>PairLimits</code> with <code>maxStrike</code> at the largest <code>uint256</code></td>
+                    <td><code>StrikeRange</code> with <code>maxStrike</code> at the largest <code>uint256</code></td>
                   </tr>
                   <tr>
                     <td class="k">A strike within 10% of spot on either side</td>
-                    <td><code>SpotBand</code> with 1,000 and 1,000, keeping <code>PairLimits</code> as an absolute backstop</td>
+                    <td><code>StrikeSpotBand</code> with 1,000 and 1,000, keeping <code>StrikeRange</code> as an absolute backstop</td>
                   </tr>
                   <tr>
                     <td class="k">At least 30 USDC per WETH and at least 10% a year</td>
-                    <td><code>PairLimits</code> with a 30 USDC floor, plus <code>YieldFloor</code> at 1,000</td>
+                    <td><code>PremiumMin</code> at 30 USDC, plus <code>PremiumYieldFloor</code> at 1,000</td>
                   </tr>
                   <tr>
                     <td class="k">Pricing by volatility</td>
-                    <td><code>MinImpliedVol</code> at your minimum, keeping a sane <code>PairLimits</code> floor</td>
+                    <td><code>PremiumVolFloor</code> at your minimum, keeping a sane <code>PremiumMin</code></td>
                   </tr>
                   <tr>
                     <td class="k">Several quote tokens</td>
-                    <td>One <code>PairLimits</code> entry per pair. The other rules price against whichever quote and premium token the bid chose.</td>
+                    <td>One <code>StrikeRange</code> entry and one <code>PremiumMin</code> entry per pair. The other rules price against whichever quote and premium token the bid chose.</td>
                   </tr>
                 </tbody>
               </table>
@@ -2154,8 +2161,8 @@
               <div>
                 <dt>During the auction</dt>
                 <dd>
-                  Rules do nothing. An <code>ExpiryWindow</code> that closes
-                  does not unlock the auction.
+                  Rules do nothing. An <code>ExpiryDates</code> rule whose
+                  <code>notAfter</code> passes does not unlock the auction.
                 </dd>
               </div>
               <div>
@@ -2214,7 +2221,7 @@
               <li>Calendar expiries, such as Fridays at 08:00 UTC to line up
                 with listed options markets. The rule reads the bid's
                 expiry.</li>
-              <li>A minimum distance out of the money. <code>SpotBand</code>
+              <li>A minimum distance out of the money. <code>StrikeSpotBand</code>
                 cannot express this because its inner edge stops at
                 spot.</li>
               <li>A premium floor that grows with tenor without a price feed,
@@ -2233,7 +2240,7 @@
             </ul>
             <p class="boundary-note">
               None of these exist yet. Until a validator offering one is
-              deployed and approved, the seven shipped kinds are what creators
+              deployed and approved, the eight shipped kinds are what creators
               can use. A new validator is new code that depositors trust, so
               frontends label any validator other than
               <code>IvyStandardBidRules</code> as custom.

@@ -148,24 +148,25 @@
       <li><strong class="key-term">Strike:</strong> a range per quote token, from a nonzero minimum to a maximum.</li>
       <li><strong class="key-term">Premium:</strong> a minimum per whole underlying token, paid in the pair’s premium token.</li>
     </ul>
-    <p>These are the PairLimits rule. A YieldFloor rule can also raise the minimum premium with the option’s length.</p>
+    <p>These are the StrikeRange and PremiumMin rules. A PremiumYieldFloor rule can also raise the minimum premium with the option’s length.</p>
     </section>
     <section data-kind="tile" id="how-bids-are-judged"><h5>How bids are judged</h5>
     <p>The owner lists <strong class="key-term">bid rules</strong> at creation: each names a governance-allowlisted validator contract and its data. At activation the Hub runs its own checks first, then every rule in order. All must approve.</p>
     <ul class="reading-list" role="list">
-      <li><strong class="key-term">PairLimits</strong>: strike range and premium floor per quote token.</li>
-      <li><strong class="key-term">SpotBand</strong>: strike within a band of the feed’s spot.</li>
-      <li><strong class="key-term">PremiumFloor</strong>: premium at least a share of spot.</li>
-      <li><strong class="key-term">YieldFloor</strong>: premium at least an annual rate of spot, for the option’s length.</li>
-      <li><strong class="key-term">TenorRange</strong>: expiry between two durations after activation.</li>
-      <li><strong class="key-term">ExpiryWindow</strong>: expiry between two dates.</li>
-      <li><strong class="key-term">MinImpliedVol</strong>: implied volatility the bid master attests at activation.</li>
+      <li><strong class="key-term">StrikeRange</strong>: strike between a minimum and maximum per quote token.</li>
+      <li><strong class="key-term">StrikeSpotBand</strong>: strike within a band of the feed’s spot.</li>
+      <li><strong class="key-term">PremiumMin</strong>: premium at least a fixed amount per quote token.</li>
+      <li><strong class="key-term">PremiumSpotFloor</strong>: premium at least a share of spot.</li>
+      <li><strong class="key-term">PremiumYieldFloor</strong>: premium at least an annual rate of spot, for the option’s length.</li>
+      <li><strong class="key-term">PremiumVolFloor</strong>: implied volatility the bid master attests at activation.</li>
+      <li><strong class="key-term">ExpiryTenor</strong>: expiry between two durations after activation.</li>
+      <li><strong class="key-term">ExpiryDates</strong>: expiry between two dates.</li>
     </ul>
-    <p>The shipped validator is bound to the release price feed. Rules from another allowlisted validator are custom. Every vault must include PairLimits with a nonzero strike range and premium floor for every pair, and a TenorRange or ExpiryWindow rule. Activation also enforces a nonzero strike, notional and total premium, and an expiry in the future.</p>
+    <p>The shipped validator is bound to the release price feed. Rules from another allowlisted validator are custom. Each kind is named for the bid field it bounds. Every vault must include StrikeRange and PremiumMin with an entry for every pair, and an ExpiryTenor or ExpiryDates rule. Activation also enforces a nonzero strike, notional and total premium, and an expiry in the future.</p>
     <p>A rule’s id is its position in the list. At activation the <strong class="role-buyer">buyer</strong> (signed) and the <strong class="role-bid">bid master</strong> (unsigned) may each pass one data slot per rule, and each rule sees only its own.</p>
     <p class="reference"><a href="index.html#bid-rules" data-guide>Every rule, its options and what can be added later ↗</a></p>
     <section data-kind="tile" id="activation-price-guard"><h5>Optional activation price check</h5>
-    <p>A strike far into the money sells the option too cheaply. If the <strong class="role-owner">owner</strong> listed a SpotBand rule, activation also checks the strike against spot:</p>
+    <p>A strike far into the money sells the option too cheaply. If the <strong class="role-owner">owner</strong> listed a StrikeSpotBand rule, activation also checks the strike against spot:</p>
     <ul class="reading-list" role="list">
       <li><strong class="key-term"><code>maxInTheMoneyBps</code></strong> limits the strike’s deviation into the money from spot.</li>
       <li><strong class="key-term"><code>maxPriceAge</code></strong> limits the age of that spot price.</li>
@@ -364,7 +365,7 @@
     </section>
     <section data-kind="tile" id="cancel-at-option-expiry"><h5>Not at an expiry</h5>
     <p>An auction has <strong class="key-term">no expiry</strong> yet: only the winning bid chooses one. The owner’s expiry rules judge bids and never unlock the auction.</p>
-    <p>If an ExpiryWindow closes mid-auction, no bid can pass. <strong class="role-lp">LPs</strong> wait for the timeout, or the <strong class="role-bid">bid master</strong> cancels.</p>
+    <p>If an ExpiryDates rule’s last date passes mid-auction, no bid can pass. <strong class="role-lp">LPs</strong> wait for the timeout, or the <strong class="role-bid">bid master</strong> cancels.</p>
     </section>
     <section data-kind="tile" id="cancel-during-pause"><h5>During an admission pause</h5>
     <p>An <strong class="key-term">admission pause</strong> stops new commitments: vault creation, deposits, auction opening and activation. A <strong class="key-term">guardian</strong> controls this safety switch.</p>

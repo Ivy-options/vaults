@@ -10,19 +10,21 @@ import {
 	Phase,
 	RuleKind,
 	SettlementPolicy,
-	callLimits,
+	callBounds,
 	callPairs,
 	callTerms,
 	createVaultAs,
 	deployIvy,
-	expiryWindowRule,
+	expiryDatesRule,
 	fixture,
-	pairLimitsRule,
-	putLimits,
+	pairBoundsRules,
+	premiumMinRule,
+	putBounds,
 	putPairs,
 	putTerms,
-	spotBandRule,
-	tenorRangeRule,
+	strikeRangeRule,
+	strikeSpotBandRule,
+	expiryTenorRule,
 	weth,
 	type IvyContext,
 	type PairConfigInput,
@@ -51,9 +53,9 @@ const testValidators = fixture(deployed, async c => {
 	await c.hub.grantRole(id("BID_VALIDATOR_ROLE"), await configRevert.getAddress())
 	return { c, wrongSelector, configRevert }
 })
-const withPairLimits = fixture(deployed, async c => ({
+const withPairBounds = fixture(deployed, async c => ({
 	c,
-	v: await createVaultAs(c, c.alice, callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]),
+	v: await createVaultAs(c, c.alice, callTerms(c), callPairs(c), [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)]),
 }))
 
 type TestValidators = Awaited<ReturnType<typeof testValidators>>
@@ -68,13 +70,13 @@ describe("createVault", () => {
 		})
 
 		it("emits VaultCreated for a covered call with WETH as underlying and collateral", async () => {
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]))
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)]))
 				.to.emit(c.hub, "VaultCreated")
 				.withArgs(1n, anyValue, c.alice.address, OptionKind.CoveredCall, c.wethAddress, c.wethAddress)
 		})
 
 		it("emits VaultCreated for a cash-secured put with USDC collateral", async () => {
-			await expect(c.hub.connect(c.alice).createVault(putTerms(c), putPairs(c), [pairLimitsRule(c, putLimits(c)), tenorRangeRule(c)]))
+			await expect(c.hub.connect(c.alice).createVault(putTerms(c), putPairs(c), [...pairBoundsRules(c, putBounds(c)), expiryTenorRule(c)]))
 				.to.emit(c.hub, "VaultCreated")
 				.withArgs(1n, anyValue, c.alice.address, OptionKind.CashSecuredPut, c.wethAddress, c.usdcAddress)
 		})
@@ -83,7 +85,7 @@ describe("createVault", () => {
 			await expect(
 				c.hub
 					.connect(c.alice)
-					.createVault(callTerms(c, { auctionStartsAt: AUCTION_START }), callPairs(c), [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]),
+					.createVault(callTerms(c, { auctionStartsAt: AUCTION_START }), callPairs(c), [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)]),
 			)
 				.to.emit(c.hub, "AuctionScheduled")
 				.withArgs(1n, AUCTION_START)
@@ -101,21 +103,21 @@ describe("createVault", () => {
 		it("rejects an expiry window that closes at exactly the creation time", async () => {
 			const createdAt = BigInt(await networkHelpers.time.latest()) + 10n
 			await at(c, createdAt)
-			const rules = [pairLimitsRule(c, callLimits(c)), expiryWindowRule(c, 0n, createdAt)]
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).to.be.revertedWithCustomError(c.hub, "InvalidExpiryWindow")
+			const rules = [...pairBoundsRules(c, callBounds(c)), expiryDatesRule(c, 0n, createdAt)]
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).to.be.revertedWithCustomError(c.hub, "InvalidExpiryDates")
 		})
 
 		it("accepts an expiry window that closes one second after the creation time", async () => {
 			const createdAt = BigInt(await networkHelpers.time.latest()) + 10n
 			await at(c, createdAt)
-			const rules = [pairLimitsRule(c, callLimits(c)), expiryWindowRule(c, 0n, createdAt + 1n)]
+			const rules = [...pairBoundsRules(c, callBounds(c)), expiryDatesRule(c, 0n, createdAt + 1n)]
 			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).not.to.be.revert(ethers)
 		})
 
 		it("accepts a call vault with several quote tokens", async () => {
 			const pairs = [...callPairs(c), { quoteToken: c.daiAddress, premiumToken: c.daiAddress }]
-			const limits = [...callLimits(c), { quoteToken: c.daiAddress, minStrike: 1n, maxStrike: MAX_UINT, minPremiumPerUnit: 1n }]
-			const { vaultId } = await createVaultAs(c, c.alice, callTerms(c), pairs, [pairLimitsRule(c, limits), tenorRangeRule(c)])
+			const bounds = [...callBounds(c), { quoteToken: c.daiAddress, minStrike: 1n, maxStrike: MAX_UINT, minPremiumPerUnit: 1n }]
+			const { vaultId } = await createVaultAs(c, c.alice, callTerms(c), pairs, [...pairBoundsRules(c, bounds), expiryTenorRule(c)])
 			expect(await c.hub.quoteTokensOf(vaultId)).to.deep.equal([c.usdcAddress, c.daiAddress])
 		})
 	})
@@ -153,9 +155,9 @@ describe("createVault", () => {
 			expect(await c.hub.pairOf(v.vaultId, c.usdcAddress)).to.equal(c.usdcAddress)
 		})
 
-		it("stores the mandatory bid limits and expiry rule", async () => {
+		it("stores the mandatory strike, premium and expiry rules", async () => {
 			const rules = await c.hub.rulesOf(v.vaultId)
-			expect(rules.map(r => r.kind)).to.deep.equal([RuleKind.PairLimits, RuleKind.TenorRange])
+			expect(rules.map(r => r.kind)).to.deep.equal([RuleKind.StrikeRange, RuleKind.PremiumMin, RuleKind.ExpiryTenor])
 		})
 
 		it("leaves the expiry for the winning bid to set", async () => {
@@ -263,14 +265,14 @@ describe("createVault", () => {
 				callPairs(c),
 			)
 			expect((await c.hub.termsOf(vaultId)).maxSettlementPriceAge).to.equal(60n)
-			expect((await c.hub.rulesOf(vaultId))[0].kind).to.equal(RuleKind.PairLimits)
+			expect((await c.hub.rulesOf(vaultId))[0].kind).to.equal(RuleKind.StrikeRange)
 		})
 	})
 
 	describe("rules", () => {
 		let validators: TestValidators
 
-		const rule = (validator: string, kind: string = RuleKind.PairLimits) => ({ validator, kind, data: "0x" })
+		const rule = (validator: string, kind: string = RuleKind.StrikeRange) => ({ validator, kind, data: "0x" })
 
 		const invalidValidators: Array<{ name: string; address: (s: TestValidators) => Promise<string> | string }> = [
 			{ name: "an account without code", address: s => s.c.alice.address },
@@ -304,30 +306,32 @@ describe("createVault", () => {
 			)
 		})
 
-		it("rejects a vault without explicit per-pair bid limits", async () => {
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [tenorRangeRule(c)])).to.be.revertedWithCustomError(
-				c.hub,
-				"MissingBidLimits",
-			)
+		it("rejects a vault without a StrikeRange rule", async () => {
+			const rules = [premiumMinRule(c, callBounds(c)), expiryTenorRule(c)]
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).to.be.revertedWithCustomError(c.hub, "MissingStrikeRange")
+		})
+
+		it("rejects a vault without a PremiumMin rule", async () => {
+			const rules = [strikeRangeRule(c, callBounds(c)), expiryTenorRule(c)]
+			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).to.be.revertedWithCustomError(c.hub, "MissingPremiumMin")
 		})
 
 		it("rejects a vault without an expiry rule", async () => {
-			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [pairLimitsRule(c, callLimits(c))])).to.be.revertedWithCustomError(
-				c.hub,
-				"MissingExpiryBounds",
-			)
+			await expect(
+				c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), [...pairBoundsRules(c, callBounds(c))]),
+			).to.be.revertedWithCustomError(c.hub, "MissingExpiryRule")
 		})
 
-		it("accepts an absolute expiry window in place of a tenor range", async () => {
+		it("accepts an ExpiryDates rule in place of ExpiryTenor", async () => {
 			const now = BigInt(await networkHelpers.time.latest())
-			const rules = [pairLimitsRule(c, callLimits(c)), expiryWindowRule(c, now + 3600n, now + 7200n)]
+			const rules = [...pairBoundsRules(c, callBounds(c)), expiryDatesRule(c, now + 3600n, now + 7200n)]
 			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).not.to.be.revert(ethers)
 		})
 
 		it("counts an expiry rule by its kind, whichever allowed validator serves it", async () => {
 			const approve = await ethers.deployContract("ApproveAllValidator")
 			await c.hub.grantRole(id("BID_VALIDATOR_ROLE"), await approve.getAddress())
-			const rules = [pairLimitsRule(c, callLimits(c)), rule(await approve.getAddress(), RuleKind.TenorRange)]
+			const rules = [...pairBoundsRules(c, callBounds(c)), rule(await approve.getAddress(), RuleKind.ExpiryTenor)]
 			await expect(c.hub.connect(c.alice).createVault(callTerms(c), callPairs(c), rules)).not.to.be.revert(ethers)
 		})
 
@@ -339,9 +343,9 @@ describe("createVault", () => {
 
 		it("stores the rules in the order given", async () => {
 			const rules = [
-				pairLimitsRule(c, callLimits(c, { minPremiumPerUnit: 5n })),
-				spotBandRule(c, { maxPriceAge: 60, maxInTheMoneyBps: 500 }),
-				tenorRangeRule(c),
+				...pairBoundsRules(c, callBounds(c, { minPremiumPerUnit: 5n })),
+				strikeSpotBandRule(c, { maxPriceAge: 60, maxInTheMoneyBps: 500 }),
+				expiryTenorRule(c),
 			]
 			const { vaultId } = await createVaultAs(c, c.alice, callTerms(c), callPairs(c), rules)
 			const stored = await c.hub.rulesOf(vaultId)
@@ -359,13 +363,13 @@ describe("createVault", () => {
 		let hash: string
 
 		beforeEach(async () => {
-			;({ c, v } = await withPairLimits())
+			;({ c, v } = await withPairBounds())
 			hash = await c.hub.termsHashOf(v.vaultId)
 		})
 
 		it("hashes the terms together with the pairs hash and the rules hash", async () => {
 			const t = callTerms(c)
-			const rules = [pairLimitsRule(c, callLimits(c)), tenorRangeRule(c)]
+			const rules = [...pairBoundsRules(c, callBounds(c)), expiryTenorRule(c)]
 			const coder = AbiCoder.defaultAbiCoder()
 			const pairsHash = keccak256(
 				coder.encode(["tuple(address quoteToken,address premiumToken)[]"], [callPairs(c).map(p => [p.quoteToken, p.premiumToken])]),
@@ -395,32 +399,32 @@ describe("createVault", () => {
 
 		it("ignores the auction start time", async () => {
 			const scheduled = await createVaultAs(c, c.alice, callTerms(c, { auctionStartsAt: AUCTION_START }), callPairs(c), [
-				pairLimitsRule(c, callLimits(c)),
-				tenorRangeRule(c),
+				...pairBoundsRules(c, callBounds(c)),
+				expiryTenorRule(c),
 			])
 			expect(await c.hub.termsHashOf(scheduled.vaultId)).to.equal(hash)
 		})
 
 		it("changes with the minimum collateral", async () => {
 			const withMinimum = await createVaultAs(c, c.alice, callTerms(c, { minCollateral: 1n }), callPairs(c), [
-				pairLimitsRule(c, callLimits(c)),
-				tenorRangeRule(c),
+				...pairBoundsRules(c, callBounds(c)),
+				expiryTenorRule(c),
 			])
 			expect(await c.hub.termsHashOf(withMinimum.vaultId)).to.not.equal(hash)
 		})
 
 		it("changes with public deposits", async () => {
 			const ownerOnly = await createVaultAs(c, c.alice, callTerms(c, { publicDeposits: false }), callPairs(c), [
-				pairLimitsRule(c, callLimits(c)),
-				tenorRangeRule(c),
+				...pairBoundsRules(c, callBounds(c)),
+				expiryTenorRule(c),
 			])
 			expect(await c.hub.termsHashOf(ownerOnly.vaultId)).to.not.equal(hash)
 		})
 
 		it("changes with the rules", async () => {
 			const otherRules = await createVaultAs(c, c.alice, callTerms(c), callPairs(c), [
-				pairLimitsRule(c, callLimits(c, { minPremiumPerUnit: 2n })),
-				tenorRangeRule(c),
+				...pairBoundsRules(c, callBounds(c, { minPremiumPerUnit: 2n })),
+				expiryTenorRule(c),
 			])
 			expect(await c.hub.termsHashOf(otherRules.vaultId)).to.not.equal(hash)
 		})

@@ -10,7 +10,7 @@ import {
 	callTerms,
 	createVaultAs,
 	deployIvy,
-	expiryWindowRule,
+	expiryDatesRule,
 	fixture,
 	fund,
 	weth,
@@ -52,7 +52,7 @@ const scheduledAuctionOpen = fixture(sixDeposited, async ({ c, v }) => {
 const auctionNearWindowEnd = fixture(deployed, async c => {
 	const now = BigInt(await networkHelpers.time.latest())
 	const notAfter = now + 100n
-	return { c, v: await openVault(c, { expiryRules: [expiryWindowRule(c, now, notAfter)] }), notAfter }
+	return { c, v: await openVault(c, { expiryRules: [expiryDatesRule(c, now, notAfter)] }), notAfter }
 })
 
 describe("openAuction", () => {

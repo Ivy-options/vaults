@@ -49,7 +49,7 @@
 </thead>
 <tbody><tr>
 <td>Activation with indicative checks enabled</td>
-<td>Fresh <code>priceFeed.spot(underlying, quote)</code> when a SpotBand bid rule is listed</td>
+<td>Fresh <code>priceFeed.spot(underlying, quote)</code> when a StrikeSpotBand bid rule is listed</td>
 </tr>
 <tr>
 <td>American cash exercise strictly before expiry</td>
@@ -92,7 +92,7 @@ function settlementPrice(uint256 vaultId)
 </code></pre>
 <p>Both publication functions require the caller to hold the publisher role and the vault to be Live with Cash as its activated settlement type. Unknown, pre-activation, physical and finalized positions are rejected. The Hub derives the underlying, selected quote and expiry from the vault&#39;s own state rather than trusting the publisher to supply them. Prices must be positive. Events carry the vault ID and the derived pair and expiry. The read functions reject unknown vault IDs; a known vault with no observation returns zeros, and a missing final price reverts.</p>
 <p>Vaults with identical underlying, quote and expiry still need their own price-setting transactions, and they may receive different prices. Publishing or finalizing one vault never populates, replaces or blocks another. This lets each vault be approved independently. It does not claim that different prices reflect one market methodology.</p>
-<p>Vault terms have no settlement feed field. <code>maxSettlementPriceAge</code> must be positive for any vault that permits cash settlement and is fixed at creation. A SpotBand rule's feed and age keep their separate activation-check meaning. A physical-only vault may use zero for the settlement age and omit the indicative feed.</p>
+<p>Vault terms have no settlement feed field. <code>maxSettlementPriceAge</code> must be positive for any vault that permits cash settlement and is fixed at creation. A StrikeSpotBand rule's feed and age keep their separate activation-check meaning. A physical-only vault may use zero for the settlement age and omit the indicative feed.</p>
 <h3 id="interchangeable-publishers">Interchangeable publishers</h3>
 <p>An EOA with the role submits either publication transaction directly, naming the vault ID. A helper contract can hold the same role and call the same functions through the minimal write-side interface. The helper may compute prices under its own approved policy; the Hub never reads from it and never stores it as a dependency of any vault.</p>
 <p>The repository ships an access-controlled example helper with tests for both EOA and contract publication. A helper must not let unprivileged callers publish through it. No helper is deployed by default. Once cash is enabled, granting an EOA the role is enough to publish. There is no feed or helper to deploy.</p>

@@ -9,20 +9,20 @@ import {
 	SettlementType,
 	USDC_UNIT,
 	WETH_UNIT,
-	callLimits,
+	callBounds,
 	callPairs,
 	callTerms,
 	createVaultAs,
 	fund,
-	pairLimitsRule,
-	putLimits,
+	pairBoundsRules,
+	putBounds,
 	putPairs,
 	putTerms,
-	spotBandRule,
-	tenorRangeRule,
+	strikeSpotBandRule,
+	expiryTenorRule,
 	type BidRuleInput,
 	type IvyContext,
-	type PairLimitInput,
+	type PairBoundsInput,
 	type VaultTermsInput,
 } from "./setup.js"
 
@@ -74,11 +74,11 @@ export interface VaultOptions {
 	deposit?: bigint
 	extraDeposits?: Array<{ signer: HardhatEthersSigner; amount: bigint }>
 	terms?: Partial<VaultTermsInput>
-	/** Strike limit and premium floor for the USDC pair, as one PairLimits rule. Omitted = no rule. */
-	pair?: Partial<PairLimitInput>
+	/** StrikeRange and PremiumMin values for the USDC pair, as rules 0 and 1. */
+	pair?: Partial<PairBoundsInput>
 	/** Extra rules appended after the generated ones. */
 	rules?: BidRuleInput[]
-	/** Replaces the default TenorRange rule (0 to DEFAULT_MAX_TENOR); pass [] to rely on `rules` alone. */
+	/** Replaces the default ExpiryTenor rule (0 to DEFAULT_MAX_TENOR); pass [] to rely on `rules` alone. */
 	expiryRules?: BidRuleInput[]
 	/** Premium token for the USDC pair. Defaults to USDC. */
 	premiumToken?: string
@@ -91,9 +91,9 @@ export async function openVault(ctx: IvyContext, o: VaultOptions = {}) {
 	const terms = isCall ? callTerms(ctx, { ...feedTerms, ...o.terms }) : putTerms(ctx, { ...feedTerms, ...o.terms })
 	const pairs = isCall ? callPairs(ctx) : putPairs(ctx)
 	if (o.premiumToken) pairs[0].premiumToken = o.premiumToken
-	const rules: BidRuleInput[] = [pairLimitsRule(ctx, isCall ? callLimits(ctx, o.pair) : putLimits(ctx, o.pair))]
-	if (o.withFeed) rules.push(spotBandRule(ctx, { maxPriceAge: 3600, maxInTheMoneyBps: 1000 }))
-	rules.push(...(o.expiryRules ?? [tenorRangeRule(ctx)]))
+	const rules: BidRuleInput[] = pairBoundsRules(ctx, isCall ? callBounds(ctx, o.pair) : putBounds(ctx, o.pair))
+	if (o.withFeed) rules.push(strikeSpotBandRule(ctx, { maxPriceAge: 3600, maxInTheMoneyBps: 1000 }))
+	rules.push(...(o.expiryRules ?? [expiryTenorRule(ctx)]))
 	rules.push(...(o.rules ?? []))
 	const { vaultId, vault, vaultAddress } = await createVaultAs(ctx, ctx.alice, terms, pairs, rules)
 
