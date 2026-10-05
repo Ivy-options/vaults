@@ -412,7 +412,7 @@ describe("hub administration", () => {
 				const bid = await makeBid(c, other.vaultId)
 				await fund(c, c.usdc, c.marketMaker, other.vaultAddress, usdc(1000))
 				const signature = await signBid(c.marketMaker, c.hubAddress, bid)
-				await expect(c.hub.connect(c.bidMaster).activate(other.vaultId, bid, [], signature, [])).not.to.be.revert(ethers)
+				await expect(c.hub.connect(c.bidMaster).activateOption(other.vaultId, bid, [], signature, [])).not.to.be.revert(ethers)
 			})
 
 			context("after the paused auction is cancelled", () => {

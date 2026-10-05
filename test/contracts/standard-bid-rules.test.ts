@@ -11,7 +11,8 @@ import {
 	encodePremiumSpotFloor,
 	encodeStrikeSpotBand,
 	encodeExpiryTenor,
-	encodePremiumYieldFloor,
+	encodePremiumGrossAprFloor,
+	encodePremiumNetAprFloor,
 	hashMarketMakerData,
 } from "../../scripts/encoding.ts"
 import type { Bid } from "../helpers/bids.js"
@@ -156,7 +157,7 @@ describe("IvyStandardBidRules", () => {
 		expect(await rules.STRIKE_SPOT_BAND()).to.equal(kind("StrikeSpotBand"))
 		expect(await rules.PREMIUM_MIN()).to.equal(kind("PremiumMin"))
 		expect(await rules.PREMIUM_SPOT_FLOOR()).to.equal(kind("PremiumSpotFloor"))
-		expect(await rules.PREMIUM_YIELD_FLOOR()).to.equal(kind("PremiumYieldFloor"))
+		expect(await rules.PREMIUM_GROSS_APR_FLOOR()).to.equal(kind("PremiumGrossAprFloor"))
 		expect(await rules.PREMIUM_VOL_FLOOR()).to.equal(kind("PremiumVolFloor"))
 		expect(await rules.EXPIRY_TENOR()).to.equal(kind("ExpiryTenor"))
 		expect(await rules.EXPIRY_DATES()).to.equal(kind("ExpiryDates"))
@@ -282,6 +283,24 @@ describe("IvyStandardBidRules", () => {
 					await rules.validateConfig(RuleKind.StrikeSpotBand, PUT, PREMIUM_IN_QUOTE, encodeStrikeSpotBand(feedAddress, 60, 20_000, NO_OTM_LIMIT)),
 				).to.equal(configAccepted)
 			})
+
+			it("accepts an out-of-the-money minimum equal to the maximum", async () => {
+				expect(
+					await rules.validateConfig(RuleKind.StrikeSpotBand, CALL, PREMIUM_IN_QUOTE, encodeStrikeSpotBand(feedAddress, 60, 0, 1000, 1000)),
+				).to.equal(configAccepted)
+			})
+
+			it("rejects an out-of-the-money minimum above the maximum", async () => {
+				await expect(
+					rules.validateConfig(RuleKind.StrikeSpotBand, CALL, PREMIUM_IN_QUOTE, encodeStrikeSpotBand(feedAddress, 60, 0, 1000, 1001)),
+				).to.be.revertedWithCustomError(rules, "DeviationTooLarge")
+			})
+
+			it("rejects a put out-of-the-money minimum of 100%", async () => {
+				await expect(
+					rules.validateConfig(RuleKind.StrikeSpotBand, PUT, PREMIUM_IN_QUOTE, encodeStrikeSpotBand(feedAddress, 60, 0, NO_OTM_LIMIT, 10_000)),
+				).to.be.revertedWithCustomError(rules, "DeviationTooLarge")
+			})
 		})
 
 		describe("PremiumSpotFloor", () => {
@@ -338,28 +357,61 @@ describe("IvyStandardBidRules", () => {
 			})
 		})
 
-		describe("PremiumYieldFloor", () => {
+		describe("PremiumGrossAprFloor", () => {
 			it("accepts a floor without a feed when every pair pays the premium in the underlying", async () => {
 				expect(
-					await rules.validateConfig(RuleKind.PremiumYieldFloor, CALL, PREMIUM_IN_UNDERLYING, encodePremiumYieldFloor(ZeroAddress, 0, 500)),
+					await rules.validateConfig(RuleKind.PremiumGrossAprFloor, CALL, PREMIUM_IN_UNDERLYING, encodePremiumGrossAprFloor(ZeroAddress, 0, 500)),
 				).to.equal(configAccepted)
 			})
 
 			it("accepts an annual rate above 100%", async () => {
 				expect(
-					await rules.validateConfig(RuleKind.PremiumYieldFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumYieldFloor(feedAddress, 60, 15_000)),
+					await rules.validateConfig(RuleKind.PremiumGrossAprFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumGrossAprFloor(feedAddress, 60, 15_000)),
 				).to.equal(configAccepted)
 			})
 
 			it("rejects a floor without a feed when a pair pays the premium in the quote token", async () => {
 				await expect(
-					rules.validateConfig(RuleKind.PremiumYieldFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumYieldFloor(ZeroAddress, 0, 500)),
+					rules.validateConfig(RuleKind.PremiumGrossAprFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumGrossAprFloor(ZeroAddress, 0, 500)),
 				).to.be.revertedWithCustomError(rules, "BindingMismatch")
 			})
 
 			it("rejects a zero annual rate", async () => {
 				await expect(
-					rules.validateConfig(RuleKind.PremiumYieldFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumYieldFloor(feedAddress, 60, 0)),
+					rules.validateConfig(RuleKind.PremiumGrossAprFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumGrossAprFloor(feedAddress, 60, 0)),
+				).to.be.revertedWithCustomError(rules, "InvalidPremiumFloor")
+			})
+		})
+
+		// validateBid reads the vault's fee from msg.sender, so it needs a Hub-shaped caller; covered at activation.
+		describe("PremiumNetAprFloor", () => {
+			it("accepts a call paid in the underlying without a feed", async () => {
+				expect(
+					await rules.validateConfig(RuleKind.PremiumNetAprFloor, CALL, PREMIUM_IN_UNDERLYING, encodePremiumNetAprFloor(ZeroAddress, 0, 500)),
+				).to.equal(configAccepted)
+			})
+
+			it("accepts a put paid in the quote token without a feed", async () => {
+				expect(
+					await rules.validateConfig(RuleKind.PremiumNetAprFloor, PUT, PREMIUM_IN_QUOTE, encodePremiumNetAprFloor(ZeroAddress, 0, 500)),
+				).to.equal(configAccepted)
+			})
+
+			it("rejects a call paid in the quote token without the release feed", async () => {
+				await expect(
+					rules.validateConfig(RuleKind.PremiumNetAprFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumNetAprFloor(ZeroAddress, 0, 500)),
+				).to.be.revertedWithCustomError(rules, "BindingMismatch")
+			})
+
+			it("rejects a put paid in the underlying without the release feed", async () => {
+				await expect(
+					rules.validateConfig(RuleKind.PremiumNetAprFloor, PUT, PREMIUM_IN_UNDERLYING, encodePremiumNetAprFloor(ZeroAddress, 0, 500)),
+				).to.be.revertedWithCustomError(rules, "BindingMismatch")
+			})
+
+			it("rejects a zero annual rate", async () => {
+				await expect(
+					rules.validateConfig(RuleKind.PremiumNetAprFloor, CALL, PREMIUM_IN_QUOTE, encodePremiumNetAprFloor(feedAddress, 60, 0)),
 				).to.be.revertedWithCustomError(rules, "InvalidPremiumFloor")
 			})
 		})
@@ -532,6 +584,30 @@ describe("IvyStandardBidRules", () => {
 					const noFloor = encodeStrikeSpotBand(feedAddress, 60, 1000, 10_000)
 					expect(await check(RuleKind.StrikeSpotBand, noFloor, { context: PUT_CONTEXT, bid: { strike: 1n } })).to.equal(bidAccepted)
 				})
+
+				// Spot 3000, out of the money by 9% to 11%: calls from 3270 to 3330, puts from 2670 to 2730.
+				const otmBand = () => encodeStrikeSpotBand(feedAddress, 60, 0, 1100, 900)
+
+				it("accepts a call strike at the out-of-the-money minimum", async () => {
+					expect(await check(RuleKind.StrikeSpotBand, otmBand(), { bid: { strike: usdc(3270) } })).to.equal(bidAccepted)
+				})
+
+				it("rejects a call strike below the out-of-the-money minimum", async () => {
+					await expect(check(RuleKind.StrikeSpotBand, otmBand(), { bid: { strike: usdc(3270) - 1n } })).to.be.revertedWithCustomError(
+						rules,
+						"StrikeOutsideSpotBand",
+					)
+				})
+
+				it("accepts a put strike at the out-of-the-money minimum", async () => {
+					expect(await check(RuleKind.StrikeSpotBand, otmBand(), { context: PUT_CONTEXT, bid: { strike: usdc(2730) } })).to.equal(bidAccepted)
+				})
+
+				it("rejects a put strike above the out-of-the-money minimum", async () => {
+					await expect(
+						check(RuleKind.StrikeSpotBand, otmBand(), { context: PUT_CONTEXT, bid: { strike: usdc(2730) + 1n } }),
+					).to.be.revertedWithCustomError(rules, "StrikeOutsideSpotBand")
+				})
 			})
 
 			context("with a spot dated one second after the latest block", () => {
@@ -550,9 +626,9 @@ describe("IvyStandardBidRules", () => {
 			})
 		})
 
-		describe("PremiumYieldFloor", () => {
+		describe("PremiumGrossAprFloor", () => {
 			// Spot 3000 at a 10% annual rate: a tenth of a year needs 30 USDC per unit.
-			const floor = () => encodePremiumYieldFloor(feedAddress, 60, 1000)
+			const floor = () => encodePremiumGrossAprFloor(feedAddress, 60, 1000)
 			let now: bigint
 
 			beforeEach(async () => {
@@ -560,32 +636,32 @@ describe("IvyStandardBidRules", () => {
 			})
 
 			it("accepts a premium at the floor for its tenor", async () => {
-				expect(await check(RuleKind.PremiumYieldFloor, floor(), { bid: { expiry: now + YEAR / 10n, premiumPerUnit: usdc(30) } })).to.equal(
+				expect(await check(RuleKind.PremiumGrossAprFloor, floor(), { bid: { expiry: now + YEAR / 10n, premiumPerUnit: usdc(30) } })).to.equal(
 					bidAccepted,
 				)
 			})
 
 			it("rejects a premium just below the floor for its tenor", async () => {
 				await expect(
-					check(RuleKind.PremiumYieldFloor, floor(), { bid: { expiry: now + YEAR / 10n, premiumPerUnit: usdc(30) - 1n } }),
+					check(RuleKind.PremiumGrossAprFloor, floor(), { bid: { expiry: now + YEAR / 10n, premiumPerUnit: usdc(30) - 1n } }),
 				).to.be.revertedWithCustomError(rules, "PremiumTooLow")
 			})
 
 			it("asks twice the premium for twice the tenor", async () => {
 				await expect(
-					check(RuleKind.PremiumYieldFloor, floor(), { bid: { expiry: now + YEAR / 5n, premiumPerUnit: usdc(30) } }),
+					check(RuleKind.PremiumGrossAprFloor, floor(), { bid: { expiry: now + YEAR / 5n, premiumPerUnit: usdc(30) } }),
 				).to.be.revertedWithCustomError(rules, "PremiumTooLow")
-				expect(await check(RuleKind.PremiumYieldFloor, floor(), { bid: { expiry: now + YEAR / 5n, premiumPerUnit: usdc(60) } })).to.equal(bidAccepted)
+				expect(await check(RuleKind.PremiumGrossAprFloor, floor(), { bid: { expiry: now + YEAR / 5n, premiumPerUnit: usdc(60) } })).to.equal(bidAccepted)
 			})
 
 			it("prices a premium paid in the underlying without the feed", async () => {
 				const context = { ...CALL_CONTEXT, premiumToken: UNDERLYING }
-				const noFeed = encodePremiumYieldFloor(ZeroAddress, 0, 1000)
+				const noFeed = encodePremiumGrossAprFloor(ZeroAddress, 0, 1000)
 				// One whole underlying at 10% for a tenth of a year: 0.01 underlying.
 				const bid = { expiry: now + YEAR / 10n, premiumPerUnit: WETH_UNIT / 100n }
-				expect(await check(RuleKind.PremiumYieldFloor, noFeed, { context, bid })).to.equal(bidAccepted)
+				expect(await check(RuleKind.PremiumGrossAprFloor, noFeed, { context, bid })).to.equal(bidAccepted)
 				await expect(
-					check(RuleKind.PremiumYieldFloor, noFeed, { context, bid: { ...bid, premiumPerUnit: bid.premiumPerUnit - 1n } }),
+					check(RuleKind.PremiumGrossAprFloor, noFeed, { context, bid: { ...bid, premiumPerUnit: bid.premiumPerUnit - 1n } }),
 				).to.be.revertedWithCustomError(rules, "PremiumTooLow")
 			})
 		})
@@ -661,6 +737,14 @@ describe("IvyStandardBidRules", () => {
 
 			it("rejects an attestation of the wrong length", async () => {
 				await expect(check(RuleKind.PremiumVolFloor, minimum, { bidMasterData: "0x1770" })).to.be.revertedWithCustomError(rules, "MissingAttestation")
+			})
+
+			it("accepts evidence after the attested volatility and reads only the first word", async () => {
+				const evidence = "ab".repeat(64)
+				expect(await check(RuleKind.PremiumVolFloor, minimum, { bidMasterData: encodeImpliedVolAttestation(6000) + evidence })).to.equal(bidAccepted)
+				await expect(
+					check(RuleKind.PremiumVolFloor, minimum, { bidMasterData: encodeImpliedVolAttestation(5999) + evidence }),
+				).to.be.revertedWithCustomError(rules, "VolTooLow")
 			})
 
 			it("ignores the market maker's claim of its own volatility", async () => {

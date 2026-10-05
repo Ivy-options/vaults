@@ -282,7 +282,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 	/// @dev Slot `i` of each data array goes to rule `i` only; pass an empty array when no rule needs data.
 	/// @param marketMakerData Per-rule data the market maker signed through `bid.marketMakerDataHash`.
 	/// @param bidMasterData Per-rule data from the bid master, unsigned. Rules that read it trust the bid master.
-	function activate(
+	function activateOption(
 		uint256 vaultId,
 		Bid calldata bid,
 		bytes[] calldata marketMakerData,
@@ -338,7 +338,7 @@ contract IvyVaultsHub is IIvyVaultsHubEvents, IIvyVaultsHubErrors, AccessControl
 		IIvyVault(state.vault).collectPremium(premiumToken, bid.marketMaker, totalPremium, fee, treasury);
 		emit PlatformFeeAllocated(vaultId, treasury, feeRate, fee);
 
-		emit Activated(
+		emit OptionActivated(
 			vaultId,
 			bid.marketMaker,
 			bid.quoteToken,

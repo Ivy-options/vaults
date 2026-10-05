@@ -11,7 +11,7 @@ import {
 	encodeStrikeRange,
 	encodeStrikeSpotBand,
 	encodeExpiryTenor,
-	encodePremiumYieldFloor,
+	encodePremiumGrossAprFloor,
 } from "../../scripts/encoding.ts"
 
 export type Connection = Awaited<ReturnType<typeof network.create>>
@@ -292,20 +292,26 @@ export function pairBoundsRules(ctx: IvyContext, bounds: PairBoundsInput[]): Bid
 
 export function strikeSpotBandRule(
 	ctx: IvyContext,
-	o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number; maxOutOfTheMoneyBps?: number },
+	o: { priceFeed?: string; maxPriceAge: number; maxInTheMoneyBps: number; maxOutOfTheMoneyBps?: number; minOutOfTheMoneyBps?: number },
 ): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
 		kind: RuleKind.StrikeSpotBand,
-		data: encodeStrikeSpotBand(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.maxInTheMoneyBps, o.maxOutOfTheMoneyBps ?? NO_OTM_LIMIT),
+		data: encodeStrikeSpotBand(
+			o.priceFeed ?? ctx.feedAddress,
+			o.maxPriceAge,
+			o.maxInTheMoneyBps,
+			o.maxOutOfTheMoneyBps ?? NO_OTM_LIMIT,
+			o.minOutOfTheMoneyBps ?? 0,
+		),
 	}
 }
 
-export function premiumYieldFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minAprBps: number }): BidRuleInput {
+export function premiumGrossAprFloorRule(ctx: IvyContext, o: { priceFeed?: string; maxPriceAge: number; minAprBps: number }): BidRuleInput {
 	return {
 		validator: ctx.bidRulesAddress,
-		kind: RuleKind.PremiumYieldFloor,
-		data: encodePremiumYieldFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minAprBps),
+		kind: RuleKind.PremiumGrossAprFloor,
+		data: encodePremiumGrossAprFloor(o.priceFeed ?? ctx.feedAddress, o.maxPriceAge, o.minAprBps),
 	}
 }
 

@@ -61,7 +61,7 @@ async function submit(
 	data: { marketMakerData?: string[]; bidMasterData?: string[] } = {},
 ) {
 	const signature = await signBid(signer, c.hubAddress, bid)
-	return c.hub.connect(c.bidMaster).activate(vaultId, bid, data.marketMakerData ?? [], signature, data.bidMasterData ?? [])
+	return c.hub.connect(c.bidMaster).activateOption(vaultId, bid, data.marketMakerData ?? [], signature, data.bidMasterData ?? [])
 }
 
 /** SlotEchoValidator config: the only market-maker and bid-master slots it accepts. */
@@ -219,7 +219,7 @@ const liveContractBuyer = fixture(contractBuyer, async s => {
 	await submit(s.c, s.v.vaultId, s.bid)
 	return s
 })
-describe("activate", () => {
+describe("activateOption", () => {
 	let c: IvyContext
 	let v: OpenedVault
 
@@ -249,9 +249,9 @@ describe("activate", () => {
 				await fund(c, c.usdc, c.marketMaker, v.vaultAddress, PREMIUM_TOTAL)
 			})
 
-			it("emits Activated with the bid terms, the notional and the premium", async () => {
+			it("emits OptionActivated with the bid terms, the notional and the premium", async () => {
 				await expect(submit(c, v.vaultId, bid))
-					.to.emit(c.hub, "Activated")
+					.to.emit(c.hub, "OptionActivated")
 					.withArgs(
 						v.vaultId,
 						c.marketMaker.address,
@@ -297,7 +297,7 @@ describe("activate", () => {
 
 			it("rejects a caller without the bid master role", async () => {
 				const signature = await signBid(c.marketMaker, c.hubAddress, bid)
-				await expect(c.hub.connect(c.alice).activate(v.vaultId, bid, [], signature, [])).to.be.revertedWithCustomError(
+				await expect(c.hub.connect(c.alice).activateOption(v.vaultId, bid, [], signature, [])).to.be.revertedWithCustomError(
 					c.hub,
 					"AccessControlUnauthorizedAccount",
 				)

@@ -348,7 +348,7 @@ describe("cash settlement opt-in", () => {
 		})
 	})
 
-	describe("activate", () => {
+	describe("activateOption", () => {
 		let c: IvyContext
 		let v: OpenedVault
 		let role: string
@@ -365,7 +365,7 @@ describe("cash settlement opt-in", () => {
 			})
 
 			it("rejects the bid without consuming it", async () => {
-				await expect(c.hub.connect(c.bidMaster).activate(v.vaultId, bid, [], signature, [])).to.be.revertedWithCustomError(
+				await expect(c.hub.connect(c.bidMaster).activateOption(v.vaultId, bid, [], signature, [])).to.be.revertedWithCustomError(
 					c.hub,
 					"CashSettlementDisabled",
 				)
@@ -377,7 +377,7 @@ describe("cash settlement opt-in", () => {
 			it("accepts the same bid once a publisher is granted and cash is re-enabled", async () => {
 				await c.hub.grantRole(role, c.bob.address)
 				await c.hub.setCashSettlementEnabled(true)
-				await c.hub.connect(c.bidMaster).activate(v.vaultId, bid, [], signature, [])
+				await c.hub.connect(c.bidMaster).activateOption(v.vaultId, bid, [], signature, [])
 				expect((await c.hub.stateOf(v.vaultId)).phase).to.equal(Phase.Live)
 			})
 		})

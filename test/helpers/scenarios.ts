@@ -174,7 +174,7 @@ export async function activate(ctx: IvyContext, vaultId: bigint, vaultAddress: s
 		await fund(ctx, premiumToken, ctx.marketMaker, vaultAddress, bankroll)
 	}
 	const signature = await signBid(ctx.marketMaker, ctx.hubAddress, bid)
-	await (await ctx.hub.connect(ctx.bidMaster).activate(vaultId, bid, o.marketMakerData ?? [], signature, o.bidMasterData ?? [])).wait()
+	await (await ctx.hub.connect(ctx.bidMaster).activateOption(vaultId, bid, o.marketMakerData ?? [], signature, o.bidMasterData ?? [])).wait()
 	return { bid, signature }
 }
 

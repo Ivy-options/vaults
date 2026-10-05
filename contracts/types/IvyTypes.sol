@@ -113,7 +113,7 @@ struct Bid {
     uint256 auctionId;
     uint256 collateralAmount;
     bytes32 termsHash; // creator inputs: terms, pairs, rules; excludes auctionStartsAt
-    bytes32 marketMakerDataHash; // keccak256(abi.encode(marketMakerData)) passed to activate
+    bytes32 marketMakerDataHash; // keccak256(abi.encode(marketMakerData)) passed to activateOption
     address executor;
     address recipient;
 }

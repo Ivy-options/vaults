@@ -6,10 +6,16 @@ import { IIvyPriceFeed } from "./interfaces/IIvyPriceFeed.sol";
 import { IvyMath } from "./libraries/IvyMath.sol";
 import "./types/IvyTypes.sol";
 
+/// @dev The Hub's per-vault platform fee. Validators run read-only from the Hub, so msg.sender is the Hub.
+interface IIvyVaultFee {
+	function vaultPlatformFeeBps(uint256 vaultId) external view returns (uint16);
+}
+
 /// @notice Stateless validator for the standard bid rule kinds.
 /// @dev Each kind is named for the bid field it bounds. Strike: StrikeRange, StrikeSpotBand.
-///      Premium: PremiumMin, PremiumSpotFloor, PremiumYieldFloor, PremiumVolFloor. Expiry: ExpiryTenor, ExpiryDates.
-///      PremiumVolFloor trusts the bid master's attestation. No kind reads market-maker data.
+///      Premium: PremiumMin, PremiumSpotFloor, PremiumGrossAprFloor, PremiumNetAprFloor, PremiumVolFloor.
+///      Expiry: ExpiryTenor, ExpiryDates. PremiumVolFloor trusts the bid master's attestation.
+///      PremiumNetAprFloor reads the vault's platform fee from the Hub. No kind reads market-maker data.
 contract IvyStandardBidRules is IIvyBidValidator {
 	address public immutable trustedPriceFeed;
 
@@ -29,6 +35,7 @@ contract IvyStandardBidRules is IIvyBidValidator {
 		uint32 maxPriceAge; // seconds, > 0
 		uint16 maxInTheMoneyBps; // calls: strike >= spot * (1 - bps); puts: strike <= spot * (1 + bps)
 		uint32 maxOutOfTheMoneyBps; // calls: strike <= spot * (1 + bps); puts: strike >= spot * (1 - bps), no floor from 10_000
+		uint32 minOutOfTheMoneyBps; // 0 = none; calls: strike >= spot * (1 + bps); puts: strike <= spot * (1 - bps); <= maxOutOfTheMoneyBps
 	}
 
 	struct PremiumSpotFloorRule {
@@ -37,10 +44,18 @@ contract IvyStandardBidRules is IIvyBidValidator {
 		uint16 minPremiumBps; // premiumPerUnit >= spot * minPremiumBps / 10_000, in (0, 10_000]
 	}
 
-	struct PremiumYieldFloorRule {
+	struct PremiumGrossAprFloorRule {
 		address priceFeed; // may be zero when every pair pays premium in the underlying
 		uint32 maxPriceAge;
 		uint16 minAprBps; // premiumPerUnit >= spot * minAprBps / 10_000 * tenor / 365 days, > 0
+	}
+
+	/// @dev What depositors keep, on what they lock: premium after the vault's platform fee, against the
+	///      collateral per unit of notional (spot for a call, the strike for a put).
+	struct PremiumNetAprFloorRule {
+		address priceFeed; // may be zero when every pair pays premium in the collateral's own unit
+		uint32 maxPriceAge;
+		uint16 minAprBps; // premiumPerUnit * (1 - fee) >= collateral per unit * minAprBps / 10_000 * tenor / 365 days, > 0
 	}
 
 	struct ExpiryTenorRule {
@@ -58,7 +73,8 @@ contract IvyStandardBidRules is IIvyBidValidator {
 	bytes4 public constant PREMIUM_MIN = bytes4(keccak256("PremiumMin"));
 	bytes4 public constant PREMIUM_SPOT_FLOOR = bytes4(keccak256("PremiumSpotFloor"));
 	bytes4 public constant PREMIUM_VOL_FLOOR = bytes4(keccak256("PremiumVolFloor"));
-	bytes4 public constant PREMIUM_YIELD_FLOOR = bytes4(keccak256("PremiumYieldFloor"));
+	bytes4 public constant PREMIUM_GROSS_APR_FLOOR = bytes4(keccak256("PremiumGrossAprFloor"));
+	bytes4 public constant PREMIUM_NET_APR_FLOOR = bytes4(keccak256("PremiumNetAprFloor"));
 	bytes4 public constant STRIKE_RANGE = bytes4(keccak256("StrikeRange"));
 	bytes4 public constant STRIKE_SPOT_BAND = bytes4(keccak256("StrikeSpotBand"));
 	uint256 private constant YEAR = 365 days;
@@ -91,14 +107,21 @@ contract IvyStandardBidRules is IIvyBidValidator {
 			StrikeSpotBandRule memory rule = abi.decode(data, (StrikeSpotBandRule));
 			_checkFeed(rule.priceFeed, rule.maxPriceAge);
 			if (isCall && rule.maxInTheMoneyBps > IvyMath.BPS) revert DeviationTooLarge();
+			if (rule.minOutOfTheMoneyBps > rule.maxOutOfTheMoneyBps || (!isCall && rule.minOutOfTheMoneyBps >= IvyMath.BPS)) {
+				revert DeviationTooLarge();
+			}
 		} else if (kind == PREMIUM_SPOT_FLOOR) {
 			PremiumSpotFloorRule memory rule = abi.decode(data, (PremiumSpotFloorRule));
 			if (rule.minPremiumBps == 0 || rule.minPremiumBps > IvyMath.BPS) revert InvalidPremiumFloor();
 			_checkPremiumFeed(terms, pairs, rule.priceFeed, rule.maxPriceAge);
-		} else if (kind == PREMIUM_YIELD_FLOOR) {
-			PremiumYieldFloorRule memory rule = abi.decode(data, (PremiumYieldFloorRule));
+		} else if (kind == PREMIUM_GROSS_APR_FLOOR) {
+			PremiumGrossAprFloorRule memory rule = abi.decode(data, (PremiumGrossAprFloorRule));
 			if (rule.minAprBps == 0) revert InvalidPremiumFloor();
 			_checkPremiumFeed(terms, pairs, rule.priceFeed, rule.maxPriceAge);
+		} else if (kind == PREMIUM_NET_APR_FLOOR) {
+			PremiumNetAprFloorRule memory rule = abi.decode(data, (PremiumNetAprFloorRule));
+			if (rule.minAprBps == 0) revert InvalidPremiumFloor();
+			_checkCollateralFeed(terms, pairs, isCall, rule.priceFeed, rule.maxPriceAge);
 		} else if (kind == EXPIRY_TENOR) {
 			ExpiryTenorRule memory rule = abi.decode(data, (ExpiryTenorRule));
 			if (rule.maxTenor == 0 || rule.minTenor > rule.maxTenor) revert InvalidExpiryTenor();
@@ -134,12 +157,19 @@ contract IvyStandardBidRules is IIvyBidValidator {
 			PremiumSpotFloorRule memory rule = abi.decode(config, (PremiumSpotFloorRule));
 			uint256 spot = _premiumSpot(context, rule.priceFeed, rule.maxPriceAge);
 			if (bid.premiumPerUnit * IvyMath.BPS < spot * rule.minPremiumBps) revert PremiumTooLow();
-		} else if (kind == PREMIUM_YIELD_FLOOR) {
-			PremiumYieldFloorRule memory rule = abi.decode(config, (PremiumYieldFloorRule));
+		} else if (kind == PREMIUM_GROSS_APR_FLOOR) {
+			PremiumGrossAprFloorRule memory rule = abi.decode(config, (PremiumGrossAprFloorRule));
 			uint256 spot = _premiumSpot(context, rule.priceFeed, rule.maxPriceAge);
 			// The Hub has already required expiry > block.timestamp.
 			uint256 tenor = bid.expiry - block.timestamp;
 			if (bid.premiumPerUnit * IvyMath.BPS * YEAR < spot * rule.minAprBps * tenor) revert PremiumTooLow();
+		} else if (kind == PREMIUM_NET_APR_FLOOR) {
+			PremiumNetAprFloorRule memory rule = abi.decode(config, (PremiumNetAprFloorRule));
+			uint256 collateralPerUnit = _collateralPerUnit(context, bid, rule.priceFeed, rule.maxPriceAge);
+			uint256 keptBps = IvyMath.BPS - IIvyVaultFee(msg.sender).vaultPlatformFeeBps(context.vaultId);
+			// The Hub has already required expiry > block.timestamp.
+			uint256 tenor = bid.expiry - block.timestamp;
+			if (bid.premiumPerUnit * keptBps * YEAR < collateralPerUnit * rule.minAprBps * tenor) revert PremiumTooLow();
 		} else if (kind == EXPIRY_TENOR) {
 			ExpiryTenorRule memory rule = abi.decode(config, (ExpiryTenorRule));
 			if (bid.expiry < block.timestamp + rule.minTenor || bid.expiry > block.timestamp + rule.maxTenor) revert ExpiryOutsideTenor();
@@ -147,8 +177,10 @@ contract IvyStandardBidRules is IIvyBidValidator {
 			ExpiryDatesRule memory rule = abi.decode(config, (ExpiryDatesRule));
 			if (bid.expiry < rule.notBefore || bid.expiry > rule.notAfter) revert ExpiryOutsideDates();
 		} else if (kind == PREMIUM_VOL_FLOOR) {
-			// The bid master attests the bid's annualized implied volatility; this rule trusts it.
-			if (bidMasterData.length != 32) revert MissingAttestation();
+			// The bid master attests the bid's annualized implied volatility; this rule trusts it. The first word is
+			// the vol; anything after it is evidence for LPs to audit (e.g. the spot and time it was computed from),
+			// ignored here and published with the activation in RuleDataProvided.
+			if (bidMasterData.length < 32) revert MissingAttestation();
 			if (abi.decode(bidMasterData, (uint32)) < abi.decode(config, (uint32))) revert VolTooLow();
 		} else {
 			revert UnknownRuleKind(kind);
@@ -171,14 +203,52 @@ contract IvyStandardBidRules is IIvyBidValidator {
 		}
 	}
 
+	/// @dev A feed is needed only when premium is paid in a token other than the collateral's own unit: a call
+	///      paid in something other than the underlying, or a put paid in the underlying. A put paid in a third
+	///      token can't be valued against its strike.
+	function _checkCollateralFeed(
+		VaultTerms calldata terms,
+		PairConfig[] calldata pairs,
+		bool isCall,
+		address priceFeed,
+		uint32 maxPriceAge
+	) private view {
+		bool needsFeed = false;
+		for (uint256 i = 0; i < pairs.length; ++i) {
+			address premiumToken = pairs[i].premiumToken;
+			if (premiumToken == (isCall ? terms.underlying : pairs[i].quoteToken)) continue;
+			if (!isCall && premiumToken != terms.underlying) revert InvalidPremiumFloor();
+			needsFeed = true;
+		}
+		if (needsFeed) _checkFeed(priceFeed, maxPriceAge);
+	}
+
+	/// @dev Collateral locked per whole underlying of notional, in premium-token units: one underlying for a
+	///      call (its spot), the strike for a put (converted at spot when the put pays in the underlying).
+	function _collateralPerUnit(BidContext calldata context, Bid calldata bid, address priceFeed, uint32 maxPriceAge) private view returns (uint256) {
+		if (context.isCall) return _premiumSpot(context, priceFeed, maxPriceAge);
+		if (context.premiumToken == bid.quoteToken) return bid.strike;
+		// validateConfig allows only the underlying here.
+		return (bid.strike * context.underlyingUnit) / _readSpot(priceFeed, maxPriceAge, context.underlying, bid.quoteToken);
+	}
+
 	function _checkStrikeSpotBand(BidContext calldata context, Bid calldata bid, StrikeSpotBandRule memory rule) private view {
 		uint256 spot = _readSpot(rule.priceFeed, rule.maxPriceAge, context.underlying, bid.quoteToken);
 		uint256 inner = IvyMath.spotBound(context.isCall, spot, rule.maxInTheMoneyBps);
 		if (context.isCall ? bid.strike < inner : bid.strike > inner) revert StrikeOutsideSpotBand();
 		if (context.isCall) {
 			if (bid.strike > (spot * (IvyMath.BPS + rule.maxOutOfTheMoneyBps)) / IvyMath.BPS) revert StrikeOutsideSpotBand();
-		} else if (rule.maxOutOfTheMoneyBps < IvyMath.BPS) {
-			if (bid.strike < (spot * (IvyMath.BPS - rule.maxOutOfTheMoneyBps)) / IvyMath.BPS) revert StrikeOutsideSpotBand();
+			if (rule.minOutOfTheMoneyBps != 0 && bid.strike < (spot * (IvyMath.BPS + rule.minOutOfTheMoneyBps)) / IvyMath.BPS) {
+				revert StrikeOutsideSpotBand();
+			}
+		} else {
+			if (rule.maxOutOfTheMoneyBps < IvyMath.BPS && bid.strike < (spot * (IvyMath.BPS - rule.maxOutOfTheMoneyBps)) / IvyMath.BPS) {
+				revert StrikeOutsideSpotBand();
+			}
+			// validateConfig keeps a put's minimum below 10_000, so this cannot underflow.
+			if (rule.minOutOfTheMoneyBps != 0 && bid.strike > (spot * (IvyMath.BPS - rule.minOutOfTheMoneyBps)) / IvyMath.BPS) {
+				revert StrikeOutsideSpotBand();
+			}
 		}
 	}
 

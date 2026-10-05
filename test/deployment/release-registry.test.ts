@@ -486,7 +486,7 @@ describe("release registry", () => {
 				// Premium on 1 WETH of notional.
 				await usdcToken.mint(admin.address, PREMIUM_PER_UNIT)
 				await usdcToken.approve(vault, PREMIUM_PER_UNIT)
-				await hub.activate(vaultId, bid, [], await signBid(admin, resolved.hub, bid), [])
+				await hub.activateOption(vaultId, bid, [], await signBid(admin, resolved.hub, bid), [])
 				expect((await hub.stateOf(vaultId)).phase).to.equal(Phase.Live)
 			})
 		})

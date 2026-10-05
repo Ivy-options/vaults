@@ -61,7 +61,7 @@ const sameTokenReserves = fixture(deployed, async c => {
 type CallbackToken = Awaited<ReturnType<typeof callbackPremium>>["token"]
 
 describe("cross-module callbacks", () => {
-	describe("activate", () => {
+	describe("activateOption", () => {
 		let c: IvyContext
 		let v: OpenedVault
 		let token: CallbackToken

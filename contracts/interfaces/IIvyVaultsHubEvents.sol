@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 import { ExerciseStyle, OptionKind, SettlementType } from "../types/IvyTypes.sol";
 
 interface IIvyVaultsHubEvents {
-	event Activated(
+	event OptionActivated(
 		uint256 indexed vaultId,
 		address indexed marketMaker,
 		address quoteToken,

@@ -194,19 +194,20 @@ The current recommendation may point to a newer Hub. That has no effect on the e
 
 A vault stores a list of bid rules chosen by its creator and frozen at creation. Each rule is a validator address, a `bytes4` kind and opaque data. Read them with `rulesOf(vaultId)`. Since `ivy-vaults-v5`, a Hub accepts a validator only while it has the Hub's `keccak256("BID_VALIDATOR_ROLE")`; the initial deployment grants that role to the shipped `IvyStandardBidRules` contract. Governance must review any additional validator before granting the role.
 
-- Label each rule by `(validator, kind)`. The release manifest's `addresses.IvyStandardBidRules` is the shipped validator; its kinds are `StrikeRange`, `StrikeSpotBand`, `PremiumMin`, `PremiumSpotFloor`, `PremiumYieldFloor`, `PremiumVolFloor`, `ExpiryTenor` and `ExpiryDates`, with ids `bytes4(keccak256(name))`. Each kind is named for the bid field it bounds: strike, premium or expiry. Its StrikeSpotBand and quote-denominated PremiumSpotFloor and PremiumYieldFloor rules accept only the release's `IvyPriceFeed`.
+- Label each rule by `(validator, kind)`. The release manifest's `addresses.IvyStandardBidRules` is the shipped validator; its kinds are `StrikeRange`, `StrikeSpotBand`, `PremiumMin`, `PremiumSpotFloor`, `PremiumGrossAprFloor`, `PremiumNetAprFloor`, `PremiumVolFloor`, `ExpiryTenor` and `ExpiryDates`, with ids `bytes4(keccak256(name))`. Each kind is named for the bid field it bounds: strike, premium or expiry. Its StrikeSpotBand and quote-denominated PremiumSpotFloor and PremiumGrossAprFloor rules, and a PremiumNetAprFloor that needs a price, accept only the release's `IvyPriceFeed`.
 - Decode shipped data with these ABI types:
   - StrikeRange `tuple(address quoteToken,uint256 minStrike,uint256 maxStrike)[]`, one entry per pair, with `0 < minStrike <= maxStrike` for calls and puts.
-  - StrikeSpotBand `tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps,uint32 maxOutOfTheMoneyBps)`. The out-of-the-money bound caps call strikes at `spot × (1 + bps)` and floors put strikes at `spot × (1 − bps)`; a put bound of 10,000 or more sets no floor.
+  - StrikeSpotBand `tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps,uint32 maxOutOfTheMoneyBps,uint32 minOutOfTheMoneyBps)`. The out-of-the-money bound caps call strikes at `spot × (1 + bps)` and floors put strikes at `spot × (1 − bps)`; a put bound of 10,000 or more sets no floor. A non-zero `minOutOfTheMoneyBps` keeps the strike out of the money: calls at or above `spot × (1 + bps)`, puts at or below `spot × (1 − bps)`. It must not exceed the out-of-the-money bound, and a put's must be below 10,000.
   - PremiumMin `tuple(address quoteToken,uint256 minPremiumPerUnit)[]`, one entry per pair, with `minPremiumPerUnit > 0` in premium-token units per whole underlying.
   - PremiumSpotFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)`.
-  - PremiumYieldFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minAprBps)`: `premiumPerUnit >= spot × minAprBps / 10,000 × (expiry − activation) / 365 days`.
+  - PremiumGrossAprFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minAprBps)`: `premiumPerUnit >= spot × minAprBps / 10,000 × (expiry − activation) / 365 days`.
+  - PremiumNetAprFloor `tuple(address priceFeed,uint32 maxPriceAge,uint16 minAprBps)`: `premiumPerUnit × (1 − fee) >= collateral per unit × minAprBps / 10,000 × (expiry − activation) / 365 days`, where fee is the vault's platform fee read from the Hub and the collateral per unit is spot for a call and the strike for a put. It needs the feed only for a call paid in a token other than the underlying or a put paid in the underlying; a put paid in a third token is rejected.
   - ExpiryTenor `tuple(uint64 minTenor,uint64 maxTenor)`: `activation + minTenor <= expiry <= activation + maxTenor`, in seconds.
   - ExpiryDates `tuple(uint64 notBefore,uint64 notAfter)`: absolute Unix timestamps, inclusive.
   - PremiumVolFloor `uint32 minVolBps`, annualized, 10,000 = 100%. Its bid-master slot is `uint32 impliedVolBps`.
 - Any other validator address is governance-allowlisted custom code. Show it as such and do not attempt to decode its data. Revoking its role blocks new vaults from adopting it but does not alter rules already stored by existing vaults.
 - Every vault must include a `StrikeRange` rule and a `PremiumMin` rule, each with an entry for every pair, and at least one `ExpiryTenor` or `ExpiryDates` rule. Creation rejects a missing rule with `MissingStrikeRange`, `MissingPremiumMin` or `MissingExpiryRule`. The Hub matches these requirements by kind and never reads their values. Additional rules are optional. The mandatory activation checks also reject expiries not in the future, zero strikes, zero notionals and premiums whose total rounds to zero. These bounds are creator-chosen, so the bid master must still reject economically unreasonable bids and the UI must display the exact values before deposits.
-- A vault has no expiry until activation. `stateOf(vaultId).expiry` is zero before then, `settlementStatus` returns zero deadlines and `settleAtExpiryTimeOf` returns zero. Show the expiry rules instead, and read the chosen expiry from `Activated` or `stateOf` once Live. An auction never unlocks at an expiry: LPs exit through the auction timeout, an admission pause or a bid master cancellation, even after an `ExpiryDates` rule's last date has passed.
+- A vault has no expiry until activation. `stateOf(vaultId).expiry` is zero before then, `settlementStatus` returns zero deadlines and `settleAtExpiryTimeOf` returns zero. Show the expiry rules instead, and read the chosen expiry from `OptionActivated` or `stateOf` once Live. An auction never unlocks at an expiry: LPs exit through the auction timeout, an admission pause or a bid master cancellation, even after an `ExpiryDates` rule's last date has passed.
 - Flag `PremiumVolFloor`, and any custom rule documented as reading `bidMasterData`, as trusting the bid master: that check is only as good as the bid master's attestation.
 
 The guide's [Bid rules](site/index.html#bid-rules) section explains what each kind checks, its errors, common combinations and what future validators can add.
@@ -215,11 +216,11 @@ Bids commit to `termsHashOf(vaultId)`, the hash of the creator's terms, pairs an
 
 ## Pass rule data at activation
 
-A rule's id is its index in `rulesOf(vaultId)`. The bid master calls `activate(vaultId, bid, marketMakerData, signature, bidMasterData)`. Each `bytes[]` is either empty, meaning no data for any rule, or holds exactly one slot per rule; any other length reverts with `RuleDataLengthMismatch(expected, actual)`. Slot `i` reaches rule `i` only, as the `marketMakerData` or `bidMasterData` argument of `validateBid`, so adding a rule never changes how another rule decodes its input. Use `0x` for rules that take nothing.
+A rule's id is its index in `rulesOf(vaultId)`. The bid master calls `activateOption(vaultId, bid, marketMakerData, signature, bidMasterData)`. Each `bytes[]` is either empty, meaning no data for any rule, or holds exactly one slot per rule; any other length reverts with `RuleDataLengthMismatch(expected, actual)`. Slot `i` reaches rule `i` only, as the `marketMakerData` or `bidMasterData` argument of `validateBid`, so adding a rule never changes how another rule decodes its input. Use `0x` for rules that take nothing.
 
 - `marketMakerData` is the market maker's. The bid signs `marketMakerDataHash = keccak256(abi.encode(marketMakerData))` as an ABI-encoded `bytes[]`; an empty array still has a hash. A bid master that alters, reorders or drops these slots fails with `CommitmentMismatch`. Validators treat these slots as the counterparty's claim, never as a market fact.
 - `bidMasterData` is the bid master's and is not signed. It carries attestations a rule cannot compute on-chain, such as a bid's implied volatility for `PremiumVolFloor`.
-- When either array is non-empty, activation emits `RuleDataProvided(vaultId, marketMakerData, bidMasterData)`. Index it next to `Activated` so LPs can audit what the bid master attested.
+- When either array is non-empty, activation emits `RuleDataProvided(vaultId, marketMakerData, bidMasterData)`. Index it next to `OptionActivated` so LPs can audit what the bid master attested.
 
 ## Discover every historical vault
 
@@ -249,7 +250,7 @@ Every wallet transaction must display and target the concrete contract that will
 
 Typed signatures also bind to the concrete immutable deployment:
 
-- Bid domain: `name = IvyVaultsHub`, `version = 3` for this release (`2` for `ivy-vaults-v3` Hubs), connected `chainId`, `verifyingContract = hubAddress`.
+- Bid domain: `name = IvyVaultsHub`, `version = 4` for this release (`2` for `ivy-vaults-v3` Hubs; read it from the Hub's `eip712Domain()` rather than hard-coding it), connected `chainId`, `verifyingContract = hubAddress`.
 
 A registry release ID is not an EIP-712 version. Never rebuild an existing bid signature against the current recommendation.
 

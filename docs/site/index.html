@@ -148,7 +148,7 @@
       <li><strong class="key-term">Strike:</strong> a range per quote token, from a nonzero minimum to a maximum.</li>
       <li><strong class="key-term">Premium:</strong> a minimum per whole underlying token, paid in the pair’s premium token.</li>
     </ul>
-    <p>These are the StrikeRange and PremiumMin rules. A PremiumYieldFloor rule can also raise the minimum premium with the option’s length.</p>
+    <p>These are the StrikeRange and PremiumMin rules. A PremiumGrossAprFloor rule can also raise the minimum premium with the option’s length.</p>
     </section>
     <section data-kind="tile" id="how-bids-are-judged"><h5>How bids are judged</h5>
     <p>The owner lists <strong class="key-term">bid rules</strong> at creation: each names a governance-allowlisted validator contract and its data. At activation the Hub runs its own checks first, then every rule in order. All must approve.</p>
@@ -157,7 +157,7 @@
       <li><strong class="key-term">StrikeSpotBand</strong>: strike within a band of the feed’s spot.</li>
       <li><strong class="key-term">PremiumMin</strong>: premium at least a fixed amount per quote token.</li>
       <li><strong class="key-term">PremiumSpotFloor</strong>: premium at least a share of spot.</li>
-      <li><strong class="key-term">PremiumYieldFloor</strong>: premium at least an annual rate of spot, for the option’s length.</li>
+      <li><strong class="key-term">PremiumGrossAprFloor</strong>: premium at least an annual rate of spot, for the option’s length.</li>
       <li><strong class="key-term">PremiumVolFloor</strong>: implied volatility the bid master attests at activation.</li>
       <li><strong class="key-term">ExpiryTenor</strong>: expiry between two durations after activation.</li>
       <li><strong class="key-term">ExpiryDates</strong>: expiry between two dates.</li>

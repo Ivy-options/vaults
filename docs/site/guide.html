@@ -305,7 +305,7 @@
                 </ul>
                 <div class="exit">
                   <p><b>Moving to Live.</b> The bid master calls
-                  <code>activate(vaultId, bid, marketMakerData, signature, bidMasterData)</code>.
+                  <code>activateOption(vaultId, bid, marketMakerData, signature, bidMasterData)</code>.
                   The two data arrays carry optional inputs for individual bid
                   rules, one slot per rule. If the checks pass, the buyer pays
                   the premium, the bid's strike and expiry become the
@@ -1866,7 +1866,8 @@
                   <tr><th scope="row"><a href="#bid-rules-strike"><code>StrikeSpotBand</code></a></th><td>Strike within a band around spot</td><td>The release price feed</td></tr>
                   <tr><th scope="row"><a href="#bid-rules-premium"><code>PremiumMin</code></a></th><td>A fixed premium minimum per pair. Required.</td><td>Configured values</td></tr>
                   <tr><th scope="row"><a href="#bid-rules-premium"><code>PremiumSpotFloor</code></a></th><td>Premium at least a percentage of spot</td><td>The release price feed, unless premium is in the underlying</td></tr>
-                  <tr><th scope="row"><a href="#bid-rules-premium"><code>PremiumYieldFloor</code></a></th><td>Premium at least an annual rate of spot, scaled by tenor</td><td>The release price feed, unless premium is in the underlying</td></tr>
+                  <tr><th scope="row"><a href="#bid-rules-premium"><code>PremiumGrossAprFloor</code></a></th><td>Premium at least an annual rate of spot, scaled by tenor</td><td>The release price feed, unless premium is in the underlying</td></tr>
+                  <tr><th scope="row"><a href="#bid-rules-premium"><code>PremiumNetAprFloor</code></a></th><td>Premium after the platform fee at least an annual rate of the collateral locked, scaled by tenor</td><td>The release price feed, unless premium is in the collateral&#39;s own unit</td></tr>
                   <tr><th scope="row"><a href="#bid-rules-premium"><code>PremiumVolFloor</code></a></th><td>Attested volatility at least your minimum</td><td>The bid master's figure; no pricing model is verified</td></tr>
                   <tr><th scope="row"><a href="#bid-rules-expiry"><code>ExpiryTenor</code></a></th><td>Time from activation to expiry. This or ExpiryDates is required.</td><td>Configured durations</td></tr>
                   <tr><th scope="row"><a href="#bid-rules-expiry"><code>ExpiryDates</code></a></th><td>Expiry between two absolute dates. This or ExpiryTenor is required.</td><td>Configured timestamps</td></tr>
@@ -1879,7 +1880,7 @@
             <h3>Make longer options cost more</h3>
             <p>
               A flat 30 USDC minimum accepts the same premium for 10 days as
-              for 30. Add <code>PremiumYieldFloor</code> if you want the minimum
+              for 30. Add <code>PremiumGrossAprFloor</code> if you want the minimum
               to scale with time. With spot at 3,000 USDC and a 10% annual rate,
               a 36.5-day option needs 30 USDC per WETH; a 73-day option needs 60.
               Keep <code>PremiumMin</code> too. The bid must meet the higher of the two floors.
@@ -1949,12 +1950,13 @@
               <details class="bid-rule-detail">
                 <summary><code>StrikeSpotBand</code><span>Keep the strike near spot · optional</span></summary>
                 <div class="bid-rule-body">
-                  <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> in seconds, <code>maxInTheMoneyBps</code> and <code>maxOutOfTheMoneyBps</code>.</p>
+                  <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> in seconds, <code>maxInTheMoneyBps</code>, <code>maxOutOfTheMoneyBps</code> and <code>minOutOfTheMoneyBps</code> (0 for none).</p>
                   <p><strong>Passes when.</strong> For a call, <code>spot × (1 − ITM) ≤ strike ≤ spot × (1 + OTM)</code>. For a put with OTM below 100%, <code>spot × (1 − OTM) ≤ strike ≤ spot × (1 + ITM)</code>. ITM and OTM here are fractions: 1,000 bps is 0.10. Spot-band bounds round down to raw token units. Spot is the underlying's price in the bid's quote token.</p>
                   <p><strong>Example.</strong> With spot at 3,000 USDC and both limits at 1,000 bps, a call may strike from 2,700 to 3,300.</p>
+                  <p><strong>Out of the money only.</strong> A non-zero OTM minimum moves the inner edge past spot: a call must strike at or above <code>spot × (1 + min)</code>, a put at or below <code>spot × (1 − min)</code>. With spot at 3,000 USDC, a minimum of 900 bps and a maximum of 1,100 bps, a call may strike from 3,270 to 3,330. The band then follows spot to the activation block, which a fixed StrikeRange cannot.</p>
                   <p><strong>Only one side.</strong> A call always has a finite upper bound. Even the largest OTM limit, 4,294,967,295 bps, still imposes a ceiling. A put with an OTM limit of 10,000 or more has no floor.</p>
                   <p><strong>Rejects with.</strong> <code>StrikeOutsideSpotBand</code>. A zero or future-dated price gives <code>InvalidPrice</code>, and one older than <code>maxPriceAge</code> gives <code>StalePrice</code>.</p>
-                  <p><strong>At creation.</strong> The feed must be the release's <code>IvyPriceFeed</code>, <code>maxPriceAge</code> must be positive, and a call's ITM limit can be at most 10,000. Otherwise <code>BindingMismatch</code>, <code>FeedNeedsMaxPriceAge</code> or <code>DeviationTooLarge</code>, respectively.</p>
+                  <p><strong>At creation.</strong> The feed must be the release's <code>IvyPriceFeed</code>, <code>maxPriceAge</code> must be positive, a call's ITM limit can be at most 10,000, and the OTM minimum can be at most the OTM limit (below 10,000 for a put). Otherwise <code>BindingMismatch</code>, <code>FeedNeedsMaxPriceAge</code> or <code>DeviationTooLarge</code>, respectively.</p>
                 </div>
               </details>
             </div>
@@ -1965,7 +1967,7 @@
             <p>
               Premium figures are the gross premium per whole underlying token,
               in the pair's premium token, before the platform fee. Flat floors
-              do not grow with the option's length. <code>PremiumYieldFloor</code>
+              do not grow with the option's length. <code>PremiumGrossAprFloor</code>
               scales the required premium with tenor. <code>PremiumVolFloor</code>
               checks an attestation; it does not calculate a premium.
             </p>
@@ -1991,7 +1993,7 @@
                 </div>
               </details>
               <details class="bid-rule-detail">
-                <summary><code>PremiumYieldFloor</code><span>Premium scaled by tenor · optional</span></summary>
+                <summary><code>PremiumGrossAprFloor</code><span>Premium scaled by tenor · optional</span></summary>
                 <div class="bid-rule-body">
                   <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> and <code>minAprBps</code> from 1 to 65,535.</p>
                   <p><strong>Passes when.</strong> <code>premiumPerUnit × 10,000 × 365 days ≥ spot × minAprBps × tenor</code>. Tenor is the time from activation to the bid's expiry. The cross-product check avoids intermediate division; a fractional minimum needs the next whole raw token unit.</p>
@@ -2002,12 +2004,23 @@
                 </div>
               </details>
               <details class="bid-rule-detail">
+                <summary><code>PremiumNetAprFloor</code><span>What depositors keep, on what they lock · optional</span></summary>
+                <div class="bid-rule-body">
+                  <p><strong>You set.</strong> <code>priceFeed</code>, <code>maxPriceAge</code> and <code>minAprBps</code> from 1 to 65,535.</p>
+                  <p><strong>Passes when.</strong> <code>premiumPerUnit × (10,000 − fee) × 365 days ≥ collateral per unit × minAprBps × tenor</code>. The fee is the vault&#39;s platform fee in bps, read from the Hub at activation. The collateral per unit is spot for a call and the strike for a put.</p>
+                  <p><strong>Example.</strong> A put struck at 2,250 USDC, 1,200 bps (12% a year), 30 days, a 10% platform fee: the bid needs at least 24.66 USDC per WETH, so depositors keep 22.19, which is 12% a year on the 2,250 they lock.</p>
+                  <p><strong>No feed needed.</strong> When premium is paid in the collateral&#39;s own unit: a call paid in the underlying, or a put paid in its quote token.</p>
+                  <p><strong>Rejects with.</strong> <code>PremiumTooLow</code>, <code>InvalidPrice</code> or <code>StalePrice</code>.</p>
+                  <p><strong>At creation.</strong> <code>InvalidPremiumFloor</code> for a zero rate or a put paid in a third token. A rule that needs a price takes the release feed and a positive <code>maxPriceAge</code>, as for <code>PremiumSpotFloor</code>.</p>
+                </div>
+              </details>
+              <details class="bid-rule-detail">
                 <summary><code>PremiumVolFloor</code><span>Trust the bid master’s volatility figure · optional</span></summary>
                 <div class="bid-rule-body">
                   <p><strong>You set.</strong> <code>minVolBps</code>, annualized, where 10,000 is 100%.</p>
-                  <p><strong>Passes when.</strong> The bid master puts the bid's implied volatility in this rule's <code>bidMasterData</code> slot, as one ABI-encoded <code>uint32</code> in bps, and it is at least <code>minVolBps</code>.</p>
+                  <p><strong>Passes when.</strong> The bid master puts the bid's implied volatility in this rule's <code>bidMasterData</code> slot, as an ABI-encoded <code>uint32</code> in bps in the first 32 bytes, and it is at least <code>minVolBps</code>. Anything after the first 32 bytes is evidence for LPs, for example the spot and time the volatility was computed from: the rule ignores it, and it is published with the activation in <code>RuleDataProvided</code>.</p>
                   <p><strong>Trust.</strong> The rule ignores the buyer's own slot, so a buyer cannot vouch for its own price. You rely on the bid master's calculation. The contract does not check the figure against the premium, strike or expiry, and does not enforce a pricing model.</p>
-                  <p><strong>Rejects with.</strong> <code>VolTooLow</code>, or <code>MissingAttestation</code> when the slot is not exactly 32 bytes. A 32-byte value that is not a valid ABI-encoded <code>uint32</code> fails decoding.</p>
+                  <p><strong>Rejects with.</strong> <code>VolTooLow</code>, or <code>MissingAttestation</code> when the slot is shorter than 32 bytes. A 32-byte value that is not a valid ABI-encoded <code>uint32</code> fails decoding.</p>
                   <p><strong>At creation.</strong> <code>InvalidVolFloor</code> for a zero minimum.</p>
                 </div>
               </details>

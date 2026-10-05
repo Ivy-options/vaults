@@ -37,7 +37,8 @@ export const RULE_KIND = {
 	StrikeSpotBand: id("StrikeSpotBand").slice(0, 10),
 	PremiumMin: id("PremiumMin").slice(0, 10),
 	PremiumSpotFloor: id("PremiumSpotFloor").slice(0, 10),
-	PremiumYieldFloor: id("PremiumYieldFloor").slice(0, 10),
+	PremiumGrossAprFloor: id("PremiumGrossAprFloor").slice(0, 10),
+	PremiumNetAprFloor: id("PremiumNetAprFloor").slice(0, 10),
 	PremiumVolFloor: id("PremiumVolFloor").slice(0, 10),
 	ExpiryTenor: id("ExpiryTenor").slice(0, 10),
 	ExpiryDates: id("ExpiryDates").slice(0, 10),
@@ -56,14 +57,18 @@ export const encodeStrikeSpotBand = (
 	maxPriceAge: BigNumberish,
 	maxInTheMoneyBps: BigNumberish,
 	maxOutOfTheMoneyBps: BigNumberish,
+	minOutOfTheMoneyBps: BigNumberish = 0,
 ) =>
 	coder.encode(
-		["tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps,uint32 maxOutOfTheMoneyBps)"],
-		[[priceFeed, maxPriceAge, maxInTheMoneyBps, maxOutOfTheMoneyBps]],
+		["tuple(address priceFeed,uint32 maxPriceAge,uint16 maxInTheMoneyBps,uint32 maxOutOfTheMoneyBps,uint32 minOutOfTheMoneyBps)"],
+		[[priceFeed, maxPriceAge, maxInTheMoneyBps, maxOutOfTheMoneyBps, minOutOfTheMoneyBps]],
 	)
 export const encodePremiumSpotFloor = (priceFeed: AddressLike, maxPriceAge: BigNumberish, minPremiumBps: BigNumberish) =>
 	coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 minPremiumBps)"], [[priceFeed, maxPriceAge, minPremiumBps]])
-export const encodePremiumYieldFloor = (priceFeed: AddressLike, maxPriceAge: BigNumberish, minAprBps: BigNumberish) =>
+export const encodePremiumGrossAprFloor = (priceFeed: AddressLike, maxPriceAge: BigNumberish, minAprBps: BigNumberish) =>
+	coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 minAprBps)"], [[priceFeed, maxPriceAge, minAprBps]])
+/** PremiumNetAprFloor config: premium after the vault's platform fee, against the collateral per unit (spot for calls, strike for puts). */
+export const encodePremiumNetAprFloor = (priceFeed: AddressLike, maxPriceAge: BigNumberish, minAprBps: BigNumberish) =>
 	coder.encode(["tuple(address priceFeed,uint32 maxPriceAge,uint16 minAprBps)"], [[priceFeed, maxPriceAge, minAprBps]])
 export const encodeExpiryTenor = (minTenor: BigNumberish, maxTenor: BigNumberish) =>
 	coder.encode(["tuple(uint64 minTenor,uint64 maxTenor)"], [[minTenor, maxTenor]])
